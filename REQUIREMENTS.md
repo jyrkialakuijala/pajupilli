@@ -84,7 +84,10 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
 
 ## 4. Code
 
-- R19. C++17, one small project, `make`. Build with `-O2 -march=native` (AVX-512 here).
+- R19. C++17, one small project, `make`. The Makefile builds for speed: `-O3 -march=native
+  -mprefer-vector-width=512 -ffast-math -fno-finite-math-only` (AVX-512 with full 512-bit vectors;
+  fast-math for vectorised reductions, but NaN/Inf checks still work for the output guard).
+  `make scalar` builds a portable reference without AVX-512 for R22.
 - R20. Bore state and per-point coefficients are `alignas(64) float[128]` arrays; inner loops run
   over the whole 128 with no branches; boundary and special points use zero/identity
   coefficients rather than ifs. Scalar code only for the jet and the boundaries, once per sample.
