@@ -21,15 +21,16 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
 - R2. 128 pressure points, 48 kHz audio rate. Courant number c·dt/dx just below 1 (≈ 0.99):
   stable, nearly dispersion-free. At c ≈ 347 m/s that is dx ≈ 7.3 mm, so 128 points span ≈ 0.93 m.
   If substeps are needed for stability or accuracy, the output rate stays 48 kHz. **(Q)**
-- R3. The flute bore (cork to foot end, ≈ 0.63 m) takes ≈ 87 points. The remaining ≈ 40 points
+- R3. The flute bore (cork to foot end, 618 mm measured on a Pearl PF-661) takes ≈ 85 points. The remaining ≈ 40 points
   model radiation beyond the foot: an expanding (spherical-wave) horn with a non-reflecting end,
   which gives the right radiation impedance and a listening point.
 
 ### 2.2 Geometry (values to be fixed by the research, §6)
-- R4. Cylindrical body bore ≈ 19 mm; head joint tapering (parabolic) toward ≈ 17 mm at the cork.
-- R5. Cork ≈ 17 mm above the embouchure hole centre (the closed end).
-- R6. Embouchure hole ≈ 10 × 12 mm with the lip-plate chimney (≈ 5 mm); partial lip coverage
-  changes its effective area.
+- R4. Cylindrical body bore 19.0 mm; head joint taper from 16.8 mm at the cork to 18.8 mm at 113.5 mm
+  below the embouchure centre (research/keywork.md).
+- R5. Cork 17.5 mm above the embouchure hole centre (the closed end).
+- R6. Embouchure hole 11.6 × 10.3 mm, undercut, chimney 4.3 mm; lip coverage (≈ 40–65 %)
+  changes its effective area and is the per-note tuning knob.
 - R7. Tone holes at real Boehm-flute positions and diameters, with real chimney heights and
   open-key (pad) heights. Holes are lumped side branches (inertance + loss) at their nearest grid
   point. A closed hole still adds its chimney volume.
@@ -43,15 +44,20 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
 - R10. Player controls: blowing pressure, W, lip coverage, jet offset y0, breath noise
   (turbulence). Overblowing to the 2nd and 3rd registers by raising pressure and shortening W, as
   flutists do.
-- R11. How much of the player's airway to model (lungs, trachea, larynx, vocal tract, tongue,
-  lips) is decided by the research (§6). Default: the mouth is a pressure source plus whatever the
-  research shows is audible. puhuja's tract/trachea code can be reused if needed.
+- R11. The player's airway (decided from research/player_and_controller.md): lungs as a slewed
+  pressure set-point with vibrato; the lip slit as nonlinear resistance + inertance whose area is
+  the main dynamics control; the tongue as a fast valve (2–10 ms; flutter at ≈ 25–30 Hz); the mouth
+  as one 50–100 cm³ compliance; Reynolds-number breath noise. Optional later: a glottal valve and a
+  weak bore→mouth feedback. Not modelled: articulated vocal tract, nasal tract, trachea, vocal folds
+  (the folds only for a later sing/growl effect, from puhuja).
 - R12. Articulation: tonguing (fast pressure gate on note start), slurs (fingering change only),
   vibrato (pressure modulation ≈ 5 Hz).
 
 ### 2.4 Output
 - R13. Radiated sound = sum of d(flow)/dt of the open holes, the embouchure and the foot/horn
   outlet; DC-blocked; mono float32 at 48 kHz.
+- R13a. Bore losses frequency dependent (≈ √f) with their dispersion (Bilbao & Harrison 2016), since
+  they shift C4 by ≈ 18 cents.
 - R14. Range: C4–C7 (the flute's written range). First octave by fingering; second by
   overblowing (D5, D♯5 with the C♯ key as vent); third octave by real cross fingerings. The third
   octave may come in a later milestone.
@@ -105,7 +111,7 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
 - R27. Real-time margin: the model must run at well under 10 % of one core.
 - R28. Listening files for each change; Jyrki's ear decides between close variants.
 
-## 6. Research to do before coding
+## 6. Research (done 2026-11-11; reports in research/)
 
 1. Keywork: positions, diameters and chimney heights of every tone hole; pad heights (how far each
    key opens); which keys close which holes; ring keys (French model) vs plateau; the standard
