@@ -197,6 +197,15 @@ A stereo pair (one near the player's head, one in the audience) would be the nex
   opening ±10 % (~3 Hz), attacks vary ±15–20 %. Held G4: 1.7 cents, 0.56 dB drift. Calibration
   and `-slur` run with wander off.
 
+### Fix 2026-11-11 — slow third-octave onsets (reported by ear: "E6 lights up a bit slow")
+E6 at velocity 64 sat at ~35 % for 40 ms before speaking (50 % at 55 ms; F#6 85–145 ms): at
+mezzo-forte it plays just above its softest steady breath (calibrated floor 0.45), where the
+oscillation grows slowly. Attacks on such notes now get the register kick (more air, jet
+closer, 60 ms), scaled by how close the floor is and faded out when the breath is well above
+it (`PJ_ATTACKKICK`). E6: 50 % at 20 ms, 80 % at 25 ms; no wrong registers at any dynamics.
+Also: learned soft/loud coverage limited to ×0.75–1.35 of mezzo-forte (Coltman ~±1.5 mm): the
+loud C4 had been covered down to 2.8 mm and choked; now +18 cents sharp at forte instead.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

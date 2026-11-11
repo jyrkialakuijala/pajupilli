@@ -140,10 +140,13 @@ static void calibrateNote(int m, double a4, Calibration* cal) {
   }
   cal->dynLo[m] = floor > 0 ? std::min(0.5, floor + 0.05) : 0.0;
   const double lo = std::max(cal->dynLo[m], 0.15);
+  // Lips move only so far (Coltman: about +-1.5 mm); the rest of the pitch
+  // change with breath stays, as on a real flute (loud a little sharp).
+  auto limit = [bestCover](double cv) { return std::clamp(cv, 0.75 * bestCover, 1.35 * bestCover); };
   double cv = bestCover;
-  if (!std::isnan(bisectCover(m, bestPress, lo, bestJet, a4, std::log(bestCover), &cv))) cal->coverLo[m] = cv;
+  if (!std::isnan(bisectCover(m, bestPress, lo, bestJet, a4, std::log(bestCover), &cv))) cal->coverLo[m] = limit(cv);
   cv = bestCover;
-  if (!std::isnan(bisectCover(m, bestPress, kCalDynHi, bestJet, a4, std::log(bestCover), &cv))) cal->coverHi[m] = cv;
+  if (!std::isnan(bisectCover(m, bestPress, kCalDynHi, bestJet, a4, std::log(bestCover), &cv))) cal->coverHi[m] = limit(cv);
 }
 
 static Calibration learn(double a4, int lo, int hi) {

@@ -73,7 +73,7 @@ class Player {
   int keyVel_ = 64;
   double regKick_ = 0, kKickP_, kKickW_, kKickT_;
   double kDynH_, kDynP_, kVelDyn_;
-  double air_, wander_;
+  double air_, wander_, kAttackKick_;
   // Slow random wander of breath support, jet aim and lip opening (~0.3-4 Hz).
   uint32_t rng_ = 4242;
   double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0, w3a_ = 0, w3b_ = 0;

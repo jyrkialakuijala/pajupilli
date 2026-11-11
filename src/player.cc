@@ -74,6 +74,7 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
   air_ = knob("PJ_AIR", 0.35);
   wander_ = knob("PJ_WANDER", 1);
+  kAttackKick_ = knob("PJ_ATTACKKICK", 1);
   kKickW_ = knob("PJ_KICKW", 0.2);
   kKickT_ = knob("PJ_KICKT", 0.06);
 }
@@ -158,6 +159,18 @@ void Player::applyNote(Attack a) {
       lungAttack_ = 0.005 * std::exp2((64 - keyVel_) / 40.0);
       break;
     }
+  }
+  // Notes that sound only a little above their softest playable breath (the
+  // third octave) start slowly: the flutist gives them a firmer start, more
+  // air and the lips closer to the edge for a moment (the same kick as an
+  // upward register slur).
+  // Only near that floor: with more air the note speaks anyway, and a kick on
+  // top would overblow it.
+  if (a != kSlur) {
+    const double dynNow = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], 1.0);
+    const double needs = std::clamp((dynLo[note_] - 0.15) / 0.3, 0.0, 1.0) *
+                         std::clamp(1 - (dynNow - dynLo[note_]) / 0.35, 0.0, 1.0);
+    regKick_ = std::max(regKick_, kAttackKick_ * needs);
   }
   // No two attacks alike: the tongue and the push vary by ~+-15 %.
   tongueRelease_ *= 1 + 0.15 * wander_ * urand();
