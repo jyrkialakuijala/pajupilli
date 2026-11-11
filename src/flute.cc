@@ -97,6 +97,7 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kJetModel_ = int(knob("PJ_JETMODEL", 1));
   kRel_ = knob("PJ_REL", 0);
   kXiHp_ = knob("PJ_XIHP", 100);
+  kVortex_ = knob("PJ_VORTEX", 1);
   // Pad pumping, as a share of a rigid pad landing flat: the felt and skin
   // compress and meet the rim unevenly, so most of the last puff leaks; 0.25
   // puts a medium key click ~24 dB under a mezzo-forte note (by ear: 0..1).
@@ -301,7 +302,7 @@ void Flute::embouchureGeometry() {
   ers_ = kEmbR_ * kRho * kC / sw;
   err_ = 1.35 * kRho * kC / sw;            // face and lip flange the window
   ehl_ = sw / (kRho * 0.82 * rw);
-  ecnl_ = kRho / (2 * 0.6 * 0.6 * sw * sw);  // vortex shedding (vena contracta 0.6)
+  ecnl_ = kVortex_ * kRho / (2 * 0.6 * 0.6 * sw * sw);  // vortex shedding (vena contracta 0.6)
 }
 
 void Flute::controlStep() {

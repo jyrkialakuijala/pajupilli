@@ -33,9 +33,16 @@ class Player {
   void setHardness(double h) { hardness_ = h; }  // attack: 0.5 soft .. 2 hard
   void setRelease(double s) { release_ = s; }    // breath release time (s)
   // Per-note corrections from calibration: uncovered width scale, pressure scale.
-  double coverTrim[128], pressTrim[128];
+  double coverTrim[128], coverLoTrim[128], coverHiTrim[128], dynLo[128], pressTrim[128], jetTrim[128];
   void setCalibration(const Calibration& c) {
-    for (int i = 0; i < 128; ++i) { coverTrim[i] = c.cover[i]; pressTrim[i] = c.press[i]; }
+    for (int i = 0; i < 128; ++i) {
+      coverTrim[i] = c.cover[i];
+      coverLoTrim[i] = c.coverLo[i];
+      coverHiTrim[i] = c.coverHi[i];
+      dynLo[i] = c.dynLo[i];
+      pressTrim[i] = c.press[i];
+      jetTrim[i] = c.jet[i];
+    }
   }
   void render(float* out, int n);
   int sounding() const { return note_; }
@@ -61,6 +68,8 @@ class Player {
   double velAccent_ = 0;
   int keyVel_ = 64;
   double regKick_ = 0, kKickP_, kKickW_, kKickT_;
+  double kDynH_, kDynP_, kVelDyn_;
+  double velDyn_ = 0, velDynTarget_ = 0;  // dynamics offset from key velocity
 };
 
 }  // namespace pajupilli

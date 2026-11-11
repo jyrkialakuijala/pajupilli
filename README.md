@@ -35,7 +35,7 @@ for the same quantum).
 
 | Control | Does |
 |---|---|
-| Keys | Notes. Velocity is also finger speed: harder keys land the pads faster (louder key clicks). Overlapping keys **slur**. A new key soon after release is a soft "du"; from silence, velocity chooses a breath attack (soft), "tu", or an accented "t" (hard). |
+| Keys | Notes. Velocity sets the breath (soft: gentler, slower onset; hard: more pressure, a sharper attack) and finger speed (harder keys land the pads faster: louder key clicks). Overlapping keys **slur**. A new key soon after release is a soft "du"; from silence, velocity chooses a breath attack (soft), "tu", or an accented "t" (hard). |
 | Joystick X | Roll the flute in / out: pitch bend through lip coverage |
 | Joystick Y | Breath push |
 | Sustain pedal | Keep blowing between keys (every key slurs unless hit hard) |
@@ -56,7 +56,7 @@ The knobs start from their defaults until you turn them.
 
     ./flute -note 69 -o a4.wav   # one note, prints its pitch
     ./flute -demo -o demo.wav    # a scale and a phrase
-    ./flute -cal                 # the per-note tuning the player learns at startup
+    ./flute -cal                 # what the player learns at startup (cached in ~/.cache/pajupilli)
     ./flute -imp 69              # passive resonances of a fingering
     ./flute -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
     make test                    # ~10 s of checks

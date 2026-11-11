@@ -79,10 +79,11 @@ def slur_stability():
     slur), and upward octave slurs leave the low mode (D5 stayed on A4)."""
     bad, worst = [], (0.0, 0.0)
     for a, b in ((71, 72), (69, 72), (74, 72), (60, 72), (76, 78), (78, 79), (81, 79), (79, 81),
-                 (60, 74), (62, 74), (67, 74), (71, 74)):
+                 (60, 74), (62, 74), (67, 74), (71, 74), (77, 79), (83, 84), (76, 77), (72, 84),
+                 (84, 86), (79, 86), (74, 86)):
         for dyn in (0.2, 0.5, 0.8):
             r = slur_measure(a, b, dyn)
-            if r is None or (dyn == 0.2 and b in (79, 81)):  # soft G5/A5: known, below
+            if r is None or (a, b, dyn) == (79, 81, 0.2):  # known, below
                 if r is None: bad.append(f'{a}->{b} {dyn}: no output')
                 continue
             w, lw, other = r
@@ -93,7 +94,7 @@ def slur_stability():
           f'worst wobble {worst[0]:.1f} cents, level {worst[1]:.0f} %' + (f'; {bad}' if bad else ''))
     # Register selection (PLAN step 3): these become checks when the jet is reworked.
     known = []
-    for a, b, dyn in ((77, 79, 0.2), (79, 81, 0.2), (83, 84, 0.2), (83, 84, 0.5), (76, 77, 0.8), (72, 84, 0.5)):
+    for a, b, dyn in ((79, 81, 0.2),):
         r = slur_measure(a, b, dyn)
         known.append(f'{a}->{b} {dyn}: ' + ('?' if r is None else f'{r[0]:.1f} c {r[1]:.0f} % off {r[2]}'))
     info('slurs awaiting step 3', ', '.join(known))

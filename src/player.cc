@@ -59,7 +59,9 @@ const NoteInfo* noteInfo(int midi) {
 double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69) / 12.0); }
 
 Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
-  for (int i = 0; i < 128; ++i) coverTrim[i] = pressTrim[i] = 1;
+  for (int i = 0; i < 128; ++i) coverTrim[i] = coverLoTrim[i] = coverHiTrim[i] = pressTrim[i] = 1;
+  for (double& d : dynLo) d = 0;
+  for (double& j : jetTrim) j = 1;
   kW_ = knob("PJ_W", 1);
   kY0_ = knob("PJ_Y0", 0.8);
   kY0Exp_ = knob("PJ_Y0EXP", 1);
@@ -67,6 +69,9 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
+  kDynH_ = knob("PJ_DYNH", 0.7);
+  kDynP_ = knob("PJ_DYNP", 0.6);
+  kVelDyn_ = knob("PJ_VELDYN", 0.35);
   kKickW_ = knob("PJ_KICKW", 0.2);
   kKickT_ = knob("PJ_KICKT", 0.06);
 }
@@ -81,7 +86,6 @@ void Player::noteOn(int midi, int velocity) {
   if (legato && noteInfo(note_) && noteInfo(midi)->harmonic > noteInfo(note_)->harmonic) regKick_ = 1;
   note_ = midi;
   keyVel_ = velocity;
-  const double v = velocity / 127.0;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
   // from silence, velocity picks a breath attack, "tu" or an accented "t".
   Attack a;
@@ -90,7 +94,13 @@ void Player::noteOn(int midi, int velocity) {
   else if (velocity < 35 * hardness_) a = kBreath;
   else if (velocity > 90 / std::max(0.3, hardness_)) a = kAccent;
   else a = kTu;
-  velAccent_ = a == kAccent ? v : a == kTu ? 0.3 * v : 0;
+  // Velocity is also how much air: +-0.35 dynamics around the knob (64 = none).
+  // A slurred note moves there over ~60 ms; a new attack starts there.
+  velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
+  if (a != kSlur) velDyn_ = velDynTarget_;
+  // Accent: a pressure overshoot growing with velocity above ~50 (tongued only).
+  const double over = std::max(0.0, (velocity - 50) / 77.0);
+  velAccent_ = a == kAccent ? 1.2 * over : a == kTu ? over : 0;
   applyNote(a);
 }
 
@@ -137,11 +147,15 @@ void Player::applyNote(Attack a) {
       lungAttack_ = 0.005;
       break;
     case kTu:
-    case kAccent:  // the tongue seals, the mouth fills, the tongue lets go
+    case kAccent: {  // the tongue seals, the mouth fills, the tongue lets go
+      // Soft keys: a slow push and a lazy tongue (16 ms); hard keys: a fast
+      // push and a sharp release (2 ms).
+      const double v = keyVel_ / 127.0;
       tongueClosed_ = 0.004;
-      tongueRelease_ = 0.010 - 0.008 * std::min(1.0, velAccent_ * 1.5);
-      lungAttack_ = 0.005;
+      tongueRelease_ = 0.002 + 0.014 * (1 - v);
+      lungAttack_ = 0.005 * std::exp2((64 - keyVel_) / 40.0);
       break;
+    }
   }
   tongueClock_ = 0;
   sinceOn_ = 0;
@@ -156,25 +170,40 @@ void Player::render(float* out, int n) {
     double lungTarget = 0;
     if (note_ >= 0) {
       const double f = noteFrequency(note_);
-      const double dyn = std::clamp(dyn_ + breathCtl_, 0.0, 1.0);
+      // Dynamics: knob + breath controls + key velocity, never below the softest
+      // the note holds its register at (learned by calibration).
+      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], 1.0);
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
-      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * (1 - kKickW_ * regKick_);
+      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[note_] * (1 - kKickW_ * regKick_);
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
       const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
-      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * coverTrim[note_] * std::exp(0.3 * roll_);
+      // The lips follow the dynamics: coverage learned soft, mezzo-forte and loud.
+      double ct;
+      {
+        const double lo = std::max(dynLo[note_], 0.15);
+        const double cl = std::log(coverLoTrim[note_]), cm = std::log(coverTrim[note_]),
+                     ch = std::log(coverHiTrim[note_]);
+        if (dyn < 0.5) ct = cl + (cm - cl) * std::clamp((dyn - lo) / std::max(0.5 - lo, 1e-3), 0.0, 1.0);
+        else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
+        ct = std::exp(ct);
+      }
+      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ct * std::exp(0.3 * roll_);
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
-      e.lipH = (0.5 + 0.5 * dyn) * 1e-3;
+      // Fletcher 1975: louder = a thicker and faster jet; the lip opening
+      // changes most. Both scale around their mezzo-forte values (dyn 0.5).
+      e.lipH = 0.75e-3 * std::exp(kDynH_ * (dyn - 0.5));
       e.lipWidth = (7 + 4 * dyn) * 1e-3;
       // Jet offset at the edge: players aim further off-centre on low notes,
       // where the jet swings further (even harmonics need offset ~ swing).
       e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3;
       e.noise = breath_ * noiseCtl_;
-      if (blowing_) lungTarget = 0.8 * f * (0.7 + 0.6 * dyn) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
+      if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
     }
     regKick_ *= std::exp(-bdt / kKickT_);
+    velDyn_ += (1 - std::exp(-bdt / 0.06)) * (velDynTarget_ - velDyn_);
     // Lungs: fast push (5 ms), slower release (30 ms).
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
     lung_ += (1 - std::exp(-bdt / tc)) * (lungTarget - lung_);

@@ -173,6 +173,20 @@ face (`PJ_LX` 0, `PJ_LY` 1): D5–G5 H3 within +4 dB of H1, level rises smoothly
 C7 −13 dB. This was part of step 3.4. The low register's weak H2 (jet saturation) remains.
 A stereo pair (one near the player's head, one in the audience) would be the next step.
 
+### Added 2026-11-11 — key velocity as dynamics and attack; steady jet length per note (D6)
+- Velocity sets the note's dynamics (knob ± 0.35, 64 = none; slurs glide over 60 ms) and its
+  attack: lung push 15 ms (v 1) … 1.7 ms (v 127), tongue release 16 … 2 ms, pressure overshoot
+  growing above v 50.
+- Calibration (D2, explicit lips): besides mezzo-forte, it learns the coverage at the note's
+  softest steady dynamics and at forte (pitch within ±5 cents across velocities), the softest
+  dynamics that holds the register steadily (soft keys stop there), and a jet length
+  (×0.8–1.1) that gives a steady note. D6 (and B5–C#6) beat at Fletcher's length: the note's
+  H2 and the fingering's 2345 Hz resonance pulsed at 13 Hz, 40–57 % level; at ×0.9 it is steady.
+  Live-like scenarios over 21 notes: register jumps 344 → 62, top octave within 18 cents.
+- Calibration is cached in ~/.cache/pajupilli (keyed on the binary and PJ_* knobs).
+- Velocity changes loudness by under 2 dB: the window's vortex loss (`PJ_VORTEX`) clamps the
+  amplitude (off: C5 spans 7 dB). Next: re-tune with weaker vortex loss, then step 3.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points
