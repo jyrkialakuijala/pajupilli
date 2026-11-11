@@ -64,6 +64,7 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kY0_ = knob("PJ_Y0", 0.8);
   kY0Exp_ = knob("PJ_Y0EXP", 1);
   kP_ = knob("PJ_P", 1);
+  kVibThroat_ = knob("PJ_VIBTHROAT", 0.5);
   breath_ = knob("PJ_BREATH", 0.01);
 }
 
@@ -113,10 +114,11 @@ void Player::applyNote(Attack a) {
   blowing_ = true;
   switch (a) {
     case kSlur: return;
-    case kBreath:  // "h": no tongue, the breath swells in over ~40 ms
+    case kBreath:  // "h": no tongue; the glottis opens from a slit over ~40 ms
       tongueClosed_ = 0;
       tongueRelease_ = 0.001;
-      lungAttack_ = 0.040;
+      lungAttack_ = 0.005;
+      glottisClock_ = 0;
       break;
     case kDu:  // soft tongue: short seal, gentle release
       tongueClosed_ = 0.002;
@@ -136,9 +138,9 @@ void Player::applyNote(Attack a) {
 
 void Player::render(float* out, int n) {
   constexpr int kBlock = 16;
-  const double bdt = kBlock / fs_;
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
+    const double bdt = m / fs_;
     Embouchure e = flute_.embouchure();
     double lungTarget = 0;
     if (note_ >= 0) {
@@ -176,13 +178,26 @@ void Player::render(float* out, int n) {
       if (flutterPhase_ > 2 * M_PI) flutterPhase_ -= 2 * M_PI;
       e.tongue *= 1 - flutter_ * 0.5 * (1 + std::sin(flutterPhase_));
     }
-    // Vibrato: pressure modulation, fading in after 300 ms.
+    // Vibrato: pressure modulation in the mouth, fading in after 300 ms. A
+    // share comes from the lungs (abdomen), the rest from the throat: the
+    // glottis is held a little narrowed and pulses (Hwang & Thorpe 2000).
     vibPhase_ += 2 * M_PI * vibRate_ * bdt;
     if (vibPhase_ > 2 * M_PI) vibPhase_ -= 2 * M_PI;
     const double vib = vibDepth_ * std::min(1.0, std::max(0.0, sinceOn_ - 0.3) / 0.4);
+    const double sv = std::sin(vibPhase_);
     // Accented attack: a short pressure overshoot.
     const double accent = 1 + 0.25 * velAccent_ * std::exp(-sinceOn_ / 0.04);
-    e.lung = lung_ * accent * (1 + vib * std::sin(vibPhase_));
+    const double vt = kVibThroat_ * vib, vl = (1 - kVibThroat_) * vib;
+    // Throat: a glottal drop of a fraction d of the lung pressure needs an
+    // area Ag = Aj sqrt((1 - d) / d) (Bernoulli, same flow as the lip jet).
+    const double d = std::clamp(0.01 + 0.65 * vt * (1 - sv), 0.01, 0.6);
+    e.lung = lung_ * accent * (1 + vl * sv) / (1 - (0.01 + 0.65 * vt));
+    const double aj = 0.8 * e.lipH * e.lipWidth;
+    double ag = std::min(1.5e-4, aj * std::sqrt((1 - d) / d));
+    // "h" attack: the glottis opens from a slit (3 mm^2) over ~40 ms.
+    glottisClock_ += bdt;
+    if (glottisClock_ < 0.040) ag = std::min(ag, 3e-6 * std::pow(ag / 3e-6, glottisClock_ / 0.040));
+    e.glottis = ag;
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
   }

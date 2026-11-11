@@ -80,6 +80,7 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kJetLp_ = knob("PJ_JETLP", 2);
   kEtaMax_ = knob("PJ_ETAMAX", 1.5) * 1e-3;
   kEmbR_ = knob("PJ_EMBR", 0.01);
+  kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
   kRadOnly_ = int(knob("PJ_RADONLY", 0));  // -1 embouchure only, 1 all but the embouchure
   bore_.setBore(boreDiameter, kCork + kFoot);
   const double dx = bore_.dx();
@@ -234,6 +235,7 @@ void Flute::controlStep() {
   glide(cur_.uncovered, target_.uncovered);
   glide(cur_.y0, target_.y0);
   glide(cur_.noise, target_.noise);
+  cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
   const double at = 1 - std::exp(-blockDt / 0.001);
   tongue_ += at * (target_.tongue - tongue_);
   embouchureGeometry();
@@ -258,8 +260,19 @@ float Flute::sample() {
   // Jet inertia: rho l dUj/dt = pf - rho Uj^2 / 2.
   uj_ = (uj_ + dt / (kRho * kChannel) * pf) / (1 + dt / (2 * kChannel) * uj_);
   const double qj = aj * uj_;
+  // Lungs -> trachea (resistance) -> glottis (Bernoulli orifice) -> mouth.
+  // The glottis conductance is linearised at the last pressure drop.
+  const double ag = std::max(cur_.glottis, 1e-7);
+  const double dpg = std::max(std::fabs(cur_.lung - pm_), 1.0);
+  const double gg = ag * std::sqrt(2 / (kRho * dpg));  // Q = gg * dp
+  const double gIn = 1 / (1 / gg + kAirwayR);
   const double cm = kMouthVol / (kRho * kC * kC);
-  pm_ = (cm / dt * pm_ + cur_.lung / kAirwayR - qj) / (cm / dt + 1 / kAirwayR);
+  // Turbulence in a narrow glottis: an "h" hiss as a pressure source in the
+  // mouth, ~ rho v^2 / 2 of the glottal jet, strong only when narrow.
+  const double vg = gIn * (cur_.lung - pm_) / ag;
+  glotLp_ += 0.35 * (whiteNoise() - glotLp_);
+  const double hiss = kGlotNoise_ * 0.5 * kRho * vg * vg * glotLp_;
+  pm_ = (cm / dt * pm_ + gIn * (cur_.lung + hiss) - qj) / (cm / dt + gIn);
   // --- The jet: convected disturbance, deflection at the labium, flow split.
   const double ujc = std::max(uj_, 0.3);
   double tau = W / (kConv_ * ujc) * fs_;
@@ -272,11 +285,13 @@ float Flute::sample() {
   // Bickley half-width at the edge: 0.4 h at the lips, the jet spreads as it goes.
   const double b = 0.4 * h + kSpread_ * W;
   // Turbulence: white noise band-limited to ~0.2 .. 6 kHz, scaled by the jet speed.
-  rng_ = rng_ * 1664525u + 1013904223u;
-  const double white = (int32_t(rng_) * (1.0 / 2147483648.0)) * 1.732;
+  const double white = whiteNoise();
   noiseLp_ += 0.55 * (white - noiseLp_);
   noiseHp_ += 0.026 * (noiseLp_ - noiseHp_);
-  const double turb = (noiseLp_ - noiseHp_) * kNoiseGain_ * cur_.noise * uj_;
+  // A narrow glottis sends turbulent air up to the lips: the lip jet carries
+  // more turbulence (the "h" of a breath attack); ~1 when the glottis is open.
+  const double glotTurb = 1 + kGlotNoise_ * std::min(25.0, (vg / 10) * (vg / 10));
+  const double turb = (noiseLp_ - noiseHp_) * kNoiseGain_ * cur_.noise * uj_ * glotTurb;
   const double gain = std::exp(std::min(kAlpha_ / h * W, 5.0));
   double eta;
   if (kJetModel_ == 1) {

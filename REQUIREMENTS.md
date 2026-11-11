@@ -47,8 +47,8 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
 - R11. The player's airway (decided from research/player_and_controller.md): lungs as a slewed
   pressure set-point with vibrato; the lip slit as nonlinear resistance + inertance whose area is
   the main dynamics control; the tongue as a fast valve (2–10 ms; flutter at ≈ 25–30 Hz); the mouth
-  as one 50–100 cm³ compliance; Reynolds-number breath noise. Optional later: a glottal valve and a
-  weak bore→mouth feedback. Not modelled: articulated vocal tract, nasal tract, trachea, vocal folds
+  as one 50–100 cm³ compliance; Reynolds-number breath noise. A glottal valve (added 2026-11-11):
+  throat vibrato, "h" breath attacks, glottal turbulence. Optional later: a weak bore→mouth feedback. Not modelled: articulated vocal tract, nasal tract, trachea, vocal folds
   (the folds only for a later sing/growl effect, from puhuja).
 - R12. Articulation: tonguing (fast pressure gate on note start), slurs (fingering change only),
   vibrato (pressure modulation ≈ 5 Hz).

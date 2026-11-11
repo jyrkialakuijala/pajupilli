@@ -28,6 +28,7 @@ struct Embouchure {
   double uncovered = 6e-3;  // embouchure hole width left open by the lower lip (m)
   double y0 = 0.1e-3;       // jet offset from the labium edge (m)
   double noise = 0.01;      // turbulence, in units of the jet velocity
+  double glottis = 1.5e-4;  // glottal opening (m^2): 1.5 cm^2 open .. ~3 mm^2 a slit
 };
 
 class Flute {
@@ -96,7 +97,11 @@ class Flute {
   float vHist_[kHist] = {};
   int hPos_ = 0;
   uint32_t rng_ = 22222;
-  double noiseLp_ = 0, noiseHp_ = 0;
+  double noiseLp_ = 0, noiseHp_ = 0, glotLp_ = 0, kGlotNoise_;
+  double whiteNoise() {
+    rng_ = rng_ * 1664525u + 1013904223u;
+    return int32_t(rng_) * (1.0 / 2147483648.0) * 1.732;
+  }
   float dcX_ = 0, dcY_ = 0;
   int ctl_ = 0;
   double testDp_ = 0;
