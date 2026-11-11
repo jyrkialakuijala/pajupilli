@@ -98,6 +98,8 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kRel_ = knob("PJ_REL", 0);
   kXiHp_ = knob("PJ_XIHP", 100);
   kVortex_ = knob("PJ_VORTEX", 1);
+  kTurbIn_ = knob("PJ_TURBIN", 4);  // jet turbulence gain (it now passes the jet's low-pass)
+  kEdge_ = knob("PJ_EDGE", 4);      // direct edge hiss
   // Pad pumping, as a share of a rigid pad landing flat: the felt and skin
   // compress and meet the rim unevenly, so most of the last puff leaks; 0.25
   // puts a medium key click ~24 dB under a mezzo-forte note (by ear: 0..1).
@@ -316,6 +318,7 @@ void Flute::controlStep() {
   glide(cur_.uncovered, target_.uncovered);
   glide(cur_.y0, target_.y0);
   glide(cur_.noise, target_.noise);
+  glide(cur_.air, target_.air);
   cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
   const double at = 1 - std::exp(-blockDt / 0.001);
   tongue_ += at * (target_.tongue - tongue_);
@@ -344,7 +347,7 @@ void Flute::resetAir() {
   eq_ = el_ = ef_ = 0;
   pm_ = uj_ = 0;
   xi_ = jl1_ = jl2_ = xiLow_ = 0;
-  noiseLp_ = noiseHp_ = glotLp_ = 0;
+  noiseLp_ = noiseHp_ = glotLp_ = edgeLow_ = edgeBand_ = 0;
   std::fill(vHist_, vHist_ + kHist, 0.0f);
   std::fill(outRing_, outRing_ + kOutRing, 0.0f);
   std::fill(radPrev_, radPrev_ + kHoles + 2, 0.0f);
@@ -384,8 +387,9 @@ float Flute::sample() {
   const double fr = rp - i0;
   const float v0 = vHist_[(i0 + kHist) & (kHist - 1)], v1 = vHist_[(i0 + 1 + kHist) & (kHist - 1)];
   const double vdel = v0 + fr * (v1 - v0);
-  // Bickley half-width at the edge: 0.4 h at the lips, the jet spreads as it goes.
-  const double b = 0.4 * h + kSpread_ * W;
+  // Bickley half-width at the edge: 0.4 h at the lips, the jet spreads as it
+  // goes; an airy (unfocused) embouchure spreads it more.
+  const double b = 0.4 * h + kSpread_ * W * (1 + 0.8 * (cur_.air - 0.35));
   // Turbulence: white noise band-limited to ~0.2 .. 6 kHz, scaled by the jet speed.
   const double white = whiteNoise();
   noiseLp_ += 0.55 * (white - noiseLp_);
@@ -402,7 +406,9 @@ float Flute::sample() {
     // the edge sees the jet relative to the moving air: eta = cosh(mu W) xi(t - tau) - xi(t).
     // The jet amplifies only disturbances longer than its width (Rayleigh: k b
     // below ~1); shorter ones decay. Two poles at cp / (2 pi b).
-    double xd = vdel;  // the history holds the displacement in this model
+    // The history holds the displacement in this model. The jet's own
+    // turbulence enters here, so the jet's response shapes it (no 8-24 kHz fizz).
+    double xd = vdel + kTurbIn_ * turb / (2 * M_PI * 1000);
     if (kJetLp_ > 0) {
       const double fc = kJetLp_ * kConv_ * ujc / (2 * M_PI * b);
       const double al = 1 - std::exp(-2 * M_PI * std::min(fc, 0.4 * fs_) / fs_);
@@ -410,8 +416,7 @@ float Flute::sample() {
       jl2_ += al * (jl1_ - jl2_);
       xd = jl2_;
     }
-    eta = kEtaSign_ * (std::cosh(std::min(kAlpha_ / h * W, 6.0)) * (xd + turb / (2 * M_PI * 1000)) -
-                       kRel_ * xi_);
+    eta = kEtaSign_ * (std::cosh(std::min(kAlpha_ / h * W, 6.0)) * xd - kRel_ * xi_);
   } else {
     eta = kEtaSign_ * (h / ujc) * gain * (vdel + turb);
   }
@@ -483,6 +488,20 @@ float Flute::sample() {
   }
   float y = outRing_[outPos_];
   outRing_[outPos_] = 0;
+  {  // Edge hiss: the turbulent jet on the labium radiates directly (a dipole,
+     // intensity ~ U^6), centred near St = f h / Uj ~ 0.12, airier = more.
+    const double fe = std::clamp(0.12 * uj_ / std::max(cur_.lipH, 2e-4), 1500.0, 7000.0);
+    // Trapezoidal state-variable band-pass, Q 0.8 (ic1 = edgeBand_, ic2 = edgeLow_).
+    const double g = std::tan(M_PI * fe / fs_), k = 1 / 0.8;
+    const double a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+    const double v3 = whiteNoise() - edgeLow_;
+    const double v1 = a1 * edgeBand_ + a2 * v3, v2 = edgeLow_ + a2 * edgeBand_ + a3 * v3;
+    edgeBand_ = 2 * v1 - edgeBand_;
+    edgeLow_ = 2 * v2 - edgeLow_;
+    const double bp = v1;
+    const double u = uj_ / 25;
+    y += float(kEdge_ * 4e-3 * (0.25 + cur_.air * cur_.air * 2) * u * u * u * bp);
+  }
   for (int m = 0; m < kTickModes; ++m) {  // key impact ticks
     const double re = tickRe_[m], im = tickIm_[m];
     tickRe_[m] = tickDecay_[m] * (re * tickCos_[m] - im * tickSin_[m]);

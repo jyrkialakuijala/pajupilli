@@ -156,6 +156,7 @@ int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep
   Player pl(fl);
   pl.setCalibration(gCal);
   pl.setDynamics(dyn);
+  pl.setWander(0);  // measure the model, not the player's natural drift
   std::vector<float> a(int(0.4 * kFs)), x(int(secs * kFs));
   pl.noteOn(from, 70);
   pl.render(a.data(), int(a.size()));

@@ -43,7 +43,7 @@ for the same quantum).
 | Pad 2 (hold) | Flutter tongue; pressure = depth |
 | Knob 1 (CC70) | Dynamics: breath and lip opening |
 | Knob 2 (CC71) | Brightness: jet offset at the edge |
-| Knob 3 (CC72) | Breath noise |
+| Knob 3 (CC72) | Air: focused → airy (lip opening, breath noise, edge hiss) |
 | Knob 4 (CC73) | Vibrato depth |
 | Knob 5 (CC74) | Vibrato rate 4–7 Hz |
 | Knob 6 (CC75) | Attack hardness |
@@ -64,6 +64,10 @@ The knobs start from their defaults until you turn them.
 The player: lungs → trachea → glottis (throat valve) → mouth → tongue → lips → jet.
 Vibrato comes from the lungs (chosen by ear); `PJ_VIBTHROAT=0..1` moves it to the throat;
 a soft key gives an "h" breath attack, the glottis opening from a slit.
+
+Blowing technique without a knob: `PJ_WANDER` (0 machine-steady, 1 natural, 2 unsteady:
+slow drift of breath support, jet aim and lips, and attacks that vary), `PJ_AIR` (the
+Air knob's start value), `PJ_EDGE` (edge hiss level).
 
 Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 `src/player.cc`), e.g. `PJ_BREATH=0.03 ./flute -live`.

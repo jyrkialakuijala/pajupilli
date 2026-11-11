@@ -72,6 +72,8 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
+  air_ = knob("PJ_AIR", 0.35);
+  wander_ = knob("PJ_WANDER", 1);
   kKickW_ = knob("PJ_KICKW", 0.2);
   kKickT_ = knob("PJ_KICKT", 0.06);
 }
@@ -157,6 +159,10 @@ void Player::applyNote(Attack a) {
       break;
     }
   }
+  // No two attacks alike: the tongue and the push vary by ~+-15 %.
+  tongueRelease_ *= 1 + 0.15 * wander_ * urand();
+  lungAttack_ *= 1 + 0.15 * wander_ * urand();
+  velAccent_ *= 1 + 0.2 * wander_ * urand();
   tongueClock_ = 0;
   sinceOn_ = 0;
 }
@@ -194,15 +200,29 @@ void Player::render(float* out, int n) {
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).
-      e.lipH = 0.75e-3 * std::exp(kDynH_ * (dyn - 0.5));
-      e.lipWidth = (7 + 4 * dyn) * 1e-3;
+      // Airy: a wider, less focused lip opening for the same breath (more
+      // flow, turbulence and edge hiss; the jet spreads before the edge).
+      const double airy = 1 + 0.5 * (air_ - 0.35);
+      e.lipH = 0.75e-3 * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_);
+      e.lipWidth = (7 + 4 * dyn) * 1e-3 * airy;
+      e.air = air_;
       // Jet offset at the edge: players aim further off-centre on low notes,
       // where the jet swings further (even harmonics need offset ~ swing).
-      e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3;
-      e.noise = breath_ * noiseCtl_;
+      e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
+      e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
       if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
     }
     regKick_ *= std::exp(-bdt / kKickT_);
+    {  // wander: two-pole low-passed noise, ~1 Hz (support), ~2 Hz (aim), ~3 Hz (lips)
+      auto lp2 = [&](double& a, double& b, double hz) {
+        const double k = 1 - std::exp(-2 * M_PI * hz * bdt);
+        a += k * (urand() * std::sqrt(1 / k) * 0.7 - a);
+        b += k * (a - b);
+      };
+      lp2(w1a_, w1b_, 1.0);
+      lp2(w2a_, w2b_, 2.0);
+      lp2(w3a_, w3b_, 3.0);
+    }
     velDyn_ += (1 - std::exp(-bdt / 0.06)) * (velDynTarget_ - velDyn_);
     // Lungs: fast push (5 ms), slower release (30 ms).
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
@@ -232,7 +252,7 @@ void Player::render(float* out, int n) {
     // Throat: a glottal drop of a fraction d of the lung pressure needs an
     // area Ag = Aj sqrt((1 - d) / d) (Bernoulli, same flow as the lip jet).
     const double d = std::clamp(0.01 + 0.65 * vt * (1 - sv), 0.01, 0.6);
-    e.lung = lung_ * accent * (1 + vl * sv) / (1 - (0.01 + 0.65 * vt));
+    e.lung = lung_ * accent * (1 + vl * sv) * (1 + 0.06 * wander_ * w1b_) / (1 - (0.01 + 0.65 * vt));
     const double aj = 0.8 * e.lipH * e.lipWidth;
     double ag = std::min(1.5e-4, aj * std::sqrt((1 - d) / d));
     // "h" attack: the glottis opens from a slit (3 mm^2) over ~40 ms.

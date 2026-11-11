@@ -36,6 +36,7 @@ double tryNote(int midi, double cover, double press, double a4, double dyn = 0.5
   pl.pressTrim[midi] = press;
   pl.jetTrim[midi] = jet;
   pl.setDynamics(dyn);
+  pl.setWander(0);  // learn on a steady player
   const int n = int((wobble ? 0.5 : 0.35) * kFs);
   std::vector<float> x(n);
   pl.noteOn(midi, 64);

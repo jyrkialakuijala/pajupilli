@@ -187,6 +187,16 @@ A stereo pair (one near the player's head, one in the audience) would be the nex
 - Velocity changes loudness by under 2 dB: the window's vortex loss (`PJ_VORTEX`) clamps the
   amplitude (off: C5 spans 7 dB). Next: re-tune with weaker vortex loss, then step 3.
 
+### Added 2026-11-11 — breath noise (step 3.1), Air control, natural variation
+- Jet turbulence now enters before the jet low-pass (×4 gain): the 8–24 kHz fizz is down
+  13–17 dB and the noise sits at 1–3 kHz, shaped by the bore.
+- Direct edge hiss: band-passed noise at St ≈ 0.12 (1.5–7 kHz), ~U³, from the embouchure.
+- Air (knob 3, `PJ_AIR`): wider, less focused lip opening, more turbulence and hiss, a jet that
+  spreads more. Noise re tone: C4 −33 (focused) … −30 (default) … −19 dB (airy); C6 −23 … −14.
+- Wander (`PJ_WANDER`, 1 = natural): breath support ±6 % (~1 Hz), jet aim ±30 % (~2 Hz), lip
+  opening ±10 % (~3 Hz), attacks vary ±15–20 %. Held G4: 1.7 cents, 0.56 dB drift. Calibration
+  and `-slur` run with wander off.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

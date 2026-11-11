@@ -199,7 +199,7 @@ class Controls {
       case 64: p_.setHold(v >= 64); break;  // sustain pedal: keep blowing
       case 70: p_.setDynamics(x); break;
       case 71: p_.setBrightness(0.3 + 2.2 * x); break;
-      case 72: p_.setNoise(3 * x); break;
+      case 72: p_.setAir(x); break;
       case 73: p_.setVibrato(0.15 * x); break;
       case 74: p_.setVibratoRate(4 + 3 * x); break;
       case 75: p_.setHardness(0.5 + 1.5 * x); break;

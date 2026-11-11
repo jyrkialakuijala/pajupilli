@@ -5,6 +5,8 @@
 #include "calibrate.h"
 #include "flute.h"
 
+#include <cstdint>
+
 namespace pajupilli {
 
 struct NoteInfo {
@@ -27,6 +29,8 @@ class Player {
   void setVibratoRate(double hz) { vibRate_ = hz; }
   void setLipRoll(double r) { roll_ = r; }       // -1 .. 1: covers more / less (pitch)
   void setNoise(double n) { noiseCtl_ = n; }     // breath noise multiplier
+  void setAir(double a) { air_ = a; }            // 0 focused .. 1 airy (lip opening, turbulence, hiss)
+  void setWander(double w) { wander_ = w; }      // 0 machine-steady .. 1 natural .. 3 unsteady
   void setBrightness(double b) { brightness_ = b; }  // jet offset multiplier
   void setHold(bool h);                          // keep blowing after the keys are up
   void setFlutter(double depth) { flutter_ = depth; }  // 0 .. 1
@@ -69,6 +73,11 @@ class Player {
   int keyVel_ = 64;
   double regKick_ = 0, kKickP_, kKickW_, kKickT_;
   double kDynH_, kDynP_, kVelDyn_;
+  double air_, wander_;
+  // Slow random wander of breath support, jet aim and lip opening (~0.3-4 Hz).
+  uint32_t rng_ = 4242;
+  double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0, w3a_ = 0, w3b_ = 0;
+  double urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; }
   double velDyn_ = 0, velDynTarget_ = 0;  // dynamics offset from key velocity
 };
 
