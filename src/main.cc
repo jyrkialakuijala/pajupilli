@@ -3,6 +3,8 @@
 //   ./flute -note 69 -o a4.wav        play one note (MIDI), print its pitch
 //   ./flute -scale                    play C4..C7, print a tuning table
 //   ./flute -imp 69                   passive resonances of a fingering
+//   ./flute -live                     play it from the MPK mini mk3
+//       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -13,6 +15,7 @@
 #include "analysis.h"
 #include "calibrate.h"
 #include "flute.h"
+#include "live.h"
 #include "player.h"
 
 using namespace pajupilli;
@@ -92,7 +95,8 @@ void impulse(int midi) {
 
 int main(int argc, char** argv) {
   int note = -1, imp = -1;
-  bool scale = false, demo = false;
+  bool scale = false, demo = false, live = false;
+  LiveOptions lo;
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
   const char* dump = nullptr;  // window pressure, raw float32
@@ -106,12 +110,21 @@ int main(int argc, char** argv) {
     else if (a == "-secs") secs = std::atof(next());
     else if (a == "-dyn") dyn = std::atof(next());
     else if (a == "-demo") demo = true;
+    else if (a == "-live") live = true;
+    else if (a == "-selftest") { live = true; lo.selfTest = true; }
+    else if (a == "-dev") lo.device = next();
+    else if (a == "-midi") lo.midiName = next();
+    else if (a == "-period") lo.period = std::atoi(next());
+    else if (a == "-periods") lo.periods = std::atoi(next());
+    else if (a == "-transpose") lo.transpose = std::atoi(next());
+    else if (a == "-v") lo.verbose = true;
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
     else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
   }
   if (imp >= 0) { impulse(imp); return 0; }
   if (!std::getenv("PJ_NOCAL")) gCal = calibrate(440, nullptr);
+  if (live) return runLive(lo, gCal);
   if (std::getenv("PJ_TRACE") && note >= 0) {
     Flute fl(kFs);
     Player pl(fl);
