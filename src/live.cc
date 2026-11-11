@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "player.h"
+#include "voice.h"
 
 namespace pajupilli {
 namespace {
@@ -127,7 +128,20 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Player& p, const LiveOptions& o) : p_(p), o_(o) {}
+  Controls(Player& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o) {
+    // Sounding range; keys outside it fold in by octaves.
+    lo_ = inst.lo + inst.transpose;
+    hi_ = inst.hi + inst.transpose;
+    transpose_ = o.transpose != LiveOptions::kAutoTranspose
+                     ? o.transpose
+                     : 12 + 12 * int(std::lround(inst.transpose / 12.0));
+  }
+  int fold(int n) const {
+    n += transpose_;
+    while (n < lo_) n += 12;
+    while (n > hi_) n -= 12;
+    return n;
+  }
   void handle(const snd_seq_event_t* ev) {
     switch (ev->type) {
       case SND_SEQ_EVENT_NOTEON:
@@ -156,12 +170,6 @@ class Controls {
 
  private:
   bool isPad(int ch) const { return ch == 9; }
-  int fold(int n) const {
-    n += o_.transpose;
-    while (n < 60) n += 12;
-    while (n > 96) n -= 12;
-    return n;
-  }
   void noteOn(int ch, int note, int vel) {
     if (isPad(ch)) {
       const int pad = (note - 36) % 8;  // bank A 36-43, bank B 44-51
@@ -212,6 +220,7 @@ class Controls {
   Player& p_;
   const LiveOptions& o_;
   int sounding_[128] = {};
+  int lo_, hi_, transpose_;
   bool breathPad_ = false;
   double joyBreath_ = 0;
 
@@ -227,7 +236,7 @@ class Controls {
 
 }  // namespace
 
-int runLive(const LiveOptions& o, const Calibration& cal) {
+int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal) {
   std::signal(SIGINT, onSignal);
   std::signal(SIGTERM, onSignal);
   bool isFloat = true;
@@ -248,12 +257,13 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
     std::fprintf(stderr, "note: no real-time priority (run with rtprio to reduce xruns)\n");
   mlockall(MCL_CURRENT | MCL_FUTURE);
 
-  Flute flute(48000);
-  Player player(flute);
+  Voice voice(inst);
+  Player& player = voice.player();
   player.setCalibration(cal);
   player.setVibrato(0.05);
-  Controls ctl(player, o);
+  Controls ctl(player, inst, o);
   ctl.init();
+  std::fprintf(stderr, "instrument: %s, model at %.0f kHz\n", inst.name, inst.fs / 1000);
 
   std::vector<float> mono(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);
@@ -283,13 +293,13 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
       const int notes[] = {60, 64, 67, 72, 76, 79, 84, 79, 76, 72, 67, 64, 60};
       const long step = 48000 / 4;
       if (frames / step != demoStep - 1 && demoStep < 14) {
-        if (demoStep < 13) player.noteOn(notes[demoStep], 80);
-        if (demoStep > 0) player.noteOff(notes[demoStep - 1]);
+        if (demoStep < 13) player.noteOn(ctl.fold(notes[demoStep] - 12), 80);
+        if (demoStep > 0) player.noteOff(ctl.fold(notes[demoStep - 1] - 12));
         ++demoStep;
       }
       if (frames > 48000 * 5) gStop = true;
     }
-    player.render(mono.data(), int(period));
+    voice.render(mono.data(), int(period));
     for (size_t i = 0; i < period; ++i) {
       gain += 0.002f * (float(ctl.gain_) - gain);  // ~10 ms volume glide, no clicks
       float y = mono[i] * gain;
@@ -321,7 +331,7 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
   snd_pcm_close(pcm);
   snd_seq_close(midi.seq);
   std::fprintf(stderr, "stopped after %.1f s, %ld xruns, %d state resets\n", frames / 48000.0,
-               xruns, flute.resets());
+               xruns, voice.flute().resets());
   return 0;
 }
 

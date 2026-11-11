@@ -1,7 +1,7 @@
 # pajupilli
 
 A real-time physical model of a Boehm concert flute (C foot), played from an
-Akai MPK mini mk3.
+Akai MPK mini mk3. Also the piccolo, alto flute and bass flute (`-inst`).
 
 - The bore is a 1-D acoustic waveguide: 128 pressure points at 48 kHz, stored
   as 8 × 16 float32 so the loops compile to AVX-512. Geometry from a measured
@@ -23,9 +23,11 @@ See `REQUIREMENTS.md` and `research/` for the physics and the numbers.
     ./flute -live           # finds the MPK mini, plays through PipeWire/ALSA
     ./flute -live -v        # also prints the MIDI events
     ./flute -selftest       # a short arpeggio without a keyboard
+    ./flute -live -inst piccolo   # or alto, bass (default: flute)
 
 Options: `-dev hw:1` (another ALSA device), `-period 64 -periods 3` (buffer),
-`-transpose 12` (the MPK's keys start at C3; notes fold into C4–C7),
+`-transpose 12` (keys to sounding pitch; default: the MPK's lowest C plays the
+instrument's lowest octave, notes outside its range fold in by octaves),
 `-midi NAME` (another MIDI controller).
 
 Latency, key to first sound: ≈ 10–15 ms (1.3 ms periods; PipeWire is asked
@@ -52,6 +54,21 @@ for the same quantum).
 
 The knobs start from their defaults until you turn them.
 
+### The flute family
+
+| `-inst` | Sounds | Range (sounding) | Model rate |
+|---|---|---|---|
+| `flute` | as written | C4–C7 | 48 kHz |
+| `piccolo` | an octave higher | D5–B7 | 96 kHz |
+| `alto` | a fourth lower (in G) | G3–B5 | 36 kHz |
+| `bass` | an octave lower | C3–D5 | 24 kHz |
+
+Each is the concert flute resized: tube lengths by the pitch ratio, bores to the real
+instruments' (piccolo ~10.5 mm, alto 26 mm, bass 35 mm), embouchure, lips and jet by about
+the square root. Same Boehm fingerings; the piccolo has a D foot. Each runs at its own rate so
+the bore keeps its 128 points, resampled to 48 kHz. Offline commands take `-inst` too, with
+sounding MIDI notes (`./flute -inst bass -note 48`).
+
 ## Offline
 
     ./flute -note 69 -o a4.wav   # one note, prints its pitch
@@ -74,7 +91,8 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
 ## Status
 
-- C4–D#6 in tune within ±2 cents after calibration; E6–C7 up to ~30 cents.
+- C4–D#6 in tune within ±2 cents after calibration; E6–C7 up to ~30 cents. Piccolo, alto
+  and bass within ±3 cents over their ranges (see PLAN.md, 2026-11-12).
 - Known: register selection is still weak at the extremes (soft G5 and loud F5 jump up,
   G6 does not sound); see PLAN.md step 3.
 - Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.

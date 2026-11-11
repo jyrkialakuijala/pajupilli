@@ -56,9 +56,14 @@ const NoteInfo* noteInfo(int midi) {
   return midi >= 60 && midi <= 96 ? &kNotes[midi - 60] : nullptr;
 }
 
+const NoteInfo* noteInfo(const Instrument& inst, int midi) {
+  const int w = midi - inst.transpose;
+  return w >= inst.lo && w <= inst.hi ? noteInfo(w) : nullptr;
+}
+
 double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69) / 12.0); }
 
-Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
+Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   for (int i = 0; i < 128; ++i) coverTrim[i] = coverLoTrim[i] = coverHiTrim[i] = pressTrim[i] = 1;
   for (double& d : dynLo) d = 0;
   for (double& j : jetTrim) j = 1;
@@ -77,16 +82,17 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kAttackKick_ = knob("PJ_ATTACKKICK", 1);
   kKickW_ = knob("PJ_KICKW", 0.2);
   kKickT_ = knob("PJ_KICKT", 0.06);
+  kKickDyn_ = knob("PJ_KICKDYN", 0.9);
 }
 
 void Player::noteOn(int midi, int velocity) {
-  if (!noteInfo(midi)) return;
+  if (!info(midi)) return;
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
   // Slurring up into a higher register: the flutist kicks the jet over
   // (faster air, lips closer to the edge for a moment), or the old mode stays.
-  if (legato && noteInfo(note_) && noteInfo(midi)->harmonic > noteInfo(note_)->harmonic) regKick_ = 1;
+  if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick();
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
@@ -116,7 +122,7 @@ void Player::noteOff(int midi) {
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
-    if (noteInfo(stack_[stackTop_ - 1])->harmonic > noteInfo(note_)->harmonic) regKick_ = 1;
+    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic) regKick_ = slurKick();
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
@@ -124,6 +130,13 @@ void Player::noteOff(int midi) {
     blowing_ = false;  // stop blowing; the fingering stays
     sinceOff_ = 0;
   }
+}
+
+// How hard to kick an upward register slur: with little air the jet needs a
+// firm push, with a lot of air a full kick overblows past the note (piccolo D7).
+double Player::slurKick() const {
+  const double dyn = dyn_ + breathCtl_ + velDyn_;
+  return std::clamp(1 + kKickDyn_ * (0.5 - dyn), 0.5, 1.5);
 }
 
 void Player::setHold(bool h) {
@@ -134,7 +147,7 @@ void Player::setHold(bool h) {
 void Player::applyNote(Attack a) {
   // Key velocity = finger speed: 64 moves a key in 10 ms, 127 in 5 ms, 1 in 20 ms;
   // a faster finger lands the pad harder (a louder key click).
-  flute_.setHoles(noteInfo(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
+  flute_.setHoles(info(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
   switch (a) {
     case kSlur: return;
@@ -188,7 +201,11 @@ void Player::render(float* out, int n) {
     Embouchure e = flute_.embouchure();
     double lungTarget = 0;
     if (note_ >= 0) {
+      // Breath and jet length follow the sounding pitch (Fletcher's rules keep the
+      // jet's travel time a fixed share of the period on any flute); the lips and
+      // the embouchure hole are the instrument's size, set by the written pitch.
       const double f = noteFrequency(note_);
+      const double fw = noteFrequency(note_ - inst_.transpose), ke = inst_.emb;
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
       const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], 1.0);
@@ -198,7 +215,7 @@ void Player::render(float* out, int n) {
       e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[note_] * (1 - kKickW_ * regKick_);
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
-      const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
+      const double t = std::clamp(std::log(fw / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
       // The lips follow the dynamics: coverage learned soft, mezzo-forte and loud.
       double ct;
       {
@@ -209,19 +226,19 @@ void Player::render(float* out, int n) {
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
         ct = std::exp(ct);
       }
-      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ct * std::exp(0.3 * roll_);
+      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * std::exp(0.3 * roll_);
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).
       // Airy: a wider, less focused lip opening for the same breath (more
       // flow, turbulence and edge hiss; the jet spreads before the edge).
       const double airy = 1 + 0.5 * (air_ - 0.35);
-      e.lipH = 0.75e-3 * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_);
-      e.lipWidth = (7 + 4 * dyn) * 1e-3 * airy;
+      e.lipH = 0.75e-3 * ke * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_);
+      e.lipWidth = (7 + 4 * dyn) * 1e-3 * ke * airy;
       e.air = air_;
       // Jet offset at the edge: players aim further off-centre on low notes,
       // where the jet swings further (even harmonics need offset ~ swing).
-      e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
+      e.y0 = kY0_ * ke * std::pow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
       e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
       if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
     }

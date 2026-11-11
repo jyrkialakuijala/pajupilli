@@ -24,6 +24,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace pajupilli {
 
@@ -79,7 +80,7 @@ class Bore {
 
   // Geometry: diameter (m) as a function of distance from the cork face; the
   // foot end at footX (m). Called once.
-  void setBore(double (*diameter)(double x), double footX);
+  void setBore(const std::function<double(double)>& diameter, double footX);
   // A branch at a cell (the coefficients are rebuilt by update()).
   void setBranch(int cell, const Branch& b) { branch_[cell] = b; dirty_ = true; }
   const Branch& branch(int cell) const { return branch_[cell]; }

@@ -12,11 +12,14 @@ struct LiveOptions {
   std::string midiName = "MPK";    // connect to MIDI clients with this in the name
   int period = 64;                 // frames per period (1.3 ms)
   int periods = 3;                 // periods in the buffer
-  int transpose = 12;              // the MPK's 25 keys start at C3 by default
+  // Keys to sounding pitch; default: the MPK's lowest C (C3) plays the
+  // instrument's lowest octave (flute +12, piccolo +24, alto +12, bass 0).
+  int transpose = kAutoTranspose;
+  static constexpr int kAutoTranspose = -1000;
   bool verbose = false;
   bool selfTest = false;           // play an arpeggio without a keyboard
 };
 
-int runLive(const LiveOptions& o, const Calibration& cal);
+int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal);
 
 }  // namespace pajupilli

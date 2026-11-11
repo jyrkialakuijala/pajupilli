@@ -14,8 +14,10 @@ struct NoteInfo {
   int harmonic;       // which resonance of the fingering sounds (1, 2, 3, 4)
 };
 
-// MIDI 60 (C4) .. 96 (C7); nullptr outside.
+// Written MIDI 60 (C4) .. 96 (C7); nullptr outside.
 const NoteInfo* noteInfo(int midi);
+// A sounding note on an instrument: its fingering, or nullptr outside its range.
+const NoteInfo* noteInfo(const Instrument& inst, int midi);
 double noteFrequency(int midi, double a4 = 440.0);
 
 class Player {
@@ -50,11 +52,13 @@ class Player {
   }
   void render(float* out, int n);
   int sounding() const { return note_; }
+  const NoteInfo* info(int midi) const { return noteInfo(inst_, midi); }
 
  private:
   enum Attack { kSlur, kBreath, kDu, kTu, kAccent };
   void applyNote(Attack a);
   Flute& flute_;
+  const Instrument& inst_;
   double fs_;
   int note_ = -1, held_[128] = {};
   int stackTop_ = 0, stack_[16];
@@ -71,7 +75,8 @@ class Player {
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
-  double regKick_ = 0, kKickP_, kKickW_, kKickT_;
+  double regKick_ = 0, kKickP_, kKickW_, kKickT_, kKickDyn_;
+  double slurKick() const;
   double kDynH_, kDynP_, kVelDyn_;
   double air_, wander_, kAttackKick_;
   // Slow random wander of breath support, jet aim and lip opening (~0.3-4 Hz).

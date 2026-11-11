@@ -18,6 +18,31 @@ namespace pajupilli {
 
 constexpr int kHoles = 16;
 
+// A member of the flute family: the concert flute resized. Along the bore
+// everything scales with the pitch (`scale`); bore, holes and pads with the
+// real instrument's bore (`bore`); the embouchure hole, the lips and the jet
+// with about sqrt(scale) (`emb`). The model runs at 48 kHz / scale so the
+// air column keeps its 128 cells; Voice resamples to 48 kHz.
+struct Instrument {
+  const char* name;
+  int transpose;     // sounding minus written pitch (semitones)
+  int lo, hi;        // written range (MIDI); the fingerings are the flute's
+  double scale;      // lengths along the bore, vs the concert flute
+  double bore;       // bore, tone hole and pad diameters
+  double emb;        // embouchure hole, lip opening, jet
+  double fs;         // the model's sample rate (Hz)
+  double foot;       // embouchure centre to the open end, concert-flute mm
+  bool dFoot;        // no C and C# keys (holes 15, 16)
+  double head;       // head shortened by (mm, own size): keeps the scale with
+                     // an embouchure hole relatively smaller (alto, bass) or
+                     // bigger (piccolo) than the flute's
+  double gain;       // output level, as if miked: the bass flute is ~15 dB
+                     // quieter than the flute, the piccolo louder
+};
+// "flute", "piccolo", "alto", "bass"; nullptr if unknown.
+const Instrument* findInstrument(const std::string& name);
+const Instrument& concertFlute();
+
 // What the player does with the lips and breath; set any time, smoothed inside.
 struct Embouchure {
   double lung = 0;          // lung (blowing) pressure set-point (Pa)
@@ -34,7 +59,8 @@ struct Embouchure {
 
 class Flute {
  public:
-  explicit Flute(double fs = 48000);
+  explicit Flute(const Instrument& inst = concertFlute());
+  const Instrument& instrument() const { return inst_; }
 
   // Fingering as 16 chars, hole 1 (D# trill) .. hole 16 (C#4), 'o' open, 'x' closed.
   // Fingering; fingerSpeed scales how fast the fingers move the keys (key velocity:
@@ -74,6 +100,8 @@ class Flute {
     bool closing = false;         // closing stroke: accelerates into the seat
     double stroke = 0.010;        // duration of the current stroke (s)
     double padIn = 0;             // air the pad pushes into the bore (m^3/s)
+    double a = 0;                 // bore radius at the hole (m)
+    bool present = true;          // a piccolo has no C# and D holes (D foot)
   };
   void updateHoles(double dtBlock);
   Branch holeBranch(const Hole& h) const;
@@ -81,8 +109,13 @@ class Flute {
   void controlStep();
   double horn_r() const;
   float sample();
+  double boreDiameter(double x) const;  // at x (m) from the cork face
 
+  const Instrument& inst_;
   double fs_;
+  // The instrument's dimensions (m).
+  double cork_, head_, foot_, embLong_, embRin_, embChimney_, holeT_, embA_;
+  double noiseA_, noiseHpA_, glotA_, noiseNorm_;  // noise filters at this rate
   Bore bore_;
   Hole hole_[kHoles];
   int ec_;  // embouchure cell
@@ -109,9 +142,9 @@ class Flute {
   double noiseLp_ = 0, noiseHp_ = 0, glotLp_ = 0, kGlotNoise_;
   double whiteNoise() {
     rng_ = rng_ * 1664525u + 1013904223u;
-    return int32_t(rng_) * (1.0 / 2147483648.0) * 1.732;
+    return int32_t(rng_) * (1.0 / 2147483648.0) * 1.732 * noiseNorm_;
   }
-  float dcX_ = 0, dcY_ = 0;
+  float dcX_ = 0, dcY_ = 0, dcPole_ = 0.99935f;
   int ctl_ = 0;
   double testDp_ = 0;
   int resets_ = 0;

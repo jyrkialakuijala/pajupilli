@@ -5,6 +5,8 @@
 
 #include <cstdio>
 
+#include "flute.h"
+
 namespace pajupilli {
 
 struct Calibration {
@@ -30,6 +32,7 @@ struct Calibration {
 };
 constexpr double kCalDynHi = 0.85;
 
-Calibration calibrate(double a4, FILE* log, int lo = 60, int hi = 96);
+// Sounding MIDI notes lo..hi (default: the instrument's whole range).
+Calibration calibrate(const Instrument& inst, double a4, FILE* log, int lo = -1, int hi = -1);
 
 }  // namespace pajupilli

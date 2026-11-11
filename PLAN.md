@@ -206,6 +206,33 @@ it (`PJ_ATTACKKICK`). E6: 50 % at 20 ms, 80 % at 25 ms; no wrong registers at an
 Also: learned soft/loud coverage limited to ×0.75–1.35 of mezzo-forte (Coltman ~±1.5 mm): the
 loud C4 had been covered down to 2.8 mm and choked; now +18 cents sharp at forte instead.
 
+### Added 2026-11-12 — piccolo, alto flute, bass flute (`-inst`)
+The concert flute resized, as makers do: lengths along the bore × the pitch ratio (0.5, 1.335,
+2), bore / holes / pads to the real bores (~10.5, 26, 35 mm), embouchure hole, lips and jet ×
+√ratio. The model runs at 48 kHz / ratio (96, 36, 24 kHz) so the bore keeps its 128 cells; a
+polyphase resampler (Kaiser sinc, 32 taps) brings it to 48 kHz. Fletcher's player rules
+(pressure ~ f, jet length ~ 1/√f) already keep the jet's travel time a fixed share of the period,
+so the player needed no new rules: breath and jet follow the sounding pitch, lips and
+embouchure the written one.
+- Relatively smaller embouchure holes (alto, bass) play flat, a bigger one (piccolo) sharp: the
+  head is shortened 15 / 30 mm (lengthened 5 mm), fitted to the flute's mode-1 resonances.
+- Piccolo: D foot (no C, C# keys), ending at 528 concert-flute mm (fitted with `-imp`);
+  cylindrical bore with the flute's head taper.
+- Ranges where calibration tunes within a few cents: piccolo D5–B7, alto G3–B5, bass C3–D5.
+  Above, the alto and bass third octave runs 25–100 cents sharp at the lip-coverage limit (weak
+  on the real instruments too); the piccolo's C8 does not speak.
+- Upward register slur kick now follows the breath, ×(1 + 0.9 (0.5 − dyn)): at forte a full kick
+  overblew the piccolo's D7 for 0.3 s; at piano the alto's D4→D5 stayed low.
+- Jet swing limit (`PJ_ETAMAX`) scales with the embouchure; noise filters and the DC blocker
+  are set per sample rate (identical at 48 kHz).
+- Calibration listens longer to notes below C4 (bass C3 had not settled in 175 ms: −26 cents).
+- `-slur` judges the register by the spectrum: a bright piccolo A6 (third harmonic 12 dB over
+  the fundamental at forte) fooled the pitch tracker.
+- Output level as if miked: piccolo ×0.7, alto ×1.4, bass ×3 (physically the bass flute is ~15
+  dB quieter than the flute).
+- Open: bass C3 speaks in ~240 ms (flute C4 ~90 ms; it scales with the period); the piccolo's
+  third octave is bright; the bass at 24 kHz has nothing above ~11 kHz.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

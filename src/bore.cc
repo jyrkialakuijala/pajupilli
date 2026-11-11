@@ -45,7 +45,7 @@ Bore::Bore(double fs) : fs_(fs) {
   }
 }
 
-void Bore::setBore(double (*diameter)(double x), double footX) {
+void Bore::setBore(const std::function<double(double)>& diameter, double footX) {
   foot_ = int(std::lround(footX / dx_));
   for (int i = 0; i < foot_; ++i) {
     double a = 0;  // mean area over the cell
