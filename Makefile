@@ -5,7 +5,7 @@ CXXFLAGS ?= -O3 -march=native -mprefer-vector-width=512 -ffast-math -fno-finite-
             -std=c++17 -Wall -Wextra
 # Portable reference build (no AVX-512), to check the vector build against.
 SCALARFLAGS = -O2 -std=c++17 -Wall -Wextra
-LDLIBS = -lasound -lm
+LDLIBS = -lm
 
 SRCS = $(wildcard src/*.cc)
 HDRS = $(wildcard src/*.h)

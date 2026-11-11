@@ -1,5 +1,4 @@
-build/
-*.o
-*.wav
 /flute
 /flute-scalar
+*.wav
+__pycache__/
