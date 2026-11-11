@@ -50,7 +50,7 @@ class Player {
   double dyn_ = 0.5, breathCtl_ = 0, vibDepth_ = 0.0, vibRate_ = 5.0, roll_ = 0;
   double noiseCtl_ = 1, brightness_ = 1;
   bool blowing_ = false, hold_ = false;
-  double kW_, kY0_, kP_, breath_;
+  double kW_, kY0_, kY0Exp_, kP_, breath_;
   double vibPhase_ = 0;
   double lung_ = 0;
   double tongueClock_ = 1e9, tongueRelease_ = 0.005, tongueClosed_ = 0.004;

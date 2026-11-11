@@ -50,7 +50,7 @@ double cents(double f, double ref) { return 1200 * std::log2(f / ref); }
 
 const char* noteName(int m) {
   static const char* n[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "Bb", "B"};
-  static char buf[8];
+  static char buf[16];
   std::snprintf(buf, sizeof buf, "%s%d", n[m % 12], m / 12 - 1);
   return buf;
 }
@@ -123,7 +123,11 @@ int main(int argc, char** argv) {
     else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
   }
   if (imp >= 0) { impulse(imp); return 0; }
-  if (!std::getenv("PJ_NOCAL")) gCal = calibrate(440, nullptr);
+  if (!std::getenv("PJ_NOCAL")) {
+    // One note: learn only that one (fast); otherwise the whole range.
+    if (note >= 60 && !scale && !demo && !live) gCal = calibrate(440, nullptr, note, note);
+    else gCal = calibrate(440, nullptr);
+  }
   if (live) return runLive(lo, gCal);
   if (std::getenv("PJ_TRACE") && note >= 0) {
     Flute fl(kFs);

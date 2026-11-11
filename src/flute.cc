@@ -78,6 +78,9 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kRel_ = knob("PJ_REL", 0);
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
+  kEtaMax_ = knob("PJ_ETAMAX", 0) * 1e-3;
+  kEmbR_ = knob("PJ_EMBR", 0);
+  kRadOnly_ = int(knob("PJ_RADONLY", 0));  // -1 embouchure only, 1 all but the embouchure
   bore_.setBore(boreDiameter, kCork + kFoot);
   const double dx = bore_.dx();
   ec_ = int(kCork / dx);
@@ -114,6 +117,10 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   };
   addRad(-1, kCork, 0);  // embouchure
   addRad(-2, kCork + kFoot, horn_r());
+  {  // the foot's gain: R / d (pressure at the horn's last cell, see sample())
+    const double dist = std::hypot(kCork + kFoot - lx, ly);
+    radGain_[nRad_ - 1] = float(horn_r() / dist);
+  }
   for (int i = 0; i < kHoles; ++i) {
     bool dup = false;
     for (int j = 0; j < i; ++j) dup |= hole_[j].cell == hole_[i].cell;
@@ -208,7 +215,9 @@ void Flute::embouchureGeometry() {
                            innerCorrection(kEmbRin, kEmbRin / a) / sbot + kEmbLen_ / sw);
   esw_ = sw;
   eg_ = 1 / m;
-  ers_ = 0;
+  // Loss in the window: the lower lip over the hole leaves a lossy slit
+  // (viscous / turbulent); brings the played resonances' Q to ~25-40.
+  ers_ = kEmbR_ * kRho * kC / sw;
   err_ = 1.35 * kRho * kC / sw;            // face and lip flange the window
   ehl_ = sw / (kRho * 0.82 * rw);
   ecnl_ = kRho / (2 * 0.6 * 0.6 * sw * sw);  // vortex shedding (vena contracta 0.6)
@@ -289,12 +298,15 @@ float Flute::sample() {
   } else {
     eta = kEtaSign_ * (h / ujc) * gain * (vdel + turb);
   }
+  // Large swings: the jet rolls up into vortices instead of growing on; its
+  // swing at the edge saturates at a few millimetres.
+  if (kEtaMax_ > 0) eta = kEtaMax_ * std::tanh(eta / kEtaMax_);
   const double fn = std::tanh((eta - cur_.y0) / b);
   const double dd = 4 / M_PI * std::sqrt(2 * h * W);
   const double kj = kRho * dd * b * uj_ / W;
   // --- The bore, then the window branch at the embouchure cell (implicit).
   float pOld, jIn;
-  const float uOut = bore_.step(ec_, &pOld, &jIn);
+  bore_.step(ec_, &pOld, &jIn);
   {
     const double c = bore_.compliance(ec_), w = 2 / dt;
     const double g = eg_, rs = ers_ + ecnl_ * std::fabs(eq_), rr = err_, hl = ehl_;
@@ -327,9 +339,19 @@ float Flute::sample() {
   // --- Radiation: d(flow)/dt of each opening, delayed to the listener.
   for (int r = 0; r < nRad_; ++r) {
     const int c = radCell_[r];
-    const float q = c == -1 ? float(eq_) : c == -2 ? uOut : bore_.s.q[c];
-    outRing_[(outPos_ + radDelay_[r]) & (kOutRing - 1)] += radGain_[r] * (q - radPrev_[r]);
-    radPrev_[r] = q;
+    if (kRadOnly_ != 0 && (kRadOnly_ == -1) != (c == -1)) continue;
+    float add;
+    if (c == -2) {
+      // The foot: the horn's last cell already holds the spherical wave at
+      // radius R; the listener gets p(R) R / d. (Its volume flow there is not
+      // the source strength: U(R) grows as |1 + jkR|.)
+      add = radGain_[r] * bore_.s.p()[kCells - 1];
+    } else {
+      const float q = c == -1 ? float(eq_) : bore_.s.q[c];
+      add = radGain_[r] * (q - radPrev_[r]);
+      radPrev_[r] = q;
+    }
+    outRing_[(outPos_ + radDelay_[r]) & (kOutRing - 1)] += add;
   }
   float y = outRing_[outPos_];
   outRing_[outPos_] = 0;

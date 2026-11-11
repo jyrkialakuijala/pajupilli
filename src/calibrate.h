@@ -17,6 +17,6 @@ struct Calibration {
   }
 };
 
-Calibration calibrate(double a4, FILE* log);
+Calibration calibrate(double a4, FILE* log, int lo = 60, int hi = 96);
 
 }  // namespace pajupilli

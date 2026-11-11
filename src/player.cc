@@ -62,6 +62,7 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   for (int i = 0; i < 128; ++i) coverTrim[i] = pressTrim[i] = 1;
   kW_ = knob("PJ_W", 1);
   kY0_ = knob("PJ_Y0", 0.3);
+  kY0Exp_ = knob("PJ_Y0EXP", 0);
   kP_ = knob("PJ_P", 1);
   breath_ = knob("PJ_BREATH", 0.01);
 }
@@ -154,7 +155,9 @@ void Player::render(float* out, int n) {
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       e.lipH = (0.5 + 0.5 * dyn) * 1e-3;
       e.lipWidth = (7 + 4 * dyn) * 1e-3;
-      e.y0 = kY0_ * brightness_ * 1e-3;
+      // Jet offset at the edge: players aim further off-centre on low notes,
+      // where the jet swings further (even harmonics need offset ~ swing).
+      e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3;
       e.noise = breath_ * noiseCtl_;
       if (blowing_) lungTarget = 0.8 * f * (0.7 + 0.6 * dyn) * pressTrim[note_] * kP_;
     }
