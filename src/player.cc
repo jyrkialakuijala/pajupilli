@@ -61,8 +61,8 @@ double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69
 Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   for (int i = 0; i < 128; ++i) coverTrim[i] = pressTrim[i] = 1;
   kW_ = knob("PJ_W", 1);
-  kY0_ = knob("PJ_Y0", 0.3);
-  kY0Exp_ = knob("PJ_Y0EXP", 0);
+  kY0_ = knob("PJ_Y0", 0.8);
+  kY0Exp_ = knob("PJ_Y0EXP", 1);
   kP_ = knob("PJ_P", 1);
   breath_ = knob("PJ_BREATH", 0.01);
 }

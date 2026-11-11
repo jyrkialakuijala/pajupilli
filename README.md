@@ -64,7 +64,7 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
 ## Status
 
-- C4–B5 in tune within ±4 cents after calibration; C6–C7 are 10–35 cents sharp.
-- The tone is still brighter (stronger odd harmonics) than a real flute.
+- C4–D6 in tune within ±2 cents after calibration; E6–C7 are up to 45 cents sharp.
+- Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.
 - Not yet: the look-ahead expressive mode, trills, harmonics, multiphonics,
   whistle tones, key clicks.

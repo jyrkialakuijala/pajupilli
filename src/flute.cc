@@ -78,8 +78,8 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kRel_ = knob("PJ_REL", 0);
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
-  kEtaMax_ = knob("PJ_ETAMAX", 0) * 1e-3;
-  kEmbR_ = knob("PJ_EMBR", 0);
+  kEtaMax_ = knob("PJ_ETAMAX", 1.5) * 1e-3;
+  kEmbR_ = knob("PJ_EMBR", 0.01);
   kRadOnly_ = int(knob("PJ_RADONLY", 0));  // -1 embouchure only, 1 all but the embouchure
   bore_.setBore(boreDiameter, kCork + kFoot);
   const double dx = bore_.dx();
