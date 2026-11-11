@@ -66,6 +66,9 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kP_ = knob("PJ_P", 1);
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
+  kKickP_ = knob("PJ_KICKP", 0.3);
+  kKickW_ = knob("PJ_KICKW", 0.2);
+  kKickT_ = knob("PJ_KICKT", 0.06);
 }
 
 void Player::noteOn(int midi, int velocity) {
@@ -73,6 +76,9 @@ void Player::noteOn(int midi, int velocity) {
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
+  // Slurring up into a higher register: the flutist kicks the jet over
+  // (faster air, lips closer to the edge for a moment), or the old mode stays.
+  if (legato && noteInfo(note_) && noteInfo(midi)->harmonic > noteInfo(note_)->harmonic) regKick_ = 1;
   note_ = midi;
   keyVel_ = velocity;
   const double v = velocity / 127.0;
@@ -97,6 +103,7 @@ void Player::noteOff(int midi) {
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
+    if (noteInfo(stack_[stackTop_ - 1])->harmonic > noteInfo(note_)->harmonic) regKick_ = 1;
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
@@ -153,7 +160,7 @@ void Player::render(float* out, int n) {
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
-      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_;
+      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * (1 - kKickW_ * regKick_);
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
       const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
@@ -165,8 +172,9 @@ void Player::render(float* out, int n) {
       // where the jet swings further (even harmonics need offset ~ swing).
       e.y0 = kY0_ * std::pow(261.6 / f, kY0Exp_) * brightness_ * 1e-3;
       e.noise = breath_ * noiseCtl_;
-      if (blowing_) lungTarget = 0.8 * f * (0.7 + 0.6 * dyn) * pressTrim[note_] * kP_;
+      if (blowing_) lungTarget = 0.8 * f * (0.7 + 0.6 * dyn) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
     }
+    regKick_ *= std::exp(-bdt / kKickT_);
     // Lungs: fast push (5 ms), slower release (30 ms).
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
     lung_ += (1 - std::exp(-bdt / tc)) * (lungTarget - lung_);

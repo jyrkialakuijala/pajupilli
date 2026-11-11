@@ -60,6 +60,7 @@ class Player {
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
+  double regKick_ = 0, kKickP_, kKickW_, kKickT_;
 };
 
 }  // namespace pajupilli

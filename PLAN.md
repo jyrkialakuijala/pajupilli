@@ -153,6 +153,16 @@ and rings at the fingering's resonances for ~30 ms. Fingers land ±15 % apart in
 sets finger speed (64 → 10 ms, 127 → 5 ms, 1 → 20 ms); springs keep 16 ms. The pump level
 (`PJ_PADPUMP` 0.25 of a rigid flat landing) is set by ear; a soft-pad contact model could replace it.
 
+### Fix 2026-11-11 — upward register slurs (reported by ear: "D5 unstable")
+A slur up into D5 (from C4, D4, G4; from A4/B4 when soft) kept the old oscillation on the D5
+fingering's first resonance (435 Hz, about A4): the note sounded A4. Direct attacks were fine.
+The player now kicks the jet over on a slur into a higher register, as flutists do: +30 % breath
+and a 20 % shorter jet, decaying over 60 ms (`PJ_KICKP`, `PJ_KICKW`, `PJ_KICKT`; 0 = off).
+Upward register slurs (21 pairs × 3 dynamics): frames in the wrong register 990 → 264; all D5
+slurs land. Stronger kicks overshoot into the register above (E6, A6). Left for step 3: F5,
+soft E5 and G5, the C6 wobble, and a D5 crescendo from silence, which starts on 435 Hz and stays
+there (too much hysteresis).
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points
