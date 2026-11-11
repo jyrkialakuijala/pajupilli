@@ -3,6 +3,7 @@
 //   ./flute -note 69 -o a4.wav        play one note (MIDI), print its pitch
 //   ./flute -scale                    play C4..C7, print a tuning table
 //   ./flute -imp 69                   passive resonances of a fingering
+//   ./flute -slur 71 72 -dyn 0.2      slur into a note; print its pitch and level wobble
 //   ./flute -live                     play it from the MPK mini mk3
 //       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
@@ -147,13 +148,53 @@ int nanTest() {
   return fl.resets() == 1 && finite && r > 1e-3 ? 0 : 1;
 }
 
+// Slur from `from` into `to` (as on the keyboard: overlap, then release) and
+// measure the settled note in 20 ms frames: mean pitch, pitch wobble (std of
+// cents), level wobble (peak-to-peak / mean) and frames in another register.
+int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep) {
+  Flute fl(kFs);
+  Player pl(fl);
+  pl.setCalibration(gCal);
+  pl.setDynamics(dyn);
+  std::vector<float> a(int(0.4 * kFs)), x(int(secs * kFs));
+  pl.noteOn(from, 70);
+  pl.render(a.data(), int(a.size()));
+  pl.noteOn(to, 70);
+  pl.noteOff(from);
+  pl.render(x.data(), int(x.size()));
+  if (keep) { keep->insert(keep->end(), a.begin(), a.end()); keep->insert(keep->end(), x.begin(), x.end()); }
+  const double f0 = noteFrequency(to);
+  const int n = 960;  // 20 ms
+  std::vector<double> cs, ls;
+  int other = 0;
+  for (int i = int(0.15 * kFs); i + n <= int(x.size()); i += n) {
+    const double f = estimatePitch(x.data() + i, n, kFs, 150, 3000);
+    const double c = f > 0 ? cents(f, f0) : 1e4;
+    if (std::fabs(c) > 300) { ++other; continue; }
+    cs.push_back(c);
+    ls.push_back(rms(x.data() + i, n));
+  }
+  double m = 0, v = 0, lm = 0, lmin = 1e9, lmax = 0;
+  for (double c : cs) m += c;
+  m /= std::max<size_t>(1, cs.size());
+  for (double c : cs) v += (c - m) * (c - m);
+  v = std::sqrt(v / std::max<size_t>(1, cs.size()));
+  for (double l : ls) { lm += l; lmin = std::min(lmin, l); lmax = std::max(lmax, l); }
+  lm /= std::max<size_t>(1, ls.size());
+  const std::string fromName = noteName(from), toName = noteName(to);
+  std::printf("slur %s -> %s dyn %.2f: mean %+.0f cents, wobble %.1f cents, level %.4f wobble %.0f %%, "
+              "other register %d/%d frames\n", fromName.c_str(), toName.c_str(), dyn, m, v, lm,
+              ls.empty() ? 0.0 : 100 * (lmax - lmin) / lm, other, other + int(cs.size()));
+  return 0;
+}
+
 int main(int argc, char** argv) {
 #if defined(__SSE__)
   // Flush denormals to zero: decaying states must not slow the real-time path
   // (fast-math links this in too, the portable build does not).
   _mm_setcsr(_mm_getcsr() | 0x8040);
 #endif
-  int note = -1, imp = -1;
+  int note = -1, imp = -1, slurFrom = -1, slurTo = -1;
   bool scale = false, demo = false, live = false;
   LiveOptions lo;
   double secs = 1.0, dyn = 0.5;
@@ -166,6 +207,7 @@ int main(int argc, char** argv) {
     else if (a == "-scale") scale = true;
     else if (a == "-cal") { calibrate(440, stdout); return 0; }
     else if (a == "-imp") imp = std::atoi(next());
+    else if (a == "-slur") { slurFrom = std::atoi(next()); slurTo = std::atoi(next()); }
     else if (a == "-secs") secs = std::atof(next());
     else if (a == "-dyn") dyn = std::atof(next());
     else if (a == "-demo") demo = true;
@@ -189,12 +231,22 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (note >= 0 && !noteInfo(note)) { std::fprintf(stderr, "-note: MIDI note must be 60..96\n"); return 1; }
+  if (slurFrom >= 0 && (!noteInfo(slurFrom) || !noteInfo(slurTo))) {
+    std::fprintf(stderr, "-slur: MIDI notes must be 60..96\n");
+    return 1;
+  }
   if (!std::getenv("PJ_NOCAL")) {
     // One note: learn only that one (fast); otherwise the whole range.
     if (note >= 60 && !scale && !demo && !live) gCal = calibrate(440, nullptr, note, note);
     else gCal = calibrate(440, nullptr);
   }
   if (live) return runLive(lo, gCal);
+  std::vector<float> slurOut;
+  if (slurFrom >= 0) {
+    slurTest(slurFrom, slurTo, dyn, secs, out ? &slurOut : nullptr);
+    if (out && !writeWav(out, slurOut, kFs)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
+    return 0;
+  }
   if (std::getenv("PJ_TRACE") && note >= 0) {
     Flute fl(kFs);
     Player pl(fl);

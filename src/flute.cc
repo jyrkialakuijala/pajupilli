@@ -76,6 +76,7 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kOut_ = knob("PJ_OUT", 0.3);
   kJetModel_ = int(knob("PJ_JETMODEL", 1));
   kRel_ = knob("PJ_REL", 0);
+  kXiHp_ = knob("PJ_XIHP", 100);
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
   kEtaMax_ = knob("PJ_ETAMAX", 1.5) * 1e-3;
@@ -262,7 +263,7 @@ void Flute::resetAir() {
   bore_.resetTermination();
   eq_ = el_ = ef_ = 0;
   pm_ = uj_ = 0;
-  xi_ = jl1_ = jl2_ = 0;
+  xi_ = jl1_ = jl2_ = xiLow_ = 0;
   noiseLp_ = noiseHp_ = glotLp_ = 0;
   std::fill(vHist_, vHist_ + kHist, 0.0f);
   std::fill(outRing_, outRing_ + kOutRing, 0.0f);
@@ -368,9 +369,14 @@ float Flute::sample() {
     el_ = 2 * x2 - el_;
     ef_ = fn;
   }
-  // Acoustic displacement in the window (leaky integral of the velocity, 15 Hz).
+  // Acoustic displacement in the window (leaky integral of the velocity, 15 Hz),
+  // high-passed at 100 Hz: a slowly drifting flow deflects a real jet only in
+  // proportion to its speed (~ v W / Uj), not by a growing displacement. Without
+  // this, the jet's mean aim and the window flow formed a slow loop that pumped
+  // the tone at ~7 Hz on soft slurs (C5, F#5, G5 ...).
   xi_ = xi_ * (1 - 2 * M_PI * 15 * dt) + dt * eq_ / esw_;
-  vHist_[hPos_] = float(kJetModel_ == 1 ? xi_ : eq_ / esw_);
+  xiLow_ += 2 * M_PI * kXiHp_ * dt * (xi_ - xiLow_);
+  vHist_[hPos_] = float(kJetModel_ == 1 ? xi_ - xiLow_ : eq_ / esw_);
   hPos_ = (hPos_ + 1) & (kHist - 1);
   // --- Radiation: d(flow)/dt of each opening, delayed to the listener.
   for (int r = 0; r < nRad_; ++r) {

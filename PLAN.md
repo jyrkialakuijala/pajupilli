@@ -126,6 +126,24 @@ change; step 3.5 tightens it to 3). The waveguide-vs-tmm.py comparison is report
 step 2 lands (now: C4 −13.5, G4 −6.7, A4 +5.9, C5 +13.0 cents). Not yet automated: the
 no-allocation check and the sanitizer run.
 
+### Fix 2026-11-11 (evening) — the 7 Hz pumping (reported by ear: "C5 not very stable")
+After a soft slur into C5 the tone warbled: ±7 cents and ±60 % level at 7.3 Hz, for as long as
+the note was held. Mouth pressure and jet speed were steady (0.2 %); the loop was inside the jet:
+the window flow's slow part went through the 15 Hz leaky integral into the jet displacement, moved
+the jet's mean aim, which changed the mean flow split and the window flow again. A real jet is
+deflected by a slow cross-flow only in proportion to its speed (~ v W / Uj), so the displacement
+drive is now high-passed at 100 Hz (`PJ_XIHP`, 0 = old behaviour).
+- Soft slur B4→C5: wobble 6.8 → 0.1 cents, level 123 → 3 %.
+- Across 59 live-like scenarios × 21 notes: unstable 296 → 92.
+- Default dynamics: F#5…D6 had been stuck in the pumping state at 1/10 of the level; all sound now.
+- F#5 now uses the middle-finger fingering (a standard alternate): the ring-finger F# holds its
+  second register only in a sliver of breath × coverage in this model.
+- New: `./flute -slur A B -dyn d` and a `slur stability` check in `make test`.
+- Still failing (step 3, register selection): soft G5 (dyn ≤ 0.3) and loud F5 (dyn 0.8) jump to
+  the 3rd/6th resonance; B5→C6 keeps a 4–5 cent, 35–50 % wobble. The soft G5 and F5 cases were
+  quiet pumping notes before; they are now wrong-register notes, which is more audible.
+  Lowering the jet low-pass (`PJ_JETLP` 1.5, 1.2) makes registers worse.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

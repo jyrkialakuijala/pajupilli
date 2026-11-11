@@ -112,6 +112,7 @@ class Flute {
   // Knobs.
   int kJetModel_, kRadOnly_;
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;
+  double kXiHp_, xiLow_ = 0;
   double kJetSign_, kEtaSign_, kEmbLen_, kAlpha_, kConv_, kNoiseGain_, kOut_;
 };
 

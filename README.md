@@ -58,6 +58,8 @@ The knobs start from their defaults until you turn them.
     ./flute -demo -o demo.wav    # a scale and a phrase
     ./flute -cal                 # the per-note tuning the player learns at startup
     ./flute -imp 69              # passive resonances of a fingering
+    ./flute -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
+    make test                    # ~10 s of checks
 
 The player: lungs → trachea → glottis (throat valve) → mouth → tongue → lips → jet.
 Vibrato comes from the lungs (chosen by ear); `PJ_VIBTHROAT=0..1` moves it to the throat;
@@ -68,7 +70,9 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
 ## Status
 
-- C4–D6 in tune within ±2 cents after calibration; E6–C7 are up to 45 cents sharp.
+- C4–D#6 in tune within ±2 cents after calibration; E6–C7 up to ~30 cents.
+- Known: register selection is still weak at the extremes (soft G5 and loud F5 jump up,
+  G6 does not sound); see PLAN.md step 3.
 - Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.
 - Not yet: the look-ahead expressive mode, trills, harmonics, multiphonics,
   whistle tones, key clicks.

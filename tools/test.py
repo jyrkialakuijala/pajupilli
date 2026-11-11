@@ -68,6 +68,34 @@ def tuning():
     check('tuning and registers', not bad,
           f'worst {worst_lo:.0f} c (C4-D#6), {worst_hi:.0f} c (E6-C7)' + (f'; {bad}' if bad else ''))
 
+def slur_measure(a, b, dyn):
+    line = run(['-slur', str(a), str(b), '-dyn', str(dyn)]).stdout
+    m = re.search(r'wobble ([\d.]+) cents, level [\d.]+ wobble (\d+) %, other register (\d+)/', line)
+    return (float(m.group(1)), float(m.group(2)), int(m.group(3))) if m else None
+
+def slur_stability():
+    """Slurs settle on a steady note: no pumping (a ~7 Hz loop between the jet's
+    aim and the window flow made C5 warble after a soft slur)."""
+    bad, worst = [], (0.0, 0.0)
+    for a, b in ((71, 72), (69, 72), (74, 72), (60, 72), (76, 78), (78, 79), (81, 79), (79, 81)):
+        for dyn in (0.2, 0.5, 0.8):
+            r = slur_measure(a, b, dyn)
+            if r is None or (dyn == 0.2 and b in (79, 81)):  # soft G5/A5: known, below
+                if r is None: bad.append(f'{a}->{b} {dyn}: no output')
+                continue
+            w, lw, other = r
+            worst = (max(worst[0], w), max(worst[1], lw))
+            if w > 3 or lw > 25 or other:
+                bad.append(f'{a}->{b} dyn {dyn}: {w:.1f} c, {lw:.0f} %, {other} frames off')
+    check('slur stability', not bad,
+          f'worst wobble {worst[0]:.1f} cents, level {worst[1]:.0f} %' + (f'; {bad}' if bad else ''))
+    # Register selection (PLAN step 3): these become checks when the jet is reworked.
+    known = []
+    for a, b, dyn in ((77, 79, 0.2), (79, 81, 0.2), (83, 84, 0.2), (83, 84, 0.5), (76, 77, 0.8)):
+        r = slur_measure(a, b, dyn)
+        known.append(f'{a}->{b} {dyn}: ' + ('?' if r is None else f'{r[0]:.1f} c {r[1]:.0f} % off {r[2]}'))
+    info('slurs awaiting step 3', ', '.join(known))
+
 def parity():
     """The portable build plays the same notes (pitch and level), R22."""
     if not os.path.exists(SCALAR):
@@ -109,7 +137,7 @@ def passive_vs_tmm():
 
 if __name__ == '__main__':
     t0 = time.time()
-    for f in (vectorised, nan_recovery, fuzz, tuning, parity, realtime, passive_vs_tmm):
+    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, parity, realtime, passive_vs_tmm):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

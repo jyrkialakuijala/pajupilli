@@ -29,7 +29,7 @@ constexpr NoteInfo kNotes[37] = {
     {"xxoxxxxxxxxxxooo", 2},  // 75 D#5
     {"xxxxxxxxxxxxoooo", 2},  // 76 E5
     {"xxxxxxxxxxxooooo", 2},  // 77 F5
-    {"xxxxxxxxxxooxooo", 2},  // 78 F#5
+    {"xxxxxxxxxxoxoooo", 2},  // 78 F#5 (middle finger: the ring-finger F# barely holds its register)
     {"xxxxxxxxxooooooo", 2},  // 79 G5
     {"xxxxxxxoxooooooo", 2},  // 80 G#5
     {"xxxxxxoxoooooooo", 2},  // 81 A5
