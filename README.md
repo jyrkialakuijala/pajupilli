@@ -60,7 +60,7 @@ The knobs start from their defaults until you turn them.
     ./flute -imp 69              # passive resonances of a fingering
 
 The player: lungs → trachea → glottis (throat valve) → mouth → tongue → lips → jet.
-Vibrato comes half from the lungs, half from the throat (`PJ_VIBTHROAT=0..1`);
+Vibrato comes from the lungs (chosen by ear); `PJ_VIBTHROAT=0..1` moves it to the throat;
 a soft key gives an "h" breath attack, the glottis opening from a slit.
 
 Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and

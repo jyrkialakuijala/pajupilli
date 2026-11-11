@@ -64,7 +64,7 @@ Player::Player(Flute& f) : flute_(f), fs_(f.fs()) {
   kY0_ = knob("PJ_Y0", 0.8);
   kY0Exp_ = knob("PJ_Y0EXP", 1);
   kP_ = knob("PJ_P", 1);
-  kVibThroat_ = knob("PJ_VIBTHROAT", 0.5);
+  kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
 }
 
