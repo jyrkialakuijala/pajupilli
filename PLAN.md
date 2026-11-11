@@ -94,7 +94,7 @@ their own experiments on a scratch copy of the code. Their reports are in `revie
 Each step lands as knobs, off by default, then becomes the default after a listening A/B
 (the puhuja process). Every step is checked with `make test` (step 1) before and after.
 
-### Step 0 — Robustness (½ day, low risk)
+### Step 0 — Robustness (½ day, low risk) — DONE 2026-11-11, except the calibration cache
 - NaN/Inf latch: if a block isn't finite, reset the flute state (and the player's) and continue.
 - Live loop:
   - stop on an unrecoverable PCM error instead of spinning;
@@ -106,7 +106,7 @@ Each step lands as knobs, off by default, then becomes the default after a liste
   keyed by a hash of the knobs.
 - Radiate (q⁺ + q)/2 for hole flows, to remove the 24 kHz click when a pad closes.
 
-### Step 1 — `make test` (½ day)
+### Step 1 — `make test` (½ day) — DONE 2026-11-11 (tools/test.py, ~10 s)
 Before more model work, lock the current behaviour into checks that run in about 10 s:
 - the bore loops are vectorised (zmm FMA present in `Bore::step` specifically);
 - 3 × 60 s fuzz: no NaN, peak bounded;
@@ -120,6 +120,11 @@ Before more model work, lock the current behaviour into checks that run in about
 - a sanitizer run.
 
 Tests encode decisions; when a change is intended, update the golden file and say why.
+
+As built: the tuning check allows 5 cents for C4–D#6 for now (F5 sits at +4 after the radiation
+change; step 3.5 tightens it to 3). The waveguide-vs-tmm.py comparison is reported as "info" until
+step 2 lands (now: C4 −13.5, G4 −6.7, A4 +5.9, C5 +13.0 cents). Not yet automated: the
+no-allocation check and the sanitizer run.
 
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).

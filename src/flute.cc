@@ -243,11 +243,32 @@ void Flute::controlStep() {
 }
 
 void Flute::process(float* out, int n) {
+  bool finite = true;
   for (int i = 0; i < n; ++i) {
     if (ctl_ == 0) controlStep();
     ctl_ = (ctl_ + 1) & 15;
     out[i] = sample();
+    finite &= std::isfinite(out[i]);
   }
+  if (!finite) {  // a NaN / Inf would stay in the state forever: start the air afresh
+    resetAir();
+    std::fill(out, out + n, 0.0f);
+    ++resets_;
+  }
+}
+
+void Flute::resetAir() {
+  std::memset(&bore_.s, 0, sizeof(bore_.s));
+  bore_.resetTermination();
+  eq_ = el_ = ef_ = 0;
+  pm_ = uj_ = 0;
+  xi_ = jl1_ = jl2_ = 0;
+  noiseLp_ = noiseHp_ = glotLp_ = 0;
+  std::fill(vHist_, vHist_ + kHist, 0.0f);
+  std::fill(outRing_, outRing_ + kOutRing, 0.0f);
+  std::fill(radPrev_, radPrev_ + kHoles + 2, 0.0f);
+  std::fill(radPrev2_, radPrev2_ + kHoles + 2, 0.0f);
+  dcX_ = dcY_ = 0;
 }
 
 float Flute::sample() {
@@ -362,8 +383,11 @@ float Flute::sample() {
       // the source strength: U(R) grows as |1 + jkR|.)
       add = radGain_[r] * bore_.s.p()[kCells - 1];
     } else {
+      // d/dt of the mean of the last two flows: a zero at Nyquist, so a pad
+      // closing (stiff, trapezoidal) does not click at 24 kHz.
       const float q = c == -1 ? float(eq_) : bore_.s.q[c];
-      add = radGain_[r] * (q - radPrev_[r]);
+      add = radGain_[r] * 0.5f * (q - radPrev2_[r]);
+      radPrev2_[r] = radPrev_[r];
       radPrev_[r] = q;
     }
     outRing_[(outPos_ + radDelay_[r]) & (kOutRing - 1)] += add;

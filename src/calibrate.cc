@@ -1,6 +1,8 @@
 #include "calibrate.h"
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <cmath>
 #include <vector>
 
@@ -35,49 +37,63 @@ double tryNote(int midi, double cover, double press, double a4) {
 
 }  // namespace
 
+// One note: for each breath pressure that sounds the right register, bisect
+// the coverage (more coverage = flatter); keep the best. Gentler breath also
+// flattens, so pressure is the second tuning control.
+static void calibrateNote(int m, double a4, Calibration* cal) {
+  const double f = noteFrequency(m);
+  const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
+  const double base = 6.0 - 2.5 * t;  // Coltman's uncovered width (mm)
+  const double cmin = 2.0 / base, cmax = 10.0 / base;
+  double bestAbs = 1e9, bestCover = 1, bestPress = 1, bestC = NAN;
+  for (double p : {1.0, 1.2, 0.85, 1.45, 0.7, 1.7, 0.6, 2.0}) {
+    double xg = 0, c = tryNote(m, 1, p, a4);
+    if (std::isnan(c)) continue;
+    double a = std::log(cmin), b = std::log(cmax), x = 0, bx = 0, bc = c;
+    for (int it = 0; it < 10 && std::fabs(bc) > 2; ++it) {
+      if (c > 0) b = xg; else a = xg;
+      x = 0.5 * (a + b);
+      const double cx = tryNote(m, std::exp(x), p, a4);
+      if (std::isnan(cx)) {  // lost the register: x is a limit
+        if (x < xg) a = x; else b = x;
+        continue;
+      }
+      xg = x;
+      c = cx;
+      if (std::fabs(c) < std::fabs(bc)) { bx = x; bc = c; }
+    }
+    if (std::fabs(bc) < bestAbs) { bestAbs = std::fabs(bc); bestCover = std::exp(bx); bestPress = p; bestC = bc; }
+    if (bestAbs < 3) break;
+  }
+  if (std::isnan(bestC)) return;
+  cal->cover[m] = bestCover;
+  cal->press[m] = bestPress;
+  cal->cents[m] = float(bestC);
+  cal->ok[m] = true;
+}
+
 Calibration calibrate(double a4, FILE* log, int lo, int hi) {
   Calibration cal;
-  for (int m = lo; m <= hi; ++m) {
-    // Uncovered width stays within 2.5 .. 10 mm of the 10.3 mm hole.
-    const double f = noteFrequency(m);
-    const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
-    const double base = 6.0 - 2.5 * t;
-    const double cmin = 2.0 / base, cmax = 10.0 / base;
-    // For each breath pressure that sounds the right register, bisect the
-    // coverage (more coverage = flatter); keep the best. Gentler breath also
-    // flattens, so pressure is the second tuning control.
-    double bestAbs = 1e9, bestCover = 1, bestPress = 1, bestC = NAN;
-    for (double p : {1.0, 1.2, 0.85, 1.45, 0.7, 1.7, 0.6, 2.0}) {
-      double xg = 0, c = tryNote(m, 1, p, a4);
-      if (std::isnan(c)) continue;
-      double a = std::log(cmin), b = std::log(cmax), x = 0, bx = 0, bc = c;
-      for (int it = 0; it < 10 && std::fabs(bc) > 2; ++it) {
-        if (c > 0) b = xg; else a = xg;
-        x = 0.5 * (a + b);
-        const double cx = tryNote(m, std::exp(x), p, a4);
-        if (std::isnan(cx)) {  // lost the register: x is a limit
-          if (x < xg) a = x; else b = x;
-          continue;
-        }
-        xg = x;
-        c = cx;
-        if (std::fabs(c) < std::fabs(bc)) { bx = x; bc = c; }
+  // Notes are independent: learn them in parallel (1.7 s -> ~0.3 s at startup).
+  std::atomic<int> next{lo};
+  const int nThreads = std::max(1, std::min(int(std::thread::hardware_concurrency()), hi - lo + 1));
+  std::vector<std::thread> pool;
+  for (int t = 0; t < nThreads; ++t)
+    pool.emplace_back([&] {
+      for (int m; (m = next.fetch_add(1)) <= hi;) calibrateNote(m, a4, &cal);
+    });
+  for (std::thread& th : pool) th.join();
+  if (log) {
+    for (int m = lo; m <= hi; ++m) {
+      if (!cal.ok[m]) {
+        std::fprintf(log, "calibrate: MIDI %d does not sound in its register\n", m);
+        continue;
       }
-      if (std::fabs(bc) < bestAbs) { bestAbs = std::fabs(bc); bestCover = std::exp(bx); bestPress = p; bestC = bc; }
-      if (bestAbs < 3) break;
-    }
-    if (std::isnan(bestC)) {
-      if (log) std::fprintf(log, "calibrate: MIDI %d does not sound in its register\n", m);
-      continue;
-    }
-    const double best = std::log(bestCover), press = bestPress, bestCents = bestC;
-    cal.cover[m] = std::exp(best);
-    cal.press[m] = press;
-    cal.cents[m] = float(bestCents);
-    cal.ok[m] = true;
-    if (log)
+      const double f = noteFrequency(m);
+      const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
       std::fprintf(log, "calibrate: MIDI %d uncovered %.1f mm, pressure x%.2f, %+.0f cents\n", m,
-                   base * cal.cover[m], press, bestCents);
+                   (6.0 - 2.5 * t) * cal.cover[m], cal.press[m], cal.cents[m]);
+    }
   }
   return cal;
 }

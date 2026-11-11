@@ -86,6 +86,7 @@ class Bore {
   double area(int cell) const { return area_[cell]; }
   double compliance(int cell) const;  // C of the cell incl. a closed chimney (m^3/Pa)
   void update();  // rebuild coefficients if something changed
+  void resetTermination() { termL_ = 0; }
 
   // One time step. The embouchure cell `ec` is excluded from the vector node
   // update (its branch is solved by the caller): pOld is p[ec] before the step,

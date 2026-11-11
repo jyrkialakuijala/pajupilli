@@ -5,7 +5,7 @@ CXXFLAGS ?= -O3 -march=native -mprefer-vector-width=512 -ffast-math -fno-finite-
             -std=c++17 -Wall -Wextra
 # Portable reference build (no AVX-512), to check the vector build against.
 SCALARFLAGS = -O2 -std=c++17 -Wall -Wextra
-LDLIBS = -lasound -lm
+LDLIBS = -lasound -lm -pthread
 
 SRCS = $(wildcard src/*.cc)
 HDRS = $(wildcard src/*.h)
@@ -23,4 +23,9 @@ asm: $(SRCS) $(HDRS)
 clean:
 	rm -f flute flute-scalar
 
-.PHONY: scalar asm clean
+# Fast checks (PLAN.md step 1): vectorisation, stability, NaN recovery,
+# tuning and registers, scalar parity, real-time margin.
+test: flute scalar
+	python3 -I tools/test.py
+
+.PHONY: scalar asm clean test

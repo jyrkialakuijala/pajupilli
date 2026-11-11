@@ -45,6 +45,9 @@ class Flute {
 
   // Tests: a pressure impulse (Pa) in the window branch on the next sample.
   void testDrive(double dp) { testDp_ = dp; }
+  // Clear all air motion (keys and settings stay); done automatically on NaN.
+  void resetAir();
+  int resets() const { return resets_; }
   // Introspection for tests.
   double fs() const { return fs_; }
   const Bore& bore() const { return bore_; }
@@ -82,7 +85,7 @@ class Flute {
   int radCell_[kHoles + 2];
   int radDelay_[kHoles + 2];
   float radGain_[kHoles + 2];
-  float radPrev_[kHoles + 2] = {};
+  float radPrev_[kHoles + 2] = {}, radPrev2_[kHoles + 2] = {};
   static constexpr int kOutRing = 1024;
   float outRing_[kOutRing] = {};
   int outPos_ = 0;
@@ -105,6 +108,7 @@ class Flute {
   float dcX_ = 0, dcY_ = 0;
   int ctl_ = 0;
   double testDp_ = 0;
+  int resets_ = 0;
   // Knobs.
   int kJetModel_, kRadOnly_;
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;

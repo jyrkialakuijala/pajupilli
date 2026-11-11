@@ -6,6 +6,10 @@
 //   ./flute -live                     play it from the MPK mini mk3
 //       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
+#include <random>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -93,7 +97,62 @@ void impulse(int midi) {
 
 }  // namespace
 
+// Fuzz: random notes, velocities and controls for `secs`; reports NaN resets
+// and the peak. Exit 1 on any non-finite sample or reset.
+int fuzz(double secs, unsigned seed) {
+  Flute fl(kFs);
+  Player pl(fl);
+  std::mt19937 rng(seed);
+  std::uniform_real_distribution<double> u(0, 1);
+  std::vector<float> x(64);
+  double peak = 0;
+  bool bad = false;
+  int held = -1;
+  for (long n = 0; n < long(secs * kFs); n += 64) {
+    if (u(rng) < 0.02) {
+      const int m = 60 + int(u(rng) * 37);
+      pl.noteOn(m, 1 + int(u(rng) * 126));
+      if (held >= 0 && u(rng) < 0.7) pl.noteOff(held);
+      held = m;
+    }
+    if (u(rng) < 0.005 && held >= 0) { pl.noteOff(held); held = -1; }
+    if (u(rng) < 0.01) pl.setDynamics(u(rng));
+    if (u(rng) < 0.01) pl.setLipRoll(2 * u(rng) - 1);
+    if (u(rng) < 0.01) pl.setBreath(u(rng) - 0.5);
+    if (u(rng) < 0.005) pl.setFlutter(u(rng) < 0.5 ? 0 : u(rng));
+    if (u(rng) < 0.005) pl.setVibrato(0.15 * u(rng));
+    if (u(rng) < 0.003) pl.setHold(u(rng) < 0.5);
+    pl.render(x.data(), 64);
+    for (float v : x) { bad |= !std::isfinite(v); peak = std::max(peak, double(std::fabs(v))); }
+  }
+  std::printf("fuzz %.0f s seed %u: peak %.3f, resets %d, %s\n", secs, seed, peak, fl.resets(),
+              bad || fl.resets() ? "FAIL" : "ok");
+  return bad || fl.resets() ? 1 : 0;
+}
+
+// A NaN injected into the window must not silence the flute for good.
+int nanTest() {
+  Flute fl(kFs);
+  Player pl(fl);
+  pl.noteOn(69, 80);
+  std::vector<float> x(kFs / 2);
+  pl.render(x.data(), int(x.size()));
+  fl.testDrive(NAN);
+  pl.render(x.data(), int(x.size()));
+  const double r = rms(x.data() + x.size() / 2, int(x.size() / 2));
+  bool finite = true;
+  for (float v : x) finite &= std::isfinite(v);
+  std::printf("nan recovery: resets %d, finite %d, rms after %.4f: %s\n", fl.resets(), finite, r,
+              fl.resets() == 1 && finite && r > 1e-3 ? "ok" : "FAIL");
+  return fl.resets() == 1 && finite && r > 1e-3 ? 0 : 1;
+}
+
 int main(int argc, char** argv) {
+#if defined(__SSE__)
+  // Flush denormals to zero: decaying states must not slow the real-time path
+  // (fast-math links this in too, the portable build does not).
+  _mm_setcsr(_mm_getcsr() | 0x8040);
+#endif
   int note = -1, imp = -1;
   bool scale = false, demo = false, live = false;
   LiveOptions lo;
@@ -118,11 +177,18 @@ int main(int argc, char** argv) {
     else if (a == "-periods") lo.periods = std::atoi(next());
     else if (a == "-transpose") lo.transpose = std::atoi(next());
     else if (a == "-v") lo.verbose = true;
+    else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
+    else if (a == "-nantest") return nanTest();
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
     else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
   }
-  if (imp >= 0) { impulse(imp); return 0; }
+  if (imp >= 0) {
+    if (!noteInfo(imp)) { std::fprintf(stderr, "-imp: MIDI note must be 60..96\n"); return 1; }
+    impulse(imp);
+    return 0;
+  }
+  if (note >= 0 && !noteInfo(note)) { std::fprintf(stderr, "-note: MIDI note must be 60..96\n"); return 1; }
   if (!std::getenv("PJ_NOCAL")) {
     // One note: learn only that one (fast); otherwise the whole range.
     if (note >= 60 && !scale && !demo && !live) gCal = calibrate(440, nullptr, note, note);
@@ -150,6 +216,7 @@ int main(int argc, char** argv) {
     std::vector<float> pw(int(secs * kFs));
     for (float& v : pw) { float y; pl.render(&y, 1); v = float(fl.windowPressure()); }
     FILE* f = std::fopen(dump, "wb");
+    if (!f) { std::fprintf(stderr, "cannot write %s\n", dump); return 1; }
     std::fwrite(pw.data(), 4, pw.size(), f);
     std::fclose(f);
     return 0;
@@ -184,6 +251,9 @@ int main(int argc, char** argv) {
     for (auto& t : tune) { pl.noteOn(t[0], 90); play(t[1] * 0.16); pl.noteOff(t[0]); play(0.03); }
     play(0.8);
   }
-  if (out && !all.empty()) writeWav(out, all, kFs);
+  if (out && !all.empty() && !writeWav(out, all, kFs)) {
+    std::fprintf(stderr, "cannot write %s\n", out);
+    return 1;
+  }
   return 0;
 }

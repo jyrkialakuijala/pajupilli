@@ -218,6 +218,11 @@ class Controls {
  public:
   double gain_ = 1;
   Controls* init() { std::fill(sounding_, sounding_ + 128, -1); return this; }
+  void allOff() {
+    for (int n = 0; n < 128; ++n)
+      if (sounding_[n] >= 0) { p_.noteOff(sounding_[n]); sounding_[n] = -1; }
+    p_.setHold(false);
+  }
 };
 
 }  // namespace
@@ -231,10 +236,11 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
   if (!pcm) return 1;
   Midi midi;
   if (!openMidi(midi)) return 1;
+  // Hear about ports coming and going (hot-plug) from the system announce port.
+  snd_seq_connect_from(midi.seq, midi.port, SND_SEQ_CLIENT_SYSTEM, SND_SEQ_PORT_SYSTEM_ANNOUNCE);
   midi.connected = connectSources(midi, o.midiName, true);
   if (!midi.connected)
-    std::fprintf(stderr, "midi: no '%s' yet; plug it in (rescanning every second)\n",
-                 o.midiName.c_str());
+    std::fprintf(stderr, "midi: no '%s' yet; plug it in any time\n", o.midiName.c_str());
   // Real-time priority if allowed; keep going without it.
   sched_param sp{};
   sp.sched_priority = 70;
@@ -252,6 +258,7 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
   std::vector<float> mono(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);
   long frames = 0, xruns = 0;
+  float gain = float(ctl.gain_);
   int demoStep = 0;
   // Prefill one period of silence so the first write starts the stream.
   std::fill(f32.begin(), f32.end(), 0.0f);
@@ -263,10 +270,15 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
   std::fprintf(stderr, "playing; Ctrl-C to stop\n");
   while (!gStop) {
     snd_seq_event_t* ev = nullptr;
-    while (snd_seq_event_input(midi.seq, &ev) >= 0 && ev) ctl.handle(ev);
-    if (!midi.connected && frames % 48000 < long(period)) {
-      midi.connected = connectSources(midi, o.midiName, true);
+    bool portStarted = false;
+    while (snd_seq_event_input(midi.seq, &ev) >= 0 && ev) {
+      if (ev->type == SND_SEQ_EVENT_PORT_START) portStarted = true;
+      else if (ev->type == SND_SEQ_EVENT_PORT_EXIT) ctl.allOff();  // unplugged mid-note
+      else ctl.handle(ev);
     }
+    // A port appeared (the MPK plugged in again): connect. Rare, so the few
+    // syscalls here are fine in this thread.
+    if (portStarted) midi.connected = connectSources(midi, o.midiName, true) || midi.connected;
     if (o.selfTest) {  // a slurred arpeggio without a keyboard
       const int notes[] = {60, 64, 67, 72, 76, 79, 84, 79, 76, 72, 67, 64, 60};
       const long step = 48000 / 4;
@@ -278,9 +290,9 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
       if (frames > 48000 * 5) gStop = true;
     }
     player.render(mono.data(), int(period));
-    const float g = float(ctl.gain_);
     for (size_t i = 0; i < period; ++i) {
-      float y = mono[i] * g;
+      gain += 0.002f * (float(ctl.gain_) - gain);  // ~10 ms volume glide, no clicks
+      float y = mono[i] * gain;
       if (!std::isfinite(y)) y = 0;  // the output guard
       y = std::max(-1.0f, std::min(1.0f, y));
       f32[2 * i] = f32[2 * i + 1] = y;
@@ -291,14 +303,25 @@ int runLive(const LiveOptions& o, const Calibration& cal) {
     if (w < 0) {
       ++xruns;
       if (o.verbose) std::fprintf(stderr, "xrun at %.3f s (%s)\n", frames / 48000.0, snd_strerror(int(w)));
-      snd_pcm_recover(pcm, int(w), 1);
+      if (snd_pcm_recover(pcm, int(w), 1) < 0) {  // the device is gone: stop, don't spin
+        std::fprintf(stderr, "audio: cannot recover (%s); stopping\n", snd_strerror(int(w)));
+        break;
+      }
+      // Refill the buffer with silence so the restarted stream has headroom.
+      std::fill(f32.begin(), f32.end(), 0.0f);
+      std::fill(s16.begin(), s16.end(), 0);
+      for (int i = 0; i < std::max(1, o.periods - 1); ++i) {
+        if (isFloat) snd_pcm_writei(pcm, f32.data(), period);
+        else snd_pcm_writei(pcm, s16.data(), period);
+      }
     }
     frames += long(period);
   }
   snd_pcm_drain(pcm);
   snd_pcm_close(pcm);
   snd_seq_close(midi.seq);
-  std::fprintf(stderr, "stopped after %.1f s, %ld xruns\n", frames / 48000.0, xruns);
+  std::fprintf(stderr, "stopped after %.1f s, %ld xruns, %d state resets\n", frames / 48000.0,
+               xruns, flute.resets());
   return 0;
 }
 
