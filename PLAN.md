@@ -163,6 +163,16 @@ slurs land. Stronger kicks overshoot into the register above (E6, A6). Left for 
 soft E5 and G5, the C6 wobble, and a D5 crescendo from silence, which starts on 435 Hz and stays
 there (too much hysteresis).
 
+### Fix 2026-11-11 — thin second register (reported by ear: "above D5 sounds thinner")
+From D5 the radiated 3rd harmonic was 12–20 dB above the fundamental and the level dropped
+3–9 dB, while the pressure in the embouchure had a normal, fundamental-led spectrum. In the
+second register the flute vibrates in its second mode: the embouchure and the open holes move
+air in antiphase, and the listener (1 m opposite the middle of the flute, equidistant) heard the
+fundamentals cancel (E5: 44 + 46 dB → 32 dB). The listener now sits 1 m in front of the player's
+face (`PJ_LX` 0, `PJ_LY` 1): D5–G5 H3 within +4 dB of H1, level rises smoothly C4 −32 → C6 −21 →
+C7 −13 dB. This was part of step 3.4. The low register's weak H2 (jet saturation) remains.
+A stereo pair (one near the player's head, one in the audience) would be the next step.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

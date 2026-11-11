@@ -141,8 +141,11 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   for (Hole& h : hole_) h.open = h.target;
   updateHoles(0);
   // Radiators: each hole cell, the embouchure, the foot (horn outlet).
-  // Listener 1 m in front of the player, opposite the middle of the flute.
-  const double lx = 0.25, ly = 1.0;
+  // Listener 1 m in front of the player's face (x along the flute from the cork
+  // face, y forward). In the second register the embouchure and the open holes
+  // move air in antiphase (mode 2): opposite the middle of the flute they cancel
+  // the fundamental by ~14 dB and those notes sounded thin.
+  const double lx = knob("PJ_LX", 0.0), ly = knob("PJ_LY", 1.0);
   auto addRad = [&](int cell, double x, double extra) {
     const double dist = std::hypot(x - lx, ly);
     radCell_[nRad_] = cell;
