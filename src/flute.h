@@ -36,7 +36,9 @@ class Flute {
   explicit Flute(double fs = 48000);
 
   // Fingering as 16 chars, hole 1 (D# trill) .. hole 16 (C#4), 'o' open, 'x' closed.
-  void setHoles(const char* pattern);
+  // Fingering; fingerSpeed scales how fast the fingers move the keys (key velocity:
+  // 1 = 10 ms, 2 = 5 ms). Springs always take their own time.
+  void setHoles(const char* pattern, double fingerSpeed = 1);
   void setEmbouchure(const Embouchure& e) { target_ = e; }
   const Embouchure& embouchure() const { return target_; }
 
@@ -67,7 +69,10 @@ class Flute {
     int cell;
     double tSeries;   // chimney + inner + matching length (m), incl. grid offset
     double tRad;      // radiation (outer) end correction (m)
-    double open = 0, target = 0;  // pad openness 0..1
+    double open = 0, target = 0;  // pad openness 0..1 (time along the stroke)
+    bool closing = false;         // closing stroke: accelerates into the seat
+    double stroke = 0.010;        // duration of the current stroke (s)
+    double padIn = 0;             // air the pad pushes into the bore (m^3/s)
   };
   void updateHoles(double dtBlock);
   Branch holeBranch(const Hole& h) const;
@@ -113,6 +118,13 @@ class Flute {
   int kJetModel_, kRadOnly_;
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;
   double kXiHp_, xiLow_ = 0;
+  double fingerSpeed_ = 1, kPadPump_, kKeyClick_;
+  int nPumping_ = 0;
+  uint32_t keyRng_ = 777;
+  // Key impact: a few damped modes of the key and the tube wall.
+  static constexpr int kTickModes = 3;
+  double tickRe_[kTickModes] = {}, tickIm_[kTickModes] = {}, tickCos_[kTickModes] = {},
+         tickSin_[kTickModes] = {}, tickDecay_[kTickModes] = {};
   double kJetSign_, kEtaSign_, kEmbLen_, kAlpha_, kConv_, kNoiseGain_, kOut_;
 };
 

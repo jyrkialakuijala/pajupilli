@@ -64,6 +64,26 @@ double innerCorrection(double b, double delta) {
 
 double smoothstep(double s) { return s * s * (3 - 2 * s); }
 
+// Pad height (fraction of the full opening) along a stroke, from the stroke time
+// `open` (0 closed .. 1 open). A finger or spring pushing a key closed
+// accelerates it into the seat (lands at 2 x the mean speed); an opening key
+// leaves the seat and settles gently.
+double padShape(double open, bool closing) {
+  return closing ? 1 - (1 - open) * (1 - open) : smoothstep(open);
+}
+
+// Stroke time that gives the pad height s on a stroke (keeps the pad where it
+// is when a key reverses mid-stroke).
+double padTime(double s, bool closing) {
+  if (closing) return 1 - std::sqrt(std::max(0.0, 1 - s));
+  double a = 0, b = 1;
+  for (int i = 0; i < 30; ++i) {
+    const double m = 0.5 * (a + b);
+    (smoothstep(m) < s ? a : b) = m;
+  }
+  return 0.5 * (a + b);
+}
+
 }  // namespace
 
 Flute::Flute(double fs) : fs_(fs), bore_(fs) {
@@ -77,6 +97,19 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
   kJetModel_ = int(knob("PJ_JETMODEL", 1));
   kRel_ = knob("PJ_REL", 0);
   kXiHp_ = knob("PJ_XIHP", 100);
+  // Pad pumping, as a share of a rigid pad landing flat: the felt and skin
+  // compress and meet the rim unevenly, so most of the last puff leaks; 0.25
+  // puts a medium key click ~24 dB under a mezzo-forte note (by ear: 0..1).
+  kPadPump_ = knob("PJ_PADPUMP", 0.25);
+  kKeyClick_ = knob("PJ_KEYCLICK", 1);
+  {  // key impact modes: key arm / cup and the tube wall (~2.4, 5.3, 8.2 kHz)
+    static const double f[kTickModes] = {2400, 5300, 8200}, tau[kTickModes] = {0.004, 0.0025, 0.0015};
+    for (int m = 0; m < kTickModes; ++m) {
+      tickCos_[m] = std::cos(2 * M_PI * f[m] / fs);
+      tickSin_[m] = std::sin(2 * M_PI * f[m] / fs);
+      tickDecay_[m] = std::exp(-1 / (tau[m] * fs));
+    }
+  }
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
   kEtaMax_ = knob("PJ_ETAMAX", 1.5) * 1e-3;
@@ -134,7 +167,8 @@ Flute::Flute(double fs) : fs_(fs), bore_(fs) {
 
 double Flute::horn_r() const { return bore_.hornRadius(); }
 
-void Flute::setHoles(const char* pattern) {
+void Flute::setHoles(const char* pattern, double fingerSpeed) {
+  fingerSpeed_ = std::clamp(fingerSpeed, 0.25, 4.0);
   for (int i = 0; i < kHoles && pattern[i]; ++i) hole_[i].target = pattern[i] == 'o' ? 1 : 0;
 }
 
@@ -142,7 +176,7 @@ Branch Flute::holeBranch(const Hole& h) const {
   Branch br;
   const double sh = M_PI * h.b * h.b;
   const double vc = sh * kHoleT;  // closed chimney volume
-  const double s = smoothstep(h.open);
+  const double s = padShape(h.open, h.closing);
   if (s < 1e-4) { br.vol = vc; return br; }
   const double hp = s * h.padH;
   // Pad as a radial slot of height hp between the cup and the rim.
@@ -164,17 +198,59 @@ Branch Flute::holeBranch(const Hole& h) const {
 
 void Flute::updateHoles(double dtBlock) {
   bool moved = dtBlock == 0;
+  nPumping_ = 0;
   for (int i = 0; i < kHoles; ++i) {
     Hole& h = hole_[i];
+    h.padIn = 0;
     if (h.open == h.target) continue;
-    // A finger pushes a key in ~10 ms, a spring moves it back in ~16 ms
-    // (Almeida et al. 2009). Normally closed keys (trills, G#, Eb) open by finger.
+    // A finger pushes a key in ~10 ms (faster when the key is struck harder), a
+    // spring moves it back in ~16 ms (Almeida et al. 2009). Normally closed keys
+    // (trills, G#, Eb) open by finger and close by spring.
     const bool normallyClosed = i == 0 || i == 1 || i == 7 || i == 13;
     const bool opening = h.target > h.open;
-    const double t = (opening != normallyClosed) ? 0.016 : 0.010;
-    const double step = dtBlock / t;
+    const bool byFinger = opening == normallyClosed;
+    if (h.closing == opening || dtBlock == 0) {  // a new stroke (or reversal): keep the pad where it is
+      const double sNow = padShape(h.open, h.closing);
+      h.closing = !opening;
+      h.open = padTime(sNow, h.closing);
+      // Fingers never land together: each stroke differs by up to +-15 %.
+      keyRng_ = keyRng_ * 1664525u + 1013904223u;
+      const double jitter = 1 + 0.3 * ((keyRng_ >> 8) * (1.0 / 16777216.0) - 0.5);
+      h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
+    }
+    const double o0 = h.open;
+    const double step = dtBlock / h.stroke;
     h.open = opening ? std::min(h.target, h.open + step) : std::max(h.target, h.open - step);
     moved = true;
+    if (dtBlock <= 0) continue;
+    // Pad pumping: the air between the pad and the hole's rim can leave only
+    // through the slot under the pad; the rest goes into the bore. Near the seat
+    // the slot's viscous resistance (~1 / h^3) wins and the stroke's last
+    // fraction of a millimetre pushes (or, opening, pulls) a puff into the tube.
+    const double sh = M_PI * h.b * h.b;
+    const double a = 0.5 * boreDiameter(h.x);
+    const double zin = kRho * kC / (2 * M_PI * a * a);  // the bore, both ways
+    const double lnr = std::log(h.padR / h.b);
+    double vin = 0, hPrev = padShape(o0, h.closing) * h.padH;
+    constexpr int kSub = 8;
+    for (int k = 1; k <= kSub; ++k) {
+      const double hk = padShape(o0 + (h.open - o0) * k / kSub, h.closing) * h.padH;
+      const double hm = std::max(0.5 * (hk + hPrev), 1e-6);
+      const double rs = 6 * kMu * lnr / (M_PI * hm * hm * hm);
+      vin += -sh * (hk - hPrev) * rs / (rs + zin);
+      hPrev = hk;
+    }
+    h.padIn = kPadPump_ * vin / dtBlock;
+    ++nPumping_;
+    // The pad lands: a tick from the key and the tube, ~ the landing speed.
+    if (h.open == 0 && h.closing && kKeyClick_ > 0) {
+      const double v = 2 * h.padH / h.stroke;   // m/s
+      const double size = h.padR / 9.5e-3;      // bigger keys ring lower and louder
+      for (int m = 0; m < kTickModes; ++m) {
+        static const double kAmp[kTickModes] = {1.0, 0.6, 0.35};
+        tickIm_[m] += kKeyClick_ * 0.01 * v * size * kAmp[m];
+      }
+    }
   }
   if (!moved) return;
   for (int i = 0; i < kHoles; ++i) {
@@ -344,6 +420,9 @@ float Flute::sample() {
   // --- The bore, then the window branch at the embouchure cell (implicit).
   float pOld, jIn;
   bore_.step(ec_, &pOld, &jIn);
+  if (nPumping_ > 0)  // pads pushing air into the tube (key clicks)
+    for (const Hole& hl : hole_)
+      if (hl.padIn != 0) bore_.s.p()[hl.cell] += float(hl.padIn * dt / bore_.compliance(hl.cell));
   {
     const double c = bore_.compliance(ec_), w = 2 / dt;
     const double g = eg_, rs = ers_ + ecnl_ * std::fabs(eq_), rr = err_, hl = ehl_;
@@ -400,6 +479,12 @@ float Flute::sample() {
   }
   float y = outRing_[outPos_];
   outRing_[outPos_] = 0;
+  for (int m = 0; m < kTickModes; ++m) {  // key impact ticks
+    const double re = tickRe_[m], im = tickIm_[m];
+    tickRe_[m] = tickDecay_[m] * (re * tickCos_[m] - im * tickSin_[m]);
+    tickIm_[m] = tickDecay_[m] * (re * tickSin_[m] + im * tickCos_[m]);
+    y += float(im);
+  }
   outPos_ = (outPos_ + 1) & (kOutRing - 1);
   // DC blocker (~5 Hz).
   const float yd = y - dcX_ + 0.99935f * dcY_;

@@ -74,6 +74,7 @@ void Player::noteOn(int midi, int velocity) {
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
   note_ = midi;
+  keyVel_ = velocity;
   const double v = velocity / 127.0;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
   // from silence, velocity picks a breath attack, "tu" or an accented "t".
@@ -97,6 +98,7 @@ void Player::noteOff(int midi) {
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
     note_ = stack_[stackTop_ - 1];
+    keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
   } else if (!hold_) {
     blowing_ = false;  // stop blowing; the fingering stays
@@ -110,7 +112,9 @@ void Player::setHold(bool h) {
 }
 
 void Player::applyNote(Attack a) {
-  flute_.setHoles(noteInfo(note_)->holes);
+  // Key velocity = finger speed: 64 moves a key in 10 ms, 127 in 5 ms, 1 in 20 ms;
+  // a faster finger lands the pad harder (a louder key click).
+  flute_.setHoles(noteInfo(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
   switch (a) {
     case kSlur: return;

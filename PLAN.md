@@ -144,6 +144,15 @@ drive is now high-passed at 100 Hz (`PJ_XIHP`, 0 = old behaviour).
   quiet pumping notes before; they are now wrong-register notes, which is more audible.
   Lowering the jet low-pass (`PJ_JETLP` 1.5, 1.2) makes registers worse.
 
+### Added 2026-11-11 — key clicks, key velocity as finger speed
+A closing pad now accelerates into the seat (lands at 2 × mean speed, ~0.5 m/s at 10 ms) instead
+of easing in. The air between pad and rim leaves through the slot under the pad; the share that
+goes into the bore is R_slot / (R_slot + ρc/2S), so only the last fraction of a millimetre
+pumps. Without breath a medium click is ~26 dB under a mezzo-forte note (soft key −30, hard −22)
+and rings at the fingering's resonances for ~30 ms. Fingers land ±15 % apart in time. Key velocity
+sets finger speed (64 → 10 ms, 127 → 5 ms, 1 → 20 ms); springs keep 16 ms. The pump level
+(`PJ_PADPUMP` 0.25 of a rigid flat landing) is set by ear; a soft-pad contact model could replace it.
+
 ### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points

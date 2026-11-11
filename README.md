@@ -35,7 +35,7 @@ for the same quantum).
 
 | Control | Does |
 |---|---|
-| Keys | Notes. Overlapping keys **slur**. A new key soon after release is a soft "du"; from silence, velocity chooses a breath attack (soft), "tu", or an accented "t" (hard). |
+| Keys | Notes. Velocity is also finger speed: harder keys land the pads faster (louder key clicks). Overlapping keys **slur**. A new key soon after release is a soft "du"; from silence, velocity chooses a breath attack (soft), "tu", or an accented "t" (hard). |
 | Joystick X | Roll the flute in / out: pitch bend through lip coverage |
 | Joystick Y | Breath push |
 | Sustain pedal | Keep blowing between keys (every key slurs unless hit hard) |
@@ -74,5 +74,8 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 - Known: register selection is still weak at the extremes (soft G5 and loud F5 jump up,
   G6 does not sound); see PLAN.md step 3.
 - Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.
+- Key clicks: a closing pad accelerates into its seat; in the last fraction of a
+  millimetre the trapped air goes into the bore (a pop pitched by the tube),
+  plus a small mechanical tick. `PJ_PADPUMP` (0.25) and `PJ_KEYCLICK` (1) set the levels.
 - Not yet: the look-ahead expressive mode, trills, harmonics, multiphonics,
-  whistle tones, key clicks.
+  whistle tones.

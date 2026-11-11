@@ -59,6 +59,7 @@ class Player {
   double flutter_ = 0, flutterPhase_ = 0, hardness_ = 1;
   double sinceOn_ = 0;
   double velAccent_ = 0;
+  int keyVel_ = 64;
 };
 
 }  // namespace pajupilli
