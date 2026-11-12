@@ -74,17 +74,16 @@ struct Player::Trill {
   const char* keys;  // "1" D trill key, "2" D# trill key
   const char* name;
   double cover;
-  bool settle;             // a held upper note eases over to its own fingering
   const char* notOn = "";  // an instrument where it falls out of its register
 };
 const Player::Trill Player::kTrills[] = {
-    {72, 74, "1", "trill-c5-d5", 1.0, true},
-    {73, 74, "1", "trill-cis5-d5", 0.8, true},     // +28 c without the lips
-    {73, 75, "2", "trill-cis5-dis5", 0.88, true},  // +16 c without the lips
-    {83, 85, "1", "trill-b5-cis6", 1.0, false},
-    {84, 86, "2", "trill-c6-d6", 1.0, false},
-    {85, 86, "1", "trill-cis6-d6", 1.0, false},
-    {85, 87, "12", "trill-cis6-dis6", 1.0, false, "piccolo"},
+    {72, 74, "1", "trill-c5-d5", 1.0},
+    {73, 74, "1", "trill-cis5-d5", 0.8},     // +28 c without the lips
+    {73, 75, "2", "trill-cis5-dis5", 0.88},  // +16 c without the lips
+    {83, 85, "1", "trill-b5-cis6", 1.0},
+    {84, 86, "2", "trill-c6-d6", 1.0},
+    {85, 86, "1", "trill-cis6-d6", 1.0},
+    {85, 87, "12", "trill-cis6-dis6", 1.0, "piccolo"},
 };
 
 Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
@@ -99,8 +98,8 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
   kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
-  kTrillSettle_ = knob("PJ_TRILLSETTLE", 0.3);  // s
-  kSettleGap_ = knob("PJ_SETTLEGAP", 0.03);
+  kTrillTune_ = knob("PJ_TRILLTUNE", 0.05);  // s; 0: the lips do not listen
+  kTrillHeld_ = 0.3;                          // s on the trill key: report the tuning
   kTrillFast_ = knob("PJ_TRILLFAST", 0.12);  // s     // s, other keys -> trill key
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
@@ -202,10 +201,11 @@ void Player::setHold(bool h) {
 const char* Player::holesFor(int midi) {
   trillCover_ = 1;
   onTrillKey_ = false;
-  trillLipTau_ = 0.002;
   if (!trill_ || midi == trillBase_) return info(midi)->holes;
   onTrillKey_ = true;
   trillClock_ = 0;
+  heldTold_ = false;
+  lastCross_ = -1;
   // The upper note: the lower note's fingering with the trill key(s) open.
   // Key 1 = the D trill key (hole 2), key 2 = the D# trill key (hole 1).
   std::memcpy(trillHoles_, info(trillBase_)->holes, 16);
@@ -270,46 +270,17 @@ void Player::render(float* out, int n) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
     keyClock_ += bdt;
-    // A trill that stops on its upper note (the lower key stays up): after a
-    // while the fingers ease over to the note's own fingering, unheard.
-    // Only the middle-octave D / D# (trill_->settle): into D6 / D#6 (3rd
-    // resonance) the bass fell an octave, and C#6 swept ~45 c on the way.
-    if (onTrillKey_ && trill_ && trill_->settle && note_ >= 0 &&
-        !held_[trill_->lo + inst_.transpose]) {
+    double lipTarget = trillCover_;
+    if (onTrillKey_ && trill_) {
       trillClock_ += bdt;
-      if (trillClock_ > kTrillSettle_) {
-        std::fprintf(stderr, "%s: settled\n", trill_->name);
-        trillLipTau_ = 0.02;  // with the keys (~20 ms)
-        // First the keys below the trill and C# holes to the note's own
-        // fingering (the trill key stays open and keeps the note); then the
-        // trill key closes (the note overblows on the long tube); then the C#
-        // vent opens. Opening it with the trill key still open goes 30 c sharp.
-        std::memcpy(trillHoles_ + 3, info(note_)->holes + 3, 13);
-        flute_.setHoles(trillHoles_, 0.5, true);
-        settleKeys_ = trill_->keys;
-        settleClock_ = 0;
-        trill_ = nullptr;
-        trillBase_ = -1;
-        onTrillKey_ = false;  // the lips stay until the trill key closes
+      lipTarget *= std::exp(trillCorr_[trill_ - kTrills]);
+      if (!heldTold_ && trillClock_ > kTrillHeld_) {  // held on the key: say how the lips sit
+        heldTold_ = true;
+        std::fprintf(stderr, "%s: held, lips %+.0f c\n", trill_->name,
+                     116 * trillCorr_[trill_ - kTrills]);
       }
     }
-    if (settleKeys_) {  // then the trill key closes, then the C# vent opens
-      settleClock_ += bdt;
-      if (note_ < 0 || trill_) {
-        settleKeys_ = nullptr;
-        if (!trill_) trillCover_ = 1;
-      } else if (settleClock_ > 2 * kSettleGap_) {
-        flute_.setHoles(info(note_)->holes, 0.5, true);
-        settleKeys_ = nullptr;
-      } else if (settleClock_ > kSettleGap_ && settleClock_ - bdt <= kSettleGap_) {
-        const char* own = info(note_)->holes;
-        for (int k = 0; k < 3; ++k)
-          if (own[k] == 'x') trillHoles_[k] = 'x';
-        flute_.setHoles(trillHoles_, 0.5, true);
-        trillCover_ = 1;  // the lips back with the trill key (~20 ms)
-      }
-    }
-    trillLip_ += (1 - std::exp(-bdt / trillLipTau_)) * (trillCover_ - trillLip_);
+    trillLip_ += (1 - std::exp(-bdt / 0.002)) * (lipTarget - trillLip_);
     Embouchure e = flute_.embouchure();
     double lungTarget = 0;
     if (note_ >= 0) {
@@ -403,6 +374,37 @@ void Player::render(float* out, int n) {
     e.glottis = ag;
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
+    if (onTrillKey_ && trill_ && kTrillTune_ > 0) listen(out + i, m);
+  }
+}
+
+// The pitch of the note on the trill key, from a band-pass around it: each
+// upward zero crossing gives one period; the coverage follows the error
+// (d cents / d ln(uncovered) ~ 116 on D5; the lips move slowly, like an ear
+// correcting, so a fast trill is barely touched and a held note settles).
+void Player::listen(const float* x, int m) {
+  const double f0 = noteFrequency(note_), w = 2 * M_PI * f0 / fs_;
+  const double r = std::exp(-M_PI * f0 / (3 * fs_));  // Q 3
+  const double a1 = 2 * r * std::cos(w), a2 = -r * r;
+  double& corr = trillCorr_[trill_ - kTrills];
+  for (int k = 0; k < m; ++k) {
+    const double y = (1 - r) * x[k] + a1 * bp1_ + a2 * bp2_;
+    bp2_ = bp1_;
+    bp1_ = y;
+    const double t = trillClock_ * fs_ - m + k;  // samples on the key
+    if (prevBp_ < 0 && y >= 0) {
+      const double tc = t - 1 + prevBp_ / (prevBp_ - y);
+      if (lastCross_ >= 0 && trillClock_ > 0.02) {  // past the key's own transient
+        const double f = fs_ / (tc - lastCross_);
+        if (f > f0 / 1.3 && f < f0 * 1.3) {
+          const double cents = 1200 * std::log2(f / f0);
+          corr -= cents / 116 * (1 / f) / kTrillTune_;
+          corr = std::clamp(corr, -0.4, 0.4);
+        }
+      }
+      lastCross_ = tc;
+    }
+    prevBp_ = y;
   }
 }
 

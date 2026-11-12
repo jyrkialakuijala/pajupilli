@@ -68,15 +68,16 @@ class Player {
   const char* holesFor(int midi);
   char trillHoles_[17] = {};
   double trillCover_ = 1, kTrillCover_;  // lip coverage for the upper note
-  // An upper note on the trill key with the lower key up for kTrillSettle_
-  // seconds: the fingers ease over to its own fingering (no key noise) and the
-  // lips back, over trillLipTau_.
+  // On a trill key the player listens and tunes with the lips (no fingering
+  // change): a band-pass at the note, its zero crossings give the pitch, and
+  // the coverage moves to bring it to the note (time constant kTrillTune_).
+  // The correction is remembered per trill: the next time it starts closer.
   bool onTrillKey_ = false;
-  double trillClock_ = 0, kTrillSettle_, trillLip_ = 1, trillLipTau_ = 0.002;
-  // Settling in two steps: the other fingers first (the trill key still vents),
-  // then the trill key closes; settleKeys_: the trill keys still open (or null).
-  const char* settleKeys_ = nullptr;
-  double settleClock_ = 0, kSettleGap_;
+  double trillClock_ = 0, trillLip_ = 1, kTrillTune_, kTrillHeld_;
+  double trillCorr_[8] = {};  // log coverage, per trill
+  double bp1_ = 0, bp2_ = 0, lastCross_ = -1, prevBp_ = 0;
+  bool heldTold_ = false;
+  void listen(const float* x, int m);
   // A trill starts only when its two notes alternate fast: the last key event
   // (press or release) was one of them, under kTrillFast_ seconds before (not a
   // slow B C D E, nor a fast scale).

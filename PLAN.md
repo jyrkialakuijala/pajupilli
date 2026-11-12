@@ -362,3 +362,9 @@ with listening files for an A/B, as before.
   8 and 16 notes/s never use the trill keys; a C-D trill picks them up from its second D.
   The settle moves every key quietly (checked: no puff, thud, click or release); slower settle
   fingers (40 ms strokes) wander more (flute 37 c, -4.8 dB), so 20 ms stays.
+- Settling replaced (2026-11-12, by request: "without fingering changes"): the upper note stays on
+  the trill key and the player tunes it by ear with the lips. A band-pass (Q 3) at the note,
+  upward zero crossings give each period; ln(uncovered) moves by -cents/116 per period over
+  50 ms (d cents / d ln uncovered ~ 116 on D5); kept per trill. Held on the key, cents off
+  without -> with: flute up to -10 -> within 2; piccolo -28 -> +5 (C6-D6); alto -17 -> 1;
+  bass +25 -> -3. The three-step fingering switch and the quiet-key flag are gone.

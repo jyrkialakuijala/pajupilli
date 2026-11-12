@@ -121,8 +121,9 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
   On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
   so the player covers more for them (`PJ_TRILLCOVER` 0 turns that off).
-  A middle-octave trill that stops on D or D# (the lower key up for 0.3 s, `PJ_TRILLSETTLE`)
-  eases over to the note's own fingering with no key sounds at all: the lower keys first, then the
-  trill key, then the C# vent, 30 ms apart (`PJ_SETTLEGAP`); printed `...: settled`.
+  On a trill key the player listens and tunes with the lips, not the fingers: the coverage
+  moves until the note is in tune (time constant 50 ms, `PJ_TRILLTUNE`; 0 = off), and the
+  correction is kept for the next time. A note held on the key for 0.3 s prints
+  `trill-c5-d5: held, lips +x c`. Held trill notes end within 3 cents (piccolo top: 7).
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
   whistle tones.

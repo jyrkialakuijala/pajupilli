@@ -231,15 +231,10 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
 
 double Flute::horn_r() const { return bore_.hornRadius(); }
 
-void Flute::setHoles(const char* pattern, double fingerSpeed, bool quiet) {
+void Flute::setHoles(const char* pattern, double fingerSpeed) {
   fingerSpeed_ = std::clamp(fingerSpeed, 0.25, 4.0);
-  for (int i = 0; i < kHoles && pattern[i]; ++i) {
-    Hole& h = hole_[i];
-    if (!h.present) continue;
-    const double t = pattern[i] == 'o' ? 1 : 0;
-    if (t != h.target) h.quiet = quiet;
-    h.target = t;
-  }
+  for (int i = 0; i < kHoles && pattern[i]; ++i)
+    if (hole_[i].present) hole_[i].target = pattern[i] == 'o' ? 1 : 0;
 }
 
 Branch Flute::holeBranch(const Hole& h) const {
@@ -315,7 +310,7 @@ void Flute::updateHoles(double dtBlock) {
       continue;
     }
     const double o0 = h.open;
-    if (opening && h.held && !h.quiet && dtBlock > 0 && kThud_ > 0) {
+    if (opening && h.held && dtBlock > 0 && kThud_ > 0) {
       // The pad leaves its seat: the felt the finger (or the spring) held
       // compressed ~0.05 mm springs back and the skin pulls air out of the
       // hole: the thud's mirror, a small suction both ways along the tube.
@@ -347,17 +342,17 @@ void Flute::updateHoles(double dtBlock) {
       vin += -sh * (hk - hPrev) * rs / (rs + zin);
       hPrev = hk;
     }
-    h.padIn = h.quiet ? 0 : kPadPump_ * vin / dtBlock;
+    h.padIn = kPadPump_ * vin / dtBlock;
     ++nPumping_;
     // The pad lands: a tick from the key and the tube, ~ the landing speed.
-    if (h.open == 0 && h.closing && kThud_ > 0 && !h.quiet) {
+    if (h.open == 0 && h.closing && kThud_ > 0) {
       const double v = 2 * h.padH / h.stroke;  // landing speed (m/s)
       h.thRe = float(kThud_ * v * sh);
       h.thIm = 0;
       h.held = true;
       thudLeft_ = int(0.03 * fs_);  // 30 ms: ~-80 dB
     }
-    if (h.open == 0 && h.closing && kKeyClick_ > 0 && !h.quiet) {
+    if (h.open == 0 && h.closing && kKeyClick_ > 0) {
       const double v = 2 * h.padH / h.stroke;   // m/s
       const double size = h.padR / 9.5e-3;      // bigger keys ring lower and louder
       for (int m = 0; m < kTickModes; ++m) {
