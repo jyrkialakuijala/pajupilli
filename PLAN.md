@@ -378,3 +378,13 @@ C7: with the gizmo (B key closed) +50 c, an extra resonance near 1917 Hz; withou
 Test: the C-foot flute runs the family checks; the tmm.py comparison uses it (tmm.py has the
 C foot). Note: that info line reads 64 -2.7 c, 67 -6.7 c (earlier +0.0, -2.2) for an unchanged
 C-foot flute since one of today's earlier commits; not chased yet.
+
+### Added 2026-11-12 — more trill-key uses
+- D6-Eb6 and A6-Bb6 on both trill keys (the request said A5-Bb5; tmm.py: A5 + both keys moves
+  the resonance 902 -> 1070 Hz, a minor third; A6 + both keys 1812 -> 1926 Hz, a semitone, where
+  the Bb6 fingering's is). With the upper note's own calibration the flute's D6-Eb6 sounded an
+  octave low and the register kick alone did not help; keeping the lower note's lips, jet and
+  breath (as a trilling flutist does) plus the kick: flute -1 c, piccolo +9 c (both trills).
+- Trill keys as vents (calibrated cents): B6 with neither +8, D# trill key +21 (the old
+  fingering), D trill key +1, both +14 -> B6 now uses the D trill key. C7: neither +29, D# +36,
+  D +95, both +97 -> unchanged.

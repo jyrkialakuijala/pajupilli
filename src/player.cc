@@ -51,7 +51,7 @@ constexpr NoteInfo kNotes[38] = {
     {"xxooxxxoxooooooo", 3},  // 92 G#6
     {"xxoxxxoxoxxooooo", 3},  // 93 A6
     {"xooxxooxoxxooxoo", 3},  // 94 Bb6
-    {"oxxxooxxxooooxoo", 3},  // 95 B6
+    {"xoxxooxxxooooxoo", 3},  // 95 B6 (D trill key as the vent: +1 c; with the D# trill key +21)
     {"xxxoxxxoxxxooxoo", 4},  // 96 C7 (no gizmo: with it the B foot's C7 is +50 c, without +29)
 };
 
@@ -76,6 +76,7 @@ struct Player::Trill {
   const char* keys;  // "1" D trill key, "2" D# trill key
   const char* name;
   double cover;
+  bool keepLips = false;   // the upper note keeps the lower note's embouchure, kicked up
   const char* notOn = "";  // an instrument where it falls out of its register
 };
 const Player::Trill Player::kTrills[] = {
@@ -85,7 +86,9 @@ const Player::Trill Player::kTrills[] = {
     {83, 85, "1", "trill-b5-cis6", 1.0},
     {84, 86, "2", "trill-c6-d6", 1.0},
     {85, 86, "1", "trill-cis6-d6", 1.0},
-    {85, 87, "12", "trill-cis6-dis6", 1.0, "piccolo"},
+    {85, 87, "12", "trill-cis6-dis6", 1.0, false, "piccolo"},
+    {86, 87, "12", "trill-d6-dis6", 1.0, true},  // D6-Eb6
+    {93, 94, "12", "trill-a6-ais6", 1.0, true},  // A6-Bb6 (A5 + both keys is a minor third up)
 };
 
 Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
@@ -140,7 +143,7 @@ void Player::noteOn(int midi, int velocity) {
     if (t) { trill_ = t; trillBase_ = t->lo + tr; }
     else if (!trill_ || (w != trill_->hi && w != trill_->lo)) { trill_ = nullptr; trillBase_ = -1; }
   }
-  if (trill_) regKick_ = 0;  // the upper note is on the same fingering, no kick
+  if (trill_) regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick() : 0;
   keyClock_ = 0;
   lastKey_ = midi;
   note_ = midi;
@@ -289,24 +292,28 @@ void Player::render(float* out, int n) {
       // Breath and jet length follow the sounding pitch (Fletcher's rules keep the
       // jet's travel time a fixed share of the period on any flute); the lips and
       // the embouchure hole are the instrument's size, set by the written pitch.
+      // The calibrated lips, jet and breath: the note's own, or on a third-octave
+      // trill key the lower note's (the flutist keeps that embouchure; with the
+      // upper note's own the flute's D6-Eb6 fell an octave).
+      const int en = onTrillKey_ && trill_ && trill_->keepLips ? trillBase_ : note_;
       const double f = noteFrequency(note_);
       const double fw = noteFrequency(note_ - inst_.transpose), ke = inst_.emb;
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
-      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], 1.0);
+      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], 1.0);
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
-      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[note_] * (1 - kKickW_ * regKick_);
+      e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[en] * (1 - kKickW_ * regKick_);
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
       const double t = std::clamp(std::log(fw / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
       // The lips follow the dynamics: coverage learned soft, mezzo-forte and loud.
       double ct;
       {
-        const double lo = std::max(dynLo[note_], 0.15);
-        const double cl = std::log(coverLoTrim[note_]), cm = std::log(coverTrim[note_]),
-                     ch = std::log(coverHiTrim[note_]);
+        const double lo = std::max(dynLo[en], 0.15);
+        const double cl = std::log(coverLoTrim[en]), cm = std::log(coverTrim[en]),
+                     ch = std::log(coverHiTrim[en]);
         if (dyn < 0.5) ct = cl + (cm - cl) * std::clamp((dyn - lo) / std::max(0.5 - lo, 1e-3), 0.0, 1.0);
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
         ct = std::exp(ct);
@@ -325,7 +332,7 @@ void Player::render(float* out, int n) {
       // where the jet swings further (even harmonics need offset ~ swing).
       e.y0 = kY0_ * ke * std::pow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
       e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
-      if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * (1 + kKickP_ * regKick_);
+      if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * (1 + kKickP_ * regKick_);
     }
     regKick_ *= std::exp(-bdt / kKickT_);
     {  // wander: two-pole low-passed noise, ~1 Hz (support), ~2 Hz (aim), ~3 Hz (lips)

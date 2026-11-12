@@ -125,8 +125,12 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   | C6-D6 | D# | `trill-c6-d6` |
   | C#6-D6 | D | `trill-cis6-d6` |
   | C#6-D#6 | both (not on the piccolo) | `trill-cis6-dis6` |
+  | D6-Eb6 | both | `trill-d6-dis6` |
+  | A6-Bb6 | both | `trill-a6-ais6` |
 
-  On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
+  In the D6-Eb6 and A6-Bb6 trills the upper note keeps the lower note's embouchure (with
+  its own, the flute's Eb6 fell an octave). B6 uses the D trill key as a vent (+1 cent;
+  with the D# trill key +21); C7 is best with neither. On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
   so the player covers more for them (`PJ_TRILLCOVER` 0 turns that off).
   On a trill key the player listens and tunes with the lips, not the fingers: the coverage
   moves until the note is in tune (time constant 50 ms, `PJ_TRILLTUNE`; 0 = off), and the

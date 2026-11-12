@@ -62,7 +62,7 @@ class Player {
   // key(s). trill_: the trill in progress (or null), trillBase_: its sounding
   // lower note.
   struct Trill;
-  static const Trill kTrills[7];
+  static const Trill kTrills[9];
   const Trill* trill_ = nullptr;
   int trillBase_ = -1;
   const char* holesFor(int midi);
@@ -74,7 +74,7 @@ class Player {
   // The correction is remembered per trill: the next time it starts closer.
   bool onTrillKey_ = false;
   double trillClock_ = 0, trillLip_ = 1, kTrillTune_, kTrillHeld_;
-  double trillCorr_[8] = {};  // log coverage, per trill
+  double trillCorr_[9] = {};  // log coverage, per trill
   double bp1_ = 0, bp2_ = 0, lastCross_ = -1, prevBp_ = 0;
   bool heldTold_ = false;
   void listen(const float* x, int m);
