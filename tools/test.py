@@ -138,12 +138,13 @@ def family():
 
 def polyphony():
     """-poly: a slurred line stays on one flute, a held note under a melody gets a
-    second, three-note chords a third; no state resets."""
+    second, three-note chords a third, a rolled four-note chord (keys 60 ms apart,
+    held) a fourth; no state resets."""
     r = run(['-poly', '4', '-polydemo'])
     err = r.stderr
     marks = [float(m.group(1)) for m in re.finditer(r'([\d.]+) s  ', err)]
     seq = re.findall(r'flutes: (\d+)', err)
-    ok = r.returncode == 0 and seq == ['2', '3'] and 'moves to flute' in err and 'state resets: 0' in err
+    ok = r.returncode == 0 and seq == ['2', '3', '4'] and 'moves to flute' in err and 'state resets: 0' in err
     check('polyphony (-poly)', ok, 'flutes ' + ' -> '.join(['1'] + seq) + ('' if ok else ': ' + err.strip()[-200:]))
 
 def parity():

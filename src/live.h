@@ -18,7 +18,7 @@ struct LiveOptions {
   static constexpr int kAutoTranspose = -1000;
   bool verbose = false;
   bool selfTest = false;           // play an arpeggio without a keyboard
-  int poly = 1;                    // flutes: more than one deals the keys to a pool
+  int poly = 8;                    // flutes in the pool (1: a single flute)
 };
 
 int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal);

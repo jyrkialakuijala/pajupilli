@@ -400,3 +400,5 @@ last key, not blowing) are skipped. Mix x 1/sqrt(playing), 40 ms glide. -polydem
 1 flute, held C4 + melody -> 2, triads -> 3 (C-E-G, D-F-A heard), peak 0.17, no resets.
 Possible next: per-flute tuning spread / seating (stereo), smarter line tracking (voice
 crossing), the held note keeping its own flute from the start when the history says so.
+- Split time 150 -> 100 ms (by request: keys held together > 100 ms get flutes from the pool);
+  live default -poly 8 (all created at start; idle ones cost nothing), -poly 1 = one flute.

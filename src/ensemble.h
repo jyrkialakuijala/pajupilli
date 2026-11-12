@@ -3,8 +3,9 @@
 //   - keys struck together (within kChord) are a chord: one flute each;
 //   - a key pressed while another is held is a slur on that flute (as with one
 //     flute), unless more lines are expected than flutes are holding keys;
-//   - two keys on one flute held together longer than kSplit are two lines:
-//     the older note moves to a free flute, which takes it up afresh;
+//   - keys held together on one flute longer than kSplit (100 ms) are separate
+//     lines: each older note moves to a free flute from the pool, which takes
+//     it up afresh;
 //   - the number of lines expected is the most seen lately, and drops back
 //     after kForget seconds with fewer.
 // A new line goes to the free flute that played nearest in pitch and most
@@ -51,7 +52,7 @@ class Ensemble {
   void split();
   void take(int flute, int midi, int velocity);
 
-  static constexpr double kChord = 0.035, kSplit = 0.15, kForget = 2.0, kIdle = 1.0;
+  static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
   std::vector<Slot> f_;
   int owner_[128];
   double pressT_[128] = {};

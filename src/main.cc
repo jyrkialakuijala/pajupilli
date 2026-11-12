@@ -242,7 +242,8 @@ const char kUsage[] =
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
     "  -fuzz SECS SEED     random playing, check for blow-ups\n"
     "  -nantest            check recovery from NaN states\n"
-    "  -polydemo           a line, a held note under a melody, chords (-o to save)\n"
+    "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
+    "                      chord (-o to save)\n"
     "\n"
     "Options:\n"
     "  -o FILE.wav         write the sound (48 kHz)\n"
@@ -258,8 +259,9 @@ const char kUsage[] =
     "  -transpose N        keys to sounding pitch (default: the lowest C plays\n"
     "                      the instrument's lowest octave)\n"
     "  -v                  verbose\n"
-    "  -poly N             up to N flutes (default 1): keys struck together, or a\n"
-    "                      note held under others, get flutes of their own\n"
+    "  -poly N             up to N flutes (default 8; 1 = a single flute): keys\n"
+    "                      struck together, or held together over 100 ms, get\n"
+    "                      flutes of their own\n"
     "\n"
     "Environment: PJ_NOCAL (skip calibration), PJ_NOCALCACHE (ignore the cache),\n"
     "PJ_TRACE (with -note: print model state per sample)\n"
@@ -340,8 +342,8 @@ int main(int argc, char** argv) {
   }
   if (live) return runLive(*gInst, lopt, gCal);
   if (polyDemo) {
-    // One line, then a held note under a melody, then chords: the pool should
-    // use 1, then 2, then 3 flutes (it prints "flutes: N" as it decides).
+    // One line, then a held note under a melody, then chords, then a rolled
+    // chord: the pool should use 1, 2, 3, then 4 flutes (it prints "flutes: N").
     Ensemble ens(*gInst, gCal, std::max(2, lopt.poly), true);
     std::vector<float> all;
     auto play = [&](double s) {  // in 64-frame periods, as live
@@ -368,6 +370,11 @@ int main(int argc, char** argv) {
       for (int k = 0; k < 3; ++k) ens.noteOff(c[k] + t);
       play(0.1);
     }
+    say("a rolled chord: four keys 60 ms apart, held");
+    const int roll[] = {60, 64, 67, 72};
+    for (int k = 0; k < 4; ++k) { ens.noteOn(roll[k] + t, 75); play(0.06); }
+    play(0.8);
+    for (int k = 0; k < 4; ++k) ens.noteOff(roll[k] + t);
     play(1.0);
     say("end");
     std::fprintf(stderr, "state resets: %d\n", ens.resets());
