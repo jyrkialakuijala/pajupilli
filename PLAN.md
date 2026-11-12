@@ -334,3 +334,16 @@ Off by default; the normal mode stays at about 10–15 ms.
 
 Steps 0–2 are mechanical and I can do them without supervision. From step 3 on, every change ends
 with listening files for an A/B, as before.
+
+### Added 2026-11-12 — key timing, thud and release, G at rest, C/C#-D trill
+- Keys that move together (closing or opening) start 0..3 ms apart (`PJ_KEYSPREAD`); pads
+  closed since the start open together on their first stroke (keeps the calibration).
+- Landing thud: the pad goes on into its felt (cup + finger on felt, ~400 Hz, Q 1.5) and pushes
+  the air of the sealed hole into the bore, both ways; 0.15 of a rigid piston, ~2 dB under the
+  pad's puff (`PJ_THUD`, `PJ_THUDF`). A held pad lifting off: the felt preload (0.05 mm) springs
+  back, a suction ~13 dB under the opening puff (`PJ_RELEASE`).
+- Rest fingering G4 (left hand down): a first note moves fewer keys. The flute's C7 moved
+  from +30 to +36 c (test limit for E6-C7 now 40 c).
+- Trill: D5 held, C5 / C#5 slurred over it: D on the C / C# fingering + D trill key
+  (prints trill-c / trill-cis). Flute: C-D -1..-3 c; C#-D +28 c, so the lips cover 20 % more
+  (+2..+4 c). Piccolo C-D -16 c, others within 10 c.

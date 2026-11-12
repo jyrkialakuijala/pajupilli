@@ -57,6 +57,12 @@ class Player {
  private:
   enum Attack { kSlur, kBreath, kDu, kTu, kAccent };
   void applyNote(Attack a);
+  // Trill C5-D5 or C#5-D5 (written) with D held: the fingers stay on C / C#
+  // and D sounds through the D trill key. trillBase_: the sounding C / C# (or -1).
+  int trillBase_ = -1;
+  const char* holesFor(int midi);
+  char trillHoles_[17] = {};
+  double trillCover_ = 1, kTrillCis_;  // C#-D trill: the D is sharp, the lips cover more
   Flute& flute_;
   const Instrument& inst_;
   double fs_;

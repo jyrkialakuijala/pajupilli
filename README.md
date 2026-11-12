@@ -98,6 +98,13 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 - Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.
 - Key clicks: a closing pad accelerates into its seat; in the last fraction of a
   millimetre the trapped air goes into the bore (a pop pitched by the tube),
-  plus a small mechanical tick. `PJ_PADPUMP` (0.25) and `PJ_KEYCLICK` (1) set the levels.
-- Not yet: the look-ahead expressive mode, trills, harmonics, multiphonics,
+  plus a small mechanical tick. The pad then sinks into its felt and springs back: a
+  low thud (~400 Hz) into the tube, both ways; a held pad lifting off gives a small suction.
+  Keys moving together start 0..3 ms apart. At rest the player holds G (left hand down).
+  `PJ_PADPUMP` (0.25), `PJ_KEYCLICK` (1), `PJ_THUD` (1), `PJ_RELEASE` (1) and
+  `PJ_KEYSPREAD` (3 ms) set them.
+- Trills: hold D5 (written) and play C5 or C#5 over it: the fingers stay on C / C# and D
+  sounds through the D trill key (printed as `trill-c` / `trill-cis`). The C#-D trill
+  is sharp on that key; the player covers more for it (`PJ_TRILLCIS` 0.8).
+- Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
   whistle tones.

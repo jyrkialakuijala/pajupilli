@@ -100,6 +100,8 @@ class Flute {
     bool closing = false;         // closing stroke: accelerates into the seat
     double stroke = 0.010;        // duration of the current stroke (s)
     double wait = 0;              // the stroke starts after this delay (s)
+    float thRe = 0, thIm = 0;     // landing thud: the pad on its felt (flow, m^3/s)
+    bool held = false;            // pressed into its felt by a closing stroke
     double padIn = 0;             // air the pad pushes into the bore (m^3/s)
     double a = 0;                 // bore radius at the hole (m)
     bool present = true;          // a piccolo has no C# and D holes (D foot)
@@ -155,7 +157,9 @@ class Flute {
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;
   double kXiHp_, xiLow_ = 0, kVortex_ = 1;
   double kTurbIn_, kEdge_, edgeLow_ = 0, edgeBand_ = 0;
-  double fingerSpeed_ = 1, kPadPump_, kKeyClick_, kKeySpread_;
+  double fingerSpeed_ = 1, kPadPump_, kKeyClick_, kKeySpread_, kThud_, kRelease_;
+  float thudCos_ = 1, thudSin_ = 0, thudDecay_ = 0;
+  int thudLeft_ = 0;  // samples until every thud has died out
   int nPumping_ = 0;
   uint32_t keyRng_ = 777;
   // Key impact: a few damped modes of the key and the tube wall.

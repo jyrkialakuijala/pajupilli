@@ -143,6 +143,20 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   kPadPump_ = knob("PJ_PADPUMP", 0.25);
   kKeyClick_ = knob("PJ_KEYCLICK", 1);
   kKeySpread_ = knob("PJ_KEYSPREAD", 3) * 1e-3;
+  // The landing thud: the pad goes on into its felt and springs back, pushing
+  // the air in the (now sealed) hole into the bore, both ways along the tube.
+  // Key cup + finger on the felt ring at ~400 Hz, Q ~1.5 (felt is lossy). Only
+  // the pad's middle moves with the cup: 0.15 of a rigid piston (by ear) puts
+  // a medium thud ~2 dB under the pad's puff, ~28 dB under a mezzo-forte note.
+  kThud_ = 0.15 * knob("PJ_THUD", 1);
+  {
+    const double f = knob("PJ_THUDF", 400), q = 1.5;
+    // Release: 0.05 mm of felt preload, peak skin speed x0 w (m/s).
+    kRelease_ = knob("PJ_RELEASE", 1) * 0.05e-3 * 2 * M_PI * f;
+    thudCos_ = float(std::cos(2 * M_PI * f / fs_));
+    thudSin_ = float(std::sin(2 * M_PI * f / fs_));
+    thudDecay_ = float(std::exp(-M_PI * f / (q * fs_)));
+  }
   {  // key impact modes: key arm / cup and the tube wall (~2.4, 5.3, 8.2 kHz)
     static const double f[kTickModes] = {2400, 5300, 8200}, tau[kTickModes] = {0.004, 0.0025, 0.0015};
     for (int m = 0; m < kTickModes; ++m) {
@@ -181,7 +195,9 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     h.tSeries = std::max(1e-3 * inst.bore, holeT_ + innerCorrection(h.b, delta) + tm + d * sh / sb);
     h.tRad = 0.6133 * h.b;
   }
-  setHoles("xxxxxxxxxxxxxxxx");
+  // At rest the player holds G: the left hand down, the right hand up (and the
+  // little finger on the D# key), so a first note moves fewer keys.
+  setHoles("xxxxxxxxxooooooo");
   for (Hole& h : hole_) h.open = h.target;
   updateHoles(0);
   // Radiators: each hole cell, the embouchure, the foot (horn outlet).
@@ -294,6 +310,17 @@ void Flute::updateHoles(double dtBlock) {
       continue;
     }
     const double o0 = h.open;
+    if (opening && h.held && dtBlock > 0 && kThud_ > 0) {
+      // The pad leaves its seat: the felt the finger (or the spring) held
+      // compressed ~0.05 mm springs back and the skin pulls air out of the
+      // hole: the thud's mirror, a small suction both ways along the tube.
+      // (A pad resting closed since the start is only lightly held.)
+      const double sh0 = M_PI * h.b * h.b;
+      h.thRe = 0;
+      h.thIm = float(kThud_ * kRelease_ * sh0);
+      thudLeft_ = int(0.03 * fs_);
+    }
+    h.held = false;
     const double step = dtBlock / h.stroke;
     h.open = opening ? std::min(h.target, h.open + step) : std::max(h.target, h.open - step);
     moved = true;
@@ -318,6 +345,13 @@ void Flute::updateHoles(double dtBlock) {
     h.padIn = kPadPump_ * vin / dtBlock;
     ++nPumping_;
     // The pad lands: a tick from the key and the tube, ~ the landing speed.
+    if (h.open == 0 && h.closing && kThud_ > 0) {
+      const double v = 2 * h.padH / h.stroke;  // landing speed (m/s)
+      h.thRe = float(kThud_ * v * sh);
+      h.thIm = 0;
+      h.held = true;
+      thudLeft_ = int(0.03 * fs_);  // 30 ms: ~-80 dB
+    }
     if (h.open == 0 && h.closing && kKeyClick_ > 0) {
       const double v = 2 * h.padH / h.stroke;   // m/s
       const double size = h.padR / 9.5e-3;      // bigger keys ring lower and louder
@@ -502,6 +536,17 @@ float Flute::sample() {
   if (nPumping_ > 0)  // pads pushing air into the tube (key clicks)
     for (const Hole& hl : hole_)
       if (hl.padIn != 0) bore_.s.p()[hl.cell] += float(hl.padIn * dt / bore_.compliance(hl.cell));
+  if (thudLeft_ > 0) {  // landing thuds
+    --thudLeft_;
+    for (Hole& hl : hole_) {
+      if (hl.thRe == 0 && hl.thIm == 0) continue;
+      bore_.s.p()[hl.cell] += float(hl.thRe * dt / bore_.compliance(hl.cell));
+      const float re = hl.thRe, im = hl.thIm;
+      hl.thRe = thudDecay_ * (re * thudCos_ - im * thudSin_);
+      hl.thIm = thudDecay_ * (re * thudSin_ + im * thudCos_);
+      if (thudLeft_ == 0) hl.thRe = hl.thIm = 0;
+    }
+  }
   {
     const double c = bore_.compliance(ec_), w = 2 / dt;
     const double g = eg_, rs = ers_ + ecnl_ * std::fabs(eq_), rr = err_, hl = ehl_;

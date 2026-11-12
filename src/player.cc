@@ -1,5 +1,8 @@
 #include "player.h"
 
+#include <cstdio>
+#include <cstring>
+
 #include <algorithm>
 #include <cmath>
 
@@ -74,6 +77,7 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
+  kTrillCis_ = knob("PJ_TRILLCIS", 0.8);
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
@@ -93,6 +97,12 @@ void Player::noteOn(int midi, int velocity) {
   // Slurring up into a higher register: the flutist kicks the jet over
   // (faster air, lips closer to the edge for a moment), or the old mode stays.
   if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick();
+  {  // C or C# slurred over a held D: a trill on the D trill key.
+    const int d = 74 + inst_.transpose, w = midi - inst_.transpose;
+    if (legato && held_[d] && (w == 72 || w == 73)) trillBase_ = midi;
+    else if (midi != d) trillBase_ = -1;
+  }
+  if (trillBase_ >= 0) regKick_ = 0;  // the trill D is the short tube's fundamental
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
@@ -116,13 +126,14 @@ void Player::noteOn(int midi, int velocity) {
 void Player::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
   held_[midi] = 0;
+  if (midi == 74 + inst_.transpose) trillBase_ = -1;  // the trill ends with the D
   int w = 0;
   for (int r = 0; r < stackTop_; ++r)
     if (stack_[r] != midi) stack_[w++] = stack_[r];
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
-    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic) regKick_ = slurKick();
+    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && trillBase_ < 0) regKick_ = slurKick();
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
@@ -144,10 +155,23 @@ void Player::setHold(bool h) {
   if (!h && stackTop_ == 0) blowing_ = false;
 }
 
+const char* Player::holesFor(int midi) {
+  trillCover_ = 1;
+  if (trillBase_ < 0) return info(midi)->holes;
+  const bool cis = trillBase_ - inst_.transpose == 73;
+  if (midi == trillBase_) return info(midi)->holes;  // the trill's lower note
+  // D: the C / C# fingering with the D trill key open.
+  std::memcpy(trillHoles_, info(trillBase_)->holes, 16);
+  trillHoles_[1] = 'o';
+  if (cis) trillCover_ = kTrillCis_;
+  std::fprintf(stderr, cis ? "trill-cis\n" : "trill-c\n");
+  return trillHoles_;
+}
+
 void Player::applyNote(Attack a) {
   // Key velocity = finger speed: 64 moves a key in 10 ms, 127 in 5 ms, 1 in 20 ms;
   // a faster finger lands the pad harder (a louder key click).
-  flute_.setHoles(info(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
+  flute_.setHoles(holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
   switch (a) {
     case kSlur: return;
@@ -226,7 +250,7 @@ void Player::render(float* out, int n) {
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
         ct = std::exp(ct);
       }
-      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * std::exp(0.3 * roll_);
+      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillCover_ * std::exp(0.3 * roll_);
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).
