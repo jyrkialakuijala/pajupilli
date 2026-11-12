@@ -6,6 +6,7 @@
 //   ./flute -slur 71 72 -dyn 0.2      slur into a note; print its pitch and level wobble
 //   ./flute -inst piccolo ...         piccolo, alto or bass flute (default: flute);
 //                                     notes are sounding MIDI pitches
+//   ./flute -h                        all options
 //   ./flute -live                     play it from the MPK mini mk3
 //       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
@@ -216,6 +217,51 @@ int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep
   return 0;
 }
 
+const char kUsage[] =
+    "pajupilli: a physical model of a Boehm flute.\n"
+    "\n"
+    "usage: flute [-inst NAME] MODE [options]\n"
+    "\n"
+    "Instrument:\n"
+    "  -inst NAME          flute (default), piccolo, alto or bass. Notes are\n"
+    "                      sounding MIDI pitches (flute 60..96, piccolo 74..107,\n"
+    "                      alto 55..83, bass 48..74)\n"
+    "\n"
+    "Modes:\n"
+    "  -live               play from a MIDI keyboard (Akai MPK mini mk3)\n"
+    "  -selftest           -live without a keyboard: plays an arpeggio\n"
+    "  -note M             play one note, print its pitch\n"
+    "  -scale              play the whole range, print a tuning table\n"
+    "  -demo               a slurred scale and a short phrase\n"
+    "  -slur A B           slur from A into B, print pitch and level wobble\n"
+    "  -imp M              passive resonances of a fingering\n"
+    "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
+    "  -fuzz SECS SEED     random playing, check for blow-ups\n"
+    "  -nantest            check recovery from NaN states\n"
+    "\n"
+    "Options:\n"
+    "  -o FILE.wav         write the sound (48 kHz)\n"
+    "  -secs S             note length (default 1)\n"
+    "  -dyn D              dynamics 0 (piano) .. 1 (forte), default 0.5\n"
+    "  -dump FILE          with -note: raw float32 window pressure\n"
+    "\n"
+    "Live options:\n"
+    "  -dev PCM            ALSA device (default: default, via PipeWire)\n"
+    "  -midi NAME          MIDI client name to connect to (default: MPK)\n"
+    "  -period N           frames per period (default 64)\n"
+    "  -periods N          periods in the buffer (default 3)\n"
+    "  -transpose N        keys to sounding pitch (default: the lowest C plays\n"
+    "                      the instrument's lowest octave)\n"
+    "  -v                  verbose\n"
+    "\n"
+    "Environment: PJ_NOCAL (skip calibration), PJ_NOCALCACHE (ignore the cache),\n"
+    "PJ_TRACE (with -note: print model state per sample)\n"
+    "\n"
+    "Examples:\n"
+    "  flute -live -inst alto\n"
+    "  flute -note 69 -o a4.wav\n"
+    "  flute -inst piccolo -scale\n";
+
 int main(int argc, char** argv) {
 #if defined(__SSE__)
   // Flush denormals to zero: decaying states must not slow the real-time path
@@ -228,8 +274,10 @@ int main(int argc, char** argv) {
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
   const char* dump = nullptr;  // window pressure, raw float32
+  if (argc < 2) { std::fputs(kUsage, stderr); return 1; }
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
+    if (a == "-h" || a == "-help" || a == "--help") { std::fputs(kUsage, stdout); return 0; }
     auto next = [&]() { return i + 1 < argc ? argv[++i] : (char*)""; };
     if (a == "-inst") {
       gInst = findInstrument(next());
@@ -255,7 +303,10 @@ int main(int argc, char** argv) {
     else if (a == "-nantest") return nanTest();
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
-    else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 1; }
+    else {
+      std::fprintf(stderr, "unknown option %s (try -h)\n", a.c_str());
+      return 1;
+    }
   }
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;
   if (cal) { calibrate(*gInst, 440, stdout); return 0; }
