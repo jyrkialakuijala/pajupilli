@@ -103,8 +103,21 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   Keys moving together start 0..3 ms apart. At rest the player holds G (left hand down).
   `PJ_PADPUMP` (0.25), `PJ_KEYCLICK` (1), `PJ_THUD` (1), `PJ_RELEASE` (1) and
   `PJ_KEYSPREAD` (3 ms) set them.
-- Trills: hold D5 (written) and play C5 or C#5 over it: the fingers stay on C / C# and D
-  sounds through the D trill key (printed as `trill-c` / `trill-cis`). The C#-D trill
-  is sharp on that key; the player covers more for it (`PJ_TRILLCIS` 0.8).
+- Trills on the D and D# trill keys (1st and 2nd): hold one note of a pair and play the
+  other over it, either way round; the fingers stay on the lower note and the upper one
+  sounds through the key(s), printed as it happens:
+
+  | Trill (written) | Keys | Printed |
+  |---|---|---|
+  | C5-D5 | D | `trill-c` |
+  | C#5-D5 | D | `trill-cis` |
+  | C#5-D#5 | D# | `trill-cis-dis` |
+  | B5-C#6 | D | `trill-b5` |
+  | C6-D6 | D# | `trill-c6` |
+  | C#6-D6 | D | `trill-cis6` |
+  | C#6-D#6 | both (not on the piccolo) | `trill-cis6-dis` |
+
+  On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
+  so the player covers more for them (`PJ_TRILLCOVER` 0 turns that off).
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
   whistle tones.

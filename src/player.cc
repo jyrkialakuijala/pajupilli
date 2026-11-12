@@ -66,6 +66,26 @@ const NoteInfo* noteInfo(const Instrument& inst, int midi) {
 
 double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69) / 12.0); }
 
+// Standard trill-key trills (written MIDI): hold the lower note's fingering,
+// trill the key(s). cover: the lips' coverage for the upper note, where the
+// trill fingering is out of tune (measured on the flute).
+struct Player::Trill {
+  int lo, hi;
+  const char* keys;  // "1" D trill key, "2" D# trill key
+  const char* name;
+  double cover;
+  const char* notOn = "";  // an instrument where it falls out of its register
+};
+const Player::Trill Player::kTrills[] = {
+    {72, 74, "1", "trill-c", 1.0},        // C5-D5
+    {73, 74, "1", "trill-cis", 0.8},      // C#5-D5 (+28 c without)
+    {73, 75, "2", "trill-cis-dis", 0.88}, // C#5-D#5 (+16 c without)
+    {83, 85, "1", "trill-b5", 1.0},       // B5-C#6
+    {84, 86, "2", "trill-c6", 1.0},       // C6-D6
+    {85, 86, "1", "trill-cis6", 1.0},     // C#6-D6
+    {85, 87, "12", "trill-cis6-dis", 1.0, "piccolo"},  // C#6-D#6
+};
+
 Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   for (int i = 0; i < 128; ++i) coverTrim[i] = coverLoTrim[i] = coverHiTrim[i] = pressTrim[i] = 1;
   for (double& d : dynLo) d = 0;
@@ -77,7 +97,7 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
-  kTrillCis_ = knob("PJ_TRILLCIS", 0.8);
+  kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
@@ -97,12 +117,22 @@ void Player::noteOn(int midi, int velocity) {
   // Slurring up into a higher register: the flutist kicks the jet over
   // (faster air, lips closer to the edge for a moment), or the old mode stays.
   if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick();
-  {  // C or C# slurred over a held D: a trill on the D trill key.
-    const int d = 74 + inst_.transpose, w = midi - inst_.transpose;
-    if (legato && held_[d] && (w == 72 || w == 73)) trillBase_ = midi;
-    else if (midi != d) trillBase_ = -1;
+  {  // One note of a trill pair slurred over the other (either held): the
+     // fingers stay on the lower note and the trill key(s) give the upper.
+    const int w = midi - inst_.transpose, tr = inst_.transpose;
+    const Trill* t = nullptr;
+    if (legato)
+      for (const Trill& k : kTrills) {
+        if (std::strcmp(k.notOn, inst_.name) == 0) continue;
+        if ((k.lo == w && held_[k.hi + tr]) || (k.hi == w && held_[k.lo + tr])) {
+          t = &k;
+          break;
+        }
+      }
+    if (t) { trill_ = t; trillBase_ = t->lo + tr; }
+    else if (!trill_ || (w != trill_->hi && w != trill_->lo)) { trill_ = nullptr; trillBase_ = -1; }
   }
-  if (trillBase_ >= 0) regKick_ = 0;  // the trill D is the short tube's fundamental
+  if (trill_) regKick_ = 0;  // the upper note is on the same fingering, no kick
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
@@ -126,14 +156,17 @@ void Player::noteOn(int midi, int velocity) {
 void Player::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
   held_[midi] = 0;
-  if (midi == 74 + inst_.transpose) trillBase_ = -1;  // the trill ends with the D
+  if (trill_) {  // the trill ends when neither of its notes is held
+    const int lo = trill_->lo + inst_.transpose, hi = trill_->hi + inst_.transpose;
+    if (!held_[lo] && !held_[hi]) { trill_ = nullptr; trillBase_ = -1; }
+  }
   int w = 0;
   for (int r = 0; r < stackTop_; ++r)
     if (stack_[r] != midi) stack_[w++] = stack_[r];
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
-    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && trillBase_ < 0) regKick_ = slurKick();
+    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && !trill_) regKick_ = slurKick();
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
@@ -157,14 +190,13 @@ void Player::setHold(bool h) {
 
 const char* Player::holesFor(int midi) {
   trillCover_ = 1;
-  if (trillBase_ < 0) return info(midi)->holes;
-  const bool cis = trillBase_ - inst_.transpose == 73;
-  if (midi == trillBase_) return info(midi)->holes;  // the trill's lower note
-  // D: the C / C# fingering with the D trill key open.
+  if (!trill_ || midi == trillBase_) return info(midi)->holes;
+  // The upper note: the lower note's fingering with the trill key(s) open.
+  // Key 1 = the D trill key (hole 2), key 2 = the D# trill key (hole 1).
   std::memcpy(trillHoles_, info(trillBase_)->holes, 16);
-  trillHoles_[1] = 'o';
-  if (cis) trillCover_ = kTrillCis_;
-  std::fprintf(stderr, cis ? "trill-cis\n" : "trill-c\n");
+  for (const char* k = trill_->keys; *k; ++k) trillHoles_[*k == '1' ? 1 : 0] = 'o';
+  trillCover_ = std::pow(trill_->cover, kTrillCover_);
+  std::fprintf(stderr, "%s\n", trill_->name);
   return trillHoles_;
 }
 

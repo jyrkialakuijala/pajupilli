@@ -344,6 +344,9 @@ with listening files for an A/B, as before.
   back, a suction ~13 dB under the opening puff (`PJ_RELEASE`).
 - Rest fingering G4 (left hand down): a first note moves fewer keys. The flute's C7 moved
   from +30 to +36 c (test limit for E6-C7 now 40 c).
-- Trill: D5 held, C5 / C#5 slurred over it: D on the C / C# fingering + D trill key
-  (prints trill-c / trill-cis). Flute: C-D -1..-3 c; C#-D +28 c, so the lips cover 20 % more
-  (+2..+4 c). Piccolo C-D -16 c, others within 10 c.
+- Trills on the trill keys (Flute School's list): C5-D5, C#5-D5, C#5-D#5, B5-C#6, C6-D6,
+  C#6-D6, C#6-D#6; either note held, the other slurred over it; the lower fingering stays
+  and the key(s) give the upper note (printed: trill-c, trill-cis, ...). Without lip help
+  C#5-D5 is +28 c and C#5-D#5 +16 c: the lips cover 20 % / 12 % more. Upper notes, cents:
+  flute -8..+6; piccolo -27..+1 (C6-D6 -27; C#6-D#6 falls out of its register: off);
+  alto -14..+10; bass -8..+23 (C#6-D6 +23; D#6 is above its range).
