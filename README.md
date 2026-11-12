@@ -109,15 +109,18 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
   | Trill (written) | Keys | Printed |
   |---|---|---|
-  | C5-D5 | D | `trill-c` |
-  | C#5-D5 | D | `trill-cis` |
-  | C#5-D#5 | D# | `trill-cis-dis` |
-  | B5-C#6 | D | `trill-b5` |
-  | C6-D6 | D# | `trill-c6` |
-  | C#6-D6 | D | `trill-cis6` |
-  | C#6-D#6 | both (not on the piccolo) | `trill-cis6-dis` |
+  | C5-D5 | D | `trill-c5-d5` |
+  | C#5-D5 | D | `trill-cis5-d5` |
+  | C#5-D#5 | D# | `trill-cis5-dis5` |
+  | B5-C#6 | D | `trill-b5-cis6` |
+  | C6-D6 | D# | `trill-c6-d6` |
+  | C#6-D6 | D | `trill-cis6-d6` |
+  | C#6-D#6 | both (not on the piccolo) | `trill-cis6-dis6` |
 
   On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
   so the player covers more for them (`PJ_TRILLCOVER` 0 turns that off).
+  A middle-octave trill that stops on D or D# (the lower key up for 0.3 s, `PJ_TRILLSETTLE`)
+  eases over to the note's own fingering without key noise: the lower keys first, then the
+  trill key, then the C# vent, 30 ms apart (`PJ_SETTLEGAP`); printed `...: settled`.
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
   whistle tones.

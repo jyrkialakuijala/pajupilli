@@ -65,7 +65,9 @@ class Flute {
   // Fingering as 16 chars, hole 1 (D# trill) .. hole 16 (C#4), 'o' open, 'x' closed.
   // Fingering; fingerSpeed scales how fast the fingers move the keys (key velocity:
   // 1 = 10 ms, 2 = 5 ms). Springs always take their own time.
-  void setHoles(const char* pattern, double fingerSpeed = 1);
+  // quiet: the fingers ease the keys over (a settled trill): no puff, thud,
+  // click or release from the keys that move.
+  void setHoles(const char* pattern, double fingerSpeed = 1, bool quiet = false);
   void setEmbouchure(const Embouchure& e) { target_ = e; }
   const Embouchure& embouchure() const { return target_; }
 
@@ -102,6 +104,7 @@ class Flute {
     double wait = 0;              // the stroke starts after this delay (s)
     float thRe = 0, thIm = 0;     // landing thud: the pad on its felt (flow, m^3/s)
     bool held = false;            // pressed into its felt by a closing stroke
+    bool quiet = false;           // this stroke eased over: no puff, thud or click
     double padIn = 0;             // air the pad pushes into the bore (m^3/s)
     double a = 0;                 // bore radius at the hole (m)
     bool present = true;          // a piccolo has no C# and D holes (D foot)

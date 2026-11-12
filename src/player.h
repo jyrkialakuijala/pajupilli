@@ -68,6 +68,15 @@ class Player {
   const char* holesFor(int midi);
   char trillHoles_[17] = {};
   double trillCover_ = 1, kTrillCover_;  // lip coverage for the upper note
+  // An upper note on the trill key with the lower key up for kTrillSettle_
+  // seconds: the fingers ease over to its own fingering (no key noise) and the
+  // lips back, over trillLipTau_.
+  bool onTrillKey_ = false;
+  double trillClock_ = 0, kTrillSettle_, trillLip_ = 1, trillLipTau_ = 0.002;
+  // Settling in two steps: the other fingers first (the trill key still vents),
+  // then the trill key closes; settleKeys_: the trill keys still open (or null).
+  const char* settleKeys_ = nullptr;
+  double settleClock_ = 0, kSettleGap_;
   Flute& flute_;
   const Instrument& inst_;
   double fs_;

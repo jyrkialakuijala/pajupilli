@@ -74,16 +74,17 @@ struct Player::Trill {
   const char* keys;  // "1" D trill key, "2" D# trill key
   const char* name;
   double cover;
+  bool settle;             // a held upper note eases over to its own fingering
   const char* notOn = "";  // an instrument where it falls out of its register
 };
 const Player::Trill Player::kTrills[] = {
-    {72, 74, "1", "trill-c", 1.0},        // C5-D5
-    {73, 74, "1", "trill-cis", 0.8},      // C#5-D5 (+28 c without)
-    {73, 75, "2", "trill-cis-dis", 0.88}, // C#5-D#5 (+16 c without)
-    {83, 85, "1", "trill-b5", 1.0},       // B5-C#6
-    {84, 86, "2", "trill-c6", 1.0},       // C6-D6
-    {85, 86, "1", "trill-cis6", 1.0},     // C#6-D6
-    {85, 87, "12", "trill-cis6-dis", 1.0, "piccolo"},  // C#6-D#6
+    {72, 74, "1", "trill-c5-d5", 1.0, true},
+    {73, 74, "1", "trill-cis5-d5", 0.8, true},     // +28 c without the lips
+    {73, 75, "2", "trill-cis5-dis5", 0.88, true},  // +16 c without the lips
+    {83, 85, "1", "trill-b5-cis6", 1.0, false},
+    {84, 86, "2", "trill-c6-d6", 1.0, false},
+    {85, 86, "1", "trill-cis6-d6", 1.0, false},
+    {85, 87, "12", "trill-cis6-dis6", 1.0, false, "piccolo"},
 };
 
 Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
@@ -98,6 +99,8 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
   kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
+  kTrillSettle_ = knob("PJ_TRILLSETTLE", 0.3);  // s
+  kSettleGap_ = knob("PJ_SETTLEGAP", 0.03);     // s, other keys -> trill key
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
@@ -190,7 +193,11 @@ void Player::setHold(bool h) {
 
 const char* Player::holesFor(int midi) {
   trillCover_ = 1;
+  onTrillKey_ = false;
+  trillLipTau_ = 0.002;
   if (!trill_ || midi == trillBase_) return info(midi)->holes;
+  onTrillKey_ = true;
+  trillClock_ = 0;
   // The upper note: the lower note's fingering with the trill key(s) open.
   // Key 1 = the D trill key (hole 2), key 2 = the D# trill key (hole 1).
   std::memcpy(trillHoles_, info(trillBase_)->holes, 16);
@@ -254,6 +261,46 @@ void Player::render(float* out, int n) {
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
+    // A trill that stops on its upper note (the lower key stays up): after a
+    // while the fingers ease over to the note's own fingering, unheard.
+    // Only the middle-octave D / D# (trill_->settle): into D6 / D#6 (3rd
+    // resonance) the bass fell an octave, and C#6 swept ~45 c on the way.
+    if (onTrillKey_ && trill_ && trill_->settle && note_ >= 0 &&
+        !held_[trill_->lo + inst_.transpose]) {
+      trillClock_ += bdt;
+      if (trillClock_ > kTrillSettle_) {
+        std::fprintf(stderr, "%s: settled\n", trill_->name);
+        trillLipTau_ = 0.02;  // with the keys (~20 ms)
+        // First the keys below the trill and C# holes to the note's own
+        // fingering (the trill key stays open and keeps the note); then the
+        // trill key closes (the note overblows on the long tube); then the C#
+        // vent opens. Opening it with the trill key still open goes 30 c sharp.
+        std::memcpy(trillHoles_ + 3, info(note_)->holes + 3, 13);
+        flute_.setHoles(trillHoles_, 0.5, true);
+        settleKeys_ = trill_->keys;
+        settleClock_ = 0;
+        trill_ = nullptr;
+        trillBase_ = -1;
+        onTrillKey_ = false;  // the lips stay until the trill key closes
+      }
+    }
+    if (settleKeys_) {  // then the trill key closes, then the C# vent opens
+      settleClock_ += bdt;
+      if (note_ < 0 || trill_) {
+        settleKeys_ = nullptr;
+        if (!trill_) trillCover_ = 1;
+      } else if (settleClock_ > 2 * kSettleGap_) {
+        flute_.setHoles(info(note_)->holes, 0.5, true);
+        settleKeys_ = nullptr;
+      } else if (settleClock_ > kSettleGap_ && settleClock_ - bdt <= kSettleGap_) {
+        const char* own = info(note_)->holes;
+        for (int k = 0; k < 3; ++k)
+          if (own[k] == 'x') trillHoles_[k] = 'x';
+        flute_.setHoles(trillHoles_, 0.5, true);
+        trillCover_ = 1;  // the lips back with the trill key (~20 ms)
+      }
+    }
+    trillLip_ += (1 - std::exp(-bdt / trillLipTau_)) * (trillCover_ - trillLip_);
     Embouchure e = flute_.embouchure();
     double lungTarget = 0;
     if (note_ >= 0) {
@@ -282,7 +329,7 @@ void Player::render(float* out, int n) {
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
         ct = std::exp(ct);
       }
-      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillCover_ * std::exp(0.3 * roll_);
+      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_);
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).

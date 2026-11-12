@@ -350,3 +350,10 @@ with listening files for an A/B, as before.
   C#5-D5 is +28 c and C#5-D#5 +16 c: the lips cover 20 % / 12 % more. Upper notes, cents:
   flute -8..+6; piccolo -27..+1 (C6-D6 -27; C#6-D#6 falls out of its register: off);
   alto -14..+10; bass -8..+23 (C#6-D6 +23; D#6 is above its range).
+- Trill names print both notes (trill-c5-d5, ...). Settling: a middle-octave trill stopping on
+  its upper note (lower key up 0.3 s) moves to the note's own fingering with quiet keys (no
+  puff, thud, click or release) in three steps 30 ms apart: the keys below the C# hole (the
+  trill key keeps the note), the trill key (the note overblows on the long tube), the C#
+  vent. One step dipped 4 dB and went -18 c; the C# vent with the trill key open is +30 c.
+  Flute: within 8 c, dip < 2 dB; piccolo / alto / bass 9-38 c (their trill notes are off too).
+  Not for the 3rd-octave trills: into D6 the bass fell an octave, into C#6 ~45 c sweeps.
