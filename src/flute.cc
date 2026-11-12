@@ -182,7 +182,10 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     h.tRad = 0.6133 * h.b;
   }
   setHoles("xxxxxxxxxxxxxxxx");
-  for (Hole& h : hole_) h.open = h.target;
+  for (Hole& h : hole_) {
+    h.open = h.target;
+    h.closing = h.open == 0;  // so the first opening is a new stroke
+  }
   updateHoles(0);
   // Radiators: each hole cell, the embouchure, the foot (horn outlet).
   // Listener 1 m in front of the player's face (x along the flute from the cork
@@ -248,10 +251,13 @@ Branch Flute::holeBranch(const Hole& h) const {
 void Flute::updateHoles(double dtBlock) {
   bool moved = dtBlock == 0;
   nPumping_ = 0;
-  // Several fingers put down "together" land 0..3 ms apart: each closing
-  // stroke that starts with others waits a random delay.
-  int closers = 0;
-  for (const Hole& h : hole_) closers += h.target < h.open && !h.closing;
+  // Several fingers put down (or lifted) "together" move 0..3 ms apart: each
+  // stroke that starts with others in the same direction waits a random delay.
+  int closers = 0, openers = 0;
+  for (const Hole& h : hole_) {
+    closers += h.target < h.open && !h.closing;
+    openers += h.target > h.open && h.closing;
+  }
   for (int i = 0; i < kHoles; ++i) {
     Hole& h = hole_[i];
     h.padIn = 0;
@@ -271,7 +277,7 @@ void Flute::updateHoles(double dtBlock) {
       const double jitter = 1 + 0.3 * ((keyRng_ >> 8) * (1.0 / 16777216.0) - 0.5);
       h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
       h.wait = 0;
-      if (h.closing && closers > 1 && dtBlock > 0) {
+      if ((h.closing ? closers : openers) > 1 && dtBlock > 0) {
         // Scrambled: the next LCG output is correlated with the stroke jitter.
         keyRng_ = keyRng_ * 1664525u + 1013904223u;
         uint32_t r = keyRng_ ^ (keyRng_ >> 16);
