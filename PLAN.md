@@ -466,3 +466,10 @@ crossing), the held note keeping its own flute from the start when the history s
   the centre (studio, hall, church); 5-8 x the echo density in the first 60 ms. `make test`
   checks it. The players hear the field at its theoretical level now (+24 dB): the coupling
   is still passive (an idle flute gives back <= 1 %), no resets.
+- Mirrored early reflections (by request): the microphones are directional, 0.6 + 0.4 cos
+  (14 dB down at the back), 2 m apart and aimed 55 degrees out; walls absorb 0.4 x the mean
+  (sides), 0.8 x (front, back, ceiling), 2.5 x (audience floor). A side wall's first
+  reflection is 10-12 dB louder in the channel on its side (hall: left wall 42 ms, right wall
+  48 ms for the left player). The diffuse field into the directional pair: x sqrt(a^2 + (1 -
+  a)^2 / 3); the microphone gain keeps the total level. Hall room/direct now +2.1 dB (centre),
+  +3.4 dB (side). `-roomimp` prints the side walls; `make test` checks the mirroring (>= 6 dB).

@@ -346,6 +346,7 @@ int roomImpulse(const RoomSpec& rs) {
     double d = 0, r = 0;
     for (int i = 0; i < N; ++i) (i < first + kFs / 500 ? d : r) += double(L[i]) * L[i] + double(R[i]) * R[i];
     std::printf("player at %+.0f m: room / direct %+.1f dB\n", x[src], 10 * std::log10(r / d));
+    std::printf("  side walls: %s\n", room.lateral(src).c_str());
     const double w[][2] = {{20, 50}, {50, 100}, {100, 300}, {300, 1000}};
     for (auto& t : w) {
       double el = 0, er = 0, lr = 0;

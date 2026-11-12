@@ -175,7 +175,10 @@ def room():
         rd = [float(v) for v in re.findall(r'room / direct ([+-][\d.]+)', out)]
         late = [(float(a), float(c)) for t0, a, c in re.findall(r'(\d+)-\s*\d+ ms: left/right ([+-][\d.]+) dB, correlation ([+-][\d.]+)', out) if int(t0) >= 100]
         ok = rd and all(-3 <= v <= 10 for v in rd) and late and all(abs(a) <= 1.5 and abs(c) <= 0.3 for a, c in late)
-        check(f'room is diffuse ({rm})', bool(ok), f'room/direct {rd} dB, late L/R and correlation {late}')
+        # Early reflections mirror the stage: the left wall's in the left channel, the right's in the right.
+        side = [(w, float(v)) for w, v in re.findall(r'(left|right) wall \d+ ms, right - left ([+-][\d.]+) dB', out)]
+        ok = ok and side and all((v <= -6) if w == 'left' else (v >= 6) for w, v in side)
+        check(f'room is diffuse ({rm})', bool(ok), f'room/direct {rd} dB, side walls {side[:2]}, late L/R and correlation {late}')
     wav = os.path.join(ROOT, 'tools', '.ens-test.wav')
     r = run(['-ensemble', '-polydemo', '-o', wav])
     err = r.stderr

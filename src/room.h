@@ -3,12 +3,14 @@
 //
 // - The room is a shoebox (2 : 1.4 : 0.7) of the given volume. The players sit
 //   on a line across the stage near the front wall (high instruments on the
-//   left); the listener is a spaced pair of microphones (1 m either side of the
-//   centre) further into the room.
+//   left); the listener is a pair of microphones 2 m apart further into the
+//   room, aimed out to the sides (55 degrees, between omni and cardioid).
 // - Early sound: the direct sound and the reflections off the six surfaces up
 //   to second order (image sources: 24 per player and microphone), each 1/r,
-//   r/c late and reflected sqrt(1 - alpha) per wall (alpha = A / S). They come
-//   from both sides within the first tens of milliseconds.
+//   r/c late and reflected sqrt(1 - alpha) per wall (alpha = A / S; hard side
+//   walls, an absorbing audience floor), picked up by the microphone facing
+//   them: a player on the left is heard off the right wall in the right
+//   channel (the stage mirrored), within the first tens of milliseconds.
 // - The reverberant field is a feedback delay network: 16 delay lines (lengths
 //   around the room's mean free path 4V/S), mixed by an orthogonal matrix
 //   (Hadamard / 4), each line losing what the walls and the air absorb in its
@@ -59,6 +61,9 @@ class Room {
                const float* listenGain);
   int sources() const { return int(x_.size()); }
   const RoomSpec& spec() const { return spec_; }
+  // Source s's first reflections off the side walls: when, and how much louder
+  // in the right channel than the left.
+  std::string lateral(int s) const;
 
  private:
   RoomSpec spec_;
@@ -69,7 +74,10 @@ class Room {
   std::vector<float> line_;     // [line][kLineRing]
   int len_[kLines], pos_ = 0;
   float b0_[kLines], a1_[kLines], lp_[kLines] = {};
-  float inGain_, micGain_ = 1;
+  float inGain_, micGain_ = 1, micDiffuse_ = 1;
+  // The microphones' pattern a + (1 - a) cos (0.6: between omni and cardioid,
+  // 14 dB down at the back) and their angle out from the stage (55 degrees).
+  static constexpr double kMicPattern = 0.6, kMicAngle = 55 * 3.14159265358979 / 180;
   std::vector<float> inDir_;    // [source][line], unit length
   std::vector<float> outDir_;   // [tap][line], unit length; taps: sources, then left, right
   // Input diffusers: three allpasses per source.
@@ -82,7 +90,7 @@ class Room {
   int rpos_ = 0;
   std::vector<int> dDelay_;     // between players: [to][from] samples
   std::vector<float> dGain_;
-  struct Tap { int src, mic, delay; float gain; };
+  struct Tap { int src, mic, delay; float gain; int u, w, z; };  // u, w, z: the image (walls hit)
   std::vector<Tap> early_;      // to the microphones: direct and reflections
 };
 

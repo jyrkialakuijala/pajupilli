@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace pajupilli {
 
@@ -59,9 +60,6 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
   // circulates as 1 / (1 - g^2) over the lines; a unit tap sees 1/16 of it.
   const double absorption = 0.161 * v / rt;
   inGain_ = spec.volume > 0 ? float(4 * std::sqrt(16 * M_PI / absorption * (1 - g2))) : 0.0f;
-  // The microphones: a source at the listener distance as at 1 m, then the
-  // whole (direct + room) back to about the direct sound's loudness.
-  micGain_ = float(spec.listener / std::sqrt(1 + 16 * M_PI / absorption * spec.listener * spec.listener));
   // Random unit directions over the lines (fixed seed): no source or listener
   // is aligned with the mixing matrix's own rows (a Hadamard row folds back
   // into a single line after one pass).
@@ -111,28 +109,63 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     }
   // To the microphones: image sources up to second order. Stage: the players
   // 3 m from the front wall (at most a fifth of the length), 1.2 m high; the
-  // microphones 1.5 m high, the listener distance further.
+  // microphones 1.5 m high, the listener distance further, 2 m apart, aimed
+  // 55 degrees out to their sides (a + (1 - a) cos: a reflection off the right
+  // wall is louder in the right channel, the left wall's in the left: the
+  // early sound mirrors the stage). Walls absorb differently: hard side walls
+  // (0.4 x the mean), front, back and ceiling 0.8 x, the audience floor 2.5 x.
   if (spec.volume > 0) {
     const double ys = std::min(3.0, 0.2 * len), ym = std::min(ys + spec.listener, len - 1);
-    const double beta = std::sqrt(1 - std::min(0.9, absorption / surface));
+    const double alpha = std::min(0.9, absorption / surface);
+    auto refl = [&](double k) { return std::sqrt(1 - std::min(0.95, k * alpha)); };
+    const double bSide = refl(0.4), bEnd = refl(0.8), bCeil = refl(0.8), bFloor = refl(2.5);
     auto image = [](int u, double c, double d) { return u % 2 == 0 ? u * d + c : (u + 1) * d - c; };
     for (int s = 0; s < ns; ++s)
       for (int mic = 0; mic < 2; ++mic) {
         const double sx = std::clamp(wid / 2 + x[s], 0.3, wid - 0.3), sy = ys, sz = std::min(1.2, hei / 2);
         const double mx = wid / 2 + (mic ? 1.0 : -1.0), my = ym, mz = std::min(1.5, hei / 2);
+        const double ax = std::sin(kMicAngle) * (mic ? 1 : -1), ay = -std::cos(kMicAngle);  // towards the stage
         for (int u = -2; u <= 2; ++u)
           for (int w = -2; w <= 2; ++w)
             for (int z = -2; z <= 2; ++z) {
               const int order = std::abs(u) + std::abs(w) + std::abs(z);
               if (order > 2) continue;
-              const double r = std::sqrt(std::pow(image(u, sx, wid) - mx, 2) + std::pow(image(w, sy, len) - my, 2) +
-                                         std::pow(image(z, sz, hei) - mz, 2));
+              const double dx = image(u, sx, wid) - mx, dy = image(w, sy, len) - my, dz = image(z, sz, hei) - mz;
+              const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
               const int d = int(std::lround(r / kC * fs));
               if (d >= kRing - kBlock) continue;
-              early_.push_back({s, mic, d, float(std::pow(beta, order) / std::max(r, 0.5))});
+              double g = std::pow(bSide, std::abs(u)) * std::pow(bEnd, std::abs(w));
+              if (z == -1 || std::abs(z) == 2) g *= bFloor;
+              if (z == 1 || std::abs(z) == 2) g *= bCeil;
+              const double cosT = (dx * ax + dy * ay) / std::max(r, 1e-9);
+              g *= kMicPattern + (1 - kMicPattern) * cosT;
+              early_.push_back({s, mic, d, float(g / std::max(r, 0.5)), u, w, z});
             }
       }
+    // The reverberant field reaches a directional microphone weaker than an
+    // omni: energy a^2 + (1 - a)^2 / 3.
+    micDiffuse_ = float(std::sqrt(kMicPattern * kMicPattern + (1 - kMicPattern) * (1 - kMicPattern) / 3));
+    const double on = kMicPattern + (1 - kMicPattern) * std::cos(kMicAngle);  // the stage's centre, about
+    micGain_ = float(spec.listener /
+                     std::sqrt(on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_));
   }
+}
+
+std::string Room::lateral(int s) const {
+  std::string out;
+  for (int u : {-1, 1}) {
+    double t = 0, g[2] = {0, 0};
+    for (const Tap& tp : early_)
+      if (tp.src == s && tp.u == u && tp.w == 0 && tp.z == 0) {
+        g[tp.mic] = tp.gain;
+        if (tp.mic == (u > 0)) t = tp.delay * 1000.0 / fs_;  // at the microphone on its side
+      }
+    char b[128];
+    std::snprintf(b, sizeof b, "%s%s wall %.0f ms, right - left %+.1f dB", out.empty() ? "" : "; ",
+                  u < 0 ? "left" : "right", t, 20 * std::log10(g[1] / g[0]));
+    out += b;
+  }
+  return out;
 }
 
 void Room::process(const float* const* src, int n, float* const* atSource, float* left, float* right,
@@ -160,7 +193,7 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
         }
         atSource[t][i] = acc;
       } else {
-        (t == ns ? left : right)[i] += lg * acc;
+        (t == ns ? left : right)[i] += lg * micDiffuse_ * acc;
       }
     }
     // Early sound at the microphones.

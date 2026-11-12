@@ -100,8 +100,11 @@ just intonation works across the ensemble.
 
 The instruments play in a room, a reverberant space of its own: a shoebox of the room's
 volume, the players on a line across the stage (high instruments on the left), the listener a
-pair of microphones further in (stereo). The early sound is the direct sound and the
-reflections off the walls, floor and ceiling (to second order); the reverberant field is a
+pair of microphones further in, aimed out to the sides (stereo). The early sound is the direct
+sound and the reflections off the walls, floor and ceiling (to second order; hard side walls,
+an absorbing audience floor), each picked up by the microphone facing it: a player on the left
+comes back off the right wall in the right channel, 30-40 ms later in the hall, the stage
+mirrored (about 11 dB between the channels); the reverberant field is a
 16-line feedback delay network sized from the room, its decay from the RT60 and its level
 from diffuse-field theory (in the hall at the listener about as loud as the direct sound).
 Each player feeds it through diffusers along its own random direction and each listener takes
