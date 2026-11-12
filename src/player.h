@@ -77,6 +77,11 @@ class Player {
   // then the trill key closes; settleKeys_: the trill keys still open (or null).
   const char* settleKeys_ = nullptr;
   double settleClock_ = 0, kSettleGap_;
+  // A trill starts only when its two notes alternate fast: the last key event
+  // (press or release) was one of them, under kTrillFast_ seconds before (not a
+  // slow B C D E, nor a fast scale).
+  double keyClock_ = 1e9, kTrillFast_;
+  int lastKey_ = -1;
   Flute& flute_;
   const Instrument& inst_;
   double fs_;

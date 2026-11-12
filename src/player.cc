@@ -100,7 +100,8 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   kKickP_ = knob("PJ_KICKP", 0.3);
   kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
   kTrillSettle_ = knob("PJ_TRILLSETTLE", 0.3);  // s
-  kSettleGap_ = knob("PJ_SETTLEGAP", 0.03);     // s, other keys -> trill key
+  kSettleGap_ = knob("PJ_SETTLEGAP", 0.03);
+  kTrillFast_ = knob("PJ_TRILLFAST", 0.12);  // s     // s, other keys -> trill key
   kDynH_ = knob("PJ_DYNH", 0.7);
   kDynP_ = knob("PJ_DYNP", 0.6);
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
@@ -127,6 +128,9 @@ void Player::noteOn(int midi, int velocity) {
     if (legato)
       for (const Trill& k : kTrills) {
         if (std::strcmp(k.notOn, inst_.name) == 0) continue;
+        const bool fast = keyClock_ < kTrillFast_ &&
+                          (lastKey_ == k.lo + tr || lastKey_ == k.hi + tr);
+        if (!fast && trill_ != &k) continue;
         if ((k.lo == w && held_[k.hi + tr]) || (k.hi == w && held_[k.lo + tr])) {
           t = &k;
           break;
@@ -136,6 +140,8 @@ void Player::noteOn(int midi, int velocity) {
     else if (!trill_ || (w != trill_->hi && w != trill_->lo)) { trill_ = nullptr; trillBase_ = -1; }
   }
   if (trill_) regKick_ = 0;  // the upper note is on the same fingering, no kick
+  keyClock_ = 0;
+  lastKey_ = midi;
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
@@ -159,6 +165,8 @@ void Player::noteOn(int midi, int velocity) {
 void Player::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
   held_[midi] = 0;
+  keyClock_ = 0;
+  lastKey_ = midi;
   if (trill_) {  // the trill ends when neither of its notes is held
     const int lo = trill_->lo + inst_.transpose, hi = trill_->hi + inst_.transpose;
     if (!held_[lo] && !held_[hi]) { trill_ = nullptr; trillBase_ = -1; }
@@ -261,6 +269,7 @@ void Player::render(float* out, int n) {
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
+    keyClock_ += bdt;
     // A trill that stops on its upper note (the lower key stays up): after a
     // while the fingers ease over to the note's own fingering, unheard.
     // Only the middle-octave D / D# (trill_->settle): into D6 / D#6 (3rd

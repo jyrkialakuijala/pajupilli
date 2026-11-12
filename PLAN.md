@@ -357,3 +357,8 @@ with listening files for an A/B, as before.
   vent. One step dipped 4 dB and went -18 c; the C# vent with the trill key open is +30 c.
   Flute: within 8 c, dip < 2 dB; piccolo / alto / bass 9-38 c (their trill notes are off too).
   Not for the 3rd-octave trills: into D6 the bass fell an octave, into C#6 ~45 c sweeps.
+- A trill starts only when its two notes alternate fast: the last key event (press or release)
+  was one of the pair, under 0.12 s before (`PJ_TRILLFAST`). Slow legato B C D E and scales at
+  8 and 16 notes/s never use the trill keys; a C-D trill picks them up from its second D.
+  The settle moves every key quietly (checked: no puff, thud, click or release); slower settle
+  fingers (40 ms strokes) wander more (flute 37 c, -4.8 dB), so 20 ms stays.

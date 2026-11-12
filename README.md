@@ -103,9 +103,11 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   Keys moving together start 0..3 ms apart. At rest the player holds G (left hand down).
   `PJ_PADPUMP` (0.25), `PJ_KEYCLICK` (1), `PJ_THUD` (1), `PJ_RELEASE` (1) and
   `PJ_KEYSPREAD` (3 ms) set them.
-- Trills on the D and D# trill keys (1st and 2nd): hold one note of a pair and play the
-  other over it, either way round; the fingers stay on the lower note and the upper one
-  sounds through the key(s), printed as it happens:
+- Trills on the D and D# trill keys (1st and 2nd): hold one note of a pair and alternate
+  the other over it fast, either way round (each key event within 0.12 s of the last one of
+  the pair, `PJ_TRILLFAST`; the first alternation is still played with real fingerings, so
+  slow passages and scales never use the trill keys). The fingers stay on the lower note
+  and the upper one sounds through the key(s), printed as it happens:
 
   | Trill (written) | Keys | Printed |
   |---|---|---|
@@ -120,7 +122,7 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   On the flute the upper notes are within 10 cents; C#-D and C#-D# are sharp on their keys,
   so the player covers more for them (`PJ_TRILLCOVER` 0 turns that off).
   A middle-octave trill that stops on D or D# (the lower key up for 0.3 s, `PJ_TRILLSETTLE`)
-  eases over to the note's own fingering without key noise: the lower keys first, then the
+  eases over to the note's own fingering with no key sounds at all: the lower keys first, then the
   trill key, then the C# vent, 30 ms apart (`PJ_SETTLEGAP`); printed `...: settled`.
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
   whistle tones.
