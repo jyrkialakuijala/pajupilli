@@ -182,10 +182,7 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     h.tRad = 0.6133 * h.b;
   }
   setHoles("xxxxxxxxxxxxxxxx");
-  for (Hole& h : hole_) {
-    h.open = h.target;
-    h.closing = h.open == 0;  // so the first opening is a new stroke
-  }
+  for (Hole& h : hole_) h.open = h.target;
   updateHoles(0);
   // Radiators: each hole cell, the embouchure, the foot (horn outlet).
   // Listener 1 m in front of the player's face (x along the flute from the cork
@@ -248,6 +245,17 @@ Branch Flute::holeBranch(const Hole& h) const {
   return br;
 }
 
+double Flute::keyDelay() {
+  // Scrambled: the next LCG output is correlated with the stroke jitter.
+  keyRng_ = keyRng_ * 1664525u + 1013904223u;
+  uint32_t r = keyRng_ ^ (keyRng_ >> 16);
+  r *= 0x7feb352du;
+  r ^= r >> 15;
+  r *= 0x846ca68bu;
+  r ^= r >> 16;
+  return kKeySpread_ * ((r >> 8) * (1.0 / 16777216.0));
+}
+
 void Flute::updateHoles(double dtBlock) {
   bool moved = dtBlock == 0;
   nPumping_ = 0;
@@ -256,6 +264,8 @@ void Flute::updateHoles(double dtBlock) {
   int closers = 0, openers = 0;
   for (const Hole& h : hole_) {
     closers += h.target < h.open && !h.closing;
+    // (A pad closed since the start opens on its own: a note from silence is
+    // fragile at the top of the bass, and the calibration starts from there.)
     openers += h.target > h.open && h.closing;
   }
   for (int i = 0; i < kHoles; ++i) {
@@ -277,16 +287,7 @@ void Flute::updateHoles(double dtBlock) {
       const double jitter = 1 + 0.3 * ((keyRng_ >> 8) * (1.0 / 16777216.0) - 0.5);
       h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
       h.wait = 0;
-      if ((h.closing ? closers : openers) > 1 && dtBlock > 0) {
-        // Scrambled: the next LCG output is correlated with the stroke jitter.
-        keyRng_ = keyRng_ * 1664525u + 1013904223u;
-        uint32_t r = keyRng_ ^ (keyRng_ >> 16);
-        r *= 0x7feb352du;
-        r ^= r >> 15;
-        r *= 0x846ca68bu;
-        r ^= r >> 16;
-        h.wait = kKeySpread_ * ((r >> 8) * (1.0 / 16777216.0));
-      }
+      if ((h.closing ? closers : openers) > 1 && dtBlock > 0) h.wait = keyDelay();
     }
     if (h.wait > 0) {
       h.wait -= dtBlock;

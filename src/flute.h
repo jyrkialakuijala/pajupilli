@@ -105,6 +105,7 @@ class Flute {
     bool present = true;          // a piccolo has no C# and D holes (D foot)
   };
   void updateHoles(double dtBlock);
+  double keyDelay();  // a random 0..PJ_KEYSPREAD start delay (s)
   Branch holeBranch(const Hole& h) const;
   void embouchureGeometry();
   void controlStep();
