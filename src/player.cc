@@ -225,6 +225,10 @@ void Player::applyNote(Attack a) {
   // a faster finger lands the pad harder (a louder key click).
   flute_.setHoles(holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
+  // A new note: the lips start from its calibrated place; the ear takes over.
+  earCorr_ = 0;
+  earClock_ = 0;
+  if (!onTrillKey_) lastCross_ = -1;
   switch (a) {
     case kSlur: return;
     case kBreath:  // "h": no tongue; the glottis opens from a slit over ~40 ms
@@ -276,7 +280,12 @@ void Player::render(float* out, int n) {
     const double bdt = m / fs_;
     keyClock_ += bdt;
     double lipTarget = trillCover_;
-    if (onTrillKey_ && trill_) {
+    const bool trillEar = onTrillKey_ && trill_;
+    if (!trillEar && ear_ && note_ >= 0) {
+      earClock_ += bdt;
+      lipTarget *= std::exp(earCorr_);
+    }
+    if (trillEar) {
       trillClock_ += bdt;
       lipTarget *= std::exp(trillCorr_[trill_ - kTrills]);
       if (!heldTold_ && trillClock_ > kTrillHeld_) {  // held on the key: say how the lips sit
@@ -383,7 +392,10 @@ void Player::render(float* out, int n) {
     e.glottis = ag;
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
-    if (onTrillKey_ && trill_ && kTrillTune_ > 0) listen(out + i, m);
+    if (kTrillTune_ > 0 && note_ >= 0) {
+      if (trillEar) listen(out + i, m, trillCorr_[trill_ - kTrills], 0, trillClock_);
+      else if (ear_) listen(out + i, m, earCorr_, earCents_, earClock_);
+    }
   }
 }
 
@@ -391,23 +403,23 @@ void Player::render(float* out, int n) {
 // upward zero crossing gives one period; the coverage follows the error
 // (d cents / d ln(uncovered) ~ 116 on D5; the lips move slowly, like an ear
 // correcting, so a fast trill is barely touched and a held note settles).
-void Player::listen(const float* x, int m) {
+void Player::listen(const float* x, int m, double& corr, double cents, double clock) {
   const double f0 = noteFrequency(note_), w = 2 * M_PI * f0 / fs_;
+  const double ft = f0 * std::exp2(cents / 1200);  // where the ear wants it
   const double r = std::exp(-M_PI * f0 / (3 * fs_));  // Q 3
   const double a1 = 2 * r * std::cos(w), a2 = -r * r;
-  double& corr = trillCorr_[trill_ - kTrills];
   for (int k = 0; k < m; ++k) {
     const double y = (1 - r) * x[k] + a1 * bp1_ + a2 * bp2_;
     bp2_ = bp1_;
     bp1_ = y;
-    const double t = trillClock_ * fs_ - m + k;  // samples on the key
+    const double t = clock * fs_ - m + k;  // samples on the note
     if (prevBp_ < 0 && y >= 0) {
       const double tc = t - 1 + prevBp_ / (prevBp_ - y);
-      if (lastCross_ >= 0 && trillClock_ > 0.02) {  // past the key's own transient
+      if (lastCross_ >= 0 && clock > 0.02) {  // past the note's own start
         const double f = fs_ / (tc - lastCross_);
         if (f > f0 / 1.3 && f < f0 * 1.3) {
-          const double cents = 1200 * std::log2(f / f0);
-          corr -= cents / 116 * (1 / f) / kTrillTune_;
+          const double err = 1200 * std::log2(f / ft);
+          corr -= err / 116 * (1 / f) / kTrillTune_;
           corr = std::clamp(corr, -0.4, 0.4);
         }
       }

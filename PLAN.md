@@ -402,3 +402,13 @@ Possible next: per-flute tuning spread / seating (stereo), smarter line tracking
 crossing), the held note keeping its own flute from the start when the history says so.
 - Split time 150 -> 100 ms (by request: keys held together > 100 ms get flutes from the pool);
   live default -poly 8 (all created at start; idle ones cost nothing), -poly 1 = one flute.
+- Adaptive just intonation in the pool (by request: "reduce the total dissonance"). Per pair
+  the nearest 5-limit ratio (offset from ET, weight 1.0 unison/octave .. 0.05 tritone, / (1 +
+  0.5 octaves)); least squares with l = 0.05 to ET for new notes, 1.0 to the current offset
+  for notes still sounding (fresh key = new); clamp ±30 c; solved when the sounding set
+  changes. Realised by each Player's ear (the trill listener, generalised: target f0 2^(c/1200)).
+  Demo (equal vs just, measured cents / Sethares roughness from partials): C-E-G 0.310 -> 0.252
+  (E -12, G +3), D-F-A .382 -> .371, C-F-A .335 -> .268, C-E-G .324 -> .213, C-E-G-C .388 -> .199,
+  but E-G-C .231 -> .259 (G, C uncovered more: +1.3 dB louder); total -21 %. On model flute
+  spectra the JI solution is within 1 % of a direct roughness search and lowers every chord
+  (E-G-C .267 -> .248), so the rule stands; the lips' loudness change is the open part.

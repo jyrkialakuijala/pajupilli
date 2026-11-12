@@ -7,8 +7,38 @@
 
 namespace pajupilli {
 
+namespace {
+
+// Interval classes (semitones mod 12): the nearest simple ratio's offset from
+// equal temperament (cents) and how much it matters (simpler = more).
+struct Just { double cents, weight; };
+constexpr Just kJust[12] = {
+    {0.0, 1.0},     // 1/1, 2/1
+    {11.7, 0.1},    // 16/15
+    {3.9, 0.15},    // 9/8
+    {15.6, 0.4},    // 6/5
+    {-13.7, 0.5},   // 5/4
+    {-2.0, 0.6},    // 4/3
+    {-9.8, 0.05},   // 45/32
+    {2.0, 0.8},     // 3/2
+    {13.7, 0.35},   // 8/5
+    {-15.6, 0.45},  // 5/3
+    {-3.9, 0.15},   // 16/9
+    {-11.7, 0.1},   // 15/8
+};
+constexpr double kToTempered = 0.05;  // pull of a new note to equal temperament
+constexpr double kStay = 1.0;         // pull of a sounding note to where it is
+constexpr double kMaxCents = 30;
+
+const char* name(int midi) {
+  static const char* n[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+  return n[midi % 12];
+}
+
+}  // namespace
+
 Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose)
-    : verbose_(verbose) {
+    : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
   std::fill(owner_, owner_ + 128, -1);
   f_.resize(std::max(1, maxFlutes));
   for (int i = 0; i < int(f_.size()); ++i) {
@@ -57,6 +87,7 @@ void Ensemble::take(int flute, int midi, int velocity) {
   ++s.held;
   s.lastNote = midi;
   s.active = true;
+  s.tunedNote = -1;  // a fresh note: it fits the chord, not its old place
   s.v->player().noteOn(midi, velocity);
 }
 
@@ -107,8 +138,67 @@ void Ensemble::split() {
   }
 }
 
+void Ensemble::retune() {
+  int idx[64], note[64], n = 0;
+  long long sig = 0;
+  for (int i = 0; i < int(f_.size()) && n < 64; ++i) {
+    const Player& p = f_[i].v->player();
+    if (!f_[i].held || !p.busy() || p.sounding() < 0) continue;
+    idx[n] = i;
+    note[n] = p.sounding();
+    sig = sig * 1000003 + i * 131 + note[n] + 1;
+    ++n;
+  }
+  if (sig == tuneSig_) return;
+  tuneSig_ = sig;
+  // Least squares: sum_pairs w (c_j - c_i - d_ij)^2 + sum_i l_i (c_i - a_i)^2.
+  double A[64][64] = {}, b[64] = {};
+  for (int i = 0; i < n; ++i) {
+    Slot& s = f_[idx[i]];
+    const bool stays = s.tunedNote == note[i];
+    const double l = stays ? kStay : kToTempered, a = stays ? s.cents : 0;
+    A[i][i] += l;
+    b[i] += l * a;
+  }
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j) {
+      if (note[j] <= note[i] && !(note[j] == note[i] && j > i)) continue;
+      const int semis = note[j] - note[i];
+      const Just& J = kJust[semis % 12];
+      const double w = J.weight / (1 + 0.5 * (semis / 12)), d = J.cents;
+      // c_j - c_i = d
+      A[i][i] += w; A[j][j] += w; A[i][j] -= w; A[j][i] -= w;
+      b[j] += w * d; b[i] -= w * d;
+    }
+  // Gaussian elimination (A is symmetric positive definite).
+  for (int k = 0; k < n; ++k)
+    for (int r = k + 1; r < n; ++r) {
+      const double f = A[r][k] / A[k][k];
+      for (int c = k; c < n; ++c) A[r][c] -= f * A[k][c];
+      b[r] -= f * b[k];
+    }
+  double c[64];
+  for (int k = n - 1; k >= 0; --k) {
+    double v = b[k];
+    for (int j = k + 1; j < n; ++j) v -= A[k][j] * c[j];
+    c[k] = std::clamp(v / A[k][k], -kMaxCents, kMaxCents);
+  }
+  for (int i = 0; i < n; ++i) {
+    Slot& s = f_[idx[i]];
+    s.cents = c[i];
+    s.tunedNote = note[i];
+    s.v->player().setTuning(c[i]);
+  }
+  if (n > 1) {
+    std::fprintf(stderr, "tune:");
+    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.0f", name(note[i]), note[i] / 12 - 1, c[i]);
+    std::fprintf(stderr, "\n");
+  }
+}
+
 void Ensemble::render(float* out, int n) {
   if (f_.size() > 1) split();
+  if (f_.size() > 1 && ji_) retune();
   // How many lines: the most seen lately, back down after kForget with fewer.
   const int h = holding();
   if (h >= lines_) {

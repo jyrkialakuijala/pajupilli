@@ -11,6 +11,15 @@
 // A new line goes to the free flute that played nearest in pitch and most
 // recently, so lines keep to their flutes. With one flute this is exactly the
 // single-flute behaviour.
+//
+// Tuning: flutes sounding together move a few cents off equal temperament
+// towards just intervals (their overtones meet instead of beating), each by
+// ear with its lips. Every pair asks for its interval's nearest simple ratio
+// (fifth 3/2 +2 c, major third 5/4 -14 c, minor third 6/5 +16 c, ...), the
+// simpler and closer the harder; a least-squares solve gives each flute its
+// offset, pulled weakly to equal temperament and strongly to where a note
+// already sounding sits (a new note fits the chord, the chord does not slide,
+// and a progression does not drift). Solved when the sounding set changes.
 #pragma once
 
 #include <memory>
@@ -45,12 +54,15 @@ class Ensemble {
     int lastNote = -1;
     double lastOff = -1e9;   // when its last key went up (s)
     bool active = false;     // being rendered
+    int tunedNote = -1;      // the note its tuning was set for
+    double cents = 0;        // its offset from equal temperament
   };
   int pickFree(int midi) const;   // a flute with no keys down, or -1
   int nearestHeld(int midi) const;
   int holding() const;            // flutes with keys down
   void split();
   void take(int flute, int midi, int velocity);
+  void retune();  // just intonation among the sounding flutes
 
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
   std::vector<Slot> f_;
@@ -60,6 +72,8 @@ class Ensemble {
   double now_ = 0, calm_ = 0, mix_ = 1;
   int lines_ = 1;
   bool verbose_;
+  bool ji_;                 // PJ_JI (1): adaptive just intonation
+  long long tuneSig_ = -1;  // the sounding set last tuned for
   std::vector<float> buf_;
 };
 

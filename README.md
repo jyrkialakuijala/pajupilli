@@ -70,6 +70,15 @@ most recently; silent flutes are not computed. The mix is scaled by 1 / sqrt(flu
 playing). Controls (breath, vibrato, knobs) go to every flute. `./flute -polydemo -o
 poly.wav` plays a line, a held note under a melody, and chords.
 
+Flutes sounding together tune to each other (adaptive just intonation, `PJ_JI=0` turns it
+off): every pair asks for its interval's nearest simple ratio (fifth +2 c, major third
+-14 c, minor third +16 c, ...), simpler and closer intervals weighing more; a least-squares
+solve gives each flute its offset (within ±30 c), weakly pulled to equal temperament, and
+a note already sounding stays where it is so a new note fits the chord and progressions do
+not drift. Each flute gets there with its lips, by ear. It prints `tune: C4 +1 E4 -12 G4 +3`.
+In the demo the flutes reach their targets within 1-2 cents and the chords' measured
+roughness (Sethares, from the partials) drops by 21 %.
+
 ### The flute family
 
 | `-inst` | Sounds | Range (sounding) | Model rate |

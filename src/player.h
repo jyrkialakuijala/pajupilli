@@ -53,6 +53,8 @@ class Player {
   void render(float* out, int n);
   int sounding() const { return note_; }
   bool busy() const { return blowing_; }
+  // Play this note `cents` off its tempered pitch, tuned by ear with the lips.
+  void setTuning(double cents) { ear_ = true; earCents_ = cents; }
   void seed(unsigned s) { rng_ = 4242u + 7907u * s; }  // its own breath wander
   const NoteInfo* info(int midi) const { return noteInfo(inst_, midi); }
 
@@ -79,7 +81,11 @@ class Player {
   double trillCorr_[9] = {};  // log coverage, per trill
   double bp1_ = 0, bp2_ = 0, lastCross_ = -1, prevBp_ = 0;
   bool heldTold_ = false;
-  void listen(const float* x, int m);
+  void listen(const float* x, int m, double& corr, double cents, double clock);
+  // Tuning by ear to a target (an ensemble's just intonation): cents from the
+  // note, reached with the lips like a trill note (earCorr_: log coverage).
+  bool ear_ = false;
+  double earCents_ = 0, earCorr_ = 0, earClock_ = 0;
   // A trill starts only when its two notes alternate fast: the last key event
   // (press or release) was one of them, under kTrillFast_ seconds before (not a
   // slow B C D E, nor a fast scale).

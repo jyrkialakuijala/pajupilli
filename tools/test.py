@@ -145,7 +145,12 @@ def polyphony():
     marks = [float(m.group(1)) for m in re.finditer(r'([\d.]+) s  ', err)]
     seq = re.findall(r'flutes: (\d+)', err)
     ok = r.returncode == 0 and seq == ['2', '3', '4'] and 'moves to flute' in err and 'state resets: 0' in err
-    check('polyphony (-poly)', ok, 'flutes ' + ' -> '.join(['1'] + seq) + ('' if ok else ': ' + err.strip()[-200:]))
+    # Just intonation: the last C-E-G triad (before the rolled chord) puts E ~14 c low, G ~2 c high.
+    tunes = [t for t in re.findall(r'tune: (.*)', err) if sorted(re.findall(r'([A-G]#?)\d', t)) == ['C', 'E', 'G']]
+    cents = dict(re.findall(r'([A-G]#?)\d ([+-]\d+)', tunes[-1])) if tunes else {}
+    ji = bool(cents) and -16 <= int(cents['E']) - int(cents['C']) <= -10 and 0 <= int(cents['G']) - int(cents['C']) <= 5
+    check('polyphony (-poly)', ok and ji, 'flutes ' + ' -> '.join(['1'] + seq) +
+          '; C-E-G tuned ' + ' '.join(f'{k}{v}' for k, v in sorted(cents.items())) + ('' if ok else ': ' + err.strip()[-200:]))
 
 def parity():
     """The portable build plays the same notes (pitch and level), R22."""
