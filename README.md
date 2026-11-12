@@ -54,6 +54,21 @@ for the same quantum).
 
 The knobs start from their defaults until you turn them.
 
+### Polyphony (`-poly N`)
+
+    ./flute -live -poly 4        # up to 4 flutes
+
+The keys are dealt to a pool of flutes, each its own model and player (with its own
+breath wander). How many play is guessed from the playing: keys struck together (within
+35 ms) are a chord, one flute each; a key pressed while another is held is a slur on that
+flute, as with one flute; if both stay down past 150 ms they are two lines and the older
+note moves to a flute of its own (it re-enters with a fresh attack). The number of lines
+is the most seen lately and drops back after 2 s with fewer; it prints `flutes: N` as it
+changes. A new line takes the free flute that played nearest in pitch and most recently;
+silent flutes are not computed. The mix is scaled by 1 / sqrt(flutes playing). Controls
+(breath, vibrato, knobs) go to every flute. `./flute -polydemo -o poly.wav` plays a line,
+a held note under a melody, and chords. `-poly 1` (the default) is the single flute.
+
 ### The flute family
 
 | `-inst` | Sounds | Range (sounding) | Model rate |

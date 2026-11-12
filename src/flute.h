@@ -67,6 +67,12 @@ class Flute {
   // Fingering; fingerSpeed scales how fast the fingers move the keys (key velocity:
   // 1 = 10 ms, 2 = 5 ms). Springs always take their own time.
   void setHoles(const char* pattern, double fingerSpeed = 1);
+  // Another instrument and player of the same kind: its own noise and key timing
+  // (0 = the default sequence).
+  void seed(unsigned s) {
+    rng_ = 22222u + 7919u * s;
+    keyRng_ = 777u + 104729u * s;
+  }
   void setEmbouchure(const Embouchure& e) { target_ = e; }
   const Embouchure& embouchure() const { return target_; }
 

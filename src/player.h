@@ -52,6 +52,8 @@ class Player {
   }
   void render(float* out, int n);
   int sounding() const { return note_; }
+  bool busy() const { return blowing_; }
+  void seed(unsigned s) { rng_ = 4242u + 7907u * s; }  // its own breath wander
   const NoteInfo* info(int midi) const { return noteInfo(inst_, midi); }
 
  private:

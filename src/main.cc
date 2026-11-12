@@ -22,6 +22,7 @@
 
 #include "analysis.h"
 #include "calibrate.h"
+#include "ensemble.h"
 #include "flute.h"
 #include "live.h"
 #include "player.h"
@@ -241,6 +242,7 @@ const char kUsage[] =
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
     "  -fuzz SECS SEED     random playing, check for blow-ups\n"
     "  -nantest            check recovery from NaN states\n"
+    "  -polydemo           a line, a held note under a melody, chords (-o to save)\n"
     "\n"
     "Options:\n"
     "  -o FILE.wav         write the sound (48 kHz)\n"
@@ -256,6 +258,8 @@ const char kUsage[] =
     "  -transpose N        keys to sounding pitch (default: the lowest C plays\n"
     "                      the instrument's lowest octave)\n"
     "  -v                  verbose\n"
+    "  -poly N             up to N flutes (default 1): keys struck together, or a\n"
+    "                      note held under others, get flutes of their own\n"
     "\n"
     "Environment: PJ_NOCAL (skip calibration), PJ_NOCALCACHE (ignore the cache),\n"
     "PJ_TRACE (with -note: print model state per sample)\n"
@@ -272,7 +276,7 @@ int main(int argc, char** argv) {
   _mm_setcsr(_mm_getcsr() | 0x8040);
 #endif
   int note = -1, imp = -1, slurFrom = -1, slurTo = -1;
-  bool scale = false, demo = false, live = false, cal = false, cfoot = false;
+  bool scale = false, demo = false, live = false, cal = false, cfoot = false, polyDemo = false;
   LiveOptions lopt;
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
@@ -303,6 +307,8 @@ int main(int argc, char** argv) {
     else if (a == "-periods") lopt.periods = std::atoi(next());
     else if (a == "-transpose") lopt.transpose = std::atoi(next());
     else if (a == "-v") lopt.verbose = true;
+    else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
+    else if (a == "-polydemo") polyDemo = true;
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
     else if (a == "-nantest") return nanTest();
     else if (a == "-o") out = next();
@@ -333,6 +339,41 @@ int main(int argc, char** argv) {
     else gCal = calibrate(*gInst, 440, nullptr);
   }
   if (live) return runLive(*gInst, lopt, gCal);
+  if (polyDemo) {
+    // One line, then a held note under a melody, then chords: the pool should
+    // use 1, then 2, then 3 flutes (it prints "flutes: N" as it decides).
+    Ensemble ens(*gInst, gCal, std::max(2, lopt.poly), true);
+    std::vector<float> all;
+    auto play = [&](double s) {  // in 64-frame periods, as live
+      std::vector<float> x(64);
+      for (int k = 0; k < int(s * kFs) / 64; ++k) { ens.render(x.data(), 64); all.insert(all.end(), x.begin(), x.end()); }
+    };
+    const int t = gInst->transpose;
+    auto say = [&](const char* what) { std::fprintf(stderr, "%5.2f s  %s\n", all.size() / double(kFs), what); };
+    say("a slurred line");
+    const int line[] = {72, 74, 76, 77, 79, 77, 76, 74, 72};
+    for (int i = 0; i < 9; ++i) { ens.noteOn(line[i] + t, 80); play(0.02); if (i) ens.noteOff(line[i - 1] + t); play(0.23); }
+    ens.noteOff(72 + t); play(0.4);
+    say("a held C4 under a slurred melody");
+    ens.noteOn(60 + t, 70);
+    play(0.3);
+    const int mel[] = {76, 77, 79, 81, 79, 77, 76};
+    for (int i = 0; i < 7; ++i) { ens.noteOn(mel[i] + t, 80); play(0.02); if (i) ens.noteOff(mel[i - 1] + t); play(0.28); }
+    ens.noteOff(76 + t); ens.noteOff(60 + t); play(0.5);
+    say("chords");
+    const int chords[][3] = {{60, 64, 67}, {62, 65, 69}, {64, 67, 72}, {60, 65, 69}, {60, 64, 67}};
+    for (auto& c : chords) {
+      for (int k = 0; k < 3; ++k) { ens.noteOn(c[k] + t, 75); play(0.01); }
+      play(0.6);
+      for (int k = 0; k < 3; ++k) ens.noteOff(c[k] + t);
+      play(0.1);
+    }
+    play(1.0);
+    say("end");
+    std::fprintf(stderr, "state resets: %d\n", ens.resets());
+    if (out && !writeWav(out, all, kFs)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
+    return 0;
+  }
   std::vector<float> slurOut;
   if (slurFrom >= 0) {
     slurTest(slurFrom, slurTo, dyn, secs, out ? &slurOut : nullptr);

@@ -136,6 +136,16 @@ def family():
     ns = (time.perf_counter() - t) / (20 * 48000) * 1e9
     check('real-time margin (piccolo, 96 kHz)', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
+def polyphony():
+    """-poly: a slurred line stays on one flute, a held note under a melody gets a
+    second, three-note chords a third; no state resets."""
+    r = run(['-poly', '4', '-polydemo'])
+    err = r.stderr
+    marks = [float(m.group(1)) for m in re.finditer(r'([\d.]+) s  ', err)]
+    seq = re.findall(r'flutes: (\d+)', err)
+    ok = r.returncode == 0 and seq == ['2', '3'] and 'moves to flute' in err and 'state resets: 0' in err
+    check('polyphony (-poly)', ok, 'flutes ' + ' -> '.join(['1'] + seq) + ('' if ok else ': ' + err.strip()[-200:]))
+
 def parity():
     """The portable build plays the same notes (pitch and level), R22."""
     if not os.path.exists(SCALAR):
@@ -177,7 +187,7 @@ def passive_vs_tmm():
 
 if __name__ == '__main__':
     t0 = time.time()
-    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, family, parity, realtime, passive_vs_tmm):
+    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, family, polyphony, parity, realtime, passive_vs_tmm):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

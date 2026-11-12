@@ -388,3 +388,15 @@ C-foot flute since one of today's earlier commits; not chased yet.
 - Trill keys as vents (calibrated cents): B6 with neither +8, D# trill key +21 (the old
   fingering), D trill key +1, both +14 -> B6 now uses the D trill key. C7: neither +29, D# +36,
   D +95, both +97 -> unchanged.
+
+### Added 2026-11-12 — polyphony (`-poly N`, src/ensemble.*)
+A pool of up to N Voices (own seeds for noise, key timing and wander). Heuristic: chord =
+keys within 35 ms; a key over a held one = slur unless more lines are expected than flutes
+holding keys; two keys held together on one flute > 150 ms = two lines (the older note
+moves to a free flute, re-attacked: it is silent for those 150 ms, unavoidable without
+look-ahead); lines expected = most seen, forgotten after 2 s with fewer. A free flute is
+chosen by |pitch difference| + 10 x seconds since its last key. Idle flutes (1 s after the
+last key, not blowing) are skipped. Mix x 1/sqrt(playing), 40 ms glide. -polydemo: line ->
+1 flute, held C4 + melody -> 2, triads -> 3 (C-E-G, D-F-A heard), peak 0.17, no resets.
+Possible next: per-flute tuning spread / seating (stereo), smarter line tracking (voice
+crossing), the held note keeping its own flute from the start when the history says so.

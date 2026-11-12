@@ -38,6 +38,7 @@ class Voice {
   Player& player() { return *player_; }
   const Instrument& instrument() const { return flute_->instrument(); }
   void render(float* out, int n);  // 48 kHz
+  void seed(unsigned s) { flute_->seed(s); player_->seed(s); }
 
  private:
   std::unique_ptr<Flute> flute_;
