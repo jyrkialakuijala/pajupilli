@@ -193,6 +193,19 @@ void Player::noteOff(int midi) {
 
 // How hard to kick an upward register slur: with little air the jet needs a
 // firm push, with a lot of air a full kick overblows past the note (piccolo D7).
+void Player::seed(unsigned s) {
+  rng_ = 4242u + 7907u * s;
+  if (s == 0) return;  // the default player keeps its sequence (tests, golden files)
+  for (int i = 0; i < 4; ++i) urand();
+  // Players differ: vibrato rate +-8 %, depth +-15 %, flutter 23..31 Hz, all
+  // starting at a random point of their cycles.
+  vibRateMul_ = 1 + 0.08 * urand();
+  vibDepthMul_ = 1 + 0.15 * urand();
+  flutterRate_ = 27 + 4 * urand();
+  vibPhase_ = M_PI * (1 + urand());
+  flutterPhase_ = M_PI * (1 + urand());
+}
+
 double Player::slurKick() const {
   const double dyn = dyn_ + breathCtl_ + velDyn_;
   return std::clamp(1 + kKickDyn_ * (0.5 - dyn), 0.5, 1.5);
@@ -366,16 +379,18 @@ void Player::render(float* out, int n) {
     else e.tongue = std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
     // Flutter tongue: the tongue tip trills against the ridge (~27 Hz).
     if (flutter_ > 0) {
-      flutterPhase_ += 2 * M_PI * 27 * bdt;
+      // Never a machine: the rate drifts with the player's lips (~3 Hz wander).
+      flutterPhase_ += 2 * M_PI * flutterRate_ * (1 + 0.1 * wander_ * w3b_) * bdt;
       if (flutterPhase_ > 2 * M_PI) flutterPhase_ -= 2 * M_PI;
       e.tongue *= 1 - flutter_ * 0.5 * (1 + std::sin(flutterPhase_));
     }
     // Vibrato: pressure modulation in the mouth, fading in after 300 ms. A
     // share comes from the lungs (abdomen), the rest from the throat: the
     // glottis is held a little narrowed and pulses (Hwang & Thorpe 2000).
-    vibPhase_ += 2 * M_PI * vibRate_ * bdt;
+    // Each player's own rate, drifting a little with the breath support (~1 Hz wander).
+    vibPhase_ += 2 * M_PI * vibRate_ * vibRateMul_ * (1 + 0.05 * wander_ * w2b_) * bdt;
     if (vibPhase_ > 2 * M_PI) vibPhase_ -= 2 * M_PI;
-    const double vib = vibDepth_ * std::min(1.0, std::max(0.0, sinceOn_ - 0.3) / 0.4);
+    const double vib = vibDepth_ * vibDepthMul_ * std::min(1.0, std::max(0.0, sinceOn_ - 0.3) / 0.4);
     const double sv = std::sin(vibPhase_);
     // Accented attack: a short pressure overshoot.
     const double accent = 1 + 0.25 * velAccent_ * std::exp(-sinceOn_ / 0.04);

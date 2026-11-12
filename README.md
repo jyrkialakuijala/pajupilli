@@ -68,7 +68,9 @@ number of lines is the most seen lately and drops back after 2 s with fewer; it 
 `playing: 3 x flute` (in an ensemble `playing: bass, alto, 2 x flute`) as the instruments
 in use change (an instrument counts for 2 s after its last key). A new line takes the free flute that played nearest in pitch and
 most recently; silent flutes are not computed. The mix is scaled by 1 / sqrt(flutes
-playing). Controls (breath, vibrato, knobs) go to every flute. `./flute -polydemo -o
+playing). Controls (breath, vibrato, knobs) go to every flute, but
+each player has its own vibrato (rate ±8 %, depth ±15 %, its own phase, drifting with the
+breath) and its own flutter tongue (23-31 Hz), so the flutes never pulse together. `./flute -polydemo -o
 poly.wav` plays a line, a held note under a melody, and chords.
 
 Flutes sounding together tune to each other (adaptive just intonation, `PJ_JI=0` turns it

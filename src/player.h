@@ -55,7 +55,9 @@ class Player {
   bool busy() const { return blowing_; }
   // Play this note `cents` off its tempered pitch, tuned by ear with the lips.
   void setTuning(double cents) { ear_ = true; earCents_ = cents; }
-  void seed(unsigned s) { rng_ = 4242u + 7907u * s; }  // its own breath wander
+  // Its own breath wander, and its own vibrato and flutter: rate, phase and
+  // depth differ from player to player, so an ensemble never pulses together.
+  void seed(unsigned s);
   const NoteInfo* info(int midi) const { return noteInfo(inst_, midi); }
 
  private:
@@ -106,6 +108,7 @@ class Player {
   double tongueClock_ = 1e9, tongueRelease_ = 0.005, tongueClosed_ = 0.004;
   double lungAttack_ = 0.005, release_ = 0.030, sinceOff_ = 1e9;
   double flutter_ = 0, flutterPhase_ = 0, hardness_ = 1;
+  double vibRateMul_ = 1, vibDepthMul_ = 1, flutterRate_ = 27;  // this player's own
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
