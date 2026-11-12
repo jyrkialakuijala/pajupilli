@@ -142,6 +142,7 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   // puts a medium key click ~24 dB under a mezzo-forte note (by ear: 0..1).
   kPadPump_ = knob("PJ_PADPUMP", 0.25);
   kKeyClick_ = knob("PJ_KEYCLICK", 1);
+  kKeySpread_ = knob("PJ_KEYSPREAD", 3) * 1e-3;
   {  // key impact modes: key arm / cup and the tube wall (~2.4, 5.3, 8.2 kHz)
     static const double f[kTickModes] = {2400, 5300, 8200}, tau[kTickModes] = {0.004, 0.0025, 0.0015};
     for (int m = 0; m < kTickModes; ++m) {
@@ -247,10 +248,14 @@ Branch Flute::holeBranch(const Hole& h) const {
 void Flute::updateHoles(double dtBlock) {
   bool moved = dtBlock == 0;
   nPumping_ = 0;
+  // Several fingers put down "together" land 0..3 ms apart: each closing
+  // stroke that starts with others waits a random delay.
+  int closers = 0;
+  for (const Hole& h : hole_) closers += h.target < h.open && !h.closing;
   for (int i = 0; i < kHoles; ++i) {
     Hole& h = hole_[i];
     h.padIn = 0;
-    if (h.open == h.target) continue;
+    if (h.open == h.target) { h.wait = 0; continue; }
     // A finger pushes a key in ~10 ms (faster when the key is struck harder), a
     // spring moves it back in ~16 ms (Almeida et al. 2009). Normally closed keys
     // (trills, G#, Eb) open by finger and close by spring.
@@ -265,6 +270,21 @@ void Flute::updateHoles(double dtBlock) {
       keyRng_ = keyRng_ * 1664525u + 1013904223u;
       const double jitter = 1 + 0.3 * ((keyRng_ >> 8) * (1.0 / 16777216.0) - 0.5);
       h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
+      h.wait = 0;
+      if (h.closing && closers > 1 && dtBlock > 0) {
+        // Scrambled: the next LCG output is correlated with the stroke jitter.
+        keyRng_ = keyRng_ * 1664525u + 1013904223u;
+        uint32_t r = keyRng_ ^ (keyRng_ >> 16);
+        r *= 0x7feb352du;
+        r ^= r >> 15;
+        r *= 0x846ca68bu;
+        r ^= r >> 16;
+        h.wait = kKeySpread_ * ((r >> 8) * (1.0 / 16777216.0));
+      }
+    }
+    if (h.wait > 0) {
+      h.wait -= dtBlock;
+      continue;
     }
     const double o0 = h.open;
     const double step = dtBlock / h.stroke;
