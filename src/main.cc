@@ -433,10 +433,10 @@ int main(int argc, char** argv) {
   }
   if (polyDemo) {
     // One line, then a held note under a melody, then chords, then a rolled
-    // chord: the pool should use 1, 2, 3, then 4 flutes (it prints "flutes: N").
+    // chord: the pool should use 1, 2, 3, then 4 flutes (it prints "playing: 2 x flute" ...).
     auto ensp = makeEnsemble(std::max(2, lopt.poly));
     Ensemble& ens = *ensp;
-    std::fprintf(stderr, "playing: %s\n", ens.describe().c_str());
+    std::fprintf(stderr, "ensemble: %s\n", ens.describe().c_str());
     std::vector<float> all;
     auto play = [&](double s) {  // in 64-frame periods, as live
       std::vector<float> l(64), r(64);
@@ -481,6 +481,10 @@ int main(int argc, char** argv) {
         for (int k = 0; k < 5; ++k) ens.noteOff(c[k]);
         play(0.08);
       }
+      say("two low notes together: only the bass reaches E3");
+      ens.noteOn(48, 72); play(0.006); ens.noteOn(52, 72);
+      play(0.8);
+      ens.noteOff(52); ens.noteOff(48);
       play(2.5);  // the room rings on
     }
     say("end");

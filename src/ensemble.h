@@ -13,9 +13,9 @@
 // single-flute behaviour.
 //
 // An ensemble (a mixed pool: by default bass, alto, two flutes and piccolo):
-// each instrument plays its own range (a key no free instrument reaches is
-// folded by octaves into one's range, reluctantly). A note goes where it sits
-// comfortably (the piccolo's top fifth and the others' strained tops cost
+// each instrument plays only its own range: a note no free instrument
+// reaches takes the nearest busy one that does (never another an octave off).
+// A note goes where it sits comfortably (the piccolo's top fifth and the others' strained tops cost
 // more; the flutes lead when several fit); a chord is dealt as a whole, low
 // notes to low instruments, without voices crossing (keys struck together
 // within kChord may move to a better instrument as the chord arrives); a line
@@ -91,7 +91,8 @@ class Ensemble {
     std::vector<float> room; // the room's pressure here, next block
   };
   void init(const std::vector<Member>& members, const RoomSpec* room);
-  int fold(int f, int key, int* octaves) const;  // the key in flute f's range
+  int fold(int f, int key, int* octaves) const;  // the key in flute f's range (a pool), -1 (an ensemble)
+  int reach(int key) const;
   double cost(int f, int pitch, int octaves) const;
   double crossing(int f, int pitch, int g, int q) const;
   int pickFree(int key, int* pitch) const;  // a flute with no keys down, or -1
@@ -114,6 +115,7 @@ class Ensemble {
   int vel_[128] = {};
   double now_ = 0, calm_ = 0, mix_ = 1;
   int lines_ = 1;
+  std::string playing_ = "none";  // last printed: "2 x flute, piccolo"
   bool verbose_;
   bool ji_;                 // PJ_JI (1): adaptive just intonation
   long long tuneSig_ = -1;  // the sounding set last tuned for

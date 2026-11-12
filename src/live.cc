@@ -260,7 +260,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
   player.all(&Player::setVibrato, 0.05);
   Controls ctl(player, inst, o);
   ctl.init();
-  std::fprintf(stderr, "playing: %s\n", player.describe().c_str());
+  std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());
 
   std::vector<float> left(period), right(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);

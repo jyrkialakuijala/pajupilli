@@ -443,4 +443,8 @@ crossing), the held note keeping its own flute from the start when the history s
   back 0.0006..0.01 Pa/Pa (rising with frequency like a small scatterer); `-scatter` measures it
   and `make test` checks < 0.03. The energy the instruments absorb (bore losses) is not taken
   out of the FDN: their absorption area (cm^2) is negligible next to the room's A (> 10 m^2).
+- No octave folding per instrument (by request): a note no free instrument reaches takes the
+  nearest held instrument whose range has it (a slur onto it, its old key under the new one);
+  keys beyond the whole ensemble fold into its range. The demo ends with C3 + E3 together: E3
+  moves the bass.
 - Cost: ensemble in the hall 6.5 % of a core (all five always computed), dry 3.8 %.

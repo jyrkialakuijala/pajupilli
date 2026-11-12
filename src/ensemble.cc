@@ -45,7 +45,6 @@ constexpr Comfort kComfort[] = {
     {"alto", 55, 79, 1}, {"bass", 48, 69, 1.5},
 };
 constexpr double kCross = 6;    // two voices crossing (a low instrument above a higher one)
-constexpr double kOctave = 24;  // a key folded by an octave into an instrument's range
 
 }  // namespace
 
@@ -125,6 +124,9 @@ int Ensemble::holding() const {
 
 int Ensemble::fold(int f, int key, int* octaves) const {
   const Slot& s = f_[f];
+  if (octaves) *octaves = 0;
+  // An ensemble never moves a note by an octave: only instruments that reach it.
+  if (mixed_) return key >= s.lo && key <= s.hi ? key : -1;
   int p = key, o = 0;
   while (p < s.lo) { p += 12; ++o; }
   while (p > s.hi) { p -= 12; ++o; }
@@ -138,7 +140,7 @@ double Ensemble::cost(int f, int p, int octaves) const {
     return s.lastNote < 0 ? 1e9 + f : std::abs(s.lastNote - p) + 10 * (now_ - s.lastOff);
   const double strain = std::max(0, s.easyLo - p) + std::max(0, p - s.easyHi);
   const double line = s.lastNote < 0 ? 2 : std::min(2.0, 0.2 * std::abs(s.lastNote - p) + 2 * (now_ - s.lastOff));
-  return strain + s.pref + line + kOctave * octaves;
+  return strain + s.pref + line + 24 * octaves;
 }
 
 double Ensemble::crossing(int f, int p, int g, int q) const {
@@ -270,7 +272,17 @@ bool Ensemble::deal(int key, int velocity) {
   return true;
 }
 
+// A key beyond every instrument of an ensemble: into its range by octaves (the
+// keyboard's folding does this already when live).
+int Ensemble::reach(int key) const {
+  if (!mixed_ || key < 0 || key > 127) return key;
+  while (key < lo_) key += 12;
+  while (key > hi_) key -= 12;
+  return key;
+}
+
 void Ensemble::noteOn(int key, int velocity) {
+  key = reach(key);
   if (key < 0 || key > 127) return;
   if (owner_[key] >= 0) noteOff(key);
   bool chord = false;
@@ -280,23 +292,29 @@ void Ensemble::noteOn(int key, int velocity) {
   // Silence, a chord, or more lines expected than flutes holding: a flute of
   // its own; otherwise a slur on the nearest held flute.
   const bool own = h == 0 || chord || h < lines_;
-  if (mixed_ && own && deal(key, velocity)) return;
-  int f = -1, p = key;
-  if (own && !mixed_) f = pickFree(key, &p);
-  if (f < 0) { f = nearestHeld(key); p = key; }
-  if (f < 0) f = pickFree(key, &p);  // no held instrument reaches it
-  if (f < 0) {  // all busy, none reaches it: the nearest, an octave off
-    int bestD = 1 << 30;
-    for (int i = 0; i < int(f_.size()); ++i) {
-      const int q = fold(i, key, nullptr), d = q < 0 ? 1 << 29 : std::abs(q - key);
-      if (d < bestD) { bestD = d; f = i; p = q; }
-    }
+  if (mixed_) {
+    if (own && deal(key, velocity)) return;
+    // A slur, or no free instrument reaches the note: the nearest instrument
+    // whose range has it moves to it (its old key stays held under the new one).
+    int f = nearestHeld(key), p = key;
+    if (f < 0) f = pickFree(key, &p);
+    if (f < 0) return;
+    if (verbose_ && own && f_[f].held)
+      std::fprintf(stderr, "move: %s%d to %s (from %s%d)\n", name(key), key / 12 - 1, f_[f].label.c_str(),
+                   name(f_[f].v->player().sounding()), f_[f].v->player().sounding() / 12 - 1);
+    take(f, key, p, velocity);
+    return;
   }
-  if (f < 0 || p < 0) return;
+  int f = -1, p = key;
+  if (own) f = pickFree(key, &p);
+  if (f < 0) { f = nearestHeld(key); p = key; }
+  if (f < 0) { f = 0; p = fold(0, key, nullptr); }
+  if (p < 0) return;
   take(f, key, p, velocity);
 }
 
 void Ensemble::noteOff(int key) {
+  key = reach(key);
   if (key < 0 || key > 127 || owner_[key] < 0) return;
   release(key);
 }
@@ -415,14 +433,31 @@ void Ensemble::block(float* left, float* right, int n) {
   const int h = holding();
   if (h >= lines_) {
     calm_ = 0;
-    if (h > lines_) {
-      lines_ = h;
-      std::fprintf(stderr, "flutes: %d\n", lines_);
-    }
+    if (h > lines_) lines_ = h;
   } else if ((calm_ += n / 48000.0) > kForget) {
     calm_ = 0;
     lines_ = std::max(1, h);
-    std::fprintf(stderr, "flutes: %d\n", lines_);
+  }
+  {  // Who is playing: holding a key, or did within kForget. Print changes.
+    std::string who;
+    std::vector<std::pair<int, std::string>> ins;  // (rank, name), low to high
+    for (const Slot& s : f_)
+      if (s.held || now_ - s.lastOff < kForget) {
+        const char* nm = s.v->instrument().name;
+        ins.push_back({s.rank, std::strncmp(nm, "flute", 5) == 0 ? "flute" : nm});
+      }
+    std::stable_sort(ins.begin(), ins.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    for (size_t i = 0; i < ins.size();) {
+      size_t j = i;
+      while (j < ins.size() && ins[j].second == ins[i].second) ++j;
+      who += (who.empty() ? "" : ", ") + (j - i > 1 ? std::to_string(j - i) + " x " : std::string()) + ins[i].second;
+      i = j;
+    }
+    if (who.empty()) who = "none";
+    if (who != playing_) {
+      if (who != "none") std::fprintf(stderr, "playing: %s\n", who.c_str());
+      playing_ = who;
+    }
   }
   const int nf = int(f_.size());
   buf_.resize(nf);

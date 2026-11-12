@@ -65,7 +65,8 @@ breath wander). How many play is guessed from the playing: keys struck together 
 flute, as with one flute; keys held together for more than 100 ms are separate lines and
 each older note moves to a flute from the pool (it re-enters with a fresh attack). The
 number of lines is the most seen lately and drops back after 2 s with fewer; it prints
-`flutes: N` as it changes. A new line takes the free flute that played nearest in pitch and
+`playing: 3 x flute` (in an ensemble `playing: bass, alto, 2 x flute`) as the instruments
+in use change (an instrument counts for 2 s after its last key). A new line takes the free flute that played nearest in pitch and
 most recently; silent flutes are not computed. The mix is scaled by 1 / sqrt(flutes
 playing). Controls (breath, vibrato, knobs) go to every flute. `./flute -polydemo -o
 poly.wav` plays a line, a held note under a melody, and chords.
@@ -87,7 +88,10 @@ roughness (Sethares, from the partials) drops by 21 %.
     ./flute -ensemble -polydemo -o choir.wav # with a five-voice chorale (stereo)
 
 A flute choir instead of a pool of one instrument: the keys are at sounding pitch over the
-whole ensemble (C3 to B7, folded in by octaves). A note goes to the instrument it suits
+whole ensemble (C3 to B7; keys beyond it fold in by octaves). Each instrument plays only its own
+range: a note never goes to the piccolo or a flute an octave up; when no free instrument reaches
+it, the nearest busy one that does moves to it (`move: E3 to bass (from C3)`; the old key stays
+held under it, as in a slur). A note goes to the instrument it suits
 (each has a comfortable range; the flutes lead when several would do), a chord is dealt as a
 whole, low notes to low instruments, without voices crossing (the keys of a chord struck
 within 35 ms may move to a better instrument as the chord arrives; it prints `deal: C3 bass,

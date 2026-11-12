@@ -148,13 +148,15 @@ def polyphony():
     r = run(['-poly', '4', '-polydemo'])
     err = r.stderr
     marks = [float(m.group(1)) for m in re.finditer(r'([\d.]+) s  ', err)]
-    seq = re.findall(r'flutes: (\d+)', err)
-    ok = r.returncode == 0 and seq == ['2', '3', '4'] and 'moves to flute' in err and 'state resets: 0' in err
+    # "playing: 2 x flute" -> 2
+    seq = [str(sum(int(m.group(1) or 1) for m in re.finditer(r'(?:(\d+) x )?[a-z]+', w)))
+           for w in re.findall(r'^playing: (.*)', err, re.M)]
+    ok = r.returncode == 0 and seq == ['1', '2', '3', '4'] and 'moves to flute' in err and 'state resets: 0' in err
     # Just intonation: the last C-E-G triad (before the rolled chord) puts E ~14 c low, G ~2 c high.
     tunes = [t for t in re.findall(r'tune: (.*)', err) if sorted(re.findall(r'([A-G]#?)\d', t)) == ['C', 'E', 'G']]
     cents = dict(re.findall(r'([A-G]#?)\d ([+-]\d+)', tunes[-1])) if tunes else {}
     ji = bool(cents) and -16 <= int(cents['E']) - int(cents['C']) <= -10 and 0 <= int(cents['G']) - int(cents['C']) <= 5
-    check('polyphony (-poly)', ok and ji, 'flutes ' + ' -> '.join(['1'] + seq) +
+    check('polyphony (-poly)', ok and ji, 'flutes ' + ' -> '.join(seq) +
           '; C-E-G tuned ' + ' '.join(f'{k}{v}' for k, v in sorted(cents.items())) + ('' if ok else ': ' + err.strip()[-200:]))
 
 def room():
@@ -175,10 +177,18 @@ def room():
         parts = [p.strip().split(' ') for p in d.split(',')]
         if len(parts) < 5:
             continue
-        notes = sorted(((int(p[0][-1]) if p[0][-1].isdigit() else 0) * 12 + 'C C# D D# E F F# G G# A A# B'.split().index(p[0][:-1]), rank[p[1]]) for p in parts)
+        notes = sorted((int(p[0][-1]) * 12 + 'C C# D D# E F F# G G# A A# B'.split().index(p[0][:-1]), rank[p[1]]) for p in parts)
         if [n[1] for n in notes] != sorted(n[1] for n in notes):
             bad.append(d)
-    ok = r.returncode == 0 and 'state resets: 0' in err and 'flutes: 5' in err and not bad and 'deal:' in err
+    # Every note within its instrument's range (no octave folding); the low pair moves the bass.
+    span = {'bass': (48, 74), 'alto': (55, 83), 'flute': (59, 96), 'piccolo': (74, 107)}
+    names = 'C C# D D# E F F# G G# A A# B'.split()
+    for m in re.finditer(r'([A-G]#?)(\d) (bass|alto|flute|piccolo)', err):
+        n = 12 * (int(m.group(2)) + 1) + names.index(m.group(1))
+        if not span[m.group(3)][0] <= n <= span[m.group(3)][1]:
+            bad.append(m.group(0))
+    ok = r.returncode == 0 and 'state resets: 0' in err and 'playing: bass, alto, 2 x flute, piccolo' in err and not bad and 'deal:' in err
+    ok &= 'move: E3 to bass' in err
     tail = ''
     if os.path.exists(wav):
         import struct
@@ -193,7 +203,7 @@ def room():
         tail = f'; hall tail {db:.0f} dB after 2 s'
         ok &= db < -50
         os.remove(wav)
-    check('ensemble in a hall (-ensemble)', ok, ('voicing low to high' if not bad else f'crossed: {bad}') + tail +
+    check('ensemble in a hall (-ensemble)', ok, ('voicing low to high, in range' if not bad else f'crossed / out of range: {bad}') + tail +
           ('' if r.returncode == 0 and 'state resets: 0' in err else ': ' + err.strip()[-200:]))
 
 def parity():
