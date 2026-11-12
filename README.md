@@ -1,6 +1,6 @@
 # pajupilli
 
-A real-time physical model of a Boehm concert flute (C foot), played from an
+A real-time physical model of a Boehm concert flute (B foot), played from an
 Akai MPK mini mk3. Also the piccolo, alto flute and bass flute (`-inst`).
 
 - The bore is a 1-D acoustic waveguide: 128 pressure points at 48 kHz, stored
@@ -58,10 +58,17 @@ The knobs start from their defaults until you turn them.
 
 | `-inst` | Sounds | Range (sounding) | Model rate |
 |---|---|---|---|
-| `flute` | as written | C4–C7 | 48 kHz |
+| `flute` | as written, B foot | B3–C7 | 48 kHz |
+| `flute-c` (or `-cfoot`) | as written, C foot | C4–C7 | 48 kHz |
 | `piccolo` | an octave higher | D5–B7 | 96 kHz |
 | `alto` | a fourth lower (in G) | G3–B5 | 36 kHz |
 | `bass` | an octave lower | C3–D5 | 24 kHz |
+
+The flute has a B foot by default (the "H-Fuß"): one more key, the C hole at 592 mm, and
+the tube on to 633 mm from the embouchure; it adds low B3 and changes the high resonances.
+Players drop it for the weight; here it costs nothing. The MPK's octave-down button reaches
+the B. C7 is played without the gizmo (in the model the gizmo makes it 50 cents sharp, 29
+without; the C foot's C7 is 36). `-cfoot` gives the C-foot flute.
 
 Each is the concert flute resized: tube lengths by the pitch ratio, bores to the real
 instruments' (piccolo ~10.5 mm, alto 26 mm, bass 35 mm), embouchure, lips and jet by about

@@ -16,7 +16,7 @@
 
 namespace pajupilli {
 
-constexpr int kHoles = 16;
+constexpr int kHoles = 17;  // the 17th: the C key of a B foot
 
 // A member of the flute family: the concert flute resized. Along the bore
 // everything scales with the pitch (`scale`); bore, holes and pads with the
@@ -33,13 +33,14 @@ struct Instrument {
   double fs;         // the model's sample rate (Hz)
   double foot;       // embouchure centre to the open end, concert-flute mm
   bool dFoot;        // no C and C# keys (holes 15, 16)
+  bool bFoot;        // a B foot: a C hole (17) and the tube on to B3
   double head;       // head shortened by (mm, own size): keeps the scale with
                      // an embouchure hole relatively smaller (alto, bass) or
                      // bigger (piccolo) than the flute's
   double gain;       // output level, as if miked: the bass flute is ~15 dB
                      // quieter than the flute, the piccolo louder
 };
-// "flute", "piccolo", "alto", "bass"; nullptr if unknown.
+// "flute" (B foot), "flute-c" (C foot), "piccolo", "alto", "bass"; nullptr if unknown.
 const Instrument* findInstrument(const std::string& name);
 const Instrument& concertFlute();
 

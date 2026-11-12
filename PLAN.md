@@ -368,3 +368,13 @@ with listening files for an A/B, as before.
   50 ms (d cents / d ln uncovered ~ 116 on D5); kept per trill. Held on the key, cents off
   without -> with: flute up to -10 -> within 2; piccolo -28 -> +5 (C6-D6); alto -17 -> 1;
   bass +25 -> -3. The three-step fingering switch and the quiet-key flag are gone.
+
+### Added 2026-11-12 — B foot by default (`-cfoot` / `-inst flute-c` for a C foot)
+Hole 17: the B foot's C hole, 592.3 mm from the embouchure, Ø 15.4, pad 2.8 mm, cup 20.6 [D];
+the tube on to 633.3 mm (B3). Fingerings without a 17th character leave it open; B3 closes
+it. Calibration: B3 -2 c (uncovered 9.9 mm), C4 needs 8.8 mm uncovered (C foot 7.7).
+C7: with the gizmo (B key closed) +50 c, an extra resonance near 1917 Hz; without +29 c; C foot
++36 c: the default C7 fingering has no gizmo. The piccolo, alto and bass keep their feet.
+Test: the C-foot flute runs the family checks; the tmm.py comparison uses it (tmm.py has the
+C foot). Note: that info line reads 64 -2.7 c, 67 -6.7 c (earlier +0.0, -2.2) for an unchanged
+C-foot flute since one of today's earlier commits; not chased yet.

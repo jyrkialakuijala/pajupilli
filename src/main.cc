@@ -4,7 +4,7 @@
 //   ./flute -scale                    play C4..C7, print a tuning table
 //   ./flute -imp 69                   passive resonances of a fingering
 //   ./flute -slur 71 72 -dyn 0.2      slur into a note; print its pitch and level wobble
-//   ./flute -inst piccolo ...         piccolo, alto or bass flute (default: flute);
+//   ./flute -inst piccolo ...         piccolo, alto or bass flute, flute-c (default: flute, B foot);
 //                                     notes are sounding MIDI pitches
 //   ./flute -h                        all options
 //   ./flute -live                     play it from the MPK mini mk3
@@ -223,9 +223,12 @@ const char kUsage[] =
     "usage: flute [-inst NAME] MODE [options]\n"
     "\n"
     "Instrument:\n"
-    "  -inst NAME          flute (default), piccolo, alto or bass. Notes are\n"
-    "                      sounding MIDI pitches (flute 60..96, piccolo 74..107,\n"
-    "                      alto 55..83, bass 48..74)\n"
+    "  -inst NAME          flute (default, B foot), flute-c (C foot), piccolo,\n"
+    "                      alto or bass. Notes are sounding MIDI pitches (flute\n"
+    "                      59..96, flute-c 60..96, piccolo 74..107, alto 55..83,\n"
+    "                      bass 48..74)\n"
+    "  -cfoot              the flute with a C foot (no low B key): same as\n"
+    "                      -inst flute-c\n"
     "\n"
     "Modes:\n"
     "  -live               play from a MIDI keyboard (Akai MPK mini mk3)\n"
@@ -269,7 +272,7 @@ int main(int argc, char** argv) {
   _mm_setcsr(_mm_getcsr() | 0x8040);
 #endif
   int note = -1, imp = -1, slurFrom = -1, slurTo = -1;
-  bool scale = false, demo = false, live = false, cal = false;
+  bool scale = false, demo = false, live = false, cal = false, cfoot = false;
   LiveOptions lopt;
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
@@ -281,8 +284,9 @@ int main(int argc, char** argv) {
     auto next = [&]() { return i + 1 < argc ? argv[++i] : (char*)""; };
     if (a == "-inst") {
       gInst = findInstrument(next());
-      if (!gInst) { std::fprintf(stderr, "-inst: flute, piccolo, alto or bass\n"); return 1; }
+      if (!gInst) { std::fprintf(stderr, "-inst: flute, flute-c, piccolo, alto or bass\n"); return 1; }
     }
+    else if (a == "-cfoot") cfoot = true;
     else if (a == "-note") note = std::atoi(next());
     else if (a == "-scale") scale = true;
     else if (a == "-cal") cal = true;
@@ -308,6 +312,7 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
+  if (cfoot && gInst == findInstrument("flute")) gInst = findInstrument("flute-c");
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;
   if (cal) { calibrate(*gInst, 440, stdout); return 0; }
   auto inRange = [&](int m, const char* what) {

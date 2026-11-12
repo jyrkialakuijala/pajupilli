@@ -10,11 +10,11 @@
 namespace pajupilli {
 
 struct NoteInfo {
-  const char* holes;  // 16 chars, hole 1 .. 16, 'o' open
+  const char* holes;  // hole 1 .. 16 (17: the B foot's C key, open if left out), 'o' open
   int harmonic;       // which resonance of the fingering sounds (1, 2, 3, 4)
 };
 
-// Written MIDI 60 (C4) .. 96 (C7); nullptr outside.
+// Written MIDI 59 (B3, B foot) .. 96 (C7); nullptr outside.
 const NoteInfo* noteInfo(int midi);
 // A sounding note on an instrument: its fingering, or nullptr outside its range.
 const NoteInfo* noteInfo(const Instrument& inst, int midi);
@@ -66,7 +66,7 @@ class Player {
   const Trill* trill_ = nullptr;
   int trillBase_ = -1;
   const char* holesFor(int midi);
-  char trillHoles_[17] = {};
+  char trillHoles_[kHoles + 1] = {};
   double trillCover_ = 1, kTrillCover_;  // lip coverage for the upper note
   // On a trill key the player listens and tunes with the lips (no fingering
   // change): a band-pass at the note, its zero crossings give the pitch, and

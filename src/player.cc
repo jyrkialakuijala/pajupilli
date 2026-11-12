@@ -12,8 +12,10 @@ namespace pajupilli {
 namespace {
 
 // Standard Boehm fingerings, C foot (research/keywork.md section 5).
-// Holes 1..16: D#tr Dtr C# C B Bb A G# G#' G F# F E D# D C#.
-constexpr NoteInfo kNotes[37] = {
+// Holes 1..16: D#tr Dtr C# C B Bb A G# G#' G F# F E D# D C#; a 17th character
+// is the B foot's C hole (left out: open; a C foot has no such hole).
+constexpr NoteInfo kNotes[38] = {
+    {"xxxxxxxxxxxxxxxxx", 1},  // 59 B3 (B foot)
     {"xxxxxxxxxxxxxxxx", 1},  // 60 C4
     {"xxxxxxxxxxxxxxxo", 1},  // 61 C#4
     {"xxxxxxxxxxxxxxoo", 1},  // 62 D4
@@ -50,13 +52,13 @@ constexpr NoteInfo kNotes[37] = {
     {"xxoxxxoxoxxooooo", 3},  // 93 A6
     {"xooxxooxoxxooxoo", 3},  // 94 Bb6
     {"oxxxooxxxooooxoo", 3},  // 95 B6
-    {"xxxoxxxoxxxooxoo", 4},  // 96 C7
+    {"xxxoxxxoxxxooxoo", 4},  // 96 C7 (no gizmo: with it the B foot's C7 is +50 c, without +29)
 };
 
 }  // namespace
 
 const NoteInfo* noteInfo(int midi) {
-  return midi >= 60 && midi <= 96 ? &kNotes[midi - 60] : nullptr;
+  return midi >= 59 && midi <= 96 ? &kNotes[midi - 59] : nullptr;
 }
 
 const NoteInfo* noteInfo(const Instrument& inst, int midi) {
@@ -208,7 +210,7 @@ const char* Player::holesFor(int midi) {
   lastCross_ = -1;
   // The upper note: the lower note's fingering with the trill key(s) open.
   // Key 1 = the D trill key (hole 2), key 2 = the D# trill key (hole 1).
-  std::memcpy(trillHoles_, info(trillBase_)->holes, 16);
+  std::strncpy(trillHoles_, info(trillBase_)->holes, kHoles);
   for (const char* k = trill_->keys; *k; ++k) trillHoles_[*k == '1' ? 1 : 0] = 'o';
   trillCover_ = std::pow(trill_->cover, kTrillCover_);
   std::fprintf(stderr, "%s\n", trill_->name);

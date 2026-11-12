@@ -38,10 +38,11 @@ double fluteBore(double e) {
 // flute's head taper), alto 26 mm, bass 35 mm. A D foot ends where an open
 // end sounds the flute's D4 fingering (fitted with -imp).
 constexpr Instrument kInstruments[] = {
-    {"flute", 0, 60, 96, 1.0, 1.0, 1.0, 48000, 600.4, false, 0, 1.0},
-    {"piccolo", 12, 62, 95, 0.5, 0.55, 0.7071, 96000, 528.0, true, -5, 0.7},
-    {"alto", -5, 60, 88, 1.3348, 1.37, 1.1553, 36000, 600.4, false, 15, 1.4},
-    {"bass", -12, 60, 86, 2.0, 1.84, 1.4142, 24000, 600.4, false, 30, 3.0},
+    {"flute", 0, 59, 96, 1.0, 1.0, 1.0, 48000, 633.3, false, true, 0, 1.0},
+    {"flute-c", 0, 60, 96, 1.0, 1.0, 1.0, 48000, 600.4, false, false, 0, 1.0},
+    {"piccolo", 12, 62, 95, 0.5, 0.55, 0.7071, 96000, 528.0, true, false, -5, 0.7},
+    {"alto", -5, 60, 88, 1.3348, 1.37, 1.1553, 36000, 600.4, false, false, 15, 1.4},
+    {"bass", -12, 60, 86, 2.0, 1.84, 1.4142, 24000, 600.4, false, false, 30, 3.0},
 };
 
 // Tone holes, Pearl PF-661 [Dickens]: x from the embouchure centre (mm),
@@ -64,6 +65,7 @@ constexpr HoleSpec kSpec[kHoles] = {
     {490.3, 15.4, 2.8, 20.6, false},// 14 D#4 (Eb key, normally closed)
     {524.3, 15.4, 2.8, 20.6, false},// 15 D4
     {557.3, 15.4, 2.8, 20.6, false},// 16 C#4
+    {592.3, 15.4, 2.8, 20.6, false},// 17 C4 (B foot only; the B key closes it)
 };
 
 // Inner end correction of a side hole (Dalmont / Nederveen), delta = b / a.
@@ -182,7 +184,7 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     h.padH = sp.padH * 1e-3 * inst.bore;
     h.padR = 0.5e-3 * sp.cup * inst.bore;
     h.perforated = sp.perf;
-    h.present = !(inst.dFoot && i >= 14);
+    h.present = !(inst.dFoot && i >= 14) && (i < 16 || inst.bFoot);
     h.cell = h.present ? int(h.x / dx) : -1;
     if (!h.present) continue;
     const double a = 0.5 * boreDiameter(h.x), delta = h.b / a;
@@ -233,8 +235,10 @@ double Flute::horn_r() const { return bore_.hornRadius(); }
 
 void Flute::setHoles(const char* pattern, double fingerSpeed) {
   fingerSpeed_ = std::clamp(fingerSpeed, 0.25, 4.0);
-  for (int i = 0; i < kHoles && pattern[i]; ++i)
-    if (hole_[i].present) hole_[i].target = pattern[i] == 'o' ? 1 : 0;
+  // A fingering without the 17th hole leaves the B foot's C key open.
+  const int n = int(std::strlen(pattern));
+  for (int i = 0; i < kHoles; ++i)
+    if (hole_[i].present) hole_[i].target = i < n ? (pattern[i] == 'o' ? 1 : 0) : 1;
 }
 
 Branch Flute::holeBranch(const Hole& h) const {
