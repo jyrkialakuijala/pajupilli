@@ -12,6 +12,15 @@
 // recently, so lines keep to their flutes. With one flute this is exactly the
 // single-flute behaviour.
 //
+// An ensemble (a mixed pool: by default bass, alto, two flutes and piccolo):
+// each instrument plays its own range (a key no free instrument reaches is
+// folded by octaves into one's range, reluctantly). A note goes where it sits
+// comfortably (the piccolo's top fifth and the others' strained tops cost
+// more; the flutes lead when several fit); a chord is dealt as a whole, low
+// notes to low instruments, without voices crossing (keys struck together
+// within kChord may move to a better instrument as the chord arrives); a line
+// keeps to its instrument.
+//
 // Tuning: flutes sounding together move a few cents off equal temperament
 // towards just intervals (their overtones meet instead of beating), each by
 // ear with its lips. Every pair asks for its interval's nearest simple ratio
@@ -20,19 +29,33 @@
 // offset, pulled weakly to equal temperament and strongly to where a note
 // already sounding sits (a new note fits the chord, the chord does not slide,
 // and a progression does not drift). Solved when the sounding set changes.
+//
+// The room (room.h): the instruments sit in it, sound into it and hear it in
+// their bores, the silent ones too. Without a room the silent flutes are not
+// computed.
 #pragma once
 
+#include <cstdlib>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "calibrate.h"
+#include "room.h"
 #include "voice.h"
 
 namespace pajupilli {
 
 class Ensemble {
  public:
-  Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose);
+  struct Member {
+    const Instrument* inst;
+    const Calibration* cal;
+  };
+  Ensemble(const std::vector<Member>& members, bool verbose, const RoomSpec* room = nullptr);
+  // maxFlutes of one instrument.
+  Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose,
+           const RoomSpec* room = nullptr);
   void noteOn(int midi, int velocity);
   void noteOff(int midi);
   // A player setting, for every flute.
@@ -42,31 +65,51 @@ class Ensemble {
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
   }
-  void render(float* out, int n);  // 48 kHz, mixed
+  void render(float* left, float* right, int n);  // 48 kHz, mixed, stereo
+  void render(float* out, int n);                 // ... mono
   int resets() const;
   int lines() const { return lines_; }
   int size() const { return int(f_.size()); }
+  int lo() const { return lo_; }  // sounding range of the whole ensemble
+  int hi() const { return hi_; }
+  std::string describe() const;
 
  private:
   struct Slot {
     std::unique_ptr<Voice> v;
+    std::string label;       // "flute 2"
+    int lo, hi;              // sounding range
+    int easyLo, easyHi;      // comfortable range
+    int rank;                // lowest note: lower instruments play lower voices
+    double pref;             // cost of choosing it (the flutes lead)
     int held = 0;            // keys down on this flute
     int lastNote = -1;
     double lastOff = -1e9;   // when its last key went up (s)
     bool active = false;     // being rendered
     int tunedNote = -1;      // the note its tuning was set for
     double cents = 0;        // its offset from equal temperament
+    std::vector<float> room; // the room's pressure here, next block
   };
-  int pickFree(int midi) const;   // a flute with no keys down, or -1
-  int nearestHeld(int midi) const;
-  int holding() const;            // flutes with keys down
+  void init(const std::vector<Member>& members, const RoomSpec* room);
+  int fold(int f, int key, int* octaves) const;  // the key in flute f's range
+  double cost(int f, int pitch, int octaves) const;
+  double crossing(int f, int pitch, int g, int q) const;
+  int pickFree(int key, int* pitch) const;  // a flute with no keys down, or -1
+  int nearestHeld(int key) const;
+  int holding() const;  // flutes with keys down
+  bool deal(int key, int velocity);  // a mixed pool: deal a chord as a whole
   void split();
-  void take(int flute, int midi, int velocity);
+  void take(int flute, int key, int pitch, int velocity);
+  void release(int key);
   void retune();  // just intonation among the sounding flutes
+  void block(float* left, float* right, int n);
 
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
   std::vector<Slot> f_;
+  bool mixed_ = false;
+  int lo_ = 127, hi_ = 0;
   int owner_[128];
+  int pitch_[128];
   double pressT_[128] = {};
   int vel_[128] = {};
   double now_ = 0, calm_ = 0, mix_ = 1;
@@ -74,7 +117,12 @@ class Ensemble {
   bool verbose_;
   bool ji_;                 // PJ_JI (1): adaptive just intonation
   long long tuneSig_ = -1;  // the sounding set last tuned for
-  std::vector<float> buf_;
+  std::vector<std::vector<float>> buf_;
+  std::unique_ptr<Room> room_;
+  float roomFb_ = std::getenv("PJ_ROOMFB") ? float(std::atof(std::getenv("PJ_ROOMFB"))) : 1.0f;  // room into the bores
+  std::vector<float> srcBuf_;  // physical pressures for the room
+  std::vector<float> qL_, qR_; // rendered, not yet handed out
+  size_t qPos_ = 0;
 };
 
 }  // namespace pajupilli

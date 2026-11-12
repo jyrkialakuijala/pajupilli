@@ -78,6 +78,11 @@ class Flute {
 
   // Render n mono samples (Pa at 1 m, roughly).
   void process(float* out, int n);
+  // The room's sound pressure outside the flute (Pa) for the next samples of
+  // process(), one per sample at the model's rate; it acts on the embouchure,
+  // the open holes and the foot. The last value holds when it runs out.
+  void setRoom(const float* p, int n) { room_ = p; roomN_ = n; roomPos_ = 0; }
+  double outScale() const { return kOut_; }  // output = Pa at 1 m * outScale
 
   // Tests: a pressure impulse (Pa) in the window branch on the next sample.
   void testDrive(double dp) { testDp_ = dp; }
@@ -158,6 +163,9 @@ class Flute {
   float dcX_ = 0, dcY_ = 0, dcPole_ = 0.99935f;
   int ctl_ = 0;
   double testDp_ = 0;
+  const float* room_ = nullptr;
+  int roomN_ = 0, roomPos_ = 0;
+  float pRoom_ = 0;
   int resets_ = 0;
   // Knobs.
   int kJetModel_, kRadOnly_;

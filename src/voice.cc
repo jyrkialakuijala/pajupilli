@@ -1,5 +1,6 @@
 #include "voice.h"
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 
@@ -75,13 +76,29 @@ void Resampler::process(const float* in, float* out, int n) {
 Voice::Voice(const Instrument& inst)
     : flute_(new Flute(inst)), player_(new Player(*flute_)), rs_(int(inst.fs), 48000) {}
 
-void Voice::render(float* out, int n) {
+void Voice::render(float* out, int n, const float* room) {
   const float g = float(instrument().gain);
   if (rs_.identity()) {
+    if (room) flute_->setRoom(room, n);
     player_->render(out, n);
   } else {
     const int need = rs_.needed(n);
     in_.resize(need);
+    if (room) {
+      // Linear interpolation to the model's rate (the room's sound is mostly
+      // below 5 kHz: the bass flute's 24 kHz sees little aliasing).
+      room_.resize(need);
+      for (int i = 0; i < need; ++i) {
+        const double t = (i + 1) * double(n) / need - 1;  // in input samples
+        const int k = int(std::floor(t));
+        const double f = t - k;
+        const float a = k < 0 ? roomLast_ : room[std::min(k, n - 1)];
+        const float b = room[std::min(k + 1, n - 1)];
+        room_[i] = float(a + f * (b - a));
+      }
+      roomLast_ = room[n - 1];
+      flute_->setRoom(room_.data(), need);
+    }
     player_->render(in_.data(), need);
     rs_.process(in_.data(), out, n);
   }

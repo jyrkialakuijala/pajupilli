@@ -4,6 +4,7 @@
 #include <string>
 
 #include "calibrate.h"
+#include "ensemble.h"
 
 namespace pajupilli {
 
@@ -21,6 +22,7 @@ struct LiveOptions {
   int poly = 8;                    // flutes in the pool (1: a single flute)
 };
 
-int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal);
+// inst: the keyboard's instrument (its transposition); ens: who plays.
+int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& ens);
 
 }  // namespace pajupilli

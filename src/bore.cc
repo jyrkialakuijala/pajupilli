@@ -93,6 +93,7 @@ void Bore::buildU() {
     const double d = l + 0.5 * kap * (kFitC0 + sumCG);
     k.au[i] = float((l - 0.5 * kap * (kFitC0 - sumCG)) / d);
     k.bu[i] = float(1.0 / (dx_ * d));
+    k.fr[i] = i == foot_ - 1 ? k.bu[i] : 0.0f;
     for (int j = 0; j < kLossSections; ++j)
       k.ck[j][i] = float(0.5 * kap * kFitC[j] * (1 + k.a[j]) / d);
   }
@@ -104,7 +105,7 @@ double Bore::compliance(int cell) const {
 
 // Trapezoidal rule for x = (p, q, l) at one cell:
 //   C dp/dt = J - q
-//   dq/dt   = g (p - rs q - rr (q - l))
+//   dq/dt   = g (p - pRoom - rs q - rr (q - l))
 //   dl/dt   = hl rr (q - l)
 void Bore::buildNode(int cell) {
   const Branch& b = branch_[cell];
@@ -120,6 +121,7 @@ void Bore::buildNode(int cell) {
     for (int col = 0; col < 3; ++col)
       k.m[r][col][cell] = float(2 * w * inv[r][col] - (r == col ? 1 : 0));
     k.v[r][cell] = float(2 * inv[r][0] / c);
+    k.e[r][cell] = float(-2 * inv[r][1] * b.g);
   }
 }
 
@@ -129,12 +131,12 @@ void Bore::update() {
   dirty_ = false;
 }
 
-float Bore::step(int ec, float* pOld, float* J) {
+float Bore::step(int ec, float* pOld, float* J, float pRoom) {
   float* __restrict p = s.p();
   float* __restrict u = s.u();
   // Momentum: interfaces 0..127 (p[128] is the zero pad).
   for (int i = 0; i < kCells; ++i) {
-    const float un = k.au[i] * u[i] - k.bu[i] * (p[i + 1] - p[i]) -
+    const float un = k.au[i] * u[i] - k.bu[i] * (p[i + 1] - p[i]) - k.fr[i] * pRoom -
                      k.ck[0][i] * s.psi[0][i] - k.ck[1][i] * s.psi[1][i] -
                      k.ck[2][i] * s.psi[2][i];
     const float du = un - u[i];
@@ -156,9 +158,9 @@ float Bore::step(int ec, float* pOld, float* J) {
   for (int i = 0; i < kCells; ++i) {
     const float j = u[i - 1] - u[i];
     const float p0 = p[i], q0 = q[i], l0 = l[i];
-    p[i] = k.m[0][0][i] * p0 + k.m[0][1][i] * q0 + k.m[0][2][i] * l0 + k.v[0][i] * j;
-    q[i] = k.m[1][0][i] * p0 + k.m[1][1][i] * q0 + k.m[1][2][i] * l0 + k.v[1][i] * j;
-    l[i] = k.m[2][0][i] * p0 + k.m[2][1][i] * q0 + k.m[2][2][i] * l0 + k.v[2][i] * j;
+    p[i] = k.m[0][0][i] * p0 + k.m[0][1][i] * q0 + k.m[0][2][i] * l0 + k.v[0][i] * j + k.e[0][i] * pRoom;
+    q[i] = k.m[1][0][i] * p0 + k.m[1][1][i] * q0 + k.m[1][2][i] * l0 + k.v[1][i] * j + k.e[1][i] * pRoom;
+    l[i] = k.m[2][0][i] * p0 + k.m[2][1][i] * q0 + k.m[2][2][i] * l0 + k.v[2][i] * j + k.e[2][i] * pRoom;
   }
   return uOut;
 }

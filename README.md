@@ -9,7 +9,7 @@ Akai MPK mini mk3. Also the piccolo, alto flute and bass flute (`-inst`).
 - 16 tone holes with pads that move in 10–16 ms, real fingerings C4–C7.
 - An air jet driven by the sound in the embouchure hole, from the player's
   lungs, mouth, tongue and lips.
-- About 0.5 % of one core.
+- About 1-2 % of one core per instrument (the ensemble in a hall: ~7 %).
 
 See `REQUIREMENTS.md` and `research/` for the physics and the numbers.
 
@@ -78,6 +78,32 @@ a note already sounding stays where it is so a new note fits the chord and progr
 not drift. Each flute gets there with its lips, by ear. It prints `tune: C4 +1 E4 -12 G4 +3`.
 In the demo the flutes reach their targets within 1-2 cents and the chords' measured
 roughness (Sethares, from the partials) drops by 21 %.
+
+### Ensemble (`-ensemble`) and the room (`-room`)
+
+    ./flute -live -ensemble                  # bass, alto, two flutes, piccolo
+    ./flute -live -ensemble alto,flute,flute # any list
+    ./flute -live -room church               # dry, studio, hall (default), church
+    ./flute -ensemble -polydemo -o choir.wav # with a five-voice chorale (stereo)
+
+A flute choir instead of a pool of one instrument: the keys are at sounding pitch over the
+whole ensemble (C3 to B7, folded in by octaves). A note goes to the instrument it suits
+(each has a comfortable range; the flutes lead when several would do), a chord is dealt as a
+whole, low notes to low instruments, without voices crossing (the keys of a chord struck
+within 35 ms may move to a better instrument as the chord arrives; it prints `deal: C3 bass,
+G3 alto, E4 flute 1, C5 flute 2, G5 piccolo`), and a line keeps to its instrument. The
+just intonation works across the ensemble.
+
+The instruments play in a room, a reverberant space of its own (a 16-line feedback delay
+network sized from the room's volume, its decay from its RT60, its level from diffuse-field
+theory). They sit on a line, high instruments on the left; the listener is a pair of
+microphones in front (stereo). Every instrument hears the room's sound and the others' direct
+sound in its bore: the pressure acts on the embouchure, the open holes and the foot, in series
+with each opening's radiation load, so an instrument takes in only as much as it would
+radiate. The silent flutes of the pool are computed too, and ring in sympathy. No energy is
+made in the loop: a silent flute gives back 0.1-1 % of the room's sound (`./flute -scatter`
+measures it), and the walls and the air take the rest as heat at the room's RT60. `-room dry`
+is the old behaviour (no room, silent flutes not computed).
 
 ### The flute family
 

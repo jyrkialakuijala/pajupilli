@@ -5,7 +5,7 @@ Run from the repo root after `make flute scalar`. Each check prints ok/FAIL;
 exit status 1 if any check fails. "info" lines report but do not fail (they
 become checks once the planned fix lands).
 """
-import math, os, re, subprocess, sys, time
+import math, os, re, resource, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FLUTE = os.path.join(ROOT, 'flute')
@@ -18,6 +18,13 @@ def run(args, binary=FLUTE, env=None):
     e = dict(os.environ)
     e.update(env or {})
     return subprocess.run([binary] + args, capture_output=True, text=True, env=e, cwd=ROOT)
+
+def cpu_time(args, env=None):
+    """CPU seconds of one run (not wall time: a busy machine does not fail the check)."""
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    run(args, env=env)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return (after.ru_utime + after.ru_stime) - (before.ru_utime + before.ru_stime)
 
 def check(name, ok, detail=''):
     print(f"{'ok  ' if ok else 'FAIL'}  {name}{': ' + detail if detail else ''}", flush=True)
@@ -131,9 +138,7 @@ def family():
         check(f'fuzz 20 s ({inst})', r.returncode == 0, r.stdout.strip())
         r = run(['-inst', inst, '-nantest'])
         check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
-    t = time.perf_counter()
-    run(['-inst', 'piccolo', '-note', '93', '-secs', '20'], env={'PJ_NOCAL': '1'})
-    ns = (time.perf_counter() - t) / (20 * 48000) * 1e9
+    ns = cpu_time(['-inst', 'piccolo', '-note', '93', '-secs', '20'], env={'PJ_NOCAL': '1'}) / (20 * 48000) * 1e9
     check('real-time margin (piccolo, 96 kHz)', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 def polyphony():
@@ -151,6 +156,45 @@ def polyphony():
     ji = bool(cents) and -16 <= int(cents['E']) - int(cents['C']) <= -10 and 0 <= int(cents['G']) - int(cents['C']) <= 5
     check('polyphony (-poly)', ok and ji, 'flutes ' + ' -> '.join(['1'] + seq) +
           '; C-E-G tuned ' + ' '.join(f'{k}{v}' for k, v in sorted(cents.items())) + ('' if ok else ': ' + err.strip()[-200:]))
+
+def room():
+    """The room (-room): an instrument gives back far less than the room's sound brings it (a small
+    passive scatterer: no energy is made); the ensemble deals chords low to high; the hall dies away."""
+    worst = []
+    for inst in ('flute', 'piccolo', 'bass'):
+        vals = [float(v) for v in re.findall(r'radiates ([\d.]+)', run(['-inst', inst, '-scatter']).stdout)]
+        worst.append((inst, max(vals) if vals else 9))
+    check('room: instruments are passive', all(w < 0.03 for _, w in worst),
+          ', '.join(f'{i} {w:.4f} Pa/Pa' for i, w in worst))
+    wav = os.path.join(ROOT, 'tools', '.ens-test.wav')
+    r = run(['-ensemble', '-polydemo', '-o', wav])
+    err = r.stderr
+    rank = {'bass': 0, 'alto': 1, 'flute': 2, 'piccolo': 3}
+    bad = []
+    for d in re.findall(r'deal: (.*)', err):
+        parts = [p.strip().split(' ') for p in d.split(',')]
+        if len(parts) < 5:
+            continue
+        notes = sorted(((int(p[0][-1]) if p[0][-1].isdigit() else 0) * 12 + 'C C# D D# E F F# G G# A A# B'.split().index(p[0][:-1]), rank[p[1]]) for p in parts)
+        if [n[1] for n in notes] != sorted(n[1] for n in notes):
+            bad.append(d)
+    ok = r.returncode == 0 and 'state resets: 0' in err and 'flutes: 5' in err and not bad and 'deal:' in err
+    tail = ''
+    if os.path.exists(wav):
+        import struct
+        d = open(wav, 'rb').read()
+        x = struct.unpack('<%df' % ((len(d) - 44) // 4), d[44:44 + 4 * ((len(d) - 44) // 4)])
+        n = len(x) // 2
+        def lvl(a, b):
+            seg = x[2 * int(a * 48000):2 * int(b * 48000)]
+            return math.sqrt(sum(v * v for v in seg) / max(1, len(seg)))
+        t = n / 48000
+        db = 20 * math.log10(max(lvl(t - 1, t - 0.5), 1e-9) / lvl(t - 6, t - 3))
+        tail = f'; hall tail {db:.0f} dB after 2 s'
+        ok &= db < -50
+        os.remove(wav)
+    check('ensemble in a hall (-ensemble)', ok, ('voicing low to high' if not bad else f'crossed: {bad}') + tail +
+          ('' if r.returncode == 0 and 'state resets: 0' in err else ': ' + err.strip()[-200:]))
 
 def parity():
     """The portable build plays the same notes (pitch and level), R22."""
@@ -171,9 +215,7 @@ def parity():
 
 def realtime():
     """Real-time margin: one 20 s note well under budget (R27: < 10 % of a core)."""
-    t = time.perf_counter()
-    run(['-note', '69', '-secs', '20'], env={'PJ_NOCAL': '1'})
-    ns = (time.perf_counter() - t) / (20 * 48000) * 1e9
+    ns = cpu_time(['-note', '69', '-secs', '20'], env={'PJ_NOCAL': '1'}) / (20 * 48000) * 1e9
     check('real-time margin', ns < 400, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 def passive_vs_tmm():
@@ -193,7 +235,7 @@ def passive_vs_tmm():
 
 if __name__ == '__main__':
     t0 = time.time()
-    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, family, polyphony, parity, realtime, passive_vs_tmm):
+    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, family, polyphony, room, parity, realtime, passive_vs_tmm):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

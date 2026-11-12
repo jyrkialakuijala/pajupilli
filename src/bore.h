@@ -50,10 +50,12 @@ struct alignas(64) BoreState {
 struct alignas(64) BoreCoefs {
   // u update:  u+ = au u - bu (p[i+1] - p[i]) - sum_k ck psi_k ;  psi_k+ = a_k psi_k + g_k (u+ - u)
   alignas(64) float au[kCells], bu[kCells], ck[kLossSections][kCells];
+  alignas(64) float fr[kCells];  // u+ -= fr pRoom: the room at the foot's opening (one interface)
   float a[kLossSections], g[kLossSections];
   // node update, x = (p, q, l):  x+ = M x + v J,  J = u[i-1] - u[i]
   alignas(64) float m[3][3][kCells];
   alignas(64) float v[3][kCells];
+  alignas(64) float e[3][kCells];  // x+ += e pRoom: the room's pressure at the opening
 };
 
 // What a side branch at a cell looks like, all in SI units (m, kg, s).
@@ -92,7 +94,11 @@ class Bore {
   // One time step. The embouchure cell `ec` is excluded from the vector node
   // update (its branch is solved by the caller): pOld is p[ec] before the step,
   // J the net bore inflow into it. Returns the flow out of the horn's far end.
-  float step(int ec, float* pOld, float* J);
+  // pRoom: the room's sound pressure outside (Pa), acting on every open branch
+  // and at the foot's opening (between the tube's last cell and the horn that
+  // is its radiation load), in series with each opening's radiation load: the
+  // flute takes in as much as it would radiate, no more (reciprocity).
+  float step(int ec, float* pOld, float* J, float pRoom = 0);
 
   BoreState s;
   BoreCoefs k;

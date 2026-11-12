@@ -45,14 +45,15 @@ inline double rms(const float* x, int n) {
   return n ? std::sqrt(s / n) : 0;
 }
 
-inline bool writeWav(const char* path, const std::vector<float>& x, int fs) {
+// x: interleaved if channels > 1.
+inline bool writeWav(const char* path, const std::vector<float>& x, int fs, int channels = 1) {
   FILE* f = std::fopen(path, "wb");
   if (!f) return false;
   const uint32_t data = uint32_t(x.size() * 4);
   auto u32 = [f](uint32_t v) { std::fwrite(&v, 4, 1, f); };
   auto u16 = [f](uint16_t v) { std::fwrite(&v, 2, 1, f); };
   std::fwrite("RIFF", 1, 4, f); u32(36 + data); std::fwrite("WAVEfmt ", 1, 8, f);
-  u32(16); u16(3); u16(1); u32(fs); u32(fs * 4); u16(4); u16(32);
+  u32(16); u16(3); u16(uint16_t(channels)); u32(fs); u32(fs * 4 * channels); u16(uint16_t(4 * channels)); u16(32);
   std::fwrite("data", 1, 4, f); u32(data);
   std::fwrite(x.data(), 4, x.size(), f);
   std::fclose(f);

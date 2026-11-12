@@ -37,14 +37,17 @@ class Voice {
   Flute& flute() { return *flute_; }
   Player& player() { return *player_; }
   const Instrument& instrument() const { return flute_->instrument(); }
-  void render(float* out, int n);  // 48 kHz
+  // 48 kHz. room (optional): the room's pressure at the instrument, n samples
+  // at 48 kHz (Pa), taken to the model's rate.
+  void render(float* out, int n, const float* room = nullptr);
   void seed(unsigned s) { flute_->seed(s); player_->seed(s); }
 
  private:
   std::unique_ptr<Flute> flute_;
   std::unique_ptr<Player> player_;
   Resampler rs_;
-  std::vector<float> in_;
+  std::vector<float> in_, room_;
+  float roomLast_ = 0;
 };
 
 }  // namespace pajupilli

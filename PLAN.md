@@ -412,3 +412,35 @@ crossing), the held note keeping its own flute from the start when the history s
   but E-G-C .231 -> .259 (G, C uncovered more: +1.3 dB louder); total -21 %. On model flute
   spectra the JI solution is within 1 % of a direct roughness search and lowers every chord
   (E-G-C .267 -> .248), so the rule stands; the lips' loudness change is the open part.
+
+### Added 2026-11-12 — ensemble (`-ensemble`) and the room (`-room`, src/room.*)
+- Ensemble: a mixed pool, default bass, alto, flute, flute, piccolo, each with its own
+  calibration. Notes go where they are comfortable (strain = semitones outside a comfort
+  range, + preference 0 flutes / 1 alto, piccolo / 1.5 bass, + line continuity capped at 2,
+  + 24 per octave folded when no free instrument reaches a key), and a chord (keys within
+  35 ms, each alone on its instrument) is re-dealt as a whole by exhaustive search with a
+  6-point penalty per voice crossing (rank = an instrument's lowest note). A key no held
+  instrument reaches is not slurred: it goes to a free one. Uniform pools (-poly) keep the
+  old rule unchanged. The demo's five-voice chorale deals C3 bass, G3 alto, E4 / C5 flutes,
+  G5 piccolo.
+- Room: 16-line FDN (Hadamard / 4, prime lengths 0.5..1.6 mean free paths of a 2:1.4:0.7
+  shoebox, one-pole wall/air loss: RT60 at DC, RT60/3 at Nyquist). Level from diffuse-field
+  theory: p_rev^2 = 16 pi / A p(1 m)^2, A = 0.161 V / RT60. Seats on a line 1 m apart (0.8 for
+  more than 6), high left; direct paths 1/r and r/c between players and to a spaced pair of
+  microphones (+-1 m, at the room's listener distance: studio 2, hall 3, church 6 m), scaled so
+  a source there sounds as at 1 m. Rooms: dry, studio 150 m3 0.5 s, hall 2500 m3 1.8 s
+  (default), church 15000 m3 4 s.
+- Room into the instruments: the room's pressure at each player (its own FDN taps + the others'
+  direct sound) is an external pressure in series with every opening's radiation load: the
+  embouchure branch, every tone-hole branch (Bore::step pRoom, the e coefficients) and the
+  foot's opening (the interface between the tube and its radiation horn). All flutes are
+  computed in a room, the silent ones too (sympathetic resonance). Coupling in 32-sample blocks
+  (the direct paths shortened by a block).
+- Passivity: the first version applied the room at the far end of the foot's radiation horn
+  (r = 0.31 m sphere): that shell collected the room's sound into the bore and an idle flute
+  gave back 0.18..0.49 Pa at 1 m per Pa; with a few players and the reverb the loop gained
+  > 1 and grew 70 dB/s. At the opening (series with its load, reciprocity) an idle flute gives
+  back 0.0006..0.01 Pa/Pa (rising with frequency like a small scatterer); `-scatter` measures it
+  and `make test` checks < 0.03. The energy the instruments absorb (bore losses) is not taken
+  out of the FDN: their absorption area (cm^2) is negligible next to the room's A (> 10 m^2).
+- Cost: ensemble in the hall 6.5 % of a core (all five always computed), dry 3.8 %.

@@ -10,6 +10,7 @@
 //   ./flute -live                     play it from the MPK mini mk3
 //       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
+#include <memory>
 #include <random>
 #if defined(__SSE__)
 #include <xmmintrin.h>
@@ -26,6 +27,7 @@
 #include "flute.h"
 #include "live.h"
 #include "player.h"
+#include "room.h"
 #include "voice.h"
 
 using namespace pajupilli;
@@ -242,8 +244,11 @@ const char kUsage[] =
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
     "  -fuzz SECS SEED     random playing, check for blow-ups\n"
     "  -nantest            check recovery from NaN states\n"
+    "  -scatter            how much a silent instrument gives back of the room's\n"
+    "                      sound, per octave band\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
-    "                      chord (-o to save)\n"
+    "                      chord; with -ensemble also a chorale (-o to save,\n"
+    "                      stereo)\n"
     "\n"
     "Options:\n"
     "  -o FILE.wav         write the sound (48 kHz)\n"
@@ -263,6 +268,13 @@ const char kUsage[] =
     "                      struck together, or held together over 100 ms, get\n"
     "                      flutes of their own\n"
     "\n"
+    "Ensemble and room (live and -polydemo):\n"
+    "  -ensemble [LIST]    a flute choir instead of -poly: bass, alto, two flutes\n"
+    "                      and a piccolo (default LIST bass,alto,flute,flute,piccolo);\n"
+    "                      notes go to the instrument they suit, chords low to high\n"
+    "  -room NAME          dry, studio, hall (default) or church: the instruments\n"
+    "                      play in it and hear it in their bores; stereo out\n"
+    "\n"
     "Environment: PJ_NOCAL (skip calibration), PJ_NOCALCACHE (ignore the cache),\n"
     "PJ_TRACE (with -note: print model state per sample)\n"
     "\n"
@@ -270,6 +282,41 @@ const char kUsage[] =
     "  flute -live -inst alto\n"
     "  flute -note 69 -o a4.wav\n"
     "  flute -inst piccolo -scale\n";
+
+// Scattering: a silent flute driven by 1 Pa of room noise in one octave band;
+// what it radiates (Pa at 1 m) per Pa of room pressure. A passive instrument
+// at 1 m gives back far less than it gets.
+int scatter() {
+  Flute fl(*gInst);
+  const double fs = fl.fs();
+  std::vector<float> tmp(int(fs / 5));
+  fl.process(tmp.data(), int(tmp.size()));
+  std::mt19937 rng(1);
+  std::normal_distribution<float> nd(0, 1);
+  for (double fc = 125; fc < 0.4 * fs && fc <= 16000; fc *= 2) {
+    const int n = int(fs);
+    std::vector<float> pr(n), y(n);
+    // Band: two one-pole sections each way (rough octave).
+    double a = 0, b = 0, c = 0, d = 0;
+    const double ah = 1 - std::exp(-2 * M_PI * fc * 1.41 / fs), al = 1 - std::exp(-2 * M_PI * fc / 1.41 / fs);
+    double e2 = 0;
+    for (int i = 0; i < n; ++i) {
+      const double x = nd(rng);
+      a += ah * (x - a); b += ah * (a - b);
+      c += al * (b - c); d += al * (c - d);
+      pr[i] = float(b - d);
+      e2 += pr[i] * pr[i];
+    }
+    const float sc = float(1 / std::sqrt(e2 / n));
+    for (float& v : pr) v *= sc;
+    fl.setRoom(pr.data(), n);
+    fl.process(y.data(), n);
+    double s2 = 0;
+    for (int i = n / 2; i < n; ++i) s2 += double(y[i]) * y[i];
+    std::printf("%6.0f Hz: radiates %.4f Pa at 1 m per Pa\n", fc, std::sqrt(s2 / (n / 2)) / fl.outScale());
+  }
+  return 0;
+}
 
 int main(int argc, char** argv) {
 #if defined(__SSE__)
@@ -280,6 +327,8 @@ int main(int argc, char** argv) {
   int note = -1, imp = -1, slurFrom = -1, slurTo = -1;
   bool scale = false, demo = false, live = false, cal = false, cfoot = false, polyDemo = false;
   LiveOptions lopt;
+  std::string ensemble;  // instruments, comma-separated
+  const RoomSpec* room = findRoom("hall");
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
   const char* dump = nullptr;  // window pressure, raw float32
@@ -311,8 +360,17 @@ int main(int argc, char** argv) {
     else if (a == "-v") lopt.verbose = true;
     else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
     else if (a == "-polydemo") polyDemo = true;
+    else if (a == "-ensemble") {
+      ensemble = "bass,alto,flute,flute,piccolo";
+      if (i + 1 < argc && argv[i + 1][0] != '-') ensemble = argv[++i];
+    }
+    else if (a == "-room") {
+      room = findRoom(next());
+      if (!room) { std::fprintf(stderr, "-room: dry, studio, hall or church\n"); return 1; }
+    }
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
     else if (a == "-nantest") return nanTest();
+    else if (a == "-scatter") return scatter();
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
     else {
@@ -340,18 +398,55 @@ int main(int argc, char** argv) {
     if (note >= 0 && !scale && !demo && !live) gCal = calibrate(*gInst, 440, nullptr, note, note);
     else gCal = calibrate(*gInst, 440, nullptr);
   }
-  if (live) return runLive(*gInst, lopt, gCal);
+  // Who plays: one instrument (-poly N of it) or an ensemble, each calibrated.
+  std::vector<const Instrument*> members;
+  std::vector<std::unique_ptr<Calibration>> cals;
+  std::vector<Ensemble::Member> roster;
+  if (!ensemble.empty()) {
+    for (size_t b = 0; b <= ensemble.size();) {
+      size_t e = ensemble.find(',', b);
+      if (e == std::string::npos) e = ensemble.size();
+      const std::string nm = ensemble.substr(b, e - b);
+      const Instrument* in = findInstrument(nm);
+      if (!in) { std::fprintf(stderr, "-ensemble: unknown instrument '%s'\n", nm.c_str()); return 1; }
+      members.push_back(in);
+      b = e + 1;
+    }
+    for (const Instrument* in : members) {
+      const Calibration* c = nullptr;
+      for (size_t j = 0; j < roster.size(); ++j)
+        if (members[j] == in) c = roster[j].cal;
+      if (!c) {
+        cals.emplace_back(new Calibration(std::getenv("PJ_NOCAL") ? Calibration() : calibrate(*in, 440, nullptr)));
+        c = cals.back().get();
+      }
+      roster.push_back({in, c});
+    }
+  }
+  auto makeEnsemble = [&](int poly) {
+    return roster.empty() ? std::unique_ptr<Ensemble>(new Ensemble(*gInst, gCal, poly, lopt.verbose || polyDemo, room))
+                          : std::unique_ptr<Ensemble>(new Ensemble(roster, lopt.verbose || polyDemo, room));
+  };
+  if (live) {
+    auto ens = makeEnsemble(lopt.poly);
+    return runLive(roster.empty() ? *gInst : concertFlute(), lopt, *ens);
+  }
   if (polyDemo) {
     // One line, then a held note under a melody, then chords, then a rolled
     // chord: the pool should use 1, 2, 3, then 4 flutes (it prints "flutes: N").
-    Ensemble ens(*gInst, gCal, std::max(2, lopt.poly), true);
+    auto ensp = makeEnsemble(std::max(2, lopt.poly));
+    Ensemble& ens = *ensp;
+    std::fprintf(stderr, "playing: %s\n", ens.describe().c_str());
     std::vector<float> all;
     auto play = [&](double s) {  // in 64-frame periods, as live
-      std::vector<float> x(64);
-      for (int k = 0; k < int(s * kFs) / 64; ++k) { ens.render(x.data(), 64); all.insert(all.end(), x.begin(), x.end()); }
+      std::vector<float> l(64), r(64);
+      for (int k = 0; k < int(s * kFs) / 64; ++k) {
+        ens.render(l.data(), r.data(), 64);
+        for (int j = 0; j < 64; ++j) { all.push_back(l[j]); all.push_back(r[j]); }
+      }
     };
-    const int t = gInst->transpose;
-    auto say = [&](const char* what) { std::fprintf(stderr, "%5.2f s  %s\n", all.size() / double(kFs), what); };
+    const int t = roster.empty() ? gInst->transpose : 0;
+    auto say = [&](const char* what) { std::fprintf(stderr, "%5.2f s  %s\n", all.size() / 2.0 / kFs, what); };
     say("a slurred line");
     const int line[] = {72, 74, 76, 77, 79, 77, 76, 74, 72};
     for (int i = 0; i < 9; ++i) { ens.noteOn(line[i] + t, 80); play(0.02); if (i) ens.noteOff(line[i - 1] + t); play(0.23); }
@@ -376,9 +471,21 @@ int main(int argc, char** argv) {
     play(0.8);
     for (int k = 0; k < 4; ++k) ens.noteOff(roll[k] + t);
     play(1.0);
+    if (!roster.empty()) {
+      say("a chorale, five voices");
+      const int ch[][5] = {{48, 55, 64, 72, 79}, {53, 57, 65, 72, 81}, {55, 59, 67, 74, 83},
+                           {48, 55, 64, 72, 84}};
+      for (auto& c : ch) {
+        for (int k : {2, 4, 0, 3, 1}) { ens.noteOn(c[k], 72); play(0.006); }
+        play(1.2);
+        for (int k = 0; k < 5; ++k) ens.noteOff(c[k]);
+        play(0.08);
+      }
+      play(2.5);  // the room rings on
+    }
     say("end");
     std::fprintf(stderr, "state resets: %d\n", ens.resets());
-    if (out && !writeWav(out, all, kFs)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
+    if (out && !writeWav(out, all, kFs, 2)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
     return 0;
   }
   std::vector<float> slurOut;

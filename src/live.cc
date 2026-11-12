@@ -130,8 +130,8 @@ class Controls {
  public:
   Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o) {
     // Sounding range; keys outside it fold in by octaves.
-    lo_ = inst.lo + inst.transpose;
-    hi_ = inst.hi + inst.transpose;
+    lo_ = p.lo();
+    hi_ = p.hi();
     transpose_ = o.transpose != LiveOptions::kAutoTranspose
                      ? o.transpose
                      : 12 + 12 * int(std::lround(inst.transpose / 12.0));
@@ -236,7 +236,7 @@ class Controls {
 
 }  // namespace
 
-int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal) {
+int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
   std::signal(SIGINT, onSignal);
   std::signal(SIGTERM, onSignal);
   bool isFloat = true;
@@ -257,15 +257,12 @@ int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal
     std::fprintf(stderr, "note: no real-time priority (run with rtprio to reduce xruns)\n");
   mlockall(MCL_CURRENT | MCL_FUTURE);
 
-  Ensemble player(inst, cal, o.poly, o.verbose);
   player.all(&Player::setVibrato, 0.05);
   Controls ctl(player, inst, o);
   ctl.init();
-  std::fprintf(stderr, "instrument: %s, model at %.0f kHz", inst.name, inst.fs / 1000);
-  if (o.poly > 1) std::fprintf(stderr, ", up to %d flutes", o.poly);
-  std::fprintf(stderr, "\n");
+  std::fprintf(stderr, "playing: %s\n", player.describe().c_str());
 
-  std::vector<float> mono(period), f32(period * 2);
+  std::vector<float> left(period), right(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);
   long frames = 0, xruns = 0;
   float gain = float(ctl.gain_);
@@ -299,14 +296,16 @@ int runLive(const Instrument& inst, const LiveOptions& o, const Calibration& cal
       }
       if (frames > 48000 * 5) gStop = true;
     }
-    player.render(mono.data(), int(period));
+    player.render(left.data(), right.data(), int(period));
     for (size_t i = 0; i < period; ++i) {
       gain += 0.002f * (float(ctl.gain_) - gain);  // ~10 ms volume glide, no clicks
-      float y = mono[i] * gain;
-      if (!std::isfinite(y)) y = 0;  // the output guard
-      y = std::max(-1.0f, std::min(1.0f, y));
-      f32[2 * i] = f32[2 * i + 1] = y;
-      s16[2 * i] = s16[2 * i + 1] = int16_t(y * 32767);
+      for (int c = 0; c < 2; ++c) {
+        float y = (c ? right[i] : left[i]) * gain;
+        if (!std::isfinite(y)) y = 0;  // the output guard
+        y = std::max(-1.0f, std::min(1.0f, y));
+        f32[2 * i + c] = y;
+        s16[2 * i + c] = int16_t(y * 32767);
+      }
     }
     snd_pcm_sframes_t w = isFloat ? snd_pcm_writei(pcm, f32.data(), period)
                                   : snd_pcm_writei(pcm, s16.data(), period);

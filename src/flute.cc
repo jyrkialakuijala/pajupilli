@@ -536,7 +536,8 @@ float Flute::sample() {
   const double kj = kRho * dd * b * uj_ / W;
   // --- The bore, then the window branch at the embouchure cell (implicit).
   float pOld, jIn;
-  bore_.step(ec_, &pOld, &jIn);
+  if (roomPos_ < roomN_) pRoom_ = room_[roomPos_++];
+  bore_.step(ec_, &pOld, &jIn, pRoom_);
   if (nPumping_ > 0)  // pads pushing air into the tube (key clicks)
     for (const Hole& hl : hole_)
       if (hl.padIn != 0) bore_.s.p()[hl.cell] += float(hl.padIn * dt / bore_.compliance(hl.cell));
@@ -559,7 +560,7 @@ float Flute::sample() {
     const double m10 = -g, m11 = w + g * (rs + rr), m12 = -g * rr;
     const double m20 = 0, m21 = -hl * rr, m22 = w + hl * rr;
     const double r0 = w * pOld + jIn / c;
-    const double r1 = w * eq_ - kJetSign_ * g * kj * (fn - ef_) / dt + g * testDp_ * 2;
+    const double r1 = w * eq_ - kJetSign_ * g * kj * (fn - ef_) / dt + g * testDp_ * 2 - g * pRoom_;
     testDp_ = 0;
     const double r2 = w * el_;
     // Cramer's rule.
