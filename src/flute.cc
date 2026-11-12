@@ -68,6 +68,13 @@ constexpr HoleSpec kSpec[kHoles] = {
     {592.3, 15.4, 2.8, 20.6, false},// 17 C4 (B foot only; the B key closes it)
 };
 
+// The series length t_a of a side hole (negative), in bore units: Dubos et al.
+// 1999 (eq. 74), t the chimney height; closed holes use coth.
+double seriesLength(double b, double a, double t, bool closed) {
+  const double d = b / a, th = std::tanh(1.84 * t / b);
+  return -b * d * d / (1.78 * (closed ? 1 / th : th) + 0.940 + 0.540 * d + 0.285 * d * d);
+}
+
 // Inner end correction of a side hole (Dalmont / Nederveen), delta = b / a.
 double innerCorrection(double b, double delta) {
   return b * (0.82 - 0.193 * delta - 1.09 * delta * delta + 1.27 * std::pow(delta, 3) -
@@ -137,6 +144,16 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   kRel_ = knob("PJ_REL", 0);
   kXiHp_ = knob("PJ_XIHP", 100);
   kVortex_ = knob("PJ_VORTEX", 1);
+  kJetDisp_ = int(knob("PJ_JETDISP", 1));
+  kCpHi_ = knob("PJ_CPHI", 0.45);
+  {  // the all-pass's share of the delay at the reference (see sample())
+    const double phi = M_PI * (1 - std::min(0.95, kConv_ / kCpHi_));
+    const double x = std::tan(0.5 * phi);   // w T at the reference: 2 atan(w T) = phi
+    kDispT_ = x / (M_PI * kConv_);          // T = kDispT W / Uj
+  }
+  kAgc_ = knob("PJ_AGC", 2);  // swing limit, in jet widths
+  agcA_ = 1 - std::exp(-1 / (knob("PJ_AGCT", 4) * 1e-3 * fs_));
+  kSeries_ = knob("PJ_SERIES", 1);  // closed holes' series length t_a (Dubos)
   kTurbIn_ = knob("PJ_TURBIN", 4);  // jet turbulence gain (it now passes the jet's low-pass)
   kEdge_ = knob("PJ_EDGE", 4);      // direct edge hiss
   // Pad pumping, as a share of a rigid pad landing flat: the felt and skin
@@ -169,13 +186,14 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   }
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
-  kEtaMax_ = knob("PJ_ETAMAX", 1.5) * 1e-3 * inst.emb;  // the jet roll-up scales with the jet
+  kEtaMax_ = knob("PJ_ETAMAX", 3) * 1e-3 * inst.emb;  // a hard limit for safety (PJ_AGC limits the swing)
   kEmbR_ = knob("PJ_EMBR", 0.01);
   kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
   kRadOnly_ = int(knob("PJ_RADONLY", 0));  // -1 embouchure only, 1 all but the embouchure
-  bore_.setBore([this](double x) { return boreDiameter(x); }, cork_ + foot_);
-  const double dx = bore_.dx();
-  ec_ = int(cork_ / dx);
+  bore_.setBore([this](double x) { return boreDiameter(x); }, cork_, cork_ + foot_);
+  const double dx = bore_.dx(), x0 = bore_.x0();
+  ec_ = bore_.embCell();
+  const double kHoleComp = knob("PJ_HOLECOMP", 2), kOpenTa = knob("PJ_OPENTA", 0.8);
   for (int i = 0; i < kHoles; ++i) {
     Hole& h = hole_[i];
     const HoleSpec& sp = kSpec[i];
@@ -185,16 +203,26 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     h.padR = 0.5e-3 * sp.cup * inst.bore;
     h.perforated = sp.perf;
     h.present = !(inst.dFoot && i >= 14) && (i < 16 || inst.bFoot);
-    h.cell = h.present ? int(h.x / dx) : -1;
+    h.cell = h.present ? int((h.x - x0) / dx) : -1;
     if (!h.present) continue;
     const double a = 0.5 * boreDiameter(h.x), delta = h.b / a;
     h.a = a;
     const double tm = h.b * delta * (1 + 0.207 * std::pow(delta, 3)) / 8;
     // The grid puts the hole at the cell centre. A hole moved up by d sounds
-    // like one with a chimney longer by d S_h / S: keep the note.
-    const double d = h.x - (h.cell + 0.5) * dx;
+    // like one with a chimney longer by ~d S_h / S: keep the note. An open
+    // hole's series length t_a (negative, Dubos) can't shorten the waveguide's
+    // interfaces (stability), but for the first open hole it acts much as the
+    // hole moved up by ~|t_a| (kOpenTa): it joins the offset. kHoleComp: with a
+    // lattice of open holes below, d S_h / S alone corrects only about half.
+    // Both fitted with tools/fitgrid.py against tools/tmm.py: 1.4 cents rms
+    // over the first three resonances of every instrument's fingerings.
+    const double d = h.x - (x0 + (h.cell + 0.5) * dx);
     const double sh = M_PI * h.b * h.b, sb = M_PI * a * a;
-    h.tSeries = std::max(1e-3 * inst.bore, holeT_ + innerCorrection(h.b, delta) + tm + d * sh / sb);
+    const double taOpen = seriesLength(h.b, a, holeT_, false);
+    h.tSeries = std::max(1e-3 * inst.bore, holeT_ + innerCorrection(h.b, delta) + tm +
+                                               kHoleComp * (d + kOpenTa * taOpen) * sh / sb);
+    h.tClosed = holeT_ + tm - 0.05 * h.b;  // closed chimney, with its matching volume
+    h.taClosed = seriesLength(h.b, a, holeT_, true);
     h.tRad = 0.6133 * h.b;
   }
   // At rest the player holds G: the left hand down, the right hand up (and the
@@ -202,7 +230,7 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   setHoles("xxxxxxxxxooooooo");
   for (Hole& h : hole_) h.open = h.target;
   updateHoles(0);
-  // Radiators: each hole cell, the embouchure, the foot (horn outlet).
+  // Radiators: each hole cell, the embouchure, the foot's open end.
   // Listener 1 m in front of the player's face (x along the flute from the cork
   // face, y forward). In the second register the embouchure and the open holes
   // move air in antiphase (mode 2): opposite the middle of the flute they cancel
@@ -216,11 +244,7 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
     ++nRad_;
   };
   addRad(-1, cork_, 0);  // embouchure
-  addRad(-2, cork_ + foot_, horn_r());
-  {  // the foot's gain: R / d (pressure at the horn's last cell, see sample())
-    const double dist = std::hypot(cork_ + foot_ - lx, ly);
-    radGain_[nRad_ - 1] = float(horn_r() / dist);
-  }
+  addRad(bore_.footCell(), cork_ + foot_, 0);
   for (int i = 0; i < kHoles; ++i) {
     if (!hole_[i].present) continue;
     bool dup = false;
@@ -230,8 +254,6 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   cur_ = target_;
   embouchureGeometry();
 }
-
-double Flute::horn_r() const { return bore_.hornRadius(); }
 
 void Flute::setHoles(const char* pattern, double fingerSpeed) {
   fingerSpeed_ = std::clamp(fingerSpeed, 0.25, 4.0);
@@ -244,7 +266,7 @@ void Flute::setHoles(const char* pattern, double fingerSpeed) {
 Branch Flute::holeBranch(const Hole& h) const {
   Branch br;
   const double sh = M_PI * h.b * h.b;
-  const double vc = sh * holeT_;  // closed chimney volume
+  const double vc = sh * h.tClosed;  // closed chimney volume
   const double s = padShape(h.open, h.closing);
   if (s < 1e-4) { br.vol = vc; return br; }
   const double hp = s * h.padH;
@@ -377,6 +399,17 @@ void Flute::updateHoles(double dtBlock) {
     for (int j = i; j < kHoles; ++j)
       if (hole_[j].cell == c) part[n++] = holeBranch(hole_[j]);
     for (int j = 0; j < n; ++j) { sum.g += part[j].g; sum.vol += part[j].vol; }
+    {  // A closed hole's negative series length, in step with its chimney
+      // volume (which keeps the cell within the scheme's stability limit):
+      // fading with openness alone, a closing pad made the bass blow up.
+      double ta = 0;
+      for (int j = i, k = 0; j < kHoles; ++j)
+        if (hole_[j].cell == c) {
+          const Hole& h = hole_[j];
+          ta += h.taClosed * part[k++].vol / (M_PI * h.b * h.b * h.tClosed);
+        }
+      bore_.setSeries(c, kSeries_ * ta);
+    }
     if (sum.g > 0) {
       double il = 0;
       for (int j = 0; j < n; ++j) {
@@ -404,7 +437,7 @@ void Flute::embouchureGeometry() {
   const double rw = std::sqrt(sw / M_PI);
   const double a = embA_;
   const double m = kRho * (embChimney_ / std::sqrt(sw * sbot) +
-                           innerCorrection(embRin_, embRin_ / a) / sbot + kEmbLen_ / sw);
+                           innerCorrection(embRin_, embRin_ / a) / sbot + kEmbLen_ * cur_.face / sw);
   esw_ = sw;
   eg_ = 1 / m;
   // Loss in the window: the lower lip over the hole leaves a lossy slit
@@ -425,6 +458,7 @@ void Flute::controlStep() {
   glide(cur_.jetLen, target_.jetLen);
   glide(cur_.uncovered, target_.uncovered);
   glide(cur_.y0, target_.y0);
+  glide(cur_.face, target_.face);
   glide(cur_.noise, target_.noise);
   glide(cur_.air, target_.air);
   cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
@@ -451,10 +485,9 @@ void Flute::process(float* out, int n) {
 
 void Flute::resetAir() {
   std::memset(&bore_.s, 0, sizeof(bore_.s));
-  bore_.resetTermination();
   eq_ = el_ = ef_ = 0;
   pm_ = uj_ = 0;
-  xi_ = jl1_ = jl2_ = xiLow_ = 0;
+  xi_ = jl1_ = jl2_ = xiLow_ = dl1_ = dl2_ = agcEnv_ = 0;
   noiseLp_ = noiseHp_ = glotLp_ = edgeLow_ = edgeBand_ = 0;
   std::fill(vHist_, vHist_ + kHist, 0.0f);
   std::fill(outRing_, outRing_ + kOutRing, 0.0f);
@@ -488,7 +521,10 @@ float Flute::sample() {
   pm_ = (cm / dt * pm_ + gIn * (cur_.lung + hiss) - qj) / (cm / dt + gIn);
   // --- The jet: convected disturbance, deflection at the labium, flow split.
   const double ujc = std::max(uj_, 0.3);
-  double tau = W / (kConv_ * ujc) * fs_;
+  // Dispersive jet: short disturbances convect faster. A pure delay at the
+  // fast speed (cp ~ 0.45 Uj, kb >~ 1) plus an all-pass that adds the rest of
+  // the delay at low kb (see below).
+  double tau = W / ((kJetDisp_ ? kCpHi_ : kConv_) * ujc) * fs_;
   tau = std::min(std::max(tau, 2.0), double(kHist - 4));
   const double rp = hPos_ - tau;
   const int i0 = int(std::floor(rp));
@@ -516,15 +552,47 @@ float Flute::sample() {
     // below ~1); shorter ones decay. Two poles at cp / (2 pi b).
     // The history holds the displacement in this model. The jet's own
     // turbulence enters here, so the jet's response shapes it (no 8-24 kHz fizz).
-    double xd = vdel + kTurbIn_ * turb / (2 * M_PI * 1000);
-    if (kJetLp_ > 0) {
+    double xd = kTurbIn_ * turb / (2 * M_PI * 1000);
+    if (kJetDisp_) {
+      // The sound's disturbance on a dispersive jet (Rayleigh / Bickley: cp
+      // rises with kb; de la Cuadra 2007). Its delay at a played note's
+      // fundamental stays W / (0.175 Uj), a half period (Fletcher's operating
+      // point), but higher harmonics see relatively less delay, so they leave
+      // the (2n+1) pi phase locks: no octave below the fundamental's threshold,
+      // overblowing only at several times the pressure. A first-order all-pass
+      // of time constant T ~ W / Uj adds 2 atan(w T) to the fast convection's
+      // delay: the rest of the delay at the reference w = pi cp0 Uj / W, less
+      // above it. All-pass: it favours no frequency's gain (poles did: a lower
+      // mode won the second register).
+      const double K = 2 * kDispT_ * W / ujc * fs_;
+      const double c = (1 - K) / (1 + K);
+      const double y = c * vdel + dl1_ - c * dl2_;
+      dl1_ = vdel;
+      dl2_ = y;
+      xd += y;
+    } else {
+      xd += vdel;
+    }
+    if (kJetLp_ > 0) {  // the jet's width: Rayleigh, k b above ~1 decays
       const double fc = kJetLp_ * kConv_ * ujc / (2 * M_PI * b);
       const double al = 1 - std::exp(-2 * M_PI * std::min(fc, 0.4 * fs_) / fs_);
       jl1_ += al * (xd - jl1_);
       jl2_ += al * (jl1_ - jl2_);
       xd = jl2_;
     }
-    eta = kEtaSign_ * (std::cosh(std::min(kAlpha_ / h * W, 6.0)) * xd - kRel_ * xi_);
+    double cg = std::cosh(std::min(kAlpha_ / h * W, 6.0));
+    if (kAgc_ > 0) {
+      // Growth-limited jet: once the swing reaches ~ its width, the jet rolls up
+      // into vortices and stops amplifying (over a few cycles, not within one):
+      // the gain falls with the swing's envelope, so the swing stays smooth and
+      // the edge, aimed off-centre by y0, makes the harmonics (Fletcher &
+      // Douglas 1980), not a clipped square wave.
+      const double lin = cg * xd;
+      agcEnv_ += agcA_ * (lin * lin - agcEnv_);
+      const double a = std::sqrt(2 * agcEnv_) / (kAgc_ * b);
+      cg /= std::sqrt(1 + a * a);
+    }
+    eta = kEtaSign_ * (cg * xd - kRel_ * xi_);
   } else {
     eta = kEtaSign_ * (h / ujc) * gain * (vdel + turb);
   }
@@ -591,12 +659,7 @@ float Flute::sample() {
     const int c = radCell_[r];
     if (kRadOnly_ != 0 && (kRadOnly_ == -1) != (c == -1)) continue;
     float add;
-    if (c == -2) {
-      // The foot: the horn's last cell already holds the spherical wave at
-      // radius R; the listener gets p(R) R / d. (Its volume flow there is not
-      // the source strength: U(R) grows as |1 + jkR|.)
-      add = radGain_[r] * bore_.s.p()[kCells - 1];
-    } else {
+    {
       // d/dt of the mean of the last two flows: a zero at Nyquist, so a pad
       // closing (stiff, trapezoidal) does not click at 24 kHz.
       const float q = c == -1 ? float(eq_) : bore_.s.q[c];

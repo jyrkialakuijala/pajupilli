@@ -233,7 +233,7 @@ embouchure the written one.
 - Open: bass C3 speaks in ~240 ms (flute C4 ~90 ms; it scales with the period); the piccolo's
   third octave is bright; the bass at 24 kHz has nothing above ~11 kHz.
 
-### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4
+### Step 2 — Exact geometry (½ day, low risk) — numerics F1–F3, geometry F4 — DONE 2026-11-12 (see the end)
 - Make the foot length exact: Courant 0.99446 instead of 0.99 (dispersion stays negligible).
 - Fit the horn's throat radius so the foot end correction is 0.61a. The horn keeps all 128 points
   in use (see decision D1).
@@ -244,7 +244,7 @@ embouchure the written one.
   rather than 27 °C.
 - **Target:** all first-octave resonances within 3 cents of tmm.py. The test from step 1 enforces it.
 
-### Step 3 — The jet (2–3 days, the core of the sound) — jet F1–F5
+### Step 3 — The jet (2–3 days, the core of the sound) — jet F1–F5 — DONE 2026-11-12 (see the end; 3.3's timbre to tune by ear)
 1. **Noise path.** Inject turbulence *before* the jet low-pass, with 3–5× more gain to keep the
    hiss level. Add a direct edge-hiss source that isn't shaped by the bore, and raise the relative
    noise at pp. Small effort; removes the 12–24 kHz fizz.
@@ -306,13 +306,14 @@ Off by default; the normal mode stays at about 10–15 ms.
 
 ## Decisions for Jyrki
 
-- **D1 — 128 points.** Replacing the radiation horn with a lumped open end would be within 1 cent
+- **D1 — 128 points.** *Taken 2026-11-12: (b), a lumped end with 96 cells. A fitted horn
+  throat matched C4 only below r0 ≈ 0.25 a, where the horn rang on its own.* Replacing the radiation horn with a lumped open end would be within 1 cent
   of theory and leave 43 cells unused. Options:
   - (a) keep the horn with a fitted throat (recommended: it uses all 128 points, radiates
     physically, and gives the listening point);
   - (b) a lumped end with 96 cells;
   - (c) a lumped end, using the spare cells for something else (e.g. a mouth/tract line later).
-- **D2 — How much tuning should the player do?** A real flute plus a fixed embouchure has a
+- **D2 — How much tuning should the player do?** *Taken 2026-11-12: (a), Dickens' face load per note.* A real flute plus a fixed embouchure has a
   45–70 cent slope over the first octave. Options:
   - (a) model the player's per-note lip/face adjustment explicitly, as Dickens does (recommended);
   - (b) keep correcting it inside calibration.
@@ -473,3 +474,48 @@ crossing), the held note keeping its own flute from the start when the history s
   48 ms for the left player). The diffuse field into the directional pair: x sqrt(a^2 + (1 -
   a)^2 / 3); the microphone gain keeps the total level. Hall room/direct now +2.1 dB (centre),
   +3.4 dB (side). `-roomimp` prints the side walls; `make test` checks the mirroring (>= 6 dB).
+
+### 2026-11-12 — steps 2 and 3: the geometry as measured, a dispersive jet, a player's ranges
+Step 2 (`src/bore.*`, `tools/tmm.py`, `tools/fitgrid.py`):
+- Air at playing conditions: c = 349.5 m/s (Dickens: 30 °C, saturated, 2.5 % CO2), +12 c.
+- The grid: dx at Courant 0.975, placed so the embouchure is a cell centre; the cork cavity's
+  missing 6 mm a volume in cell 0; the foot ends inside its last cell (the end branch takes
+  the rest), so the B and C feet share one grid and one hole fit.
+- The open foot: a lumped Levine–Schwinger end (D1). 96 cells.
+- Dubos' series length t_a: on closed holes as a shorter interface mass, faded in with the
+  chimney's volume (fading with openness alone, a closing pad blew up the bass; a limit in
+  `Bore::buildU` keeps every interface within the stability margin). Open holes' t_a can't
+  shorten the waveguide; it joins the position compensation (the hole moved up 0.8 |t_a|),
+  and that compensation is 2 × d S_h / S. Both fitted against `tools/tmm.py` (now every
+  instrument, the B foot and t_a): 1.4 c rms, worst 4.8 c over the first three resonances of
+  every first- and second-octave fingering of all five instruments.
+- `-imp` peaks are interpolated, filtered for prominence, and measured after 1 s of settling:
+  at 0.1 s the key thud still rang louder than the test impulse, which had made the upper
+  resonances look 13–30 dB too weak (in the old code too).
+- The closed holes' t_a raises the first octave 10–15 c (as the geometry review predicted).
+Step 3 (`src/flute.cc`, `src/player.cc`, `src/calibrate.cc`):
+- 3.2: the jet is a delay at 0.45 Uj plus a first-order all-pass (time constant ~W / Uj) that
+  supplies the rest of the delay at the fundamental (the old operating point, a half period)
+  and less above it. The register map (`-ramp`, now a test): the octave no longer sounds below
+  the fundamental's threshold (it did at x0.55–0.87), the fundamental holds from threshold to
+  ~x2.5, then the octave, back down at ~x1.3–2.3 (hysteresis). Two poles instead of the
+  all-pass favoured the lower mode in the second register by 6 dB; cp_hi 0.35–0.40 brought
+  the low-breath octave back.
+- 3.3: growth-limited jet (`PJ_AGC` 2 jet widths, a 4 ms envelope) instead of the hard clip
+  (now only a 3 mm safety limit). C4: H3 / H5 from -14 / -8 to -31 / -28 dB, H2 from -21 to
+  -8 dB (pp): no longer a clarinet; but the odd harmonics are now weak (to tune by ear).
+- Face load (D2): the window's extra length follows Dickens' 2.937 ln m - 11.63 (A4 = the old
+  2 mm). With it the calibration lands on Coltman's schedule: C4 6.0 mm (was 9.7), A4 5.2,
+  C6 4.2, all at x1.0 breath through C#6 (was up to x1.7).
+- 3.5: calibration within Coltman ±1.5 mm, breath x0.85–1.25, jet x0.8–1.2 (x0.7–0.75 last);
+  only if nothing steady within 10 c, breath up to x2 (logged as outside a player's range).
+- Slurs up into a vented fingering (C# hole open: D5, D#5, D6, most of the third octave) get
+  a short, strong kick (x1.9, 40 ms, any dynamics): the octave slurs' kick left G5 -> D6 on
+  the vented fingering's second mode; longer kicks overshot 60 c.
+- `-slur` counts a frame as another register when a subharmonic is within 10 dB (was 15):
+  breath noise at 1.5 f0 reached -14 dB in single 20 ms frames on the piccolo's A6.
+- Tests: tuning C4–C#6 3 c (flute) / 5 c, D6–C7 40 c; register map; waveguide vs tmm 3 c.
+- Open: C4 pp -> ff is only 3 dB (step 4: the breath range and the ear); odd harmonics weak;
+  C7 +35–40 c, the alto's D#6 +21 c; faint octave islands at ~x0.3 breath (attacks pass
+  through them quickly). Listening files: `listen/step23_*_{before,after}.wav`.
+

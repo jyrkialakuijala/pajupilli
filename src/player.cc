@@ -96,6 +96,7 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   for (double& d : dynLo) d = 0;
   for (double& j : jetTrim) j = 1;
   kW_ = knob("PJ_W", 1);
+  kFace_ = knob("PJ_FACE", 1);
   kY0_ = knob("PJ_Y0", 0.8);
   kY0Exp_ = knob("PJ_Y0EXP", 1);
   kP_ = knob("PJ_P", 1);
@@ -113,7 +114,11 @@ Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
   wander_ = knob("PJ_WANDER", 1);
   kAttackKick_ = knob("PJ_ATTACKKICK", 1);
   kKickW_ = knob("PJ_KICKW", 0.2);
+  kSlurKick_ = knob("PJ_SLURKICK", 1.9);
+  kVentKickT_ = knob("PJ_VENTKICKT", 0.04);
+  kVentKickDyn_ = knob("PJ_VENTKICKDYN", 0);
   kKickT_ = knob("PJ_KICKT", 0.06);
+  kickT_ = kKickT_;
   kKickDyn_ = knob("PJ_KICKDYN", 0.9);
 }
 
@@ -124,7 +129,7 @@ void Player::noteOn(int midi, int velocity) {
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
   // Slurring up into a higher register: the flutist kicks the jet over
   // (faster air, lips closer to the edge for a moment), or the old mode stays.
-  if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick();
+  if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick(midi);
   {  // One note of a trill pair slurred over the other (either held): the
      // fingers stay on the lower note and the trill key(s) give the upper.
     const int w = midi - inst_.transpose, tr = inst_.transpose;
@@ -143,7 +148,7 @@ void Player::noteOn(int midi, int velocity) {
     if (t) { trill_ = t; trillBase_ = t->lo + tr; }
     else if (!trill_ || (w != trill_->hi && w != trill_->lo)) { trill_ = nullptr; trillBase_ = -1; }
   }
-  if (trill_) regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick() : 0;
+  if (trill_) regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick(midi) : 0;
   keyClock_ = 0;
   lastKey_ = midi;
   note_ = midi;
@@ -181,7 +186,7 @@ void Player::noteOff(int midi) {
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
-    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && !trill_) regKick_ = slurKick();
+    if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && !trill_) regKick_ = slurKick(stack_[stackTop_ - 1]);
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
@@ -206,8 +211,19 @@ void Player::seed(unsigned s) {
   flutterPhase_ = M_PI * (1 + urand());
 }
 
-double Player::slurKick() const {
+double Player::slurKick(int to) {
   const double dyn = dyn_ + breathCtl_ + velDyn_;
+  // Up into a vented fingering (the C# hole open as a vent: D5, D#5, D6 and
+  // most of the third octave) the player pushes harder and moves the lips
+  // closer, at any dynamics: with the dispersive jet, G5 -> D6 stayed on the
+  // vented fingering's second mode with the octave slurs' kick.
+  // A short, strong kick (40 ms): a long one overshot the pitch by 60 cents.
+  const char* h = info(to)->holes;
+  if (h[2] == 'o' && h[3] == 'x') {
+    kickT_ = kVentKickT_;
+    return kSlurKick_ * std::clamp(1 + kVentKickDyn_ * (0.5 - dyn), 0.5, 1.5);
+  }
+  kickT_ = kKickT_;
   return std::clamp(1 + kKickDyn_ * (0.5 - dyn), 0.5, 1.5);
 }
 
@@ -276,7 +292,10 @@ void Player::applyNote(Attack a) {
     const double dynNow = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], 1.0);
     const double needs = std::clamp((dynLo[note_] - 0.15) / 0.3, 0.0, 1.0) *
                          std::clamp(1 - (dynNow - dynLo[note_]) / 0.35, 0.0, 1.0);
-    regKick_ = std::max(regKick_, kAttackKick_ * needs);
+    if (kAttackKick_ * needs > regKick_) {
+      regKick_ = kAttackKick_ * needs;
+      kickT_ = kKickT_;
+    }
   }
   // No two attacks alike: the tongue and the push vary by ~+-15 %.
   tongueRelease_ *= 1 + 0.15 * wander_ * urand();
@@ -341,6 +360,15 @@ void Player::render(float* out, int n) {
         ct = std::exp(ct);
       }
       e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_);
+      // The face and lips load the window more as the pitch rises (Dickens
+      // 2007, fitted to played flutes: ~ 2.937 ln m - 11.63, x4.5 from C4 to
+      // C7); A4 keeps the constant 2 mm. Without it the third octave ran sharp
+      // with the window nearly closed.
+      {
+        const double mw = 69 + 12 * std::log2(fw / 440);
+        const double sh = std::max(0.1, (2.937 * std::log(mw) - 11.63) / (2.937 * std::log(69.0) - 11.63));
+        e.face = 1 + kFace_ * (sh - 1);
+      }
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).
@@ -354,9 +382,9 @@ void Player::render(float* out, int n) {
       // where the jet swings further (even harmonics need offset ~ swing).
       e.y0 = kY0_ * ke * std::pow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
       e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
-      if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * (1 + kKickP_ * regKick_);
+      if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * pressScale_ * (1 + kKickP_ * regKick_);
     }
-    regKick_ *= std::exp(-bdt / kKickT_);
+    regKick_ *= std::exp(-bdt / kickT_);
     {  // wander: two-pole low-passed noise, ~1 Hz (support), ~2 Hz (aim), ~3 Hz (lips)
       auto lp2 = [&](double& a, double& b, double hz) {
         const double k = 1 - std::exp(-2 * M_PI * hz * bdt);

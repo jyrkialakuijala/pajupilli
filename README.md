@@ -3,9 +3,10 @@
 A real-time physical model of a Boehm concert flute (B foot), played from an
 Akai MPK mini mk3. Also the piccolo, alto flute and bass flute (`-inst`).
 
-- The bore is a 1-D acoustic waveguide: 128 pressure points at 48 kHz, stored
-  as 8 × 16 float32 so the loops compile to AVX-512. Geometry from a measured
-  Pearl PF-661 (UNSW).
+- The bore is a 1-D acoustic waveguide: 96 pressure points at 48 kHz (7.5 mm apart),
+  stored as 6 × 16 float32 so the loops compile to AVX-512. Geometry from a measured
+  Pearl PF-661 (UNSW); it agrees with a transfer-matrix model of the same flute
+  (`tools/tmm.py`) within 1.4 cents rms over the first three resonances of every fingering.
 - 16 tone holes with pads that move in 10–16 ms, real fingerings C4–C7.
 - An air jet driven by the sound in the embouchure hole, from the player's
   lungs, mouth, tongue and lips.
@@ -138,7 +139,7 @@ without; the C foot's C7 is 36). `-cfoot` gives the C-foot flute.
 Each is the concert flute resized: tube lengths by the pitch ratio, bores to the real
 instruments' (piccolo ~10.5 mm, alto 26 mm, bass 35 mm), embouchure, lips and jet by about
 the square root. Same Boehm fingerings; the piccolo has a D foot. Each runs at its own rate so
-the bore keeps its 128 points, resampled to 48 kHz. Offline commands take `-inst` too, with
+the bore keeps its 96 points, resampled to 48 kHz. Offline commands take `-inst` too, with
 sounding MIDI notes (`./flute -inst bass -note 48`).
 
 ## Offline
@@ -146,9 +147,12 @@ sounding MIDI notes (`./flute -inst bass -note 48`).
     ./flute -note 69 -o a4.wav   # one note, prints its pitch
     ./flute -demo -o demo.wav    # a scale and a phrase
     ./flute -cal                 # what the player learns at startup (cached in ~/.cache/pajupilli)
-    ./flute -imp 69              # passive resonances of a fingering
+    ./flute -imp 69              # passive resonances of a fingering (PJ_IMPHOLES: any fingering)
     ./flute -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
-    make test                    # ~10 s of checks
+    ./flute -ramp 60             # register map: the breath swept x0.25 .. x3 and back
+    tools/tmm.py -inst alto 69   # the transfer-matrix reference
+    tools/fitgrid.py             # the waveguide against it, every instrument and fingering
+    make test                    # ~30 s of checks
 
 The player: lungs → trachea → glottis (throat valve) → mouth → tongue → lips → jet.
 Vibrato comes from the lungs (chosen by ear); `PJ_VIBTHROAT=0..1` moves it to the throat;
@@ -163,11 +167,20 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
 
 ## Status
 
-- C4–D#6 in tune within ±2 cents after calibration; E6–C7 up to ~30 cents. Piccolo, alto
-  and bass within ±3 cents over their ranges (see PLAN.md, 2026-11-12).
-- Known: register selection is still weak at the extremes (soft G5 and loud F5 jump up,
-  G6 does not sound); see PLAN.md step 3.
-- Tone: variant D (jet swing saturation, pitch-dependent jet aim, lip loss at the window) chosen by ear on 2026-11-11; still being refined.
+- Geometry and air as measured (PLAN step 2): air at 30 °C, humid, exhaled (c = 349.5 m/s);
+  Dubos' negative series length on the closed holes; the grid placed on the embouchure; the
+  open foot a lumped unflanged end.
+- The jet (PLAN step 3) is dispersive (short disturbances convect faster) and limits its
+  own growth instead of clipping, so the registers behave like a flute's: the fundamental
+  from the threshold up to ~x2.5 of the normal breath, the octave only above that, back down
+  at a lower breath; soft breath no longer jumps up an octave. The face and lips load the
+  window more as the pitch rises (Dickens 2007).
+- Calibration stays inside a player's ranges (Coltman's lip coverage ±1.5 mm, breath
+  ×0.85–1.25, jet length +20 / −30 %) and logs the rest as the model's error: C4–C#6 within
+  ±2 cents on every instrument with normal breath; the third octave within ~±10 cents except
+  C7 (+35–40) and the alto's D#6 (+21); a few third-octave notes need more breath (flagged).
+- Known: the dynamic range is still small (C4 pp → ff: 3 dB) and the low register's odd
+  harmonics are now weak (PLAN step 4); faint octave islands remain at ~x0.3 of the breath.
 - Key clicks: a closing pad accelerates into its seat; in the last fraction of a
   millimetre the trapped air goes into the bore (a pop pitched by the tube),
   plus a small mechanical tick. The pad then sinks into its felt and springs back: a

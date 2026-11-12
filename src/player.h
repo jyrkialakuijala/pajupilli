@@ -27,6 +27,7 @@ class Player {
   void noteOff(int midi);
   void setDynamics(double d) { dyn_ = d; }      // 0 pp .. 1 ff (breath, lip opening)
   void setBreath(double b) { breathCtl_ = b; }   // added to dynamics (joystick, pad pressure)
+  void setPressureScale(double s) { pressScale_ = s; }  // multiplies the breath pressure (tests: -ramp)
   void setVibrato(double depth) { vibDepth_ = depth; }  // fraction of lung pressure
   void setVibratoRate(double hz) { vibRate_ = hz; }
   void setLipRoll(double r) { roll_ = r; }       // -1 .. 1: covers more / less (pitch)
@@ -98,9 +99,11 @@ class Player {
   double fs_;
   int note_ = -1, held_[128] = {};
   int stackTop_ = 0, stack_[16];
+  double pressScale_ = 1;
   double dyn_ = 0.5, breathCtl_ = 0, vibDepth_ = 0.0, vibRate_ = 5.0, roll_ = 0;
   double noiseCtl_ = 1, brightness_ = 1;
   bool blowing_ = false, hold_ = false;
+  double kFace_ = 1;
   double kW_, kY0_, kY0Exp_, kP_, kVibThroat_, breath_;
   double glottisClock_ = 1e9;
   double vibPhase_ = 0;
@@ -112,8 +115,9 @@ class Player {
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
-  double regKick_ = 0, kKickP_, kKickW_, kKickT_, kKickDyn_;
-  double slurKick() const;
+  double regKick_ = 0, kKickP_, kKickW_, kKickT_, kKickDyn_, kSlurKick_ = 1.9, kVentKickDyn_ = 0,
+         kVentKickT_ = 0.04, kickT_ = 0.06;
+  double slurKick(int to);  // the register kick for a slur up to `to` (sets its duration)
   double kDynH_, kDynP_, kVelDyn_;
   double air_, wander_, kAttackKick_;
   // Slow random wander of breath support, jet aim and lip opening (~0.3-4 Hz).

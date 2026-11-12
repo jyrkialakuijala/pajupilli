@@ -4,6 +4,7 @@
 #include <atomic>
 #include <thread>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -64,6 +65,7 @@ double tryNote(const Instrument& inst, int midi, double cover, double press, dou
 }
 
 constexpr double kSteady = 0.2;  // level wobble above this: not a usable state
+const double kCoverMm = std::atof(std::getenv("PJ_CALCOVER") ? std::getenv("PJ_CALCOVER") : "1.5");
 
 }  // namespace
 
@@ -77,7 +79,9 @@ static double bisectCover(const Instrument& inst, int m, double p, double dyn, d
   const double f = noteFrequency(m - inst.transpose);  // the lips go by the written note
   const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
   const double base = 6.0 - 2.5 * t;  // Coltman's uncovered width (concert-flute mm)
-  const double cmin = 2.0 / base, cmax = 10.0 / base;
+  // A player's lips: Coltman's schedule +-1.5 mm (wider than that is not a
+  // flute embouchure; the rest of the error is the model's, and is logged).
+  const double cmin = std::max(1.5, base - kCoverMm) / base, cmax = (base + kCoverMm) / base;
   double xg = x0, c = tryNote(inst, m, std::exp(x0), p, a4, dyn, jet);
   if (std::isnan(c)) return NAN;
   double a = std::log(cmin), b = std::log(cmax), bx = x0, bc = c;
@@ -106,25 +110,37 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   // until the note is steady (a note can sit where its harmonics beat against
   // a nearby resonance, e.g. D6 at Fletcher's length).
   double bestAbs = 1e9, bestCover = 1, bestPress = 1, bestJet = 1, bestC = NAN, bestWob = 1e9;
-  for (double jet : {1.0, 0.9, 1.1, 0.8}) {
-    double jAbs = 1e9, jCover = 1, jPress = 1, jC = NAN;
-    for (double p : {1.0, 1.2, 0.85, 1.45, 0.7, 1.7, 0.6, 2.0}) {
-      double cv = 1;
-      const double bc = bisectCover(inst, m, p, 0.5, jet, a4, 0, &cv);
-      if (std::isnan(bc)) continue;
-      if (std::fabs(bc) < jAbs) { jAbs = std::fabs(bc); jCover = cv; jPress = p; jC = bc; }
-      if (jAbs < 3) break;
+  // Fletcher's jet length +-20 % (shorter as a last resort: players shorten it
+  // in the third octave), breath x0.85 .. 1.25: a player tunes with the lips,
+  // not by blowing harder. Only if that finds no steady note within 10 cents,
+  // harder breath (logged as outside a player's range: the model's error).
+  static const double kJets[] = {1.0, 0.9, 1.1, 0.8, 1.2, 0.7, 0.85, 0.75};
+  static const double kPress[] = {1.0, 1.15, 0.9, 1.25, 0.85}, kHard[] = {1.45, 1.7, 2.0};
+  auto search = [&](const double* ps, int np) {
+    for (double jet : kJets) {
+      double jAbs = 1e9, jCover = 1, jPress = 1, jC = NAN;
+      for (int k = 0; k < np; ++k) {
+        const double p = ps[k];
+        double cv = 1;
+        const double bc = bisectCover(inst, m, p, 0.5, jet, a4, 0, &cv);
+        if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d jet %.2f press %.2f: %+.0f c cover %.2f\n", m, jet, p, bc, cv);
+        if (std::isnan(bc)) continue;
+        if (std::fabs(bc) < jAbs) { jAbs = std::fabs(bc); jCover = cv; jPress = p; jC = bc; }
+        if (jAbs < 3) break;
+      }
+      if (std::isnan(jC)) continue;
+      double wob = 1;
+      const double cc = tryNote(inst, m, jCover, jPress, a4, 0.5, jet, &wob);
+      if (std::isnan(cc)) continue;
+      // Prefer steady, then in tune.
+      const bool better = (wob < kSteady) != (bestWob < kSteady) ? wob < kSteady
+                          : wob < kSteady ? jAbs < bestAbs : wob < bestWob;
+      if (better) { bestAbs = jAbs; bestCover = jCover; bestPress = jPress; bestJet = jet; bestC = jC; bestWob = wob; }
+      if (bestWob < kSteady && bestAbs < 3) break;
     }
-    if (std::isnan(jC)) continue;
-    double wob = 1;
-    const double cc = tryNote(inst, m, jCover, jPress, a4, 0.5, jet, &wob);
-    if (std::isnan(cc)) continue;
-    // Prefer steady, then in tune.
-    const bool better = (wob < kSteady) != (bestWob < kSteady) ? wob < kSteady
-                        : wob < kSteady ? jAbs < bestAbs : wob < bestWob;
-    if (better) { bestAbs = jAbs; bestCover = jCover; bestPress = jPress; bestJet = jet; bestC = jC; bestWob = wob; }
-    if (bestWob < kSteady && bestAbs < 3) break;
-  }
+  };
+  search(kPress, 5);
+  if (!(bestWob < kSteady && bestAbs <= 10)) search(kHard, 3);
   if (std::isnan(bestC)) return;
   cal->cover[m] = cal->coverLo[m] = cal->coverHi[m] = bestCover;
   cal->press[m] = bestPress;
@@ -175,9 +191,10 @@ static void logCalibration(const Instrument& inst, const Calibration& cal, FILE*
     const double t = std::clamp(std::log(f / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
     const double mm = (6.0 - 2.5 * t) * inst.emb;
     std::fprintf(log, "calibrate: MIDI %d uncovered %.1f mm, pressure x%.2f, %+.0f cents; "
-                 "jet x%.1f; softest dynamics %.2f; uncovered soft %.1f, loud %.1f mm\n", m,
+                 "jet x%.2f; softest dynamics %.2f; uncovered soft %.1f, loud %.1f mm%s\n", m,
                  mm * cal.cover[m], cal.press[m], cal.cents[m], cal.jet[m], cal.dynLo[m],
-                 mm * cal.coverLo[m], mm * cal.coverHi[m]);
+                 mm * cal.coverLo[m], mm * cal.coverHi[m],
+                 cal.press[m] > 1.3 ? " (breath outside a player's range)" : "");
   }
 }
 

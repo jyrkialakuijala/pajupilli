@@ -35,7 +35,7 @@ void invert3(const double a[3][3], double r[3][3]) {
 
 Bore::Bore(double fs) : fs_(fs) {
   dt_ = 1.0 / fs;
-  dx_ = kC * dt_ / kCourant;
+  dx_ = kC * dt_ / kCourantMax;
   std::memset(&s, 0, sizeof(s));
   std::memset(&k, 0, sizeof(k));
   for (int j = 0; j < kLossSections; ++j) {
@@ -45,38 +45,47 @@ Bore::Bore(double fs) : fs_(fs) {
   }
 }
 
-void Bore::setBore(const std::function<double(double)>& diameter, double footX) {
-  foot_ = int(std::lround(footX / dx_));
-  for (int i = 0; i < foot_; ++i) {
-    double a = 0;  // mean area over the cell
+void Bore::setBore(const std::function<double(double)>& diameter, double embX, double footX) {
+  // dx at the Courant limit, the embouchure at the centre of cell ec. The cork
+  // face is x0 before cell 0 (that piece of the cavity: a volume in cell 0).
+  // The foot ends `endLen` past the centre of the last cell (foot - 1): the
+  // end branch's tube and the cell's volume take the rest, so the grid does
+  // not depend on the foot (a B and a C foot share it, and the hole fit).
+  dx_ = kC * dt_ / kCourantMax;
+  ec_ = std::max(0, int(std::floor(embX / dx_ - 0.5)));
+  x0_ = embX - (ec_ + 0.5) * dx_;
+  foot_ = int(std::floor((footX - x0_) / dx_ + 0.5));
+  const double endLen = footX - (x0_ + (foot_ - 0.5) * dx_);  // 0 .. dx
+  for (int i = 0; i < kCells; ++i) {
+    double a = 0;  // mean area over the cell (idle cells past the foot: the end's)
+    const int ic = std::min(i, foot_ - 1);
     for (int j = 0; j < 4; ++j) {
-      const double d = diameter((i + (j + 0.5) / 4) * dx_);
+      const double d = diameter(x0_ + (ic + (j + 0.5) / 4) * dx_);
       a += 0.25 * M_PI * d * d / 4;
     }
     area_[i] = a;
   }
-  // The horn: a spherical sector of solid angle omega whose throat (radius r0)
-  // has the area of the bore end. Its mass load is that of an unflanged end:
-  // r0 = 0.6133 a gives the end correction 0.6133 a.
-  const double aEnd = std::sqrt(area_[foot_ - 1] / M_PI);
-  horn0_ = 0.6133 * aEnd;
-  omega_ = area_[foot_ - 1] / (horn0_ * horn0_);
-  for (int i = foot_; i < kCells; ++i) {
-    const double r = horn0_ + (i - foot_ + 0.5) * dx_;
-    area_[i] = omega_ * r * r;
+  {
+    const double d = diameter(0.5 * x0_);
+    cellVol_[0] = 0.25 * M_PI * d * d * x0_;
   }
-  termR_ = horn0_ + (kCells - foot_) * dx_;
-  termS_ = omega_ * termR_ * termR_;
-  // Spherical-wave termination: Z = rho c / S * jkr / (1 + jkr), i.e. a
-  // resistance rho c / S in parallel with an inertance rho r / S.
-  termRes_ = float(termS_ / (kRho * kC));
-  termInd_ = float(dt_ * termS_ / (kRho * termR_));
+  cellVol_[foot_ - 1] += area_[foot_ - 1] * (endLen - 0.5 * dx_);  // the last cell ends at the foot
   // Viscothermal loss per length, thermal part lumped into the series term:
   // Re Z = 2 rho / (S a) * 1.47 * sqrt(nu w / 2)  =>  kappa = 2.94 rho sqrt(nu) / (S a).
   for (int i = 0; i < kCells; ++i) {
-    if (i + 1 >= foot_) { kappa_[i] = 0; continue; }  // free air past the foot
-    const double sa = std::min(area_[i], area_[i + 1]);
+    const double sa = std::min(area_[i], area_[std::min(i + 1, kCells - 1)]);
     kappa_[i] = 2.94 * kRho * std::sqrt(kNu) / (sa * std::sqrt(sa / M_PI));
+  }
+  // The open end: the tube from the last cell's centre to the end in series
+  // with the unflanged radiation load, a resistance 1.505 rho c / S in parallel
+  // with the mass of 0.6133 a (Levine-Schwinger at low ka: Re Z = rho c / S (ka)^2 / 4).
+  {
+    const double s = area_[foot_ - 1], a = std::sqrt(s / M_PI);
+    Branch end;
+    end.g = s / (kRho * std::max(endLen, 0.02 * dx_));
+    end.rr = 1.505 * kRho * kC / s;
+    end.hl = s / (kRho * 0.6133 * a);
+    branch_[foot_ - 1] = end;
   }
   buildU();
   dirty_ = true;
@@ -87,20 +96,36 @@ void Bore::buildU() {
   double sumCG = 0;
   for (int j = 0; j < kLossSections; ++j) sumCG += kFitC[j] * k.g[j];
   for (int i = 0; i < kCells; ++i) {
+    if (i >= foot_ - 1) {  // closed: the foot's end and the idle cells past it
+      k.au[i] = k.bu[i] = 0;
+      for (int j = 0; j < kLossSections; ++j) k.ck[j][i] = 0;
+      continue;
+    }
     // Interface area: the smaller neighbour keeps the scheme's energy bounded.
-    const double sa = i + 1 < kCells ? std::min(area_[i], area_[i + 1]) : area_[i];
-    const double l = kRho / (sa * dt_), kap = kappa_[i];
+    const double sa = std::min(area_[i], area_[i + 1]);
+    // A hole's series length (t_a) lengthens or shortens the interface's mass.
+    // Never by more than the stability margin left by kCourantMax: a cell next
+    // to it, without a chimney's extra volume, needs
+    // lambda^2 (1 / (1 - e) + 1) / 2 <= 1.
+    const double lam2 = courant() * courant(), eMax = 0.9 * (1 - lam2 / (2 - lam2));
+    const double extra = std::max(-eMax * dx_, 0.5 * (series_[i] + (i + 1 < kCells ? series_[i + 1] : 0)));
+    const double l = kRho * (1 + extra / dx_) / (sa * dt_), kap = kappa_[i];
     const double d = l + 0.5 * kap * (kFitC0 + sumCG);
     k.au[i] = float((l - 0.5 * kap * (kFitC0 - sumCG)) / d);
     k.bu[i] = float(1.0 / (dx_ * d));
-    k.fr[i] = i == foot_ - 1 ? k.bu[i] : 0.0f;
     for (int j = 0; j < kLossSections; ++j)
       k.ck[j][i] = float(0.5 * kap * kFitC[j] * (1 + k.a[j]) / d);
   }
 }
 
 double Bore::compliance(int cell) const {
-  return (area_[cell] * dx_ + branch_[cell].vol) / (kRho * kC * kC);
+  return (area_[cell] * dx_ + branch_[cell].vol + cellVol_[cell]) / (kRho * kC * kC);
+}
+
+void Bore::setSeries(int cell, double len) {
+  if (series_[cell] == len) return;
+  series_[cell] = len;
+  dirtyU_ = true;
 }
 
 // Trapezoidal rule for x = (p, q, l) at one cell:
@@ -126,18 +151,21 @@ void Bore::buildNode(int cell) {
 }
 
 void Bore::update() {
+  if (dirtyU_) {
+    buildU();
+    dirtyU_ = false;
+  }
   if (!dirty_) return;
   for (int i = 0; i < kCells; ++i) buildNode(i);
   dirty_ = false;
 }
 
-float Bore::step(int ec, float* pOld, float* J, float pRoom) {
+void Bore::step(int ec, float* pOld, float* J, float pRoom) {
   float* __restrict p = s.p();
   float* __restrict u = s.u();
-  // Momentum: interfaces 0..127 (p[128] is the zero pad).
+  // Momentum: every interface (p[kCells] is the zero pad; past the foot all zero).
   for (int i = 0; i < kCells; ++i) {
-    const float un = k.au[i] * u[i] - k.bu[i] * (p[i + 1] - p[i]) - k.fr[i] * pRoom -
-                     k.ck[0][i] * s.psi[0][i] - k.ck[1][i] * s.psi[1][i] -
+    const float un = k.au[i] * u[i] - k.bu[i] * (p[i + 1] - p[i]) - k.ck[0][i] * s.psi[0][i] - k.ck[1][i] * s.psi[1][i] -
                      k.ck[2][i] * s.psi[2][i];
     const float du = un - u[i];
     s.psi[0][i] = k.a[0] * s.psi[0][i] + k.g[0] * du;
@@ -145,11 +173,6 @@ float Bore::step(int ec, float* pOld, float* J, float pRoom) {
     s.psi[2][i] = k.a[2] * s.psi[2][i] + k.g[2] * du;
     u[i] = un;
   }
-  // The far end of the horn: the spherical-wave load.
-  const float pe = p[kCells - 1];
-  const float uOut = pe * termRes_ + termL_;
-  termL_ += termInd_ * pe;
-  u[kCells - 1] = uOut;
   *pOld = p[ec];
   *J = u[ec - 1] - u[ec];
   // Continuity with the side branches (u[-1] is the zero pad: the cork).
@@ -162,7 +185,6 @@ float Bore::step(int ec, float* pOld, float* J, float pRoom) {
     q[i] = k.m[1][0][i] * p0 + k.m[1][1][i] * q0 + k.m[1][2][i] * l0 + k.v[1][i] * j + k.e[1][i] * pRoom;
     l[i] = k.m[2][0][i] * p0 + k.m[2][1][i] * q0 + k.m[2][2][i] * l0 + k.v[2][i] * j + k.e[2][i] * pRoom;
   }
-  return uOut;
 }
 
 }  // namespace pajupilli

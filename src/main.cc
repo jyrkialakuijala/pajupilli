@@ -73,9 +73,14 @@ const char* noteName(int m) {
 void impulse(int midi) {
   Flute fl(*gInst);  // at the model's own rate
   const double fs = fl.fs();
-  fl.setHoles(noteInfo(*gInst, midi)->holes);
-  std::vector<float> tmp(int(fs / 10));
-  fl.process(tmp.data(), int(tmp.size()));  // let the pads settle
+  // PJ_IMPHOLES: any fingering (tools/fitgrid.py).
+  const char* holes = std::getenv("PJ_IMPHOLES");
+  if (!holes || !*holes) holes = noteInfo(*gInst, midi)->holes;
+  fl.setHoles(holes);
+  // Let the pads settle and their thuds die away: at 0.1 s the bore still rings
+  // louder than the response to the test impulse.
+  std::vector<float> tmp(size_t(fs), 0.0f);
+  fl.process(tmp.data(), int(tmp.size()));
   const int n = 1 << 16;
   std::vector<double> q(n);
   for (int i = 0; i < n; ++i) {
@@ -85,22 +90,27 @@ void impulse(int midi) {
     q[i] = fl.windowFlow();
   }
   // DFT magnitude on a fine grid, peaks below 4 kHz.
-  std::printf("%s fingering %s, admittance peaks (Hz):", noteName(midi), noteInfo(*gInst, midi)->holes);
-  double prev2 = 0, prev1 = 0;
-  const double df = 0.5;
-  for (double f = 50; f < 4000 / gInst->scale; f += df) {
-    double re = 0, im = 0;
-    const double w = 2 * M_PI * f / fs;
+  std::printf("%s fingering %s, admittance peaks (Hz):", noteName(midi), holes);
+  const double df = 0.5, f0 = 50;  // peaks parabolic in log magnitude
+  std::vector<double> lm;
+  for (double f = f0; f < 4000 / gInst->scale; f += df) {
     // Goertzel
+    const double w = 2 * M_PI * f / fs;
     double s1 = 0, s2 = 0;
     const double c = 2 * std::cos(w);
     for (int i = 0; i < n; ++i) { const double s0 = q[i] + c * s1 - s2; s2 = s1; s1 = s0; }
-    re = s1 - s2 * std::cos(w);
-    im = s2 * std::sin(w);
-    const double mag = re * re + im * im;
-    if (prev1 > prev2 && prev1 > mag) std::printf(" %.1f", f - df);
-    prev2 = prev1;
-    prev1 = mag;
+    const double re = s1 - s2 * std::cos(w), im = s2 * std::sin(w);
+    lm.push_back(std::log(re * re + im * im + 1e-300));
+  }
+  // Peaks standing at least 3 dB over the troughs on both sides (not ripples).
+  for (int i = 1; i + 1 < int(lm.size()); ++i) {
+    if (!(lm[i] > lm[i - 1] && lm[i] >= lm[i + 1])) continue;
+    double lo = lm[i], ro = lm[i];
+    for (int k = i - 1; k >= 0 && lm[k] <= lm[i]; --k) lo = std::min(lo, lm[k]);
+    for (int k = i + 1; k < int(lm.size()) && lm[k] <= lm[i]; ++k) ro = std::min(ro, lm[k]);
+    if (lm[i] - std::max(lo, ro) < 0.69) continue;
+    const double a0 = lm[i - 1], a1 = lm[i], a2 = lm[i + 1];
+    std::printf(" %.2f", f0 + df * (i + 0.5 * (a0 - a2) / (a0 - 2 * a1 + a2)));
   }
   std::printf("  (target %.1f)\n", noteFrequency(midi));
 }
@@ -163,6 +173,50 @@ int nanTest() {
 // Slur from `from` into `to` (as on the keyboard: overlap, then release) and
 // measure the settled note in 20 ms frames: mean pitch, pitch wobble (std of
 // cents), level wobble (peak-to-peak / mean) and frames in another register.
+// Register map: the note at mezzo-forte, its breath pressure swept slowly
+// (log) from x0.25 to x3 and back. Prints the regimes that sound, as the ratio
+// of the sounding pitch to the note's, with the pressure range of each.
+// A flute: the fundamental from threshold, the next register only well above
+// the normal pressure, back down at a lower pressure (hysteresis).
+int rampTest(int midi, double secs) {
+  Voice voice(*gInst);
+  Player& pl = voice.player();
+  pl.setCalibration(gCal);
+  pl.setDynamics(0.5);
+  pl.setWander(0);
+  const double f0 = noteFrequency(midi), lo = 0.25, hi = 3.0;
+  const int frame = std::max(1024, int(4 * kFs / f0));
+  std::vector<float> x(frame);
+  pl.setPressureScale(lo);
+  pl.noteOn(midi, 64);
+  struct Seg { std::string r; double a, b; };
+  for (int dir = 0; dir < 2; ++dir) {
+    std::vector<Seg> segs;
+    const int n = int(secs * kFs / frame);
+    for (int k = 0; k < n; ++k) {
+      const double u = double(k) / n, s = dir == 0 ? lo * std::pow(hi / lo, u) : hi * std::pow(lo / hi, u);
+      pl.setPressureScale(s);
+      voice.render(x.data(), frame);
+      std::string r = "-";
+      if (rms(x.data(), frame) > 2e-3) {
+        double clarity = 0;
+        const double f = estimatePitch(x.data(), frame, kFs, f0 * 0.4, f0 * 6, &clarity);
+        const double q = f / f0;
+        char b[16];
+        if (clarity < 0.6 || f <= 0) r = "?";
+        else if (std::fabs(q - std::round(q)) < 0.04 * q) std::snprintf(b, sizeof b, "%.0f", q), r = b;
+        else std::snprintf(b, sizeof b, "%.2f", q), r = b;
+      }
+      if (segs.empty() || segs.back().r != r) segs.push_back({r, s, s});
+      else segs.back().b = s;
+    }
+    std::printf("%s %s:", noteName(midi), dir == 0 ? "up  " : "down");
+    for (const Seg& g : segs) std::printf(" %s [%.2f-%.2f]", g.r.c_str(), g.a, g.b);
+    std::printf("\n");
+  }
+  return 0;
+}
+
 int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep) {
   Voice voice(*gInst);
   Player& pl = voice.player();
@@ -199,7 +253,9 @@ int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep
     double lmax = l1;
     for (int h = 2; h <= 4 && h * f0 < 0.45 * kFs; ++h) lmax = std::max(lmax, level(y, h * f0));
     const double sub = std::max(level(y, f0 / 2), level(y, f0 * 1.5));
-    if (l1 < lmax * 3e-3 || sub > l1 * 0.03) { ++other; continue; }
+    // (A subharmonic within 10 dB: another regime. Breath noise in a 20 ms frame
+    // reached -14 dB at 1.5 f0 on the piccolo's A6, whose mean there is -33 dB.)
+    if (l1 < lmax * 3e-3 || sub > l1 * 0.1) { ++other; continue; }
     const double f = estimatePitch(y, n, kFs, f0 / 1.3, f0 * 1.3);
     const double c = f > 0 ? cents(f, f0) : 1e4;
     if (std::fabs(c) > 300) { ++other; continue; }
@@ -240,7 +296,7 @@ const char kUsage[] =
     "  -scale              play the whole range, print a tuning table\n"
     "  -demo               a slurred scale and a short phrase\n"
     "  -slur A B           slur from A into B, print pitch and level wobble\n"
-    "  -imp M              passive resonances of a fingering\n"
+    "  -imp M              passive resonances of a fingering\n"    "  -ramp M             register map: breath x0.25 .. x3 and back (-secs per way)\n"
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
     "  -fuzz SECS SEED     random playing, check for blow-ups\n"
     "  -nantest            check recovery from NaN states\n"
@@ -366,7 +422,7 @@ int main(int argc, char** argv) {
   // (fast-math links this in too, the portable build does not).
   _mm_setcsr(_mm_getcsr() | 0x8040);
 #endif
-  int note = -1, imp = -1, slurFrom = -1, slurTo = -1;
+  int note = -1, imp = -1, slurFrom = -1, slurTo = -1, ramp = -1;
   bool scale = false, demo = false, live = false, cal = false, cfoot = false, polyDemo = false;
   LiveOptions lopt;
   std::string ensemble;  // instruments, comma-separated
@@ -389,6 +445,7 @@ int main(int argc, char** argv) {
     else if (a == "-cal") cal = true;
     else if (a == "-imp") imp = std::atoi(next());
     else if (a == "-slur") { slurFrom = std::atoi(next()); slurTo = std::atoi(next()); }
+    else if (a == "-ramp") ramp = std::atoi(next());
     else if (a == "-secs") secs = std::atof(next());
     else if (a == "-dyn") dyn = std::atof(next());
     else if (a == "-demo") demo = true;
@@ -440,9 +497,11 @@ int main(int argc, char** argv) {
   }
   if (note >= 0 && !inRange(note, "-note")) return 1;
   if (slurFrom >= 0 && (!inRange(slurFrom, "-slur") || !inRange(slurTo, "-slur"))) return 1;
+  if (ramp >= 0 && !inRange(ramp, "-ramp")) return 1;
   if (!std::getenv("PJ_NOCAL")) {
     // One note: learn only that one (fast); otherwise the whole range.
     if (note >= 0 && !scale && !demo && !live) gCal = calibrate(*gInst, 440, nullptr, note, note);
+    else if (ramp >= 0) gCal = calibrate(*gInst, 440, nullptr, ramp, ramp);
     else gCal = calibrate(*gInst, 440, nullptr);
   }
   // Who plays: one instrument (-poly N of it) or an ensemble, each calibrated.
@@ -539,6 +598,7 @@ int main(int argc, char** argv) {
     if (out && !writeWav(out, all, kFs, 2)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
     return 0;
   }
+  if (ramp >= 0) return rampTest(ramp, secs > 1 ? secs : 4);
   std::vector<float> slurOut;
   if (slurFrom >= 0) {
     slurTest(slurFrom, slurTo, dyn, secs, out ? &slurOut : nullptr);

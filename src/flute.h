@@ -56,6 +56,8 @@ struct Embouchure {
   double noise = 0.01;      // turbulence, in units of the jet velocity
   double air = 0.35;        // 0 focused .. 1 airy: unfocused jet, edge hiss
   double glottis = 1.5e-4;  // glottal opening (m^2): 1.5 cm^2 open .. ~3 mm^2 a slit
+  double face = 1;          // the face and lip load on the window: extra window
+                            // length in units of 2 mm (the instrument's size)
 };
 
 class Flute {
@@ -115,6 +117,8 @@ class Flute {
     float thRe = 0, thIm = 0;     // landing thud: the pad on its felt (flow, m^3/s)
     bool held = false;            // pressed into its felt by a closing stroke
     double padIn = 0;             // air the pad pushes into the bore (m^3/s)
+    double tClosed = 0;           // closed chimney length, incl. matching volume (m)
+    double taClosed = 0;          // series length of the closed hole (negative, m)
     double a = 0;                 // bore radius at the hole (m)
     bool present = true;          // a piccolo has no C# and D holes (D foot)
   };
@@ -123,7 +127,6 @@ class Flute {
   Branch holeBranch(const Hole& h) const;
   void embouchureGeometry();
   void controlStep();
-  double horn_r() const;
   float sample();
   double boreDiameter(double x) const;  // at x (m) from the cork face
 
@@ -170,7 +173,10 @@ class Flute {
   // Knobs.
   int kJetModel_, kRadOnly_;
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;
-  double kXiHp_, xiLow_ = 0, kVortex_ = 1;
+  double kXiHp_, xiLow_ = 0, kVortex_ = 1, kSeries_ = 1;
+  int kJetDisp_ = 1;
+  double kCpHi_ = 0.45, kDispT_ = 0, dl1_ = 0, dl2_ = 0;
+  double kAgc_ = 0, agcA_ = 0, agcEnv_ = 0;
   double kTurbIn_, kEdge_, edgeLow_ = 0, edgeBand_ = 0;
   double fingerSpeed_ = 1, kPadPump_, kKeyClick_, kKeySpread_, kThud_, kRelease_;
   float thudCos_ = 1, thudSin_ = 0, thudDecay_ = 0;
