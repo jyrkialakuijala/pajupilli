@@ -246,6 +246,8 @@ const char kUsage[] =
     "  -nantest            check recovery from NaN states\n"
     "  -scatter            how much a silent instrument gives back of the room's\n"
     "                      sound, per octave band\n"
+    "  -roomimp ROOM       the room at the microphones: room vs direct sound,\n"
+    "                      left/right balance and correlation over time\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
@@ -318,6 +320,45 @@ int scatter() {
   return 0;
 }
 
+// The room's impulse response at the microphones for a player on the far left
+// and one in the middle (five seats, 1 m apart): direct vs room energy, and
+// over time the left / right balance and correlation (a diffuse field: even
+// and uncorrelated, wherever the player sits).
+int roomImpulse(const RoomSpec& rs) {
+  if (rs.volume <= 0) { std::printf("no room\n"); return 0; }
+  const std::vector<double> x = {-2, -1, 0, 1, 2};
+  for (int src : {0, 2}) {
+    Room room(rs, x);
+    const int B = Room::kBlock, N = kFs * 2 / B * B;
+    std::vector<float> L(N), R(N), zero(B, 0.0f), in(B, 0.0f), at[5];
+    float* atp[5];
+    for (int i = 0; i < 5; ++i) { at[i].assign(B, 0.0f); atp[i] = at[i].data(); }
+    const float lg[5] = {1, 1, 1, 1, 1};
+    for (int b = 0; b < N / B; ++b) {
+      in[0] = b == 0 ? 1.0f : 0.0f;
+      const float* srcs[5];
+      for (int i = 0; i < 5; ++i) srcs[i] = i == src ? in.data() : zero.data();
+      room.process(srcs, B, atp, &L[b * B], &R[b * B], lg);
+    }
+    // The direct sound: the first 2 ms after it arrives.
+    int first = 0;
+    while (first < N && std::fabs(L[first]) + std::fabs(R[first]) < 1e-6f) ++first;
+    double d = 0, r = 0;
+    for (int i = 0; i < N; ++i) (i < first + kFs / 500 ? d : r) += double(L[i]) * L[i] + double(R[i]) * R[i];
+    std::printf("player at %+.0f m: room / direct %+.1f dB\n", x[src], 10 * std::log10(r / d));
+    const double w[][2] = {{20, 50}, {50, 100}, {100, 300}, {300, 1000}};
+    for (auto& t : w) {
+      double el = 0, er = 0, lr = 0;
+      for (int i = first + int(t[0] * kFs / 1000); i < std::min(N, first + int(t[1] * kFs / 1000)); ++i) {
+        el += double(L[i]) * L[i]; er += double(R[i]) * R[i]; lr += double(L[i]) * R[i];
+      }
+      std::printf("  %4.0f-%4.0f ms: left/right %+.1f dB, correlation %+.2f\n", t[0], t[1],
+                  10 * std::log10(el / er), lr / std::sqrt(el * er));
+    }
+  }
+  return 0;
+}
+
 int main(int argc, char** argv) {
 #if defined(__SSE__)
   // Flush denormals to zero: decaying states must not slow the real-time path
@@ -371,6 +412,11 @@ int main(int argc, char** argv) {
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
     else if (a == "-nantest") return nanTest();
     else if (a == "-scatter") return scatter();
+    else if (a == "-roomimp") {
+      const RoomSpec* rs = findRoom(next());
+      if (!rs) { std::fprintf(stderr, "-roomimp: dry, studio, hall or church\n"); return 1; }
+      return roomImpulse(*rs);
+    }
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
     else {

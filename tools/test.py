@@ -168,6 +168,14 @@ def room():
         worst.append((inst, max(vals) if vals else 9))
     check('room: instruments are passive', all(w < 0.03 for _, w in worst),
           ', '.join(f'{i} {w:.4f} Pa/Pa' for i, w in worst))
+    # Diffuse: after 100 ms the room is even left/right (1.5 dB) and uncorrelated (0.3) for a
+    # player at the side or the centre; room and direct sound about equal at the listener.
+    for rm in ('studio', 'hall', 'church'):
+        out = run(['-roomimp', rm]).stdout
+        rd = [float(v) for v in re.findall(r'room / direct ([+-][\d.]+)', out)]
+        late = [(float(a), float(c)) for t0, a, c in re.findall(r'(\d+)-\s*\d+ ms: left/right ([+-][\d.]+) dB, correlation ([+-][\d.]+)', out) if int(t0) >= 100]
+        ok = rd and all(-3 <= v <= 10 for v in rd) and late and all(abs(a) <= 1.5 and abs(c) <= 0.3 for a, c in late)
+        check(f'room is diffuse ({rm})', bool(ok), f'room/direct {rd} dB, late L/R and correlation {late}')
     wav = os.path.join(ROOT, 'tools', '.ens-test.wav')
     r = run(['-ensemble', '-polydemo', '-o', wav])
     err = r.stderr

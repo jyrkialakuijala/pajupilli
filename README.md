@@ -98,10 +98,15 @@ within 35 ms may move to a better instrument as the chord arrives; it prints `de
 G3 alto, E4 flute 1, C5 flute 2, G5 piccolo`), and a line keeps to its instrument. The
 just intonation works across the ensemble.
 
-The instruments play in a room, a reverberant space of its own (a 16-line feedback delay
-network sized from the room's volume, its decay from its RT60, its level from diffuse-field
-theory). They sit on a line, high instruments on the left; the listener is a pair of
-microphones in front (stereo). Every instrument hears the room's sound and the others' direct
+The instruments play in a room, a reverberant space of its own: a shoebox of the room's
+volume, the players on a line across the stage (high instruments on the left), the listener a
+pair of microphones further in (stereo). The early sound is the direct sound and the
+reflections off the walls, floor and ceiling (to second order); the reverberant field is a
+16-line feedback delay network sized from the room, its decay from the RT60 and its level
+from diffuse-field theory (in the hall at the listener about as loud as the direct sound).
+Each player feeds it through diffusers along its own random direction and each listener takes
+its own: after 50 ms the room is even left and right and uncorrelated, wherever the player
+sits (`./flute -roomimp hall` shows it). Every instrument hears the room's sound and the others' direct
 sound in its bore: the pressure acts on the embouchure, the open holes and the foot, in series
 with each opening's radiation load, so an instrument takes in only as much as it would
 radiate. The silent flutes of the pool are computed too, and ring in sympathy. No energy is

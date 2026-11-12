@@ -448,3 +448,21 @@ crossing), the held note keeping its own flute from the start when the history s
   keys beyond the whole ensemble fold into its range. The demo ends with C3 + E3 together: E3
   moves the bass.
 - Cost: ensemble in the hall 6.5 % of a core (all five always computed), dry 3.8 %.
+
+### 2026-11-12 — the room diffuses (by ear: "panning too much preserved, echoes from the same directions")
+- Measured (`-roomimp`): the reverberant field was 23 dB below the direct sound at the listener
+  (theory: +3 dB in the hall at 3 m, critical distance 2.1 m), so the panned direct sound was all
+  one heard. Two bugs: the input was scaled by the mixing matrix's 1/4 (-12 dB) and the 1/16
+  spread over the lines was left out of the normalisation (-12 dB). Also each player fed the
+  network along a Hadamard row, which the Hadamard mixing folds into a single line after one
+  pass (sparse, repeating echoes); the first room sound came at 12 ms as 16 single echoes.
+- Now: random unit directions in and out (the microphones' two orthogonal), three Schroeder
+  allpass diffusers per player (0.11, 0.23, 0.37 mean free paths, g 0.6), early reflections by
+  image sources to second order (24 per player and microphone, sqrt(1 - A/S) per wall) in a
+  shoebox with the players 3 m from the front wall. Microphone gain: the listener distance /
+  sqrt(1 + 16 pi / A d^2) (the total about as loud as one source at 1 m before).
+- Result: room / direct at the listener +2.9 dB (hall, centre player; +6.5 dB from the side);
+  from 50 ms on left/right within 1 dB and correlation |c| < 0.2 for a player at the side or
+  the centre (studio, hall, church); 5-8 x the echo density in the first 60 ms. `make test`
+  checks it. The players hear the field at its theoretical level now (+24 dB): the coupling
+  is still passive (an idle flute gives back <= 1 %), no resets.
