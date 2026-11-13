@@ -519,3 +519,34 @@ Step 3 (`src/flute.cc`, `src/player.cc`, `src/calibrate.cc`):
   C7 +35–40 c, the alto's D#6 +21 c; faint octave islands at ~x0.3 breath (attacks pass
   through them quickly). Listening files: `listen/step23_*_{before,after}.wav`.
 
+
+### Added 2026-11-12 — other woodwinds (`-inst`): recorder, ocarina, shakuhachi, pan flute, clarinet, saxophones, oboe, bassoon, duduk, shawm
+- The model split: `Tube` (src/tube.*: bore, holes with pads or fingers, key noises, radiation,
+  room) under `Flute` (jets: the flutes, a duct, an end-blown rim, pan pipes) and `Reed`
+  (src/reed.*: single and double reeds); `Performer` (src/performer.h) under `Player` (flutes)
+  and `ReedPlayer`. The flute family is unchanged (bit-identical notes, all tests as before).
+- Bore: up to 256 cells, the loops over the used vectors only; a closed end (stopped pipes, a
+  vessel); for the designed instruments the Webster scheme's areas (cells: the mean of their
+  faces, interfaces: the bore there): with the smaller-neighbour rule the clarinet's bell and
+  mouthpiece put the waveguide 15–60 c off the transfer-matrix model.
+- Reed (Wilson–Beavers / Chaigne–Kergomard): mass-spring per area, trapezoidal; beats on the
+  lay; Bernoulli flow (+ a double reed's duct loss); the swept flow; the mouthpiece cell solved
+  with the flow in closed form. In the design model the reed is the same mass-spring: as a pure
+  compliance the clarion came out 10–50 c off.
+- Nonlinear hole losses (`PJ_HOLENL`, 2: both ends of the chimney): without them the clarinet's
+  register key only moved the low mode up (197 -> 253 Hz) and the reed stayed on it; with them
+  the clarion speaks. Also the reed's resonance: 3 kHz for the clarinet (2.2 kHz left B5–C6 and
+  the altissimo on the wrong regime).
+- Design (`tools/design.py`): positions (diameters, the bore's length, the cone's top volume)
+  fitted to every fingering's resonance. Learned on the way: vents must be bounded near the node
+  of the mode they serve (the fit put the alto's neck vent at 326 mm, pitches right, register
+  wrong); a cone's octave is set by the volume at its apex, which the reed's compliance is part
+  of (the shawm's 5e-5 m^2 reed flattened it 140 c); a duct's register is set by the window
+  (the recorder's 4.5 mm kept the first mode up to x3 the breath; 3 mm gives the octave at x1.1).
+- Calibration: the pitch control per kind (flute lips, a duct's breath, a reed's lips, an
+  end-blown's wider coverage); more starting points when the first does not sound (a duct's pitch
+  climbs steeply with the breath: the ocarina's middle notes sat 180 c flat at the planned
+  breath); each note's loudest dynamics (the duduk's soft reed broke above ~0.65).
+- The reed players tune each held note by ear (the duduk fell 63 c into a second regime on a
+  harder attack).
+- Open: see README, Status. Next for the horns: research/horns.md.

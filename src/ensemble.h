@@ -59,7 +59,7 @@ class Ensemble {
   void noteOn(int midi, int velocity);
   void noteOff(int midi);
   // A player setting, for every flute.
-  void all(void (Player::*set)(double), double x) {
+  void all(void (Performer::*set)(double), double x) {
     for (Slot& s : f_) (s.v->player().*set)(x);
   }
   void setHold(bool h) {

@@ -27,6 +27,7 @@
 #include "flute.h"
 #include "live.h"
 #include "player.h"
+#include "reed.h"
 #include "room.h"
 #include "voice.h"
 
@@ -36,14 +37,14 @@ namespace {
 
 constexpr int kFs = 48000;
 
-struct Result { double f, clarity, rms; };
+struct Result { double f, clarity, rms, pitchSd = 0, levelWobble = 0; };
 
 Calibration gCal;
 const Instrument* gInst = &concertFlute();
 
 Result playNote(int midi, double secs, double dyn, std::vector<float>* keep) {
   Voice v(*gInst);
-  Player& pl = v.player();
+  Performer& pl = v.player();
   pl.setCalibration(gCal);
   pl.setDynamics(dyn);
   const int n = int(secs * kFs);
@@ -55,6 +56,30 @@ Result playNote(int midi, double secs, double dyn, std::vector<float>* keep) {
   Result r;
   r.f = estimatePitch(x.data() + a, len, kFs, f0 / 2.2, f0 * 2.2, &r.clarity);
   r.rms = rms(x.data() + a, len);
+  // Steadiness from 0.4 s on: the spread of the pitch over frames of >= 6
+  // periods (cents, rms) and the level's (max - min) / mean.
+  {
+    const int fr = int(std::max(0.05, 6 / f0) * kFs);
+    std::vector<double> cs, ls;
+    for (int i = int(0.4 * kFs); i + fr <= n; i += fr) {
+      const double f = estimatePitch(x.data() + i, fr, kFs, f0 / 1.5, f0 * 1.5);
+      if (f > 0) cs.push_back(1200 * std::log2(f / f0));
+      ls.push_back(rms(x.data() + i, fr));
+    }
+    if (cs.size() > 1) {
+      double m = 0, v = 0;
+      for (double c : cs) m += c;
+      m /= cs.size();
+      for (double c : cs) v += (c - m) * (c - m);
+      r.pitchSd = std::sqrt(v / cs.size());
+    }
+    if (!ls.empty()) {
+      double lm = 0, lmin = 1e9, lmax = 0;
+      for (double l : ls) { lm += l; lmin = std::min(lmin, l); lmax = std::max(lmax, l); }
+      lm /= ls.size();
+      r.levelWobble = lm > 0 ? (lmax - lmin) / lm : 0;
+    }
+  }
   if (keep) keep->insert(keep->end(), x.begin(), x.end());
   return r;
 }
@@ -71,11 +96,13 @@ const char* noteName(int m) {
 // Passive resonances seen by the jet: a pressure impulse in the window branch,
 // the window flow's spectrum; peaks of |Y|.
 void impulse(int midi) {
-  Flute fl(*gInst);  // at the model's own rate
+  auto flp = Voice::makeModel(*gInst);  // at the model's own rate
+  Tube& fl = *flp;
   const double fs = fl.fs();
   // PJ_IMPHOLES: any fingering (tools/fitgrid.py).
   const char* holes = std::getenv("PJ_IMPHOLES");
   if (!holes || !*holes) holes = noteInfo(*gInst, midi)->holes;
+  fl.selectPipe(midi);
   fl.setHoles(holes);
   // Let the pads settle and their thuds die away: at 0.1 s the bore still rings
   // louder than the response to the test impulse.
@@ -87,10 +114,16 @@ void impulse(int midi) {
     fl.testDrive(i == 0 ? 1.0 : 0.0);
     float y;
     fl.process(&y, 1);
-    q[i] = fl.windowFlow();
+    q[i] = fl.testResponse();
+  }
+  if (const char* dump = std::getenv("PJ_IMPDUMP")) {  // the impulse response (Pa per 1e-8 m^3/s), float64
+    if (FILE* f = std::fopen(dump, "wb")) {
+      std::fwrite(q.data(), sizeof(double), q.size(), f);
+      std::fclose(f);
+    }
   }
   // DFT magnitude on a fine grid, peaks below 4 kHz.
-  std::printf("%s fingering %s, admittance peaks (Hz):", noteName(midi), holes);
+  std::printf("%s fingering %s, %s peaks (Hz):", noteName(midi), holes, gInst->reed() || gInst->lip() ? "impedance" : "admittance");
   const double df = 0.5, f0 = 50;  // peaks parabolic in log magnitude
   std::vector<double> lm;
   for (double f = f0; f < 4000 / gInst->scale; f += df) {
@@ -111,6 +144,7 @@ void impulse(int midi) {
     if (lm[i] - std::max(lo, ro) < 0.69) continue;
     const double a0 = lm[i - 1], a1 = lm[i], a2 = lm[i + 1];
     std::printf(" %.2f", f0 + df * (i + 0.5 * (a0 - a2) / (a0 - 2 * a1 + a2)));
+    if (std::getenv("PJ_IMPMAG")) std::printf("[%.1f dB]", 10 / std::log(10.0) * lm[i] - 20 * std::log10(1e-8));
   }
   std::printf("  (target %.1f)\n", noteFrequency(midi));
 }
@@ -121,8 +155,8 @@ void impulse(int midi) {
 // and the peak. Exit 1 on any non-finite sample or reset.
 int fuzz(double secs, unsigned seed) {
   Voice v(*gInst);
-  Player& pl = v.player();
-  Flute& fl = v.flute();
+  Performer& pl = v.player();
+  Tube& fl = v.model();
   const int lo = gInst->lo + gInst->transpose, span = gInst->hi - gInst->lo + 1;
   std::mt19937 rng(seed);
   std::uniform_real_distribution<double> u(0, 1);
@@ -155,9 +189,10 @@ int fuzz(double secs, unsigned seed) {
 // A NaN injected into the window must not silence the flute for good.
 int nanTest() {
   Voice v(*gInst);
-  Player& pl = v.player();
-  Flute& fl = v.flute();
-  pl.noteOn(69 + gInst->transpose, 80);
+  Performer& pl = v.player();
+  Tube& fl = v.model();
+  // A4 (written) on the flutes; mid-range elsewhere.
+  pl.noteOn((gInst->design ? (gInst->lo + gInst->hi) / 2 : 69) + gInst->transpose, 80);
   std::vector<float> x(kFs / 2);
   v.render(x.data(), int(x.size()));
   fl.testDrive(NAN);
@@ -180,7 +215,7 @@ int nanTest() {
 // the normal pressure, back down at a lower pressure (hysteresis).
 int rampTest(int midi, double secs) {
   Voice voice(*gInst);
-  Player& pl = voice.player();
+  Performer& pl = voice.player();
   pl.setCalibration(gCal);
   pl.setDynamics(0.5);
   pl.setWander(0);
@@ -219,7 +254,7 @@ int rampTest(int midi, double secs) {
 
 int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep) {
   Voice voice(*gInst);
-  Player& pl = voice.player();
+  Performer& pl = voice.player();
   pl.setCalibration(gCal);
   pl.setDynamics(dyn);
   pl.setWander(0);  // measure the model, not the player's natural drift
@@ -277,15 +312,18 @@ int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep
 }
 
 const char kUsage[] =
-    "pajupilli: a physical model of a Boehm flute.\n"
+    "pajupilli: physical models of the Boehm flute and other woodwinds.\n"
     "\n"
     "usage: flute [-inst NAME] MODE [options]\n"
     "\n"
     "Instrument:\n"
     "  -inst NAME          flute (default, B foot), flute-c (C foot), piccolo,\n"
-    "                      alto or bass. Notes are sounding MIDI pitches (flute\n"
-    "                      59..96, flute-c 60..96, piccolo 74..107, alto 55..83,\n"
-    "                      bass 48..74)\n"
+    "                      alto or bass; recorder, ocarina, shakuhachi, panflute;\n"
+    "                      clarinet, soprano-sax, alto-sax, tenor-sax, baritone-sax;\n"
+    "                      oboe, bassoon, duduk, shawm; horn (in F, valves).\n"
+    "                      Notes are sounding MIDI\n"
+    "                      pitches (flute 59..96, piccolo 74..107, alto 55..83,\n"
+    "                      bass 48..74; -note out of range prints the range)\n"
     "  -cfoot              the flute with a C foot (no low B key): same as\n"
     "                      -inst flute-c\n"
     "\n"
@@ -345,7 +383,8 @@ const char kUsage[] =
 // what it radiates (Pa at 1 m) per Pa of room pressure. A passive instrument
 // at 1 m gives back far less than it gets.
 int scatter() {
-  Flute fl(*gInst);
+  auto flp = Voice::makeModel(*gInst);
+  Tube& fl = *flp;
   const double fs = fl.fs();
   std::vector<float> tmp(int(fs / 5));
   fl.process(tmp.data(), int(tmp.size()));
@@ -437,7 +476,7 @@ int main(int argc, char** argv) {
     auto next = [&]() { return i + 1 < argc ? argv[++i] : (char*)""; };
     if (a == "-inst") {
       gInst = findInstrument(next());
-      if (!gInst) { std::fprintf(stderr, "-inst: flute, flute-c, piccolo, alto or bass\n"); return 1; }
+      if (!gInst) { std::fprintf(stderr, "-inst: %s\n", instrumentNames().c_str()); return 1; }
     }
     else if (a == "-cfoot") cfoot = true;
     else if (a == "-note") note = std::atoi(next());
@@ -605,7 +644,7 @@ int main(int argc, char** argv) {
     if (out && !writeWav(out, slurOut, kFs)) { std::fprintf(stderr, "cannot write %s\n", out); return 1; }
     return 0;
   }
-  if (std::getenv("PJ_TRACE") && note >= 0) {  // at the model's own rate
+  if (std::getenv("PJ_TRACE") && note >= 0 && gInst->kind == Kind::kFlute) {  // at the model's own rate
     Flute fl(*gInst);
     Player pl(fl);
     pl.noteOn(note, 90);
@@ -618,7 +657,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   std::vector<float> all;
-  if (note >= 0 && dump) {  // at the model's own rate
+  if (note >= 0 && dump && gInst->kind == Kind::kFlute) {  // at the model's own rate
     Flute fl(*gInst);
     Player pl(fl);
     pl.setDynamics(dyn);
@@ -633,9 +672,10 @@ int main(int argc, char** argv) {
   }
   if (note >= 0) {
     const Result r = playNote(note, secs, dyn, &all);
-    std::printf("%s target %.1f Hz: played %.1f Hz (%+.0f cents) clarity %.2f rms %.4f\n",
+    std::printf("%s target %.1f Hz: played %.1f Hz (%+.0f cents) clarity %.2f rms %.4f; "
+                "pitch wobble %.1f cents, level wobble %.0f %%\n",
                 noteName(note), noteFrequency(note), r.f, cents(r.f, noteFrequency(note)),
-                r.clarity, r.rms);
+                r.clarity, r.rms, r.pitchSd, 100 * r.levelWobble);
   }
   if (scale) {
     for (int m = lo; m <= hi; ++m) {
@@ -647,20 +687,30 @@ int main(int argc, char** argv) {
   if (demo) {
     // A scale up and down (slurred), then a tongued phrase with vibrato.
     Voice v(*gInst);
-    Player& pl = v.player();
+    Performer& pl = v.player();
     pl.setCalibration(gCal);
     pl.setDynamics(dyn);
     auto play = [&](double s) { std::vector<float> x(int(s * kFs)); v.render(x.data(), int(x.size())); all.insert(all.end(), x.begin(), x.end()); };
     // In the instrument's own octave (the piccolo from D: it has no low C).
-    const int t = gInst->transpose, s0 = gInst->lo > 60 ? 62 : 60;
-    int up[] = {s0, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84};
-    for (int& m : up) m += t;
+    // In the instrument's own octave (the piccolo from D: it has no low C);
+    // other instruments: from the lowest C (or D) of their range, up to their top.
+    int t = gInst->transpose, s0 = gInst->lo > 60 ? 62 : 60;
+    if (gInst->design) {
+      const int c = (gInst->lo + 11) / 12 * 12;  // the lowest C in the written range
+      t += c - 60;
+      s0 = 60;
+    }
+    const int top = gInst->hi + gInst->transpose;
+    std::vector<int> up;
+    for (int m : {s0, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84})
+      if (m + t <= top) up.push_back(m + t);
     int prev = -1;
     for (int m : up) { pl.noteOn(m, 70); if (prev >= 0) pl.noteOff(prev); prev = m; play(0.22); }
-    for (int i = 13; i >= 0; --i) { pl.noteOn(up[i], 70); pl.noteOff(prev); prev = up[i]; play(0.22); }
+    for (int i = int(up.size()) - 2; i >= 0; --i) { pl.noteOn(up[i], 70); pl.noteOff(prev); prev = up[i]; play(0.22); }
     pl.noteOff(prev); play(0.5);
     pl.setVibrato(0.08);
-    const int tune[][2] = {{72, 4}, {76, 2}, {79, 2}, {84, 6}, {83, 2}, {81, 2}, {79, 2}, {77, 4}, {76, 4}, {74, 2}, {72, 6}};
+    int tune[][2] = {{72, 4}, {76, 2}, {79, 2}, {84, 6}, {83, 2}, {81, 2}, {79, 2}, {77, 4}, {76, 4}, {74, 2}, {72, 6}};
+    if (84 + t > top) t -= 12;  // the phrase an octave lower if the top is out of reach
     for (auto& n : tune) { pl.noteOn(n[0] + t, 90); play(n[1] * 0.16); pl.noteOff(n[0] + t); play(0.03); }
     play(0.8);
   }

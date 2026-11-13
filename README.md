@@ -1,7 +1,10 @@
 # pajupilli
 
 A real-time physical model of a Boehm concert flute (B foot), played from an
-Akai MPK mini mk3. Also the piccolo, alto flute and bass flute (`-inst`).
+Akai MPK mini mk3. Also the piccolo, alto flute and bass flute, and other woodwinds
+on the same air column: recorder, ocarina, shakuhachi, pan flute, clarinet, the
+saxophones (soprano, alto, tenor, baritone), oboe, bassoon, duduk and shawm, and the
+first brass instrument, the horn in F (`-inst`).
 
 - The bore is a 1-D acoustic waveguide: 96 pressure points at 48 kHz (7.5 mm apart),
   stored as 6 × 16 float32 so the loops compile to AVX-512. Geometry from a measured
@@ -142,6 +145,98 @@ the square root. Same Boehm fingerings; the piccolo has a D foot. Each runs at i
 the bore keeps its 96 points, resampled to 48 kHz. Offline commands take `-inst` too, with
 sounding MIDI notes (`./flute -inst bass -note 48`).
 
+### Other woodwinds
+
+| `-inst` | What | Range (written) | Model rate |
+|---|---|---|---|
+| `recorder` | alto recorder in F, Baroque fingering: duct, thumb half-holed for the 2nd register | F4–G6 | 48 kHz |
+| `ocarina` | alto C, 12 holes: a vessel (Helmholtz), duct | A4–F6 | 48 kHz |
+| `shakuhachi` | 1.8 (in D), end-blown: the lips cover the rim (meri / kari) | D4–D6 | 48 kHz |
+| `panflute` | chromatic nai, one stopped pipe per note | G4–C7 | 96 kHz |
+| `clarinet` | in Bb (sounds a tone lower), register key | E3–C6 | 48 kHz |
+| `soprano-sax` | in Bb (a tone lower) | Bb3–F#6 | 48 kHz |
+| `alto-sax` | in Eb (a sixth lower) | Bb3–F#6 | 48 kHz |
+| `tenor-sax` | in Bb (a ninth lower) | Bb3–F#6 | 36 kHz |
+| `baritone-sax` | in Eb (an octave and a sixth lower) | Bb3–F#6 | 24 kHz |
+| `oboe` | octave keys | Bb3–F6 | 48 kHz |
+| `bassoon` | flick-key vents for the 2nd register | Bb1–F4 | 24 kHz |
+| `duduk` | in A: a large soft double reed on a cylindrical bore | A3–C#5 | 48 kHz |
+| `shawm` | treble in D: a wide cone, a reed behind a pirouette | D4–A5 | 48 kHz |
+
+`./flute -inst NAME -cal` lists, note by note, how the player tunes and which notes do not
+sound in their register (see Status). They play live, in `-poly` pools and in ensembles
+(`-ensemble bassoon,clarinet,oboe,flute`).
+
+What they share with the flute: the waveguide (now up to 512 cells, so a bassoon's 2.5 m fit
+at 24 kHz; the bore's cells take the mean of their faces' areas, the interfaces the area there,
+the stable scheme for cones and bells), the tone holes with pads or fingers (a finger slides off,
+or half-holes, a hole), key clicks, the radiation and the room. New:
+
+- **The reed** (`src/reed.*`): a damped mass-spring per unit area driven by the pressure across
+  it, beating on the lay; Bernoulli flow through the slit (a double reed adds the head loss of
+  its duct), the flow it sweeps as it moves; solved with the mouthpiece cell each sample. The lips
+  set its rest opening, stiffness and damping; the tongue on the reed stops and damps it.
+- **Nonlinear tone-hole losses**: at playing levels the flow in a small open hole separates and
+  sheds vortices (a resistance ~ rho |u| / 2 Cd^2 S^2 at each end of the chimney, linearised per
+  control block). It is what makes a register vent work: it damps the low mode, whose flow
+  through the vent is large, and spares the mode with a pressure node there.
+- **The reed player** (`src/reedplayer.*`): breath by the note and the dynamics, the lips tune
+  (calibrated per note, soft / mezzo-forte / loud), "tu", "du", breath attacks, slurs; vibrato
+  from the breath (oboe, bassoon, shawm), the jaw (saxophones) or both (duduk), none on the
+  clarinet; the player listens and tunes each held note with the lips.
+- **A duct** (recorder, ocarina): the windway and window fixed, the breath alone sets the pitch,
+  so louder is sharper; the calibration learns each note's breath. **End-blown** (shakuhachi,
+  pan flute): the flute's lips on the open top, the coverage bending the pitch.
+- **The calibration** also learns each note's loudest dynamics that still holds its register
+  (a soft reed or a vessel breaks above it); the players stay below it.
+- **The geometry** (`tools/design.py`, `tools/instruments.py` -> `src/designs.cc`): bores, hole
+  and reed sizes typical of the real instruments; the hole positions (and, for the recorder and
+  shakuhachi, diameters; for the ocarina only the diameters), the bore's length and the volume at
+  the top of a cone are fitted by least squares so every fingering's resonance lands on its note,
+  as an instrument maker would, with a transfer-matrix model that mirrors the waveguide (the same
+  holes, pads, reed and window; `tools/design.py -grid NAME` compares the two: the clarinet
+  within ~5 c). Cross fingerings and half-holes are found by search. The keywork is simplified:
+  a keyed instrument has a hole per semitone of its first register and vents for the upper ones.
+
+### Brass
+
+| `-inst` | What | Range (written) | Model rate |
+|---|---|---|---|
+| `horn` | single horn in F (sounds a fifth lower), three valves | C3–C6 (partials 2–16) | 32 kHz |
+
+The same air column and room, with these new parts (`research/horns.md` has the physics):
+
+- **The bore** (`src/brass.cc`, designed with `tools/brass.py`, a transfer-matrix model that
+  mirrors the waveguide): throat, backbore, conical leadpipe, the cylindrical valve section, a
+  long cone and a Bessel flare to a 305 mm bell, 342 cells at 32 kHz (the waveguide now holds
+  up to 512). The flare and the cone are fitted for even partials: 2–16 within 10 cents of F1's
+  series. The leadpipe and cone meet the cylinder smoothly, because a kink reflects and made every
+  other partial 2–3 dB weaker. The cup is a volume in the first cell and the throat's mass is
+  in the first interfaces. The waveguide matches `tools/brass.py` within 4 cents, except
+  partials 3–6 (up to 13 c), which turn back in the flare.
+- **The valves** (`src/horn.*`): each loop is a bore of its own, linked to the two cells at the
+  valve's port. Pressing a valve shuts the port while the links open over a ~12 ms stroke, so
+  half-valves are real. The loops are fitted so partials 4–12 drop by their semitones;
+  combinations come out sharp, as on a real horn (1-2-3 by ~55 cents).
+- **The lips**: an outward-striking valve (the mouth pressure opens them into the cup) at about
+  0.85 of the note, plus a weaker inward-striking second mode 1.3× higher. A one-mass lip alone
+  played 50–200 cents sharp of the bore and the upper register did not speak. The lips are heavier
+  in the low register. Their Q is 7.5, rising with pitch above 300 Hz: a sharper lip splits each
+  slot into two regimes some 50 cents apart, and a slur can leave the note in the sharp one, while
+  the top notes need the sharper lip to speak. Bernoulli flow through the opening plus the lips'
+  swept flow, solved with the cup each sample.
+- **The horn player** (`src/hornplayer.*`): valves and partial from a fingering table, with the
+  standard alternates (another partial, other valves; up high, partial 15 instead of a sharp
+  valved 16). Breath rises as f^1.45 with the note. "ta" / "da" / breath attacks. A slur across
+  partials gets a brief push of lips and air towards the new note. The ear trims a held note only
+  slowly and slightly (errors over 5 cents, at most 0.8 % of the lips' tension), because a fast or
+  wide one pushed notes over the jump in their slot and made them waver.
+- **The calibration** for brass scans each note's lips across its slot and keeps the steady
+  ranges between jumps. It picks the setting nearest in tune that stays 2 % clear of a jump. It
+  checks the note arrived at by a slur from a fourth below and above, and chooses the fingering
+  and breath that land in tune both ways. It retunes at each dynamic as far as the note holds.
+  `-note` prints each held note's pitch and level wobble; `make test` checks them.
+
 ## Offline
 
     ./flute -note 69 -o a4.wav   # one note, prints its pitch
@@ -215,4 +310,24 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   correction is kept for the next time. A note held on the key for 0.3 s prints
   `trill-c5-d5: held, lips +x c`. Held trill notes end within 3 cents (piccolo top: 7).
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
+- Other woodwinds (`./flute -inst NAME -cal` per note; `make test` checks the shares):
+
+  | Instrument | Notes that sound in tune (calibrated, within ~10 c) | Off or silent |
+  |---|---|---|
+  | pan flute | all 30 | — |
+  | ocarina | 20 / 21 | F5 -22 c |
+  | recorder | 21 / 24 | A#5, C#6, D6 (second register: the jet barely leaves the first mode) |
+  | shakuhachi | 21 / 24 | D#4 -76 c, B5 +130 c (meri notes), D#5 silent |
+  | clarinet | 32 / 33 (E3–C6) | one note silent; the altissimo needs the player's vocal tract |
+  | saxophones | soprano 26 / 29, alto 28 / 30, tenor 30 / 30, baritone 30 / 30 (the alto scaled x2) | a few top notes; palm keys above D#6 left out (the low mode wins) |
+  | oboe | 22 / 28 | Bb3, G#5 silent; B3 +70 c; a few 14–22 c |
+  | bassoon | 28 / 30 | B3 -58 c, Eb4 -32 c (second register) |
+  | duduk | 16 / 17 | C4 silent |
+  | shawm | 10 / 13 (D4–D5) | D#4 -118 c, F#4 -38 c, D4 -10 c; the second register is open |
+
+  | horn | 34 / 37 (C3–F5 within ~10 c on `-scale`; held notes steady within 2 c and a few % in level) | F2, F#2, G2 do not speak; G#2–B2 16–39 c off; some notes hold only a narrow dynamic range; slurs G4→C4 and C3→F3 land ~20 c sharp |
+
+  The designs' passive resonances are within a few cents of their notes (rms 0–10 c on the
+  core fingerings; the saxophones and oboe 16–48 c, their octaves stretched: the mouthpiece's
+  volume is not a lumped volume at high frequencies); the players' lips take up the rest.
   whistle tones.

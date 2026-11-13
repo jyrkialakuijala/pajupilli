@@ -10,7 +10,6 @@ namespace pajupilli {
 namespace {
 
 constexpr double kRho = Bore::kRho, kC = Bore::kC;
-constexpr double kMu = 1.85e-5;      // dynamic viscosity of air (Pa s)
 // The concert flute; the other instruments are resized from it.
 constexpr double kCork = 0.0175;     // cork face to embouchure centre (m)
 constexpr double kEmbLong = 11.6e-3; // embouchure hole along the bore axis (m)
@@ -32,18 +31,6 @@ double fluteBore(double e) {
   else d = 19.0;
   return d;
 }
-
-// Piccolo (C, D foot), alto (G) and bass (C) flutes: Boehm system, the same
-// fingerings. Bores: piccolo ~10.5 mm (here a cylindrical-bore piccolo with the
-// flute's head taper), alto 26 mm, bass 35 mm. A D foot ends where an open
-// end sounds the flute's D4 fingering (fitted with -imp).
-constexpr Instrument kInstruments[] = {
-    {"flute", 0, 59, 96, 1.0, 1.0, 1.0, 48000, 633.3, false, true, 0, 1.0},
-    {"flute-c", 0, 60, 96, 1.0, 1.0, 1.0, 48000, 600.4, false, false, 0, 1.0},
-    {"piccolo", 12, 62, 95, 0.5, 0.55, 0.7071, 96000, 528.0, true, false, -5, 0.7},
-    {"alto", -5, 60, 88, 1.3348, 1.37, 1.1553, 36000, 600.4, false, false, 15, 1.4},
-    {"bass", -12, 60, 86, 2.0, 1.84, 1.4142, 24000, 600.4, false, false, 30, 3.0},
-};
 
 // Tone holes, Pearl PF-661 [Dickens]: x from the embouchure centre (mm),
 // diameter, key opening, key cup diameter (mm), French perforation.
@@ -68,70 +55,18 @@ constexpr HoleSpec kSpec[kHoles] = {
     {592.3, 15.4, 2.8, 20.6, false},// 17 C4 (B foot only; the B key closes it)
 };
 
-// The series length t_a of a side hole (negative), in bore units: Dubos et al.
-// 1999 (eq. 74), t the chimney height; closed holes use coth.
-double seriesLength(double b, double a, double t, bool closed) {
-  const double d = b / a, th = std::tanh(1.84 * t / b);
-  return -b * d * d / (1.78 * (closed ? 1 / th : th) + 0.940 + 0.540 * d + 0.285 * d * d);
-}
-
-// Inner end correction of a side hole (Dalmont / Nederveen), delta = b / a.
-double innerCorrection(double b, double delta) {
-  return b * (0.82 - 0.193 * delta - 1.09 * delta * delta + 1.27 * std::pow(delta, 3) -
-              0.71 * std::pow(delta, 4));
-}
-
-double smoothstep(double s) { return s * s * (3 - 2 * s); }
-
-// Pad height (fraction of the full opening) along a stroke, from the stroke time
-// `open` (0 closed .. 1 open). A finger or spring pushing a key closed
-// accelerates it into the seat (lands at 2 x the mean speed); an opening key
-// leaves the seat and settles gently.
-double padShape(double open, bool closing) {
-  return closing ? 1 - (1 - open) * (1 - open) : smoothstep(open);
-}
-
-// Stroke time that gives the pad height s on a stroke (keeps the pad where it
-// is when a key reverses mid-stroke).
-double padTime(double s, bool closing) {
-  if (closing) return 1 - std::sqrt(std::max(0.0, 1 - s));
-  double a = 0, b = 1;
-  for (int i = 0; i < 30; ++i) {
-    const double m = 0.5 * (a + b);
-    (smoothstep(m) < s ? a : b) = m;
-  }
-  return 0.5 * (a + b);
-}
-
 }  // namespace
-
-const Instrument* findInstrument(const std::string& name) {
-  for (const Instrument& i : kInstruments)
-    if (name == i.name) return &i;
-  return nullptr;
-}
-const Instrument& concertFlute() { return kInstruments[0]; }
 
 double Flute::boreDiameter(double x) const {
   return inst_.bore * 1e-3 * fluteBore((x - cork_) / inst_.scale * 1e3);
 }
 
-Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs) {
-  cork_ = kCork * inst.scale;
-  head_ = knob("PJ_HEAD", inst.head) * 1e-3;
-  foot_ = knob("PJ_FOOT", inst.foot) * 1e-3 * inst.scale - head_;
-  embLong_ = kEmbLong * inst.emb;
-  embRin_ = kEmbRin * inst.emb;
-  embChimney_ = kEmbChimney * inst.emb;
-  holeT_ = kHoleT * inst.bore;
-  embA_ = 0.5 * boreDiameter(cork_);
-  {  // noise filters (set at 48 kHz) and white-noise level for this rate
+Flute::Flute(const Instrument& inst) : Tube(inst) {
+  {  // noise filters (set at 48 kHz) for this rate
     const double r = 48000 / fs_;
     noiseA_ = 1 - std::pow(1 - 0.55, r);
     noiseHpA_ = 1 - std::pow(1 - 0.026, r);
     glotA_ = 1 - std::pow(1 - 0.35, r);
-    noiseNorm_ = std::sqrt(1 / r);
-    dcPole_ = float(std::pow(0.99935, r));
   }
   kJetSign_ = knob("PJ_JET_SIGN", 1);
   kEtaSign_ = knob("PJ_ETA_SIGN", 1);
@@ -139,7 +74,6 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   kAlpha_ = knob("PJ_ALPHA", 0.3);
   kConv_ = knob("PJ_CONV", 0.175);
   kNoiseGain_ = knob("PJ_NOISE", 0.3);
-  kOut_ = knob("PJ_OUT", 0.3);
   kJetModel_ = int(knob("PJ_JETMODEL", 1));
   kRel_ = knob("PJ_REL", 0);
   kXiHp_ = knob("PJ_XIHP", 100);
@@ -153,280 +87,117 @@ Flute::Flute(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs)
   }
   kAgc_ = knob("PJ_AGC", 2);  // swing limit, in jet widths
   agcA_ = 1 - std::exp(-1 / (knob("PJ_AGCT", 4) * 1e-3 * fs_));
-  kSeries_ = knob("PJ_SERIES", 1);  // closed holes' series length t_a (Dubos)
   kTurbIn_ = knob("PJ_TURBIN", 4);  // jet turbulence gain (it now passes the jet's low-pass)
   kEdge_ = knob("PJ_EDGE", 4);      // direct edge hiss
-  // Pad pumping, as a share of a rigid pad landing flat: the felt and skin
-  // compress and meet the rim unevenly, so most of the last puff leaks; 0.25
-  // puts a medium key click ~24 dB under a mezzo-forte note (by ear: 0..1).
-  kPadPump_ = knob("PJ_PADPUMP", 0.25);
-  kKeyClick_ = knob("PJ_KEYCLICK", 1);
-  kKeySpread_ = knob("PJ_KEYSPREAD", 3) * 1e-3;
-  // The landing thud: the pad goes on into its felt and springs back, pushing
-  // the air in the (now sealed) hole into the bore, both ways along the tube.
-  // Key cup + finger on the felt ring at ~400 Hz, Q ~1.5 (felt is lossy). Only
-  // the pad's middle moves with the cup: 0.15 of a rigid piston (by ear) puts
-  // a medium thud ~2 dB under the pad's puff, ~28 dB under a mezzo-forte note.
-  kThud_ = 0.15 * knob("PJ_THUD", 1);
-  {
-    const double f = knob("PJ_THUDF", 400), q = 1.5;
-    // Release: 0.05 mm of felt preload, peak skin speed x0 w (m/s).
-    kRelease_ = knob("PJ_RELEASE", 1) * 0.05e-3 * 2 * M_PI * f;
-    thudCos_ = float(std::cos(2 * M_PI * f / fs_));
-    thudSin_ = float(std::sin(2 * M_PI * f / fs_));
-    thudDecay_ = float(std::exp(-M_PI * f / (q * fs_)));
-  }
-  {  // key impact modes: key arm / cup and the tube wall (~2.4, 5.3, 8.2 kHz)
-    static const double f[kTickModes] = {2400, 5300, 8200}, tau[kTickModes] = {0.004, 0.0025, 0.0015};
-    for (int m = 0; m < kTickModes; ++m) {
-      tickCos_[m] = std::cos(2 * M_PI * f[m] / fs_);
-      tickSin_[m] = std::sin(2 * M_PI * f[m] / fs_);
-      tickDecay_[m] = std::exp(-1 / (tau[m] * fs_));
-    }
-  }
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
   kEtaMax_ = knob("PJ_ETAMAX", 3) * 1e-3 * inst.emb;  // a hard limit for safety (PJ_AGC limits the swing)
   kEmbR_ = knob("PJ_EMBR", 0.01);
   kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
-  kRadOnly_ = int(knob("PJ_RADONLY", 0));  // -1 embouchure only, 1 all but the embouchure
-  bore_.setBore([this](double x) { return boreDiameter(x); }, cork_, cork_ + foot_);
-  const double dx = bore_.dx(), x0 = bore_.x0();
-  ec_ = bore_.embCell();
-  const double kHoleComp = knob("PJ_HOLECOMP", 2), kOpenTa = knob("PJ_OPENTA", 0.8);
-  for (int i = 0; i < kHoles; ++i) {
-    Hole& h = hole_[i];
-    const HoleSpec& sp = kSpec[i];
-    h.x = cork_ + sp.x * 1e-3 * inst.scale - head_;
-    h.b = 0.5e-3 * sp.d * inst.bore;
-    h.padH = sp.padH * 1e-3 * inst.bore;
-    h.padR = 0.5e-3 * sp.cup * inst.bore;
-    h.perforated = sp.perf;
-    h.present = !(inst.dFoot && i >= 14) && (i < 16 || inst.bFoot);
-    h.cell = h.present ? int((h.x - x0) / dx) : -1;
-    if (!h.present) continue;
-    const double a = 0.5 * boreDiameter(h.x), delta = h.b / a;
-    h.a = a;
-    const double tm = h.b * delta * (1 + 0.207 * std::pow(delta, 3)) / 8;
-    // The grid puts the hole at the cell centre. A hole moved up by d sounds
-    // like one with a chimney longer by ~d S_h / S: keep the note. An open
-    // hole's series length t_a (negative, Dubos) can't shorten the waveguide's
-    // interfaces (stability), but for the first open hole it acts much as the
-    // hole moved up by ~|t_a| (kOpenTa): it joins the offset. kHoleComp: with a
-    // lattice of open holes below, d S_h / S alone corrects only about half.
-    // Both fitted with tools/fitgrid.py against tools/tmm.py: 1.4 cents rms
-    // over the first three resonances of every instrument's fingerings.
-    const double d = h.x - (x0 + (h.cell + 0.5) * dx);
-    const double sh = M_PI * h.b * h.b, sb = M_PI * a * a;
-    const double taOpen = seriesLength(h.b, a, holeT_, false);
-    h.tSeries = std::max(1e-3 * inst.bore, holeT_ + innerCorrection(h.b, delta) + tm +
-                                               kHoleComp * (d + kOpenTa * taOpen) * sh / sb);
-    h.tClosed = holeT_ + tm - 0.05 * h.b;  // closed chimney, with its matching volume
-    h.taClosed = seriesLength(h.b, a, holeT_, true);
-    h.tRad = 0.6133 * h.b;
-  }
-  // At rest the player holds G: the left hand down, the right hand up (and the
-  // little finger on the D# key), so a first note moves fewer keys.
-  setHoles("xxxxxxxxxooooooo");
-  for (Hole& h : hole_) h.open = h.target;
-  updateHoles(0);
-  // Radiators: each hole cell, the embouchure, the foot's open end.
-  // Listener 1 m in front of the player's face (x along the flute from the cork
-  // face, y forward). In the second register the embouchure and the open holes
-  // move air in antiphase (mode 2): opposite the middle of the flute they cancel
-  // the fundamental by ~14 dB and those notes sounded thin.
-  const double lx = knob("PJ_LX", 0.0), ly = knob("PJ_LY", 1.0);
-  auto addRad = [&](int cell, double x, double extra) {
-    const double dist = std::hypot(x - lx, ly);
-    radCell_[nRad_] = cell;
-    radDelay_[nRad_] = std::max(0, int(std::lround((dist - extra) / kC * fs_)));
-    radGain_[nRad_] = float(kRho / (4 * M_PI * dist) * fs_);
-    ++nRad_;
-  };
-  addRad(-1, cork_, 0);  // embouchure
-  addRad(bore_.footCell(), cork_ + foot_, 0);
-  for (int i = 0; i < kHoles; ++i) {
-    if (!hole_[i].present) continue;
-    bool dup = false;
-    for (int j = 0; j < i; ++j) dup |= hole_[j].cell == hole_[i].cell;
-    if (!dup) addRad(hole_[i].cell, hole_[i].x, 0);
+  if (inst.design) {
+    buildDesign();
+  } else {
+    cork_ = kCork * inst.scale;
+    head_ = knob("PJ_HEAD", inst.head) * 1e-3;
+    foot_ = knob("PJ_FOOT", inst.foot) * 1e-3 * inst.scale - head_;
+    embLong_ = kEmbLong * inst.emb;
+    embRin_ = kEmbRin * inst.emb;
+    embChimney_ = kEmbChimney * inst.emb;
+    holeT_ = kHoleT * inst.bore;
+    channel_ = kChannel;
+    embA_ = 0.5 * boreDiameter(cork_);
+    setGeometry([this](double x) { return boreDiameter(x); }, cork_, cork_ + foot_, false);
+    for (int i = 0; i < kHoles; ++i) {
+      const HoleSpec& sp = kSpec[i];
+      // Normally closed keys: the trill keys, G# and Eb.
+      const int flags = (sp.perf ? kPerforated : 0) | (i == 0 || i == 1 || i == 7 || i == 13 ? kNormallyClosed : 0);
+      addHole(cork_ + sp.x * 1e-3 * inst.scale - head_, 0.5e-3 * sp.d * inst.bore, holeT_,
+              sp.padH * 1e-3 * inst.bore, 0.5e-3 * sp.cup * inst.bore, flags,
+              !(inst.dFoot && i >= 14) && (i < 16 || inst.bFoot));
+    }
+    finishHoles();
+    // At rest the player holds G: the left hand down, the right hand up (and the
+    // little finger on the D# key), so a first note moves fewer keys.
+    restHoles("xxxxxxxxxooooooo");
+    // Radiators: the embouchure, the foot's open end, each hole cell.
+    addRadiators(true, cork_);
   }
   cur_ = target_;
   embouchureGeometry();
 }
 
-void Flute::setHoles(const char* pattern, double fingerSpeed) {
-  fingerSpeed_ = std::clamp(fingerSpeed, 0.25, 4.0);
-  // A fingering without the 17th hole leaves the B foot's C key open.
-  const int n = int(std::strlen(pattern));
-  for (int i = 0; i < kHoles; ++i)
-    if (hole_[i].present) hole_[i].target = i < n ? (pattern[i] == 'o' ? 1 : 0) : 1;
+// The bore of a design: piecewise linear (mm), constant beyond its ends.
+double designDiameter(const Design& d, double x) {
+  const double xm = x * 1e3;
+  if (xm <= d.bore[0].x) return d.bore[0].d * 1e-3;
+  for (int i = 1; i < d.nBore; ++i)
+    if (xm <= d.bore[i].x) {
+      const BorePoint &a = d.bore[i - 1], &b = d.bore[i];
+      return 1e-3 * (a.d + (b.d - a.d) * (xm - a.x) / std::max(1e-9, b.x - a.x));
+    }
+  return d.bore[d.nBore - 1].d * 1e-3;
 }
 
-Branch Flute::holeBranch(const Hole& h) const {
-  Branch br;
-  const double sh = M_PI * h.b * h.b;
-  const double vc = sh * h.tClosed;  // closed chimney volume
-  const double s = padShape(h.open, h.closing);
-  if (s < 1e-4) { br.vol = vc; return br; }
-  const double hp = s * h.padH;
-  // Pad as a radial slot of height hp between the cup and the rim.
-  const double lnr = std::log(h.padR / h.b);
-  double dpad = h.b * h.b * lnr / (2 * hp);
-  if (h.perforated) {  // Dalmont 2001: the perforation shortens the pad's effect
-    const double q = 3.4e-3, e = 3.6e-3;
-    const double de = 1.64 * h.b / q - 0.15 * h.b / h.padR - 1.1 + e * h.b / (q * q);
-    dpad /= 1 + 5 * std::pow(de, -1.35) * std::pow(hp / h.b, -0.2);
+void Flute::buildDesign() {
+  const Design& d = *inst_.design;
+  const JetParams& j = d.jet;
+  channel_ = inst_.kind == Kind::kDuct ? j.channel : kChannel;
+  if (d.pipes) {  // a pan flute: the pipe is chosen per note
+    buildPipe(0);
+    return;
   }
-  const double ts = h.tSeries + dpad;
-  br.g = sh / (kRho * ts);
-  br.rs = 6 * kMu * lnr / (M_PI * hp * hp * hp);
-  br.rr = 1.5 * kRho * kC / sh;
-  br.hl = sh / (kRho * h.tRad);
-  br.vol = vc * dpad / (dpad + h.tSeries + h.tRad);
-  return br;
+  // The window (a duct: the window cut in the head; end-blown: the open top,
+  // partly covered by the lower lip) at d.excite from the top.
+  cork_ = d.excite * 1e-3;
+  embChimney_ = j.chimney;
+  const Design* dp = &d;
+  setGeometry([dp](double x) { return designDiameter(*dp, x); }, cork_, d.end * 1e-3, d.closedEnd);
+  embA_ = 0.5 * designDiameter(d, cork_);
+  embLong_ = inst_.kind == Kind::kDuct ? j.w : 2 * embA_;
+  // The window's opening at the bore: a duct's window as cut; an end's rim: the bore.
+  embRin_ = inst_.kind == Kind::kDuct ? std::sqrt(j.w * j.window / M_PI) : embA_;
+  for (int i = 0; i < d.nHoles; ++i) {
+    const HoleDef& h = d.holes[i];
+    addHole(h.x * 1e-3, 0.5e-3 * h.d, h.t * 1e-3, h.padH * 1e-3, 0.5e-3 * h.cup, h.flags);
+  }
+  finishHoles();
+  restHoles(d.notes[0].holes);
+  addRadiators(true, cork_);
 }
 
-double Flute::keyDelay() {
-  // Scrambled: the next LCG output is correlated with the stroke jitter.
-  keyRng_ = keyRng_ * 1664525u + 1013904223u;
-  uint32_t r = keyRng_ ^ (keyRng_ >> 16);
-  r *= 0x7feb352du;
-  r ^= r >> 15;
-  r *= 0x846ca68bu;
-  r ^= r >> 16;
-  return kKeySpread_ * ((r >> 8) * (1.0 / 16777216.0));
+void Flute::buildPipe(int k) {
+  const Design& d = *inst_.design;
+  const PipeDef& p = d.pipes[k];
+  pipe_ = k;
+  const double r = 0.5e-3 * p.d;
+  // The jet meets the rim at the top; the window branch sits half a cell in.
+  cork_ = 0.5 * Bore::kC / (Bore::kCourantMax * fs_);
+  embA_ = r;
+  embRin_ = r;
+  embLong_ = 2 * r;
+  embChimney_ = d.jet.chimney;
+  const double dd = p.d * 1e-3;
+  setGeometry([dd](double) { return dd; }, cork_, cork_ + p.len * 1e-3, true);
+  nHoles_ = 0;
+  finishHoles();
+  addRadiators(true, cork_);
 }
 
-void Flute::updateHoles(double dtBlock) {
-  bool moved = dtBlock == 0;
-  nPumping_ = 0;
-  // Several fingers put down (or lifted) "together" move 0..3 ms apart: each
-  // stroke that starts with others in the same direction waits a random delay.
-  int closers = 0, openers = 0;
-  for (const Hole& h : hole_) {
-    closers += h.target < h.open && !h.closing;
-    // (A pad closed since the start opens on its own: a note from silence is
-    // fragile at the top of the bass, and the calibration starts from there.)
-    openers += h.target > h.open && h.closing;
-  }
-  for (int i = 0; i < kHoles; ++i) {
-    Hole& h = hole_[i];
-    h.padIn = 0;
-    if (h.open == h.target) { h.wait = 0; continue; }
-    // A finger pushes a key in ~10 ms (faster when the key is struck harder), a
-    // spring moves it back in ~16 ms (Almeida et al. 2009). Normally closed keys
-    // (trills, G#, Eb) open by finger and close by spring.
-    const bool normallyClosed = i == 0 || i == 1 || i == 7 || i == 13;
-    const bool opening = h.target > h.open;
-    const bool byFinger = opening == normallyClosed;
-    if (h.closing == opening || dtBlock == 0) {  // a new stroke (or reversal): keep the pad where it is
-      const double sNow = padShape(h.open, h.closing);
-      h.closing = !opening;
-      h.open = padTime(sNow, h.closing);
-      // Fingers never land together: each stroke differs by up to +-15 %.
-      keyRng_ = keyRng_ * 1664525u + 1013904223u;
-      const double jitter = 1 + 0.3 * ((keyRng_ >> 8) * (1.0 / 16777216.0) - 0.5);
-      h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
-      h.wait = 0;
-      if ((h.closing ? closers : openers) > 1 && dtBlock > 0) h.wait = keyDelay();
-    }
-    if (h.wait > 0) {
-      h.wait -= dtBlock;
-      continue;
-    }
-    const double o0 = h.open;
-    if (opening && h.held && dtBlock > 0 && kThud_ > 0) {
-      // The pad leaves its seat: the felt the finger (or the spring) held
-      // compressed ~0.05 mm springs back and the skin pulls air out of the
-      // hole: the thud's mirror, a small suction both ways along the tube.
-      // (A pad resting closed since the start is only lightly held.)
-      const double sh0 = M_PI * h.b * h.b;
-      h.thRe = 0;
-      h.thIm = float(kThud_ * kRelease_ * sh0);
-      thudLeft_ = int(0.03 * fs_);
-    }
-    h.held = false;
-    const double step = dtBlock / h.stroke;
-    h.open = opening ? std::min(h.target, h.open + step) : std::max(h.target, h.open - step);
-    moved = true;
-    if (dtBlock <= 0) continue;
-    // Pad pumping: the air between the pad and the hole's rim can leave only
-    // through the slot under the pad; the rest goes into the bore. Near the seat
-    // the slot's viscous resistance (~1 / h^3) wins and the stroke's last
-    // fraction of a millimetre pushes (or, opening, pulls) a puff into the tube.
-    const double sh = M_PI * h.b * h.b;
-    const double a = h.a;
-    const double zin = kRho * kC / (2 * M_PI * a * a);  // the bore, both ways
-    const double lnr = std::log(h.padR / h.b);
-    double vin = 0, hPrev = padShape(o0, h.closing) * h.padH;
-    constexpr int kSub = 8;
-    for (int k = 1; k <= kSub; ++k) {
-      const double hk = padShape(o0 + (h.open - o0) * k / kSub, h.closing) * h.padH;
-      const double hm = std::max(0.5 * (hk + hPrev), 1e-6);
-      const double rs = 6 * kMu * lnr / (M_PI * hm * hm * hm);
-      vin += -sh * (hk - hPrev) * rs / (rs + zin);
-      hPrev = hk;
-    }
-    h.padIn = kPadPump_ * vin / dtBlock;
-    ++nPumping_;
-    // The pad lands: a tick from the key and the tube, ~ the landing speed.
-    if (h.open == 0 && h.closing && kThud_ > 0) {
-      const double v = 2 * h.padH / h.stroke;  // landing speed (m/s)
-      h.thRe = float(kThud_ * v * sh);
-      h.thIm = 0;
-      h.held = true;
-      thudLeft_ = int(0.03 * fs_);  // 30 ms: ~-80 dB
-    }
-    if (h.open == 0 && h.closing && kKeyClick_ > 0) {
-      const double v = 2 * h.padH / h.stroke;   // m/s
-      const double size = h.padR / 9.5e-3;      // bigger keys ring lower and louder
-      for (int m = 0; m < kTickModes; ++m) {
-        static const double kAmp[kTickModes] = {1.0, 0.6, 0.35};
-        tickIm_[m] += kKeyClick_ * 0.01 * v * size * kAmp[m];
-      }
-    }
-  }
-  if (!moved) return;
-  for (int i = 0; i < kHoles; ++i) {
-    const int c = hole_[i].cell;
-    if (c < 0) continue;
-    bool first = true;
-    for (int j = 0; j < i; ++j) first &= hole_[j].cell != c;
-    if (!first) continue;
-    Branch sum, part[kHoles];
-    int n = 0;
-    for (int j = i; j < kHoles; ++j)
-      if (hole_[j].cell == c) part[n++] = holeBranch(hole_[j]);
-    for (int j = 0; j < n; ++j) { sum.g += part[j].g; sum.vol += part[j].vol; }
-    {  // A closed hole's negative series length, in step with its chimney
-      // volume (which keeps the cell within the scheme's stability limit):
-      // fading with openness alone, a closing pad made the bass blow up.
-      double ta = 0;
-      for (int j = i, k = 0; j < kHoles; ++j)
-        if (hole_[j].cell == c) {
-          const Hole& h = hole_[j];
-          ta += h.taClosed * part[k++].vol / (M_PI * h.b * h.b * h.tClosed);
-        }
-      bore_.setSeries(c, kSeries_ * ta);
-    }
-    if (sum.g > 0) {
-      double il = 0;
-      for (int j = 0; j < n; ++j) {
-        if (part[j].g == 0) continue;
-        const double w = part[j].g / sum.g;
-        sum.rs += w * w * part[j].rs;
-        sum.rr += w * w * part[j].rr;
-        il += w * w / part[j].hl;
-      }
-      sum.hl = 1 / il;
-    } else {
-      bore_.s.q[c] = 0;
-      bore_.s.l[c] = 0;
-    }
-    bore_.setBranch(c, sum);
-  }
-  bore_.update();
+void Flute::selectPipe(int midi) {
+  const Design* d = inst_.design;
+  if (!d || !d->pipes) return;
+  int k = 0;
+  for (int i = 0; i < d->nPipes; ++i)
+    if (d->pipes[i].midi == midi - inst_.transpose) k = i;
+  if (k == pipe_) return;
+  // Another pipe under the lips: it starts from rest (the old one rings on
+  // briefly in the room, not here).
+  buildPipe(k);
+  std::memset(&bore_.s, 0, sizeof(bore_.s));
+  eq_ = el_ = 0;
+  std::fill(radPrev_, radPrev_ + kMaxHoles + 2, 0.0f);
+  std::fill(radPrev2_, radPrev2_ + kMaxHoles + 2, 0.0f);
+  embouchureGeometry();
 }
 
 void Flute::embouchureGeometry() {
@@ -464,36 +235,26 @@ void Flute::controlStep() {
   cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
   const double at = 1 - std::exp(-blockDt / 0.001);
   tongue_ += at * (target_.tongue - tongue_);
+  if (duct()) {  // the windway and the window are the instrument's
+    const JetParams& j = inst_.design->jet;
+    cur_.lipH = j.h;
+    cur_.lipWidth = j.width;
+    cur_.jetLen = j.w;
+    cur_.uncovered = j.window;
+    cur_.face = 0;
+  }
   embouchureGeometry();
   updateHoles(blockDt);
-}
-
-void Flute::process(float* out, int n) {
-  bool finite = true;
-  for (int i = 0; i < n; ++i) {
-    if (ctl_ == 0) controlStep();
-    ctl_ = (ctl_ + 1) & 15;
-    out[i] = sample();
-    finite &= std::isfinite(out[i]);
-  }
-  if (!finite) {  // a NaN / Inf would stay in the state forever: start the air afresh
-    resetAir();
-    std::fill(out, out + n, 0.0f);
-    ++resets_;
-  }
+  holeLosses();
 }
 
 void Flute::resetAir() {
-  std::memset(&bore_.s, 0, sizeof(bore_.s));
+  Tube::resetAir();
   eq_ = el_ = ef_ = 0;
   pm_ = uj_ = 0;
   xi_ = jl1_ = jl2_ = xiLow_ = dl1_ = dl2_ = agcEnv_ = 0;
   noiseLp_ = noiseHp_ = glotLp_ = edgeLow_ = edgeBand_ = 0;
   std::fill(vHist_, vHist_ + kHist, 0.0f);
-  std::fill(outRing_, outRing_ + kOutRing, 0.0f);
-  std::fill(radPrev_, radPrev_ + kHoles + 2, 0.0f);
-  std::fill(radPrev2_, radPrev2_ + kHoles + 2, 0.0f);
-  dcX_ = dcY_ = 0;
 }
 
 float Flute::sample() {
@@ -504,7 +265,7 @@ float Flute::sample() {
   const double at = tongue_ * kTongueArea;
   const double pf = std::max(0.0, pm_) * at * at / (at * at + aj * aj + 1e-30);
   // Jet inertia: rho l dUj/dt = pf - rho Uj^2 / 2.
-  uj_ = (uj_ + dt / (kRho * kChannel) * pf) / (1 + dt / (2 * kChannel) * uj_);
+  uj_ = (uj_ + dt / (kRho * channel_) * pf) / (1 + dt / (2 * channel_) * uj_);
   const double qj = aj * uj_;
   // Lungs -> trachea (resistance) -> glottis (Bernoulli orifice) -> mouth.
   // The glottis conductance is linearised at the last pressure drop.
@@ -604,22 +365,7 @@ float Flute::sample() {
   const double kj = kRho * dd * b * uj_ / W;
   // --- The bore, then the window branch at the embouchure cell (implicit).
   float pOld, jIn;
-  if (roomPos_ < roomN_) pRoom_ = room_[roomPos_++];
-  bore_.step(ec_, &pOld, &jIn, pRoom_);
-  if (nPumping_ > 0)  // pads pushing air into the tube (key clicks)
-    for (const Hole& hl : hole_)
-      if (hl.padIn != 0) bore_.s.p()[hl.cell] += float(hl.padIn * dt / bore_.compliance(hl.cell));
-  if (thudLeft_ > 0) {  // landing thuds
-    --thudLeft_;
-    for (Hole& hl : hole_) {
-      if (hl.thRe == 0 && hl.thIm == 0) continue;
-      bore_.s.p()[hl.cell] += float(hl.thRe * dt / bore_.compliance(hl.cell));
-      const float re = hl.thRe, im = hl.thIm;
-      hl.thRe = thudDecay_ * (re * thudCos_ - im * thudSin_);
-      hl.thIm = thudDecay_ * (re * thudSin_ + im * thudCos_);
-      if (thudLeft_ == 0) hl.thRe = hl.thIm = 0;
-    }
-  }
+  stepBore(&pOld, &jIn);
   {
     const double c = bore_.compliance(ec_), w = 2 / dt;
     const double g = eg_, rs = ers_ + ecnl_ * std::fabs(eq_), rr = err_, hl = ehl_;
@@ -655,22 +401,7 @@ float Flute::sample() {
   vHist_[hPos_] = float(kJetModel_ == 1 ? xi_ - xiLow_ : eq_ / esw_);
   hPos_ = (hPos_ + 1) & (kHist - 1);
   // --- Radiation: d(flow)/dt of each opening, delayed to the listener.
-  for (int r = 0; r < nRad_; ++r) {
-    const int c = radCell_[r];
-    if (kRadOnly_ != 0 && (kRadOnly_ == -1) != (c == -1)) continue;
-    float add;
-    {
-      // d/dt of the mean of the last two flows: a zero at Nyquist, so a pad
-      // closing (stiff, trapezoidal) does not click at 24 kHz.
-      const float q = c == -1 ? float(eq_) : bore_.s.q[c];
-      add = radGain_[r] * 0.5f * (q - radPrev2_[r]);
-      radPrev2_[r] = radPrev_[r];
-      radPrev_[r] = q;
-    }
-    outRing_[(outPos_ + radDelay_[r]) & (kOutRing - 1)] += add;
-  }
-  float y = outRing_[outPos_];
-  outRing_[outPos_] = 0;
+  float y = radiate(eq_);
   {  // Edge hiss: the turbulent jet on the labium radiates directly (a dipole,
      // intensity ~ U^6), centred near St = f h / Uj ~ 0.12, airier = more.
     const double fe = std::clamp(0.12 * uj_ / std::max(cur_.lipH, 2e-4), 1500.0, 7000.0);
@@ -685,18 +416,7 @@ float Flute::sample() {
     const double u = uj_ / 25;
     y += float(kEdge_ * 4e-3 * (0.25 + cur_.air * cur_.air * 2) * u * u * u * bp);
   }
-  for (int m = 0; m < kTickModes; ++m) {  // key impact ticks
-    const double re = tickRe_[m], im = tickIm_[m];
-    tickRe_[m] = tickDecay_[m] * (re * tickCos_[m] - im * tickSin_[m]);
-    tickIm_[m] = tickDecay_[m] * (re * tickSin_[m] + im * tickCos_[m]);
-    y += float(im);
-  }
-  outPos_ = (outPos_ + 1) & (kOutRing - 1);
-  // DC blocker (~5 Hz).
-  const float yd = y - dcX_ + dcPole_ * dcY_;
-  dcX_ = y;
-  dcY_ = yd;
-  return float(yd * kOut_);
+  return finish(y);
 }
 
 }  // namespace pajupilli

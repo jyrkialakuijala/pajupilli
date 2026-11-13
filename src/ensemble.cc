@@ -349,7 +349,7 @@ void Ensemble::retune() {
   int idx[64], note[64], n = 0;
   long long sig = 0;
   for (int i = 0; i < int(f_.size()) && n < 64; ++i) {
-    const Player& p = f_[i].v->player();
+    const Performer& p = f_[i].v->player();
     if (!f_[i].held || !p.busy() || p.sounding() < 0) continue;
     idx[n] = i;
     note[n] = p.sounding();
@@ -475,7 +475,7 @@ void Ensemble::block(float* left, float* right, int n) {
   if (room_) {
     // To pressure at 1 m (Pa) for the room; the listener's microphones keep
     // each instrument's balance (its gain).
-    const float k = float(f_[0].v->flute().outScale());
+    const float k = float(f_[0].v->model().outScale());
     srcBuf_.resize(size_t(nf) * n);
     std::vector<const float*> src(nf);
     std::vector<float*> at(nf);
@@ -508,7 +508,7 @@ void Ensemble::block(float* left, float* right, int n) {
 
 int Ensemble::resets() const {
   int r = 0;
-  for (const Slot& s : f_) r += s.v->flute().resets();
+  for (const Slot& s : f_) r += s.v->model().resets();
   return r;
 }
 

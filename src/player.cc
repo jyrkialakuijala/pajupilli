@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 
 #include <algorithm>
 #include <cmath>
@@ -11,62 +12,7 @@
 namespace pajupilli {
 namespace {
 
-// Standard Boehm fingerings, C foot (research/keywork.md section 5).
-// Holes 1..16: D#tr Dtr C# C B Bb A G# G#' G F# F E D# D C#; a 17th character
-// is the B foot's C hole (left out: open; a C foot has no such hole).
-constexpr NoteInfo kNotes[38] = {
-    {"xxxxxxxxxxxxxxxxx", 1},  // 59 B3 (B foot)
-    {"xxxxxxxxxxxxxxxx", 1},  // 60 C4
-    {"xxxxxxxxxxxxxxxo", 1},  // 61 C#4
-    {"xxxxxxxxxxxxxxoo", 1},  // 62 D4
-    {"xxxxxxxxxxxxxooo", 1},  // 63 D#4
-    {"xxxxxxxxxxxxoooo", 1},  // 64 E4
-    {"xxxxxxxxxxxooooo", 1},  // 65 F4
-    {"xxxxxxxxxxooxooo", 1},  // 66 F#4
-    {"xxxxxxxxxooooooo", 1},  // 67 G4
-    {"xxxxxxxoxooooooo", 1},  // 68 G#4
-    {"xxxxxxoxoooooooo", 1},  // 69 A4
-    {"xxxxxooxoooooooo", 1},  // 70 Bb4 (thumb)
-    {"xxxxoooxoooooooo", 1},  // 71 B4
-    {"xxxooooxoooooooo", 1},  // 72 C5
-    {"xxoooooxoooooooo", 1},  // 73 C#5
-    {"xxoxxxxxxxxxxxoo", 2},  // 74 D5 (C# hole vents)
-    {"xxoxxxxxxxxxxooo", 2},  // 75 D#5
-    {"xxxxxxxxxxxxoooo", 2},  // 76 E5
-    {"xxxxxxxxxxxooooo", 2},  // 77 F5
-    {"xxxxxxxxxxoxoooo", 2},  // 78 F#5 (middle finger: the ring-finger F# barely holds its register)
-    {"xxxxxxxxxooooooo", 2},  // 79 G5
-    {"xxxxxxxoxooooooo", 2},  // 80 G#5
-    {"xxxxxxoxoooooooo", 2},  // 81 A5
-    {"xxxxxooxoooooooo", 2},  // 82 Bb5
-    {"xxxxoooxoooooooo", 2},  // 83 B5
-    {"xxxooooxoooooooo", 2},  // 84 C6
-    {"xxoooooxoooooooo", 2},  // 85 C#6
-    {"xxoxxxxxxooooooo", 3},  // 86 D6 (G4 fingering, vented)
-    {"xxxxxxxoxxxxxooo", 3},  // 87 D#6
-    {"xxxxxxoxoxxxoooo", 3},  // 88 E6
-    {"xxxxxoxxxxxooooo", 3},  // 89 F6
-    {"xxxxooxxxxooxooo", 3},  // 90 F#6
-    {"xxxoxxxxxooooooo", 3},  // 91 G6
-    {"xxooxxxoxooooooo", 3},  // 92 G#6
-    {"xxoxxxoxoxxooooo", 3},  // 93 A6
-    {"xooxxooxoxxooxoo", 3},  // 94 Bb6
-    {"xoxxooxxxooooxoo", 3},  // 95 B6 (D trill key as the vent: +1 c; with the D# trill key +21)
-    {"xxxoxxxoxxxooxoo", 4},  // 96 C7 (no gizmo: with it the B foot's C7 is +50 c, without +29)
-};
-
 }  // namespace
-
-const NoteInfo* noteInfo(int midi) {
-  return midi >= 59 && midi <= 96 ? &kNotes[midi - 59] : nullptr;
-}
-
-const NoteInfo* noteInfo(const Instrument& inst, int midi) {
-  const int w = midi - inst.transpose;
-  return w >= inst.lo && w <= inst.hi ? noteInfo(w) : nullptr;
-}
-
-double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69) / 12.0); }
 
 // Standard trill-key trills (written MIDI): hold the lower note's fingering,
 // trill the key(s). cover: the lips' coverage for the upper note, where the
@@ -91,10 +37,7 @@ const Player::Trill Player::kTrills[] = {
     {93, 94, "12", "trill-a6-ais6", 1.0, true},  // A6-Bb6 (A5 + both keys is a minor third up)
 };
 
-Player::Player(Flute& f) : flute_(f), inst_(f.instrument()), fs_(f.fs()) {
-  for (int i = 0; i < 128; ++i) coverTrim[i] = coverLoTrim[i] = coverHiTrim[i] = pressTrim[i] = 1;
-  for (double& d : dynLo) d = 0;
-  for (double& j : jetTrim) j = 1;
+Player::Player(Flute& f) : Performer(f), flute_(f) {
   kW_ = knob("PJ_W", 1);
   kFace_ = knob("PJ_FACE", 1);
   kY0_ = knob("PJ_Y0", 0.8);
@@ -134,7 +77,7 @@ void Player::noteOn(int midi, int velocity) {
      // fingers stay on the lower note and the trill key(s) give the upper.
     const int w = midi - inst_.transpose, tr = inst_.transpose;
     const Trill* t = nullptr;
-    if (legato)
+    if (legato && !inst_.design)  // the trill keys: the Boehm flutes
       for (const Trill& k : kTrills) {
         if (std::strcmp(k.notOn, inst_.name) == 0) continue;
         const bool fast = keyClock_ < kTrillFast_ &&
@@ -219,7 +162,7 @@ double Player::slurKick(int to) {
   // vented fingering's second mode with the octave slurs' kick.
   // A short, strong kick (40 ms): a long one overshot the pitch by 60 cents.
   const char* h = info(to)->holes;
-  if (h[2] == 'o' && h[3] == 'x') {
+  if (!inst_.design && h[2] == 'o' && h[3] == 'x') {
     kickT_ = kVentKickT_;
     return kSlurKick_ * std::clamp(1 + kVentKickDyn_ * (0.5 - dyn), 0.5, 1.5);
   }
@@ -252,7 +195,9 @@ const char* Player::holesFor(int midi) {
 void Player::applyNote(Attack a) {
   // Key velocity = finger speed: 64 moves a key in 10 ms, 127 in 5 ms, 1 in 20 ms;
   // a faster finger lands the pad harder (a louder key click).
-  flute_.setHoles(holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
+  flute_.selectPipe(note_);
+  const char* ov = std::getenv("PJ_HOLES");  // any fingering (experiments)
+  flute_.setHoles(ov && *ov ? ov : holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
   // A new note: the lips start from its calibrated place; the ear takes over.
   earCorr_ = 0;
@@ -341,7 +286,7 @@ void Player::render(float* out, int n) {
       const double fw = noteFrequency(note_ - inst_.transpose), ke = inst_.emb;
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
-      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], 1.0);
+      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], std::max(dynLo[en], dynHi[en]));
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
@@ -367,7 +312,8 @@ void Player::render(float* out, int n) {
       {
         const double mw = 69 + 12 * std::log2(fw / 440);
         const double sh = std::max(0.1, (2.937 * std::log(mw) - 11.63) / (2.937 * std::log(69.0) - 11.63));
-        e.face = 1 + kFace_ * (sh - 1);
+        // (A transverse flute's: an end-blown rim keeps its load.)
+        e.face = inst_.kind == Kind::kFlute ? 1 + kFace_ * (sh - 1) : 1;
       }
       // Louder: more breath and a bigger lip opening (Fletcher: all players open the lips).
       // Fletcher 1975: louder = a thicker and faster jet; the lip opening
@@ -383,6 +329,26 @@ void Player::render(float* out, int n) {
       e.y0 = kY0_ * ke * std::pow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
       e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
       if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * pressScale_ * (1 + kKickP_ * regKick_);
+      if (flute_.duct()) {
+        // A duct: the windway and the window are fixed; the player has only the
+        // breath. It sets the pitch (the calibration's "cover" is the breath
+        // here: no lips to tune with) and the loudness, which on a recorder
+        // cannot be separated: louder is sharper, as on the real one.
+        const JetParams& j = inst_.design->jet;
+        const double lo = noteFrequency(inst_.lo), hi = noteFrequency(inst_.hi);
+        const double u = std::clamp(std::log(fw / lo) / std::log(hi / lo), 0.0, 1.0);
+        const double p0 = j.press * std::pow(j.pressHi / j.press, u);
+        e.y0 = j.y0 + 0.1e-3 * (brightness_ - 1) * (1 + 0.3 * wander_ * w2b_);
+        // The top notes: ocarina players tuck the chin (head down) to steady
+        // the hard breath and cut the wind noise: half the breath noise in the
+        // top sixth of the range.
+        e.noise *= 1 - 0.5 * std::clamp((u - 0.83) / 0.17, 0.0, 1.0);
+        // The breath tunes by ear on the note (the ear's correction), the
+        // roll (pitch bend) blows harder or softer.
+        lungTarget = blowing_ ? p0 * coverTrim[en] * trillLip_ * std::exp(0.35 * (dyn - 0.5) + 0.4 * roll_) *
+                                    pressScale_ * (1 + 0.5 * kKickP_ * regKick_)
+                              : 0;
+      }
     }
     regKick_ *= std::exp(-bdt / kickT_);
     {  // wander: two-pole low-passed noise, ~1 Hz (support), ~2 Hz (aim), ~3 Hz (lips)
@@ -436,39 +402,9 @@ void Player::render(float* out, int n) {
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
     if (kTrillTune_ > 0 && note_ >= 0) {
-      if (trillEar) listen(out + i, m, trillCorr_[trill_ - kTrills], 0, trillClock_);
-      else if (ear_) listen(out + i, m, earCorr_, earCents_, earClock_);
+      if (trillEar) listen(out + i, m, trillCorr_[trill_ - kTrills], 0, trillClock_, 116, kTrillTune_);
+      else if (ear_) listen(out + i, m, earCorr_, earCents_, earClock_, flute_.duct() ? 150 : 116, kTrillTune_);
     }
-  }
-}
-
-// The pitch of the note on the trill key, from a band-pass around it: each
-// upward zero crossing gives one period; the coverage follows the error
-// (d cents / d ln(uncovered) ~ 116 on D5; the lips move slowly, like an ear
-// correcting, so a fast trill is barely touched and a held note settles).
-void Player::listen(const float* x, int m, double& corr, double cents, double clock) {
-  const double f0 = noteFrequency(note_), w = 2 * M_PI * f0 / fs_;
-  const double ft = f0 * std::exp2(cents / 1200);  // where the ear wants it
-  const double r = std::exp(-M_PI * f0 / (3 * fs_));  // Q 3
-  const double a1 = 2 * r * std::cos(w), a2 = -r * r;
-  for (int k = 0; k < m; ++k) {
-    const double y = (1 - r) * x[k] + a1 * bp1_ + a2 * bp2_;
-    bp2_ = bp1_;
-    bp1_ = y;
-    const double t = clock * fs_ - m + k;  // samples on the note
-    if (prevBp_ < 0 && y >= 0) {
-      const double tc = t - 1 + prevBp_ / (prevBp_ - y);
-      if (lastCross_ >= 0 && clock > 0.02) {  // past the note's own start
-        const double f = fs_ / (tc - lastCross_);
-        if (f > f0 / 1.3 && f < f0 * 1.3) {
-          const double err = 1200 * std::log2(f / ft);
-          corr -= err / 116 * (1 / f) / kTrillTune_;
-          corr = std::clamp(corr, -0.4, 0.4);
-        }
-      }
-      lastCross_ = tc;
-    }
-    prevBp_ = y;
   }
 }
 

@@ -1,50 +1,24 @@
-// A Boehm concert flute (C foot) on the bore waveguide: geometry, tone holes
-// with moving pads, the embouchure window driven by the air jet, and the
-// player's mouth and tongue upstream of the lips.
-//
-// Geometry: Pearl PF-661 measured by Dickens (UNSW), see research/keywork.md.
+// Flue instruments on the bore waveguide: the air jet across a window drives
+// the air column.
+//   - The Boehm concert flute (B foot) and its family, resized from it.
+//     Geometry: Pearl PF-661 measured by Dickens (UNSW), see research/keywork.md.
+//   - Designs (src/designs.cc): a duct forms the jet (recorder, ocarina), or
+//     the lips blow across the open top of a pipe (shakuhachi, pan flute).
 // Jet: Verge / Fabre / de la Cuadra jet-drive model, see research/jet_and_losses.md.
 // Player: lungs as a pressure set-point, the mouth one compliance, the tongue a
-// valve, the lip slit a Bernoulli orifice with jet inertia
+// valve, the lip slit (or the windway) a Bernoulli orifice with jet inertia
 // (research/player_and_controller.md).
 #pragma once
 
 #include <cstdint>
 #include <string>
 
-#include "bore.h"
+#include "tube.h"
 
 namespace pajupilli {
 
-constexpr int kHoles = 17;  // the 17th: the C key of a B foot
-
-// A member of the flute family: the concert flute resized. Along the bore
-// everything scales with the pitch (`scale`); bore, holes and pads with the
-// real instrument's bore (`bore`); the embouchure hole, the lips and the jet
-// with about sqrt(scale) (`emb`). The model runs at 48 kHz / scale so the
-// air column keeps its 128 cells; Voice resamples to 48 kHz.
-struct Instrument {
-  const char* name;
-  int transpose;     // sounding minus written pitch (semitones)
-  int lo, hi;        // written range (MIDI); the fingerings are the flute's
-  double scale;      // lengths along the bore, vs the concert flute
-  double bore;       // bore, tone hole and pad diameters
-  double emb;        // embouchure hole, lip opening, jet
-  double fs;         // the model's sample rate (Hz)
-  double foot;       // embouchure centre to the open end, concert-flute mm
-  bool dFoot;        // no C and C# keys (holes 15, 16)
-  bool bFoot;        // a B foot: a C hole (17) and the tube on to B3
-  double head;       // head shortened by (mm, own size): keeps the scale with
-                     // an embouchure hole relatively smaller (alto, bass) or
-                     // bigger (piccolo) than the flute's
-  double gain;       // output level, as if miked: the bass flute is ~15 dB
-                     // quieter than the flute, the piccolo louder
-};
-// "flute" (B foot), "flute-c" (C foot), "piccolo", "alto", "bass"; nullptr if unknown.
-const Instrument* findInstrument(const std::string& name);
-const Instrument& concertFlute();
-
 // What the player does with the lips and breath; set any time, smoothed inside.
+// A duct instrument keeps its own jet geometry (the lip settings are ignored).
 struct Embouchure {
   double lung = 0;          // lung (blowing) pressure set-point (Pa)
   double tongue = 0;        // tongue valve: 0 closed .. 1 open
@@ -58,42 +32,21 @@ struct Embouchure {
   double glottis = 1.5e-4;  // glottal opening (m^2): 1.5 cm^2 open .. ~3 mm^2 a slit
   double face = 1;          // the face and lip load on the window: extra window
                             // length in units of 2 mm (the instrument's size)
+  double reed = 1;          // (reeds) lip force on the reed, x mezzo-forte
 };
 
-class Flute {
+class Flute : public Tube {
  public:
   explicit Flute(const Instrument& inst = concertFlute());
-  const Instrument& instrument() const { return inst_; }
 
-  // Fingering as 16 chars, hole 1 (D# trill) .. hole 16 (C#4), 'o' open, 'x' closed.
-  // Fingering; fingerSpeed scales how fast the fingers move the keys (key velocity:
-  // 1 = 10 ms, 2 = 5 ms). Springs always take their own time.
-  void setHoles(const char* pattern, double fingerSpeed = 1);
-  // Another instrument and player of the same kind: its own noise and key timing
-  // (0 = the default sequence).
-  void seed(unsigned s) {
-    rng_ = 22222u + 7919u * s;
-    keyRng_ = 777u + 104729u * s;
-  }
   void setEmbouchure(const Embouchure& e) { target_ = e; }
   const Embouchure& embouchure() const { return target_; }
+  void selectPipe(int midi) override;
+  bool duct() const { return inst_.kind == Kind::kDuct; }
 
-  // Render n mono samples (Pa at 1 m, roughly).
-  void process(float* out, int n);
-  // The room's sound pressure outside the flute (Pa) for the next samples of
-  // process(), one per sample at the model's rate; it acts on the embouchure,
-  // the open holes and the foot. The last value holds when it runs out.
-  void setRoom(const float* p, int n) { room_ = p; roomN_ = n; roomPos_ = 0; }
-  double outScale() const { return kOut_; }  // output = Pa at 1 m * outScale
-
-  // Tests: a pressure impulse (Pa) in the window branch on the next sample.
-  void testDrive(double dp) { testDp_ = dp; }
-  // Clear all air motion (keys and settings stay); done automatically on NaN.
-  void resetAir();
-  int resets() const { return resets_; }
+  double testResponse() const override { return eq_; }
+  void resetAir() override;
   // Introspection for tests.
-  double fs() const { return fs_; }
-  const Bore& bore() const { return bore_; }
   double mouthPressure() const { return pm_; }
   double jetVelocity() const { return uj_; }
   double windowFlow() const { return eq_; }
@@ -101,52 +54,18 @@ class Flute {
   double windowPressure() const { return bore_.s.p()[ec_]; }
 
  private:
-  struct Hole {
-    double x;         // centre from the cork face (m)
-    double b;         // radius (m)
-    double padH;      // key opening (m)
-    double padR;      // key cup radius (m)
-    bool perforated;  // French (open-hole) key
-    int cell;
-    double tSeries;   // chimney + inner + matching length (m), incl. grid offset
-    double tRad;      // radiation (outer) end correction (m)
-    double open = 0, target = 0;  // pad openness 0..1 (time along the stroke)
-    bool closing = false;         // closing stroke: accelerates into the seat
-    double stroke = 0.010;        // duration of the current stroke (s)
-    double wait = 0;              // the stroke starts after this delay (s)
-    float thRe = 0, thIm = 0;     // landing thud: the pad on its felt (flow, m^3/s)
-    bool held = false;            // pressed into its felt by a closing stroke
-    double padIn = 0;             // air the pad pushes into the bore (m^3/s)
-    double tClosed = 0;           // closed chimney length, incl. matching volume (m)
-    double taClosed = 0;          // series length of the closed hole (negative, m)
-    double a = 0;                 // bore radius at the hole (m)
-    bool present = true;          // a piccolo has no C# and D holes (D foot)
-  };
-  void updateHoles(double dtBlock);
-  double keyDelay();  // a random 0..PJ_KEYSPREAD start delay (s)
-  Branch holeBranch(const Hole& h) const;
   void embouchureGeometry();
-  void controlStep();
-  float sample();
-  double boreDiameter(double x) const;  // at x (m) from the cork face
+  void controlStep() override;
+  float sample() override;
+  double boreDiameter(double x) const;  // at x (m) from the cork face (the flute family)
+  void buildDesign();
+  void buildPipe(int pipe);
 
-  const Instrument& inst_;
-  double fs_;
   // The instrument's dimensions (m).
-  double cork_, head_, foot_, embLong_, embRin_, embChimney_, holeT_, embA_;
-  double noiseA_, noiseHpA_, glotA_, noiseNorm_;  // noise filters at this rate
-  Bore bore_;
-  Hole hole_[kHoles];
-  int ec_;  // embouchure cell
-  // Hole cells, for the radiated sound.
-  int nRad_ = 0;
-  int radCell_[kHoles + 2];
-  int radDelay_[kHoles + 2];
-  float radGain_[kHoles + 2];
-  float radPrev_[kHoles + 2] = {}, radPrev2_[kHoles + 2] = {};
-  static constexpr int kOutRing = 1024;
-  float outRing_[kOutRing] = {};
-  int outPos_ = 0;
+  double cork_, head_, foot_, embLong_, embRin_, embChimney_, embA_;
+  double channel_;  // lip channel or windway: the jet's inertia (m)
+  int pipe_ = -1;   // a pan flute's pipe in use
+  double noiseA_, noiseHpA_, glotA_;  // noise filters at this rate
 
   Embouchure target_, cur_;
   // Embouchure window branch (scalar): flow out of the bore Q, radiation flow l.
@@ -157,37 +76,16 @@ class Flute {
   static constexpr int kHist = 2048;
   float vHist_[kHist] = {};
   int hPos_ = 0;
-  uint32_t rng_ = 22222;
   double noiseLp_ = 0, noiseHp_ = 0, glotLp_ = 0, kGlotNoise_;
-  double whiteNoise() {
-    rng_ = rng_ * 1664525u + 1013904223u;
-    return int32_t(rng_) * (1.0 / 2147483648.0) * 1.732 * noiseNorm_;
-  }
-  float dcX_ = 0, dcY_ = 0, dcPole_ = 0.99935f;
-  int ctl_ = 0;
-  double testDp_ = 0;
-  const float* room_ = nullptr;
-  int roomN_ = 0, roomPos_ = 0;
-  float pRoom_ = 0;
-  int resets_ = 0;
   // Knobs.
-  int kJetModel_, kRadOnly_;
+  int kJetModel_;
   double kRel_, kSpread_, kJetLp_, kEtaMax_, kEmbR_, xi_ = 0, jl1_ = 0, jl2_ = 0;
-  double kXiHp_, xiLow_ = 0, kVortex_ = 1, kSeries_ = 1;
+  double kXiHp_, xiLow_ = 0, kVortex_ = 1;
   int kJetDisp_ = 1;
   double kCpHi_ = 0.45, kDispT_ = 0, dl1_ = 0, dl2_ = 0;
   double kAgc_ = 0, agcA_ = 0, agcEnv_ = 0;
   double kTurbIn_, kEdge_, edgeLow_ = 0, edgeBand_ = 0;
-  double fingerSpeed_ = 1, kPadPump_, kKeyClick_, kKeySpread_, kThud_, kRelease_;
-  float thudCos_ = 1, thudSin_ = 0, thudDecay_ = 0;
-  int thudLeft_ = 0;  // samples until every thud has died out
-  int nPumping_ = 0;
-  uint32_t keyRng_ = 777;
-  // Key impact: a few damped modes of the key and the tube wall.
-  static constexpr int kTickModes = 3;
-  double tickRe_[kTickModes] = {}, tickIm_[kTickModes] = {}, tickCos_[kTickModes] = {},
-         tickSin_[kTickModes] = {}, tickDecay_[kTickModes] = {};
-  double kJetSign_, kEtaSign_, kEmbLen_, kAlpha_, kConv_, kNoiseGain_, kOut_;
+  double kJetSign_, kEtaSign_, kEmbLen_, kAlpha_, kConv_, kNoiseGain_;
 };
 
 }  // namespace pajupilli

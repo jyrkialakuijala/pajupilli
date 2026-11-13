@@ -155,7 +155,7 @@ class Controls {
         cc(ev->data.control.param, ev->data.control.value);
         break;
       case SND_SEQ_EVENT_PITCHBEND:  // joystick X: roll the flute in / out
-        p_.all(&Player::setLipRoll, ev->data.control.value / 8192.0);
+        p_.all(&Performer::setLipRoll, ev->data.control.value / 8192.0);
         break;
       case SND_SEQ_EVENT_CHANPRESS:  // pad pressure (channel mode)
         padPressure(-1, ev->data.control.value);
@@ -173,8 +173,8 @@ class Controls {
   void noteOn(int ch, int note, int vel) {
     if (isPad(ch)) {
       const int pad = (note - 36) % 8;  // bank A 36-43, bank B 44-51
-      if (pad == 0) { breathPad_ = true; p_.all(&Player::setBreath, 0); }
-      else if (pad == 1) p_.all(&Player::setFlutter, 0.4 + 0.6 * vel / 127.0);
+      if (pad == 0) { breathPad_ = true; p_.all(&Performer::setBreath, 0); }
+      else if (pad == 1) p_.all(&Performer::setFlutter, 0.4 + 0.6 * vel / 127.0);
       if (o_.verbose) std::fprintf(stderr, "pad %d vel %d\n", pad + 1, vel);
       return;
     }
@@ -185,8 +185,8 @@ class Controls {
   void noteOff(int ch, int note) {
     if (isPad(ch)) {
       const int pad = (note - 36) % 8;
-      if (pad == 0) { breathPad_ = false; p_.all(&Player::setBreath, joyBreath_); }
-      else if (pad == 1) p_.all(&Player::setFlutter, 0);
+      if (pad == 0) { breathPad_ = false; p_.all(&Performer::setBreath, joyBreath_); }
+      else if (pad == 1) p_.all(&Performer::setFlutter, 0);
       return;
     }
     if (sounding_[note] >= 0) p_.noteOff(sounding_[note]);
@@ -194,24 +194,24 @@ class Controls {
   }
   void padPressure(int note, int value) {
     const int pad = note < 0 ? (breathPad_ ? 0 : 1) : (note - 36) % 8;
-    if (pad == 0 && breathPad_) p_.all(&Player::setBreath, -0.5 + value / 127.0);  // breath controller
-    else if (pad == 1) p_.all(&Player::setFlutter, 0.3 + 0.7 * value / 127.0);
+    if (pad == 0 && breathPad_) p_.all(&Performer::setBreath, -0.5 + value / 127.0);  // breath controller
+    else if (pad == 1) p_.all(&Performer::setFlutter, 0.3 + 0.7 * value / 127.0);
   }
   void cc(int num, int v) {
     const double x = v / 127.0;
     switch (num) {
       case 1:  // joystick Y: breath push
         joyBreath_ = 0.5 * x;
-        if (!breathPad_) p_.all(&Player::setBreath, joyBreath_);
+        if (!breathPad_) p_.all(&Performer::setBreath, joyBreath_);
         break;
       case 64: p_.setHold(v >= 64); break;  // sustain pedal: keep blowing
-      case 70: p_.all(&Player::setDynamics, x); break;
-      case 71: p_.all(&Player::setBrightness, 0.3 + 2.2 * x); break;
-      case 72: p_.all(&Player::setAir, x); break;
-      case 73: p_.all(&Player::setVibrato, 0.15 * x); break;
-      case 74: p_.all(&Player::setVibratoRate, 4 + 3 * x); break;
-      case 75: p_.all(&Player::setHardness, 0.5 + 1.5 * x); break;
-      case 76: p_.all(&Player::setRelease, 0.015 + 0.2 * x); break;
+      case 70: p_.all(&Performer::setDynamics, x); break;
+      case 71: p_.all(&Performer::setBrightness, 0.3 + 2.2 * x); break;
+      case 72: p_.all(&Performer::setAir, x); break;
+      case 73: p_.all(&Performer::setVibrato, 0.15 * x); break;
+      case 74: p_.all(&Performer::setVibratoRate, 4 + 3 * x); break;
+      case 75: p_.all(&Performer::setHardness, 0.5 + 1.5 * x); break;
+      case 76: p_.all(&Performer::setRelease, 0.015 + 0.2 * x); break;
       case 77: gain_ = 2 * x * x; break;
       default: break;
     }
@@ -257,7 +257,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
     std::fprintf(stderr, "note: no real-time priority (run with rtprio to reduce xruns)\n");
   mlockall(MCL_CURRENT | MCL_FUTURE);
 
-  player.all(&Player::setVibrato, 0.05);
+  player.all(&Performer::setVibrato, 0.05);
   Controls ctl(player, inst, o);
   ctl.init();
   std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());

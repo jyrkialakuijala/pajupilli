@@ -5,7 +5,7 @@
 
 #include <cstdio>
 
-#include "flute.h"
+#include "instrument.h"
 
 namespace pajupilli {
 
@@ -17,15 +17,19 @@ struct Calibration {
   double coverLo[128];  // ... at dynLo
   double coverHi[128];  // ... at kCalDynHi
   double dynLo[128];    // softest dynamics that holds the register (+ margin)
+  double dynHi[128];    // loudest (the designed instruments; the flutes: 1)
   double press[128];    // lung pressure multiplier
   double jet[128];      // jet length (lip-to-edge) multiplier
   float cents[128];     // remaining error after calibration (mezzo-forte)
+  int fingering[128];   // which fingering (0 standard, 1 the alternate: brass)
   bool ok[128];
   Calibration() {
     for (int i = 0; i < 128; ++i) {
       cover[i] = coverLo[i] = coverHi[i] = press[i] = jet[i] = 1;
       dynLo[i] = 0;
+      dynHi[i] = 1;
       cents[i] = 0;
+      fingering[i] = 0;
       ok[i] = false;
     }
   }

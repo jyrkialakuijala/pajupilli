@@ -248,6 +248,98 @@ def register_map():
                     bad.append(f'{line.split(":")[0]} {lab} at x{lo:.2f}-{hi:.2f}')
     check('register map (-ramp)', not bad, 'C4 D4 F4 G4 A4 C5: the fundamental from x0.5 to x2' + (f'; {bad}' if bad else ''))
 
+# The designed instruments (tools/instruments.py): the written range's share
+# that must sound in its register after calibration (the rest is logged).
+# (2026-11-13: recorder 21/24, ocarina 21/21, shakuhachi 23/24, pan flute 30/30, clarinet 32/33,
+# soprano sax 28/29, alto 30/30, tenor 30/30, oboe 26/28, bassoon 30/30, duduk 16/17.)
+WOODWINDS = {'recorder': 0.85, 'ocarina': 0.95, 'shakuhachi': 0.9, 'panflute': 1.0, 'clarinet': 0.9,
+             'soprano-sax': 0.9, 'alto-sax': 0.95, 'tenor-sax': 0.95, 'baritone-sax': 0.9, 'oboe': 0.9,
+             'bassoon': 0.95, 'duduk': 0.9, 'shawm': 0.75}
+# The share of the sounding notes allowed over 10 c (the shawm's cross fingerings: 3 of 13).
+WOODWINDS_OFF = {'shawm': 0.25}
+
+
+def woodwinds():
+    """Each designed instrument: the calibration finds most of its notes, in tune; random
+    playing never blows up; it recovers from a NaN; the longest bores run in real time."""
+    for inst, need in WOODWINDS.items():
+        out = run(['-inst', inst, '-cal']).stdout
+        lines = re.findall(r'calibrate: MIDI (\d+) (.*)', out)
+        silent = [m for m, t in lines if 'does not sound' in t]
+        cents = [float(re.search(r'([+-]\d+) cents', t).group(1)) for m, t in lines if 'cents' in t]
+        share = 1 - len(silent) / max(1, len(lines))
+        off = [c for c in cents if abs(c) > 10]
+        check(f'{inst}: notes sound and tune', share >= need and len(off) <= WOODWINDS_OFF.get(inst, 0.2) * len(cents),
+              f'{len(lines) - len(silent)}/{len(lines)} sound (need {need:.0%}), {len(off)} over 10 c'
+              + (f'; silent {silent}' if silent else ''))
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+        r = run(['-inst', inst, '-nantest'])
+        check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
+    for inst, note in (('bassoon', 46), ('baritone-sax', 50), ('clarinet', 60)):
+        ns = cpu_time(['-inst', inst, '-note', str(note), '-secs', '10'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+        check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+# The brass (src/brass.cc): the share of the written range that must sound in
+# its partial after calibration. (2026-11-13: horn 34/37; F2, F#2, G2, the
+# lowest valved partials 2 and 3, do not speak; G#2..B2 are 21..39 c off and
+# C#4, D4 14..16 c: 6 of 34 over 10 c.)
+BRASS = {'horn': 0.9}
+lo_steady = {'horn': 45}  # (above the notes that do not speak)
+
+
+def brass():
+    """Each brass instrument: the calibration finds its notes, in tune; random playing
+    (valves, slurs across partials) never blows up; NaN recovery; real time; and the
+    waveguide's resonances (bore, cup, valve loops) against tools/brass.py's transfer
+    matrices, partials 2..12, open and with all three valves."""
+    for inst, need in BRASS.items():
+        out = run(['-inst', inst, '-cal']).stdout
+        lines = re.findall(r'calibrate: MIDI (\d+) (.*)', out)
+        silent = [m for m, t in lines if 'does not sound' in t]
+        cents = [float(re.search(r'([+-]\d+) cents', t).group(1)) for m, t in lines if 'cents' in t]
+        share = 1 - len(silent) / max(1, len(lines))
+        off = [c for c in cents if abs(c) > 10]
+        check(f'{inst}: notes sound and tune', share >= need and len(off) <= 0.2 * len(cents),
+              f'{len(lines) - len(silent)}/{len(lines)} sound (need {need:.0%}), {len(off)} over 10 c'
+              + (f'; silent {silent}' if silent else ''))
+        # Steady notes: a held note's pitch and level do not wander or beat
+        # (a slot can hold two states; the player keeps clear of the jump).
+        bad = []
+        for m in range(lo_steady[inst], 78, 3):
+            for d in ('0.3', '0.6', '0.9'):
+                t = run(['-inst', inst, '-note', str(m), '-secs', '2', '-dyn', d]).stdout
+                ps = float(re.search(r'pitch wobble ([\d.]+)', t).group(1))
+                lw = float(re.search(r'level wobble ([\d.]+)', t).group(1))
+                if ps > 5 or lw > 25:
+                    bad.append(f'{m}@{d}: {ps:.0f} c {lw:.0f} %')
+        check(f'{inst}: held notes steady', len(bad) <= 1,
+              f'pitch within 5 c rms, level within 25 % from 0.4 s, MIDI {lo_steady[inst]}..77 x 3 dynamics'
+              + (f'; {bad}' if bad else ''))
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+        r = run(['-inst', inst, '-nantest'])
+        check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
+        ns = cpu_time(['-inst', inst, '-note', '65', '-secs', '10'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+        check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import brass as tmmb
+    worst, out = 0, []
+    for combo in ('', '123'):
+        pat = ''.join('x' if str(k) in combo else 'o' for k in (1, 2, 3))
+        line = run(['-inst', 'horn', '-imp', '53'], env={'PJ_NOCAL': '1', 'PJ_IMPHOLES': pat}).stdout
+        got = [float(v) for v in line.split(':')[1].split('(')[0].split()]
+        ref = [(n, f) for n, f, c, l in tmmb.report(tmmb.HORN, combo) if 2 <= n <= 12]
+        errs = [1200 * math.log2(min(got, key=lambda g: abs(math.log(g / f))) / f) for n, f in ref]
+        w = max(abs(e) for e in errs)
+        worst = max(worst, w)
+        out.append(f'{combo or "open"} worst {w:.1f} c')
+    # (Partials 3..6 turn back in the flare, which 11 mm cells resolve coarsely: up to
+    # 13 c there, the rest within 4; Bilbao & Chick's FDTD met measured horns within 1 %.)
+    check('horn waveguide vs brass.py (partials 2..12)', worst <= 15, ', '.join(out))
+
+
 def passive_vs_tmm():
     """Waveguide vs transfer matrix, first resonance (PLAN step 2: the grid placed on the
     embouchure, a lumped open end, the holes' position and series corrections fitted)."""
@@ -268,7 +360,7 @@ def passive_vs_tmm():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm):
+              realtime, passive_vs_tmm, woodwinds, brass):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

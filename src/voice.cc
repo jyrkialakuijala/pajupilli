@@ -4,6 +4,13 @@
 #include <cmath>
 #include <numeric>
 
+#include "flute.h"
+#include "horn.h"
+#include "hornplayer.h"
+#include "player.h"
+#include "reed.h"
+#include "reedplayer.h"
+
 namespace pajupilli {
 namespace {
 
@@ -73,13 +80,25 @@ void Resampler::process(const float* in, float* out, int n) {
   buf_.resize(hist);
 }
 
+std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
+  if (inst.reed()) return std::unique_ptr<Tube>(new Reed(inst));
+  if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));
+  return std::unique_ptr<Tube>(new Flute(inst));
+}
+
+std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
+  if (t.instrument().reed()) return std::unique_ptr<Performer>(new ReedPlayer(static_cast<Reed&>(t)));
+  if (t.instrument().lip()) return std::unique_ptr<Performer>(new HornPlayer(static_cast<Horn&>(t)));
+  return std::unique_ptr<Performer>(new Player(static_cast<Flute&>(t)));
+}
+
 Voice::Voice(const Instrument& inst)
-    : flute_(new Flute(inst)), player_(new Player(*flute_)), rs_(int(inst.fs), 48000) {}
+    : model_(makeModel(inst)), player_(makePlayer(*model_)), rs_(int(inst.fs), 48000) {}
 
 void Voice::render(float* out, int n, const float* room) {
   const float g = float(instrument().gain);
   if (rs_.identity()) {
-    if (room) flute_->setRoom(room, n);
+    if (room) model_->setRoom(room, n);
     player_->render(out, n);
   } else {
     const int need = rs_.needed(n);
@@ -97,7 +116,7 @@ void Voice::render(float* out, int n, const float* room) {
         room_[i] = float(a + f * (b - a));
       }
       roomLast_ = room[n - 1];
-      flute_->setRoom(room_.data(), need);
+      model_->setRoom(room_.data(), need);
     }
     player_->render(in_.data(), need);
     rs_.process(in_.data(), out, n);

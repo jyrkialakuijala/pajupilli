@@ -1,13 +1,13 @@
-// One instrument ready to play at 48 kHz: the flute model at its own rate
-// (piccolo 96 kHz, alto 36 kHz, bass 24 kHz), the player, and a polyphase
-// resampler to the output rate.
+// One instrument ready to play at 48 kHz: the model at its own rate (piccolo
+// 96 kHz, alto flute 36 kHz, bass flute 24 kHz, ...), its player, and a
+// polyphase resampler to the output rate.
 #pragma once
 
 #include <memory>
 #include <vector>
 
-#include "flute.h"
-#include "player.h"
+#include "performer.h"
+#include "tube.h"
 
 namespace pajupilli {
 
@@ -34,17 +34,20 @@ class Resampler {
 class Voice {
  public:
   explicit Voice(const Instrument& inst = concertFlute());
-  Flute& flute() { return *flute_; }
-  Player& player() { return *player_; }
-  const Instrument& instrument() const { return flute_->instrument(); }
+  // The model and player for an instrument, at the model's rate.
+  static std::unique_ptr<Tube> makeModel(const Instrument& inst);
+  static std::unique_ptr<Performer> makePlayer(Tube& t);
+  Tube& model() { return *model_; }
+  Performer& player() { return *player_; }
+  const Instrument& instrument() const { return model_->instrument(); }
   // 48 kHz. room (optional): the room's pressure at the instrument, n samples
   // at 48 kHz (Pa), taken to the model's rate.
   void render(float* out, int n, const float* room = nullptr);
-  void seed(unsigned s) { flute_->seed(s); player_->seed(s); }
+  void seed(unsigned s) { model_->seed(s); player_->seed(s); }
 
  private:
-  std::unique_ptr<Flute> flute_;
-  std::unique_ptr<Player> player_;
+  std::unique_ptr<Tube> model_;
+  std::unique_ptr<Performer> player_;
   Resampler rs_;
   std::vector<float> in_, room_;
   float roomLast_ = 0;

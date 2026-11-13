@@ -31,7 +31,8 @@
 
 namespace pajupilli {
 
-constexpr int kCells = 96;
+constexpr int kCells = 512;        // room for the longest bore (a horn in F at 32 kHz);
+                                  // the loops run over the used vectors only
 constexpr int kVec = 16;          // floats per AVX-512 register
 constexpr int kLossSections = 3;  // sqrt(jw) fit
 constexpr int kPad = 16;          // zero padding on both sides of p and u
@@ -84,13 +85,21 @@ class Bore {
   double dt() const { return dt_; }
   double dx() const { return dx_; }
   int footCell() const { return foot_ - 1; }  // the last cell: the open end's branch
+  int cells() const { return n_; }            // cells computed per step (a multiple of 16)
   int embCell() const { return ec_; }     // the cell centred on the embouchure
   double x0() const { return x0_; }       // cell 0 starts this far from the cork face (m)
   double courant() const { return kC * dt_ / dx_; }
 
   // Geometry: diameter (m) as a function of distance from the cork face; the
-  // embouchure centre at embX, the foot end at footX (m). Sets dx. Called once.
-  void setBore(const std::function<double(double)>& diameter, double embX, double footX);
+  // embouchure centre at embX, the foot end at footX (m). Sets dx. A closed
+  // end (a stopped pipe, a vessel) has no radiation branch.
+  // webster: each interface takes the bore's own area there and each cell the
+  // mean of its two faces (Bilbao 2009, the Webster equation's stable scheme:
+  // exact for cones and bells, stable at Courant <= 1); otherwise cells take
+  // their mean area and interfaces the smaller neighbour (the flute family's
+  // nearly cylindrical bores, fitted that way).
+  void setBore(const std::function<double(double)>& diameter, double embX, double footX,
+               bool closedEnd = false, bool webster = false);
   // A series length (m, in units of the bore at the cell; negative for a
   // hole's t_a) split over the two interfaces around a cell.
   void setSeries(int cell, double len);
@@ -100,6 +109,30 @@ class Bore {
   double area(int cell) const { return area_[cell]; }
   double compliance(int cell) const;  // C of the cell incl. a closed chimney (m^3/Pa)
   void update();  // rebuild coefficients if something changed
+  // A branch whose coefficients are rebuilt at once (only this cell).
+  void setBranchNow(int cell, const Branch& b) { branch_[cell] = b; buildNode(cell); }
+
+  // Brass: lumped and network pieces (after setBore).
+  // Extra volume at a cell (m^3): a mouthpiece's cup.
+  void addVolume(int cell, double v) { cellVol_[cell] += v; dirty_ = true; }
+  // Extra length (m, in units of the interface's own area) of the interface
+  // between cell i and i + 1: a constriction narrower than its cells (a throat).
+  void setInterfaceLength(int i, double len) { ifaceExtra_[i] = len; dirtyU_ = true; }
+  double interfaceArea(int i) const { return areaI_[i]; }
+  // A valve port: the interface's open share (1 open .. 0 shut). Part open, it
+  // is narrower (more mass) and loses the flow's energy (a resistance).
+  void setGate(int i, double open) {
+    if (gate_[i] == open) return;
+    gate_[i] = open;
+    dirtyU_ = true;
+  }
+  // A flow w (m^3/s) leaving the cell for another tube over the last step
+  // (a valve loop's link): applied after step(), as part of its continuity.
+  void inject(int cell, float w) {
+    s.p()[cell] -= k.v[0][cell] * w;
+    s.q[cell] -= k.v[1][cell] * w;
+    s.l[cell] -= k.v[2][cell] * w;
+  }
 
   // One time step. The embouchure cell `ec` is excluded from the vector node
   // update (its branch is solved by the caller): pOld is p[ec] before the step,
@@ -116,11 +149,14 @@ class Bore {
   void buildU();
   void buildNode(int cell);
   double dt_, dx_, fs_, x0_ = 0;
-  int foot_ = 0, ec_ = 0;
+  int foot_ = 0, ec_ = 0, n_ = kVec;
   double cellVol_[kCells] = {};  // lumped extra volume (cork cavity) (m^3)
   double series_[kCells] = {};   // series length per cell (m)
+  double ifaceExtra_[kCells] = {};  // extra length per interface (m)
+  double gate_[kCells];          // valve ports: open share per interface
   bool dirtyU_ = false;
   double area_[kCells] = {};    // cell areas (m^2)
+  double areaI_[kCells] = {};   // interface areas (m^2): between cell i and i + 1
   double kappa_[kCells] = {};   // sqrt(jw) loss per length at each interface
   Branch branch_[kCells];
   bool dirty_ = true;
