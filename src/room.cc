@@ -14,7 +14,7 @@ constexpr RoomSpec kRooms[] = {
     {"studio", 150, 0.5, 2},      // a small studio, damped
     {"hall", 2500, 1.8, 3},       // a chamber-music hall
     {"church", 15000, 4.0, 6},    // a stone church
-    {"gated", 3000, 4.0, 3, 0.35},  // a big live room behind a gate (the 80s snare)
+    {"gated", 3000, 4.0, 3, 0.5},  // a big live room, its ambience compressed and gated (80s snare, toms)
 };
 constexpr double kC = 343;
 
@@ -183,20 +183,23 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
       lp_[k] = b0_[k] * raw + a1_[k] * lp_[k];
       x[k] = lp_[k];
     }
-    // The gate, keyed by the sound going in: open while it is within 20 dB
-    // of its recent peak, and spec.gate seconds after; then shut in ~15 ms.
+    // The gate's side chain, keyed by the dry sound: a hit (its fast level
+    // jumping over its slow one, within 20 dB of the recent peaks) opens it
+    // for spec.gate seconds; then it shuts in ~10 ms, whatever still rings.
     float g = 1;
     if (spec_.gate > 0) {
       float in = 0;
       for (int s = 0; s < ns; ++s) in += std::fabs(src[s][i]);
-      gateEnv_ = std::max(in, gateEnv_ * 0.9995f);
-      gatePeak_ = std::max(gateEnv_, gatePeak_ * float(std::exp(-1 / (2.0 * fs_))));
-      if (gateEnv_ > std::max(1e-5f, 0.1f * gatePeak_)) gateHold_ = float(spec_.gate);
+      gateFast_ = std::max(in, gateFast_ * float(std::exp(-1 / (0.002 * fs_))));
+      gateSlow_ += (gateFast_ - gateSlow_) * float(1 - std::exp(-1 / (0.05 * fs_)));
+      gatePeak_ = std::max(gateFast_, gatePeak_ * float(std::exp(-1 / (3.0 * fs_))));
+      if (gateFast_ > 2 * gateSlow_ && gateFast_ > std::max(1e-5f, 0.1f * gatePeak_)) gateHold_ = float(spec_.gate);
       else gateHold_ = std::max(0.0f, gateHold_ - float(1 / fs_));
       const float target = gateHold_ > 0 ? 1.0f : 0.0f;
-      gateGain_ += (target - gateGain_) * float(1 - std::exp(-1 / ((target > gateGain_ ? 0.001 : 0.015) * fs_)));
+      gateGain_ += (target - gateGain_) * float(1 - std::exp(-1 / ((target > gateGain_ ? 0.0005 : 0.010) * fs_)));
       g = gateGain_;
     }
+    float amb[2] = {0, 0};  // the reverberant field at the microphones
     // The reverberant field at each listener.
     for (int t = 0; t < ns + 2; ++t) {
       const float* dir = &outDir_[t * kLines];
@@ -209,9 +212,22 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
         }
         atSource[t][i] = acc;
       } else {
-        (t == ns ? left : right)[i] += lg * micDiffuse_ * g * acc;
+        amb[t - ns] = lg * micDiffuse_ * acc;
       }
     }
+    if (spec_.gate > 0) {
+      // The ambience compressed hard (8:1 over 20 dB under its recent peak,
+      // 2 ms attack, 150 ms release; made up 3x): the body holds up while
+      // the gate is open, as from squashed room mics.
+      const float lvl = std::max(std::fabs(amb[0]), std::fabs(amb[1]));
+      compEnv_ += (lvl - compEnv_) * float(1 - std::exp(-1 / ((lvl > compEnv_ ? 0.002 : 0.15) * fs_)));
+      compPeak_ = std::max(compEnv_, compPeak_ * float(std::exp(-1 / (3.0 * fs_))));
+      const float th = std::max(1e-9f, 0.1f * compPeak_);
+      const float cg = compEnv_ > th ? std::pow(compEnv_ / th, 1.0f / 8 - 1) : 1.0f;
+      g *= 3 * cg;
+    }
+    left[i] += g * amb[0];
+    right[i] += g * amb[1];
     // Early sound at the microphones.
     float e[2] = {0, 0};
     for (const Tap& tp : early_)

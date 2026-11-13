@@ -778,9 +778,16 @@ for f in (clarinet, oboe, english_horn, bassoon, duduk, shawm, shehnai, bagpipe,
           lambda: sax('tenor-sax', 4 / 3, -14, 36000, dict(width=15e-3, h0=0.85e-3, k=3.5e6, fr=1500, qr=0.3,
                       sr=8e-5, press=1400, pressHi=2000, vib=1), 0.4, 'Tenor saxophone in Bb, written Bb3..D#6'),
           # (the baritone: tools/design.py -scale alto-sax baritone-sax 2; its reed's
-          # compliance sr / k, part of the cone's apex volume, x 2^3 of the alto's)
-          lambda: sax('baritone-sax', 2.0, -21, 24000, dict(width=17e-3, h0=0.9e-3, k=3e6, fr=1150, qr=0.3,
-                      sr=3.6e-4, press=1300, pressHi=1900, vib=1), 0.45, 'Baritone saxophone in Eb, written Bb3..D#6'),
+          # compliance sr / k, part of the cone's apex volume, x 2^3 of the alto's.
+          # A soft reed (k 2.4e6, was 3e6) meeting the lay gradually, from 30 % of
+          # its closure: fitted to Gerry Mulligan, Georgia on My Mind, its first
+          # 1.5 s (C3 .. C4 at mezzo-piano): the harmonics to 2.5 kHz within ~5 dB
+          # per band, 2.5-4 kHz +3 dB (the stiffer reed closing at its tip alone:
+          # +12 dB, and +28 dB at 4-6.5 kHz); the softer reed keeps the low notes
+          # in tune (meeting gradually, the stiffer one went 10-20 c sharp).)
+          lambda: sax('baritone-sax', 2.0, -21, 24000, dict(width=17e-3, h0=0.9e-3, k=2.4e6, fr=1150, qr=0.3,
+                      sr=3.6e-4, press=1300, pressHi=1900, vib=1, meetAt=0.3, contact=1), 0.45,
+                      'Baritone saxophone in Eb, written Bb3..D#6'),
           ):
     s = f()
     INSTRUMENTS[s['name']] = s

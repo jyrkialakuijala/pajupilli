@@ -410,10 +410,32 @@ def leads():
         check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def strings():
+    """The plucked double bass (src/bass.cc, src/bassbody.cc; research/double_bass.md): the body's
+    design puts its air and wood resonances on their targets; notes over the four strings play
+    in tune; random playing never blows up; it runs within its share of a core (25 %)."""
+    out = subprocess.run([sys.executable, os.path.join(ROOT, 'tools', 'bassbody.py'), '-fit'],
+                         capture_output=True, text=True).stdout
+    m = re.search(r'lowest two: ([\d.]+) and ([\d.]+) Hz, ratio ([\d.]+)', out)
+    ok = bool(m) and abs(float(m.group(1)) - 66.0) < 0.1 and abs(float(m.group(3)) - 1.69478) < 0.002
+    check('double-bass: body resonances on their targets', ok,
+          f'air {m.group(1)} Hz, wood {m.group(2)} Hz, ratio {m.group(3)}' if m else out[-200:])
+    cents = []
+    for note in (28, 33, 38, 43, 36, 45, 50, 55):
+        r = run(['-inst', 'double-bass', '-note', str(note), '-secs', '1.2'])
+        c = re.search(r'\(([+-]\d+) cents\)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+    check('double-bass: notes in tune', max(abs(c) for c in cents) <= 10, f'cents {cents}')
+    r = run(['-inst', 'double-bass', '-fuzz', '10', '1'])
+    check('fuzz 10 s (double-bass)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'double-bass', '-note', '45', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (double-bass)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

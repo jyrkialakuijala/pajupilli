@@ -18,6 +18,7 @@
 #include <cstring>
 #include <vector>
 
+#include "bassinst.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "player.h"
@@ -129,7 +130,7 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked()) {
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();
     hi_ = p.hi();
@@ -217,7 +218,14 @@ class Controls {
           p_.all(&Performer::setDynamics, x);
         }
         break;
-      case 71: p_.all(&Performer::setBrightness, 0.3 + 2.2 * x); break;
+      case 71:
+        p_.all(&Performer::setBrightness, 0.3 + 2.2 * x);
+        if (plucked_) {  // the double bass: K2 is where the right hand plucks
+          const char* place = BassPlayer::pluckPlaceName(0.3 + 2.2 * x);
+          if (place != lastPlace_) std::fprintf(stderr, "plucking: %s\n", place);
+          lastPlace_ = place;
+        }
+        break;
       case 72:
         p_.all(&Performer::setAir, x);
         if (circuit_) {  // a synth: K3 is the filter's resonance; say its Q
@@ -242,6 +250,8 @@ class Controls {
   int lo_, hi_, transpose_;
   bool breathPad_ = false;
   bool circuit_ = false;  // a synth lead: K2 cutoff, K3 resonance
+  bool plucked_ = false;  // the double bass: K2 the plucking place
+  const char* lastPlace_ = nullptr;
   int lastQ10_ = -1, lastSpread_ = -1;
   double joyBreath_ = 0;
 

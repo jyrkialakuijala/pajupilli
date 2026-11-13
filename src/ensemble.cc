@@ -63,7 +63,8 @@ Ensemble::Ensemble(const std::vector<Member>& members, bool verbose, const RoomS
 Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose,
                    const RoomSpec* room)
     : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
-  init(std::vector<Member>(std::max(1, maxFlutes), Member{&inst, &cal}), room);
+  // (A plucked instrument is one voice: its player takes the keys to its strings.)
+  init(std::vector<Member>(inst.plucked() ? 1 : std::max(1, maxFlutes), Member{&inst, &cal}), room);
 }
 
 void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
@@ -140,13 +141,13 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
   }
 }
 
-// Which reverb channel an instrument plays into: the drums and the synth
-// basses a small room (their low end and their attacks stay clear), the rest
-// the main one; the third, a gated reverb, waits for the snare.
+// Which reverb channel an instrument plays into: the synth basses a small
+// room (their low end stays clear); the toms and drums the gated reverb (a
+// big live room, its ambience compressed and gated: Phil Collins); the rest
+// the main one.
 int Ensemble::reverbChannel(const Instrument& in) {
-  static const char* const kSmall[] = {"drum", "tom", "bass"};
-  for (const char* f : kSmall)
-    if (std::strcmp(in.family, f) == 0) return 0;
+  if (std::strcmp(in.family, "drum") == 0 || std::strcmp(in.family, "tom") == 0) return 2;  // gated
+  if (std::strcmp(in.family, "bass") == 0) return 0;
   return 1;
 }
 
@@ -358,7 +359,7 @@ void Ensemble::noteOn(int key, int velocity) {
   // own, so a held note is never taken over and restarted elsewhere. Only
   // the portamento gesture slurs on the held voice: a soft key, softer than
   // the last one held (Performer::articulate's glide thresholds).
-  if (!own && !mixed_ && f_[0].v->instrument().circuit()) {
+  if (!own && !mixed_ && (f_[0].v->instrument().circuit() || f_[0].v->instrument().plucked())) {
     static const double glideVel = knob("PJ_GLIDEVEL", 45), dvGlide = knob("PJ_DVGLIDE", 30);
     int lastVel = 64;
     double lastT = -1e9;
@@ -802,6 +803,14 @@ void Ensemble::block(float* left, float* right, int n) {
       for (int j = 0; j < n; ++j) left[j] += buf_[i][j];
     std::copy(left, left + n, right);
   }
+  // An instrument that sounds differently to its two sides (the double bass):
+  // its direct sound's difference, to the left and from the right.
+  for (int i : go)
+    if (const float* sd = f_[i].v->side(n))
+      for (int j = 0; j < n; ++j) {
+        left[j] += sd[j];
+        right[j] -= sd[j];
+      }
   // Several flutes add up; keep the sum near one flute's level (1 / sqrt(n)).
   const double target = 1 / std::sqrt(std::max(1, playing));
   // Down at once when voices join (~40 ms: no clipping), back up slowly when

@@ -42,10 +42,10 @@ Reed::Reed(const Instrument& inst) : Tube(inst), rp_(inst.design->reed) {
   kQr_ = knob("PJ_REEDQ", 1);   // its damping, x the design's
   // (Experiments: a double reed's duct loss, in place of the design's.)
   psi_ = rp_.psi;
-  contact_ = knob("PJ_REEDCONTACT", 0);  // the blades' contact stiffness, x the reed's (0: the hard stop alone)
+  contact_ = knob("PJ_REEDCONTACT", rp_.contact);  // the blades' contact stiffness, x the reed's (0: the hard stop alone)
   contactAt_ = knob("PJ_REEDCONTACTAT", 0.5);  // where the blades start to meet (share of the closure)
   contactD_ = knob("PJ_REEDCONTACTD", 0.5);    // the contact's damping ratio
-  meetAt_ = knob("PJ_REEDMEETAT", 1);  // where the blades begin to meet (share of the closure; 1: at the tip only)
+  meetAt_ = knob("PJ_REEDMEETAT", rp_.meetAt);  // where the blades begin to meet (share of the closure; 1: at the tip only)
   meet_ = knob("PJ_REEDMEET", 1);      // how the open width shrinks past it: (open share)^meet
   if (const double psi = knob("PJ_REEDPSI", -1); psi >= 0) psi_ = psi;
   // The reed at the top: the grid's first cell centre (the mouthpiece's or the

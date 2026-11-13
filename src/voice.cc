@@ -7,6 +7,7 @@
 #include "flute.h"
 #include "horn.h"
 #include "hornplayer.h"
+#include "bassinst.h"
 #include "lead.h"
 #include "player.h"
 #include "reed.h"
@@ -81,10 +82,16 @@ void Resampler::process(const float* in, float* out, int n) {
   buf_.resize(hist);
 }
 
+const float* Voice::side(int n) {
+  if (!instrument().plucked() || !rs_.identity()) return nullptr;
+  return static_cast<BassModel&>(*model_).takeSide(n);
+}
+
 std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.reed()) return std::unique_ptr<Tube>(new Reed(inst));
   if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));
   if (inst.circuit()) return std::unique_ptr<Tube>(new Lead(inst));
+  if (inst.plucked()) return std::unique_ptr<Tube>(new BassModel(inst));
   return std::unique_ptr<Tube>(new Flute(inst));
 }
 
@@ -92,6 +99,7 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
   if (t.instrument().reed()) return std::unique_ptr<Performer>(new ReedPlayer(static_cast<Reed&>(t)));
   if (t.instrument().lip()) return std::unique_ptr<Performer>(new HornPlayer(static_cast<Horn&>(t)));
   if (t.instrument().circuit()) return std::unique_ptr<Performer>(new LeadPlayer(static_cast<Lead&>(t)));
+  if (t.instrument().plucked()) return std::unique_ptr<Performer>(new BassPlayer(static_cast<BassModel&>(t)));
   return std::unique_ptr<Performer>(new Player(static_cast<Flute&>(t)));
 }
 
@@ -99,7 +107,7 @@ Voice::Voice(const Instrument& inst)
     : model_(makeModel(inst)), player_(makePlayer(*model_)), rs_(int(inst.fs), 48000) {}
 
 void Voice::render(float* out, int n, const float* room) {
-  const float g = float(instrument().gain);
+  const float g = float(instrument().gain * levelTrim(instrument()));
   if (rs_.identity()) {
     if (room) model_->setRoom(room, n);
     player_->render(out, n);

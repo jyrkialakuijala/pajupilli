@@ -43,6 +43,9 @@ class Voice {
   // 48 kHz. room (optional): the room's pressure at the instrument, n samples
   // at 48 kHz (Pa), taken to the model's rate.
   void render(float* out, int n, const float* room = nullptr);
+  // A model that sounds differently to its two sides (the double bass): the
+  // last n samples' difference (left = out + side, right = out - side), or null.
+  const float* side(int n);
   void seed(unsigned s) { model_->seed(s); player_->seed(s); }
 
  private:

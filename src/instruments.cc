@@ -1,3 +1,8 @@
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+
+#include "levels_data.h"
 #include "instrument.h"
 
 #include <cmath>
@@ -72,6 +77,18 @@ extern const Instrument kBrass[];
 extern const int kNumBrass;
 extern const Instrument kLeads[];
 extern const int kNumLeads;
+extern const Instrument kPlucked[];
+extern const int kNumPlucked;
+
+// The instruments at a common loudness: each one's trim (tools/levels.py),
+// as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
+double levelTrim(const Instrument& inst) {
+  static const bool off = std::getenv("PJ_NOLEVELS") != nullptr;
+  if (off) return 1;
+  for (const LevelTrim& t : kLevelTrims)
+    if (std::strcmp(t.name, inst.name) == 0) return std::pow(10.0, t.db / 20);
+  return 1;
+}
 
 const Instrument* findInstrument(const std::string& name) {
   for (const Instrument& i : kFlutes)
@@ -82,6 +99,8 @@ const Instrument* findInstrument(const std::string& name) {
     if (name == kBrass[k].name) return &kBrass[k];
   for (int k = 0; k < kNumLeads; ++k)
     if (name == kLeads[k].name) return &kLeads[k];
+  for (int k = 0; k < kNumPlucked; ++k)
+    if (name == kPlucked[k].name) return &kPlucked[k];
   return nullptr;
 }
 
@@ -93,6 +112,7 @@ std::string instrumentNames() {
   for (int k = 0; k < kNumDesigned; ++k) s += ", " + std::string(kDesigned[k].name);
   for (int k = 0; k < kNumBrass; ++k) s += ", " + std::string(kBrass[k].name);
   for (int k = 0; k < kNumLeads; ++k) s += ", " + std::string(kLeads[k].name);
+  for (int k = 0; k < kNumPlucked; ++k) s += ", " + std::string(kPlucked[k].name);
   return s;
 }
 

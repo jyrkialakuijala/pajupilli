@@ -394,7 +394,8 @@ def emit(results):
         j = spec.get('jet', {})
         reed = (f"{{{r.get('width', 0):g}, {r.get('h0', 0):g}, {r.get('k', 0):g}, {r.get('fr', 0):g}, "
                 f"{r.get('qr', 0):g}, {r.get('sr', 0):g}, {r.get('psi', 0):g}, {r.get('sd', 0):g}, "
-                f"{r.get('press', 0):g}, {r.get('pressHi', 0):g}, {r.get('vib', 0):g}}}")
+                f"{r.get('press', 0):g}, {r.get('pressHi', 0):g}, {r.get('vib', 0):g}, "
+                f"{r.get('meetAt', 1):g}, {r.get('contact', 0):g}}}")
         jet = (f"{{{j.get('h', 0):g}, {j.get('width', 0):g}, {j.get('w', 0):g}, {j.get('window', 0):g}, "
                f"{j.get('chimney', 0):g}, {j.get('channel', 0):g}, {j.get('y0', 0):g}, {j.get('press', 0):g}, "
                f"{j.get('pressHi', 0):g}}}")

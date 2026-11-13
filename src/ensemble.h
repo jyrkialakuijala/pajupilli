@@ -132,9 +132,9 @@ class Ensemble {
   bool ji_;                 // PJ_JI (1): adaptive just intonation
   long long tuneSig_ = -1;  // the sounding set last tuned for
   std::vector<std::vector<float>> buf_;
-  // Three reverb channels, each a room of its own: small (the drums, the
-  // synth basses), main (the room chosen; everyone else), gated (a big room
-  // behind a gate: for the snare).
+  // Three reverb channels, each a room of its own: small (the synth
+  // basses), main (the room chosen; everyone else), gated (a big live room,
+  // its ambience compressed and gated: the toms and drums, a snare).
   // A source sounds into its channel's room and hears that room back.
   std::unique_ptr<Room> rooms_[3];
   std::vector<int> roomSlots_[3];

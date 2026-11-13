@@ -42,9 +42,10 @@ struct RoomSpec {
   double volume;    // m^3
   double rt60;      // s, mid frequencies
   double listener;  // listener distance from the players (m)
-  // A gated reverb (s; 0: none): the reverberant field at the microphones
-  // passes only while the sound going in is loud, and this long after; then
-  // it is cut (in ~15 ms), whatever is still ringing.
+  // A gated reverb (Phil Collins, the 80s snare and toms): the reverberant
+  // field at the microphones (the ambience mics), compressed hard (its body
+  // held up, not decaying), passes through a gate keyed by the dry sound:
+  // each hit opens it for `gate` seconds (s; 0: none), then it shuts fast.
   double gate = 0;
 };
 // "dry" (no room), "studio", "hall" (default), "church"; nullptr if unknown.
@@ -95,7 +96,8 @@ class Room {
   std::vector<int> dDelay_;     // between players: [to][from] samples
   std::vector<float> dGain_;
   // The gate (RoomSpec::gate): the input's envelope, its recent peak, the hold left, the gain.
-  float gateEnv_ = 0, gatePeak_ = 0, gateHold_ = 0, gateGain_ = 0;
+  float gateFast_ = 0, gateSlow_ = 0, gatePeak_ = 0, gateHold_ = 0, gateGain_ = 0;
+  float compEnv_ = 0, compPeak_ = 0;  // the ambience's compressor: its level, its recent peak
   struct Tap { int src, mic, delay; float gain; int u, w, z; };  // u, w, z: the image (walls hit)
   std::vector<Tap> early_;      // to the microphones: direct and reflections
 };

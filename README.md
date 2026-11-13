@@ -250,6 +250,23 @@ The same air column and room, with these new parts (`research/horns.md` has the 
   and breath that land in tune both ways. It retunes at each dynamic as far as the note holds.
   `-note` prints each held note's pitch and level wobble; `make test` checks them.
 
+### Double bass (plucked)
+
+`-inst double-bass` is a jazz double bass plucked by hand (GM 33), E1 to G4
+(`research/double_bass.md`):
+
+- **Strings:** four gut strings, each 64 modes in two directions, on one bridge: the strings not
+  played ring along. A hard pluck stretches the string and lets it touch the fingerboard.
+- **Fingers:** two calloused fingers take turns; a very hard key takes both.
+- **Left hand:** it stops the string when the key goes up. A soft key under a held one is a slide
+  or a hammer-on on the same string.
+- **Bridge:** a mass on its legs, swaying on its waist.
+- **Body:** top and back plates as 16 x 8 grids of masses in a bass's outline, with the bass bar,
+  the sound post, the f-holes and a column of air cells. `tools/bassbody.py` designs it, with the
+  air resonance at 66 Hz and the main wood resonance 1.69478 times higher.
+- **Knobs:** dynamics scales the pull, brightness moves the plucking point, vibrato rocks the
+  stopping finger.
+
 ### Synth leads (analog circuits)
 
 `-inst lead-saw` is GM's sawtooth lead (82), built from a circuit rather than a stored waveform

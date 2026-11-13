@@ -15,7 +15,8 @@ enum class Kind {
   kReed,      // a single reed on a mouthpiece: clarinet, saxophones
   kDoubleReed, // a double reed: oboe, bassoon, duduk, shawm
   kLip,        // the lips buzzing in a cup mouthpiece: horn (src/brass.cc)
-  kCircuit     // an analog circuit: the synth leads (src/lead.cc)
+  kCircuit,    // an analog circuit: the synth leads (src/lead.cc)
+  kString      // plucked strings on a body: the double bass (src/bass.cc)
 };
 
 struct NoteInfo {
@@ -55,6 +56,12 @@ struct ReedParams {
   double press;   // mezzo-forte mouth pressure at the lowest note (Pa)
   double pressHi; // ... at the top of the range (Pa)
   double vib;     // vibrato: from the breath (oboe, bassoon), or the jaw (sax): 0..1
+  // How the reed closes on the lay: where the blades begin to meet (share of
+  // the closure; 1: at the tip only, the opening's width unchanged until
+  // shut), and the blades' contact stiffness there (x the reed's; 0: the hard
+  // stop alone). Meeting gradually, the flow is not cut at once: fewer high
+  // harmonics (a dark, soft-reed sound).
+  double meetAt = 1, contact = 0;
 };
 
 // A duct or the lips at an open end: the jet and the window it crosses.
@@ -148,10 +155,12 @@ struct Instrument {
   bool reed() const { return kind == Kind::kReed || kind == Kind::kDoubleReed; }
   bool lip() const { return kind == Kind::kLip; }
   bool circuit() const { return kind == Kind::kCircuit; }
+  bool plucked() const { return kind == Kind::kString; }
 };
 
 // By name; nullptr if unknown.
 const Instrument* findInstrument(const std::string& name);
+double levelTrim(const Instrument& inst);  // the factor that brings it to the common loudness
 const Instrument& concertFlute();
 // All names, comma-separated (for messages).
 std::string instrumentNames();

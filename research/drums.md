@@ -168,3 +168,8 @@ kit's separation is done and kept for later (section 7).
   separated in 78 s on 4 threads. The jazz tracks are being separated next (16 tracks: Cullum,
   Ella Fitzgerald, Cyrus Chestnut, Gerry Mulligan, Louis Armstrong, Ray Charles, the Love Ballads,
   *Autumn Leaves*, *Fly Me to the Moon*) to find where brushes play.
+- 2026-11-13: *Some Cats Know* (Love Ballads), 1:01–1:10, brushes with upright bass (the user's
+  pointer). In this passage the brushes are short strokes and taps, about one per 0.54 s, not a
+  continuous swirl: above 5 kHz the mix itself is silent between strokes (its floor is 0.6 % of
+  its mean). The separated drum stem is very quiet (13 dB under the bass) and keeps the strokes.
+  A passage with a held swirl is still needed for the sweep's measurements.

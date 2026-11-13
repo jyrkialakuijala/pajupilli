@@ -926,7 +926,7 @@ const NoteInfo kBaritoneSaxNotes[] = {
     {"oxxxxoxoxoxoxoxooxoxoo", 2},  // 86 D6 (+43 c passive)
     {"oxxxoxxoxoxoxoxooxoxoo", 2},  // 87 D#6 (+18 c passive)
 };
-const Design kBaritoneSaxDesign = {kBaritoneSaxBore, 6, kBaritoneSaxHoles, 22, kBaritoneSaxNotes, 7.47, 2132.1, false, nullptr, 0, {0.017, 0.0009, 3e+06, 1150, 0.3, 0.00036, 0, 0, 1300, 1900, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kBaritoneSaxDesign = {kBaritoneSaxBore, 6, kBaritoneSaxHoles, 22, kBaritoneSaxNotes, 7.47, 2132.1, false, nullptr, 0, {0.017, 0.0009, 2.4e+06, 1150, 0.3, 0.00036, 0, 0, 1300, 1900, 1, 0.3, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 }  // namespace
 
