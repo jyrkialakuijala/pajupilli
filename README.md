@@ -56,6 +56,14 @@ for the same quantum).
 | Knob 7 (CC76) | Release time |
 | Knob 8 (CC77) | Volume |
 
+With a synth lead (`-inst lead-saw`), the first three knobs work the filter instead:
+
+| Knob | Synth lead |
+|---|---|
+| Knob 1 (CC70) | Formant spread: each key its own fixed filter offset, within ±12 semitones at full turn (the level is knob 8) |
+| Knob 2 (CC71) | Cutoff: two octaves under the note to five over it (up to ~19 kHz); an octave over at rest |
+| Knob 3 (CC72) | Resonance, which in a ladder is the Q: about 0.5 at 0, 5 at the middle, 19 at 0.85, self-oscillating from about 0.92. Live prints the Q as it turns |
+
 The knobs start from their defaults until you turn them.
 
 ### Polyphony (`-poly N`, default 8)
@@ -241,6 +249,46 @@ The same air column and room, with these new parts (`research/horns.md` has the 
   checks the note arrived at by a slur from a fourth below and above, and chooses the fingering
   and breath that land in tune both ways. It retunes at each dynamic as far as the note holds.
   `-note` prints each held note's pitch and level wobble; `make test` checks them.
+
+### Synth leads (analog circuits)
+
+`-inst lead-saw` is GM's sawtooth lead (82), built from a circuit rather than a stored waveform
+(`research/synth_leads.md`; the reference simulations in `tools/circuit.py` need ngspice).
+
+The same core, with a sound circuit of its own between the core and the filter, makes the other
+synths:
+
+| Family | Instruments |
+|---|---|
+| Leads (GM 81–88) | `lead-square`, `lead-saw`, `lead-calliope`, `lead-chiff`, `lead-charang`, `lead-voice`, `lead-fifths`, `lead-bass+lead` |
+| Synth bass | `synth-bass-1`, `synth-bass-2` |
+| Synth strings | `synth-strings-1`, `synth-strings-2` |
+| Synth voice | `synth-voice` |
+| Synth brass | `synth-brass-1`, `synth-brass-2` |
+| Percussion | `melodic-tom`, `synth-drum` |
+
+Lead-saw's circuit:
+
+- **The core:** an expo transistor charges a capacitor through an op-amp integrator; a
+  comparator with hysteresis resets it through a MOSFET. In real time it is exact between resets,
+  each reset found between samples, with its dead time, and band-limited with a polyBLEP.
+- **Its parasitics:** emitter resistance (the top a little flat) and leakage (the bottom a little
+  sharp, more so when warm).
+- **Each voice its own:** parts and temperature, which drifts slowly. It tunes itself at power-on,
+  per octave, as polyphonic analog synths do. The ensemble's just intonation trims each voice's
+  control voltage.
+- **Then:** a 4-pole transistor ladder (Huovilainen's nonlinear model), an OTA amplifier and RC
+  envelopes.
+- **The voices share a board.** Each one's output runs past the others' timing nodes, the
+  sounding voices pull the supply rail and lift the shared ground, and playing warms the board.
+  Each voice has its own 1/f noise, ladder offsets (even harmonics), amplifier thump and bleed,
+  and mains hum. `PJ_ANALOG` scales all of this (0: ideal, 1: as sized, more: exaggerated).
+- **Controls:**
+  - the knobs: dynamics (level and cutoff), brightness (cutoff), air (resonance), vibrato,
+    hardness (attack) and release;
+  - the joystick: ±2 semitones;
+  - overlapping keys slur, a softer overlapped key glides, and a harder one retriggers the
+    envelopes.
 
 ## Offline
 

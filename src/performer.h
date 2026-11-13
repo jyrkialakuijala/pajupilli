@@ -11,6 +11,37 @@
 
 namespace pajupilli {
 
+// A player's vibrato: a rotating complex number z (a phasor), turned each
+// block by its angle, an amplitude loop holding |z| at 1; its real part is the
+// lung pressure's pulse (the abdomen and the throat). Being a rotation, not a
+// sine of a phase, its speed can wander without a jump:
+//   - Breathing: the speed (~15 %) and the depth (~20 %) wander, each a noise
+//     through two low-passes: the speed's 0.15 s (~1 Hz: it drifts within a
+//     few pulses, never within one), the depth's 0.6 s (~0.3 Hz); scaled by
+//     the player's wander.
+//   - The breath: harder support (dynamics) swings a little faster.
+//   - The onset, a random path per attack: none at first; after ~0.3 s the
+//     depth comes in over ~0.4 s (a smoothstep to a random power); most notes
+//     at their rate from the start, ~10 % starting slower (55-80 %).
+// PJ_VIBNOISE scales the breathing.
+class Vibrato {
+ public:
+  void seed(unsigned s) { rng_ = 31337u + 104729u * s; }
+  void setPhase(double ph) { re_ = std::cos(ph); im_ = std::sin(ph); }
+  // One block: rate (Hz), the time since the attack (s: a new attack when it
+  // goes back), the support (0..1, dynamics), the wander (0 steady .. 1
+  // natural). Returns Re z with the breathing depth; env() is the onset.
+  double step(double dt, double rate, double sinceOn, double support, double wander);
+  double env() const { return env_; }
+  double rateMul = 1, depthMul = 1;  // this player's own
+
+ private:
+  double re_ = 1, im_ = 0, n1_ = 0, rateN_ = 0, d1_ = 0, depthN_ = 0, env_ = 0, last_ = 1e9;
+  double delay_ = 0.3, fade_ = 0.4, curve_ = 1, start_ = 1;
+  uint32_t rng_ = 31337;
+  double urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; }
+};
+
 class Performer {
  public:
   explicit Performer(Tube& t);
@@ -36,6 +67,7 @@ class Performer {
   void setFlutter(double depth) { flutter_ = depth; }  // 0 .. 1
   void setHardness(double h) { hardness_ = h; }  // attack: 0.5 soft .. 2 hard
   void setRelease(double s) { release_ = s; }    // breath release time (s)
+  void setFormantSpread(double s) { formantSpread_ = s; }  // synths: each key its own filter (0..1)
 
   // Per-note corrections from calibration. cover: the pitch control of the
   // lips (a flute: the uncovered width; a duct: the breath; a reed: the lip
@@ -94,7 +126,8 @@ class Performer {
   //   - overlap, a similar velocity: a slur (the fingers only);
   //   - overlap, a much harder key (or a very hard one): tongued legato, a
   //     light "du" on the moving air;
-  //   - overlap, a much softer key: a portamento, the fingers sliding off
+  //   - overlap, a much softer key pressed very softly (velocity <= 45: a
+  //     deliberate touch, not legato's ordinary spread): a portamento, the fingers sliding off
   //     and onto the holes (keys, valves half-way) while the lips follow,
   //     over ~60 ms + 25 ms per semitone, longer the softer the key; only
   //     where the fingering lets the pitch glide (not a pan flute's pipes,
@@ -139,7 +172,7 @@ class Performer {
   double pressScale_ = 1;
   double dyn_ = 0.5, breathCtl_ = 0, vibDepth_ = 0.0, vibRate_ = 5.0, roll_ = 0;
   double noiseCtl_ = 1, brightness_ = 1, air_ = 0.35, wander_ = 1;
-  double flutter_ = 0, hardness_ = 1, release_ = 0.030;
+  double flutter_ = 0, hardness_ = 1, release_ = 0.030, formantSpread_ = 0;
   bool ear_ = false;
   double earCents_ = 0, earCorr_ = 0, earClock_ = 0;
   double bp1_ = 0, bp2_ = 0, lastCross_ = -1, prevBp_ = 0;
@@ -150,7 +183,7 @@ class Performer {
   bool stopping_ = false;
   int lastArt_ = 0;
   double stopClock_ = 1e9;
-  double kRetongue_, kDvTongue_, kDvGlide_, kGlide_, kStaccato_, kDetache_;
+  double kRetongue_, kDvTongue_, kDvGlide_, kGlideVel_, kGlide_, kStaccato_, kDetache_;
 };
 
 }  // namespace pajupilli

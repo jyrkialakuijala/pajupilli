@@ -55,7 +55,9 @@ class Flute : public Tube {
 
  private:
   void embouchureGeometry();
+  void jetCoefs();
   void controlStep() override;
+  void settle() override;
   float sample() override;
   double boreDiameter(double x) const;  // at x (m) from the cork face (the flute family)
   void buildDesign();
@@ -86,6 +88,11 @@ class Flute : public Tube {
   double kAgc_ = 0, agcA_ = 0, agcEnv_ = 0;
   double kTurbIn_, kEdge_, edgeLow_ = 0, edgeBand_ = 0;
   double kJetSign_, kEtaSign_, kEmbLen_, kAlpha_, kConv_, kNoiseGain_;
+  // Per block (jetCoefs): the jet's width at the edge, its growth, the edge
+  // force's scale; the jet lowpass's exp(-x) and the edge hiss's tan(a) at the
+  // block's start, followed through the block by their series in uj.
+  double jB_ = 1e-3, jGain_ = 1, jCg_ = 1, jDd_ = 0;
+  double lpX0_ = 0, lpE0_ = 1, hissA0_ = 0, hissT0_ = 0;
 };
 
 }  // namespace pajupilli

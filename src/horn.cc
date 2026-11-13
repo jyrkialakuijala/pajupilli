@@ -124,6 +124,7 @@ void Horn::setValveCoefs(Valve& v) {
     v.w1 = v.w2 = 0;
     return;
   }
+  v.awake = true;
   // As Bore's interfaces: L dw/dt = dp - R w (trapezoidal in R).
   const double L = kRho * v.link / (v.area * v.s), R = 0.5 * kRho * kC / v.area * (1 / v.s - 1);
   const double d = L * fs_ + 0.5 * R;
@@ -147,15 +148,53 @@ void Horn::setHoles(const char* pattern, double fingerSpeed) {
   glide_ = 0;
 }
 
+void Horn::settle() {
+  // The valves down or up, the lips at the new note's tension.
+  for (int k = 0; k < nValves_; ++k) {
+    Valve& v = valve_[k];
+    if (v.t == v.target) continue;
+    v.t = v.target;
+    v.s = v.t;
+    bore_.setGate(v.a, 1 - v.s);
+    setValveCoefs(v);
+  }
+  bore_.update();
+  // The tongue and the glottis where the attack starts (not closing from rest first).
+  tongue_ = target_.tongue;
+  cur_.glottis = target_.glottis;
+  cur_.reed = target_.reed;
+  cur_.noise = target_.noise;
+  cur_.air = target_.air;
+}
+
 void Horn::resetAir() {
   Tube::resetAir();
   for (int k = 0; k < nValves_; ++k) {
     std::memset(&valve_[k].loop->s, 0, sizeof(valve_[k].loop->s));
     valve_[k].w1 = valve_[k].w2 = 0;
+    valve_[k].awake = valve_[k].cp != 0;
   }
   out_.x = out_.v = in_.x = in_.v = 0;
   dp_ = u_ = pm_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
+}
+
+// Still: the flow and the loss states below ~1 mPa of plane-wave pressure,
+// the pressure even to ~1 mPa (-160 dB re the bore's few kPa). A shut loop
+// keeps the pressure it was cut off at (its air is trapped); stepping a still
+// loop changes nothing, so it can stand until the valve opens again.
+bool Horn::still(const Bore& b, double area) {
+  const float* p = b.s.p();
+  const float* u = b.s.u();
+  const float zu = float(kRho * kC / area), lim = 1e-3f;
+  for (int i = 0; i <= b.footCell(); ++i)
+    if (std::fabs(p[i] - p[0]) > lim) return false;
+  for (int i = 0; i < b.cells(); ++i) {
+    float f = std::fabs(u[i]);
+    for (int j = 0; j < kLossSections; ++j) f = std::max(f, std::fabs(b.s.psi[j][i]));
+    if (f * zu > lim) return false;
+  }
+  return true;
 }
 
 void Horn::controlStep() {
@@ -194,6 +233,11 @@ void Horn::controlStep() {
     moved = true;
   }
   if (moved) bore_.update();
+  // A valve up: once its loop has rung down it stands still (skipped until pressed).
+  for (int k = 0; k < nValves_; ++k) {
+    Valve& v = valve_[k];
+    if (v.cp == 0 && v.awake && still(*v.loop, v.area)) v.awake = false;
+  }
 }
 
 float Horn::sample() {
@@ -239,6 +283,7 @@ float Horn::sample() {
   stepBore(&pOld, &jIn);
   for (int k = 0; k < nValves_; ++k) {
     Valve& v = valve_[k];
+    if (!v.awake) continue;
     float d0, d1;
     v.loop->step(0, &d0, &d1, 0);
     if (v.cp == 0) continue;

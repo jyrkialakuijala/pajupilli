@@ -124,6 +124,7 @@ Flute::Flute(const Instrument& inst) : Tube(inst) {
   }
   cur_ = target_;
   embouchureGeometry();
+  jetCoefs();
 }
 
 // The bore of a design: piecewise linear (mm), constant beyond its ends.
@@ -250,6 +251,49 @@ void Flute::controlStep() {
   embouchureGeometry();
   updateHoles(blockDt);
   holeLosses();
+  jetCoefs();
+}
+
+// The jet lowpass's step x and the edge hiss's centre a (rad per sample), from
+// the jet's speed.
+static inline double jetLpX(double kJetLp, double kConv, double ujc, double b, double fs) {
+  const double fc = kJetLp * kConv * ujc / (2 * M_PI * b);
+  return 2 * M_PI * std::min(fc, 0.4 * fs) / fs;
+}
+static inline double hissA(double uj, double lipH, double fs) {
+  return M_PI * std::clamp(0.12 * uj / std::max(lipH, 2e-4), 1500.0, 7000.0) / fs;
+}
+
+void Flute::jetCoefs() {
+  const double h = cur_.lipH, W = cur_.jetLen;
+  // Bickley half-width at the edge: 0.4 h at the lips, the jet spreads as it
+  // goes; an airy (unfocused) embouchure spreads it more.
+  jB_ = 0.4 * h + kSpread_ * W * (1 + 0.8 * (cur_.air - 0.35));
+  jGain_ = std::exp(std::min(kAlpha_ / h * W, 5.0));
+  jCg_ = std::cosh(std::min(kAlpha_ / h * W, 6.0));
+  jDd_ = 4 / M_PI * std::sqrt(2 * h * W);
+  lpX0_ = jetLpX(kJetLp_, kConv_, std::max(uj_, 0.3), jB_, fs_);
+  lpE0_ = std::exp(-lpX0_);
+  hissA0_ = hissA(uj_, cur_.lipH, fs_);
+  hissT0_ = std::tan(hissA0_);
+}
+
+void Flute::settle() {
+  Tube::settle();
+  // The lips and the jet where the new note wants them; the tongue and the
+  // glottis where the attack starts (a tongued note: the tongue sealed, as on
+  // a flute never played; it did not rest open and have to close first). The
+  // breath still comes as an attack does.
+  tongue_ = target_.tongue;
+  cur_.glottis = target_.glottis;
+  cur_.lipH = target_.lipH;
+  cur_.lipWidth = target_.lipWidth;
+  cur_.jetLen = target_.jetLen;
+  cur_.uncovered = target_.uncovered;
+  cur_.y0 = target_.y0;
+  cur_.face = target_.face;
+  cur_.noise = target_.noise;
+  cur_.air = target_.air;
 }
 
 void Flute::resetAir() {
@@ -296,9 +340,7 @@ float Flute::sample() {
   const double fr = rp - i0;
   const float v0 = vHist_[(i0 + kHist) & (kHist - 1)], v1 = vHist_[(i0 + 1 + kHist) & (kHist - 1)];
   const double vdel = v0 + fr * (v1 - v0);
-  // Bickley half-width at the edge: 0.4 h at the lips, the jet spreads as it
-  // goes; an airy (unfocused) embouchure spreads it more.
-  const double b = 0.4 * h + kSpread_ * W * (1 + 0.8 * (cur_.air - 0.35));
+  const double b = jB_;  // the jet's half-width at the edge
   // Turbulence: white noise band-limited to ~0.2 .. 6 kHz, scaled by the jet speed.
   const double white = whiteNoise();
   noiseLp_ += noiseA_ * (white - noiseLp_);
@@ -307,7 +349,6 @@ float Flute::sample() {
   // more turbulence (the "h" of a breath attack); ~1 when the glottis is open.
   const double glotTurb = 1 + kGlotNoise_ * std::min(25.0, (vg / 10) * (vg / 10));
   const double turb = (noiseLp_ - noiseHp_) * kNoiseGain_ * cur_.noise * uj_ * glotTurb;
-  const double gain = std::exp(std::min(kAlpha_ / h * W, 5.0));
   double eta;
   if (kJetModel_ == 1) {
     // Fletcher: the jet follows the acoustic displacement xi of the air in the
@@ -339,13 +380,15 @@ float Flute::sample() {
       xd += vdel;
     }
     if (kJetLp_ > 0) {  // the jet's width: Rayleigh, k b above ~1 decays
-      const double fc = kJetLp_ * kConv_ * ujc / (2 * M_PI * b);
-      const double al = 1 - std::exp(-2 * M_PI * std::min(fc, 0.4 * fs_) / fs_);
+      // 1 - exp(-x) = 1 - exp(-x0) exp(-d) from the block's start, to the second
+      // order in d (error < d^3 / 6 < 2e-6); a jump (an attack) exactly.
+      const double x = jetLpX(kJetLp_, kConv_, ujc, b, fs_), d = x - lpX0_;
+      const double al = std::fabs(d) < 0.02 ? 1 - lpE0_ * (1 - d * (1 - 0.5 * d)) : -std::expm1(-x);
       jl1_ += al * (xd - jl1_);
       jl2_ += al * (jl1_ - jl2_);
       xd = jl2_;
     }
-    double cg = std::cosh(std::min(kAlpha_ / h * W, 6.0));
+    double cg = jCg_;
     if (kAgc_ > 0) {
       // Growth-limited jet: once the swing reaches ~ its width, the jet rolls up
       // into vortices and stops amplifying (over a few cycles, not within one):
@@ -359,13 +402,13 @@ float Flute::sample() {
     }
     eta = kEtaSign_ * (cg * xd - kRel_ * xi_);
   } else {
-    eta = kEtaSign_ * (h / ujc) * gain * (vdel + turb);
+    eta = kEtaSign_ * (h / ujc) * jGain_ * (vdel + turb);
   }
   // Large swings: the jet rolls up into vortices instead of growing on; its
   // swing at the edge saturates at a few millimetres.
   if (kEtaMax_ > 0) eta = kEtaMax_ * std::tanh(eta / kEtaMax_);
   const double fn = std::tanh((eta - cur_.y0) / b);
-  const double dd = 4 / M_PI * std::sqrt(2 * h * W);
+  const double dd = jDd_;
   const double kj = kRho * dd * b * uj_ / W;
   // --- The bore, then the window branch at the embouchure cell (implicit).
   float pOld, jIn;
@@ -408,9 +451,10 @@ float Flute::sample() {
   float y = radiate(eq_);
   {  // Edge hiss: the turbulent jet on the labium radiates directly (a dipole,
      // intensity ~ U^6), centred near St = f h / Uj ~ 0.12, airier = more.
-    const double fe = std::clamp(0.12 * uj_ / std::max(cur_.lipH, 2e-4), 1500.0, 7000.0);
-    // Trapezoidal state-variable band-pass, Q 0.8 (ic1 = edgeBand_, ic2 = edgeLow_).
-    const double g = std::tan(M_PI * fe / fs_), k = 1 / 0.8;
+    // Trapezoidal state-variable band-pass, Q 0.8 (ic1 = edgeBand_, ic2 = edgeLow_);
+    // g = tan(a) from the block's start, to the second order in d (a jump: exactly).
+    const double a = hissA(uj_, cur_.lipH, fs_), d = a - hissA0_, t2 = 1 + hissT0_ * hissT0_;
+    const double g = std::fabs(d) < 0.02 ? hissT0_ + t2 * d * (1 + hissT0_ * d) : std::tan(a), k = 1 / 0.8;
     const double a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
     const double v3 = whiteNoise() - edgeLow_;
     const double v1 = a1 * edgeBand_ + a2 * v3, v2 = edgeLow_ + a2 * edgeBand_ + a3 * v3;

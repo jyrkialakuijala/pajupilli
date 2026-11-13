@@ -542,6 +542,12 @@ static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) 
 Calibration calibrate(const Instrument& inst, double a4, FILE* log, int lo, int hi) {
   if (lo < 0) lo = inst.lo + inst.transpose;
   if (hi < 0) hi = inst.hi + inst.transpose;
+  if (inst.circuit()) {  // a circuit tunes itself (its autotune, src/lead.cc)
+    Calibration cal;
+    for (int m = lo; m <= hi; ++m) cal.ok[m] = true;
+    if (log) std::fprintf(log, "calibrate: the %s tunes itself at power-on (autotune)\n", inst.name);
+    return cal;
+  }
   const std::string path = cachePath(inst, a4, lo, hi);
   Calibration cal;
   bool cached = false;

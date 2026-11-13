@@ -54,6 +54,11 @@ class Tube {
   virtual double testResponse() const = 0;
   // Clear all air motion (keys and settings stay); done automatically on NaN.
   virtual void resetAir();
+  // A silent instrument picked up for a new note: what the player sets before
+  // blowing (the keys, the lips) is in place at once on the next block, not
+  // moved there from wherever the last note left it. The breath, the tongue
+  // and the air still make the attack.
+  void startFresh() { fresh_ = true; }
   int resets() const { return resets_; }
   double fs() const { return fs_; }
   const Bore& bore() const { return bore_; }
@@ -120,6 +125,10 @@ class Tube {
   double glide_ = 0;  // setGlide
   virtual void controlStep() = 0;
   virtual float sample() = 0;
+  // startFresh: the settings jump to their targets (the keys here; each model
+  // its own lips or embouchure on top).
+  virtual void settle();
+  bool fresh_ = false;
 
   const Instrument& inst_;
   double fs_;

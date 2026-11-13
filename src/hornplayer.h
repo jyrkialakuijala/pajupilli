@@ -39,7 +39,7 @@ class HornPlayer : public Performer {
   double lung_ = 0, lungAttack_ = 0.008, sinceOff_ = 1e9, sinceOn_ = 0;
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
-  double vibPhase_ = 0, vibRateMul_ = 1, vibDepthMul_ = 1;
+  Vibrato vib_;  // its own vibrato (performer.h)
   double flutterPhase_ = 0, flutterRate_ = 27;
   double kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
   double tongueFloor_ = 0;

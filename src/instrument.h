@@ -14,7 +14,8 @@ enum class Kind {
   kEndBlown,  // the lips blow across the rim of the open top: shakuhachi, pan flute
   kReed,      // a single reed on a mouthpiece: clarinet, saxophones
   kDoubleReed, // a double reed: oboe, bassoon, duduk, shawm
-  kLip         // the lips buzzing in a cup mouthpiece: horn (src/brass.cc)
+  kLip,        // the lips buzzing in a cup mouthpiece: horn (src/brass.cc)
+  kCircuit     // an analog circuit: the synth leads (src/lead.cc)
 };
 
 struct NoteInfo {
@@ -146,6 +147,7 @@ struct Instrument {
   const char* family = "flute";  // the ensemble's label ("flute 2", "sax 1")
   bool reed() const { return kind == Kind::kReed || kind == Kind::kDoubleReed; }
   bool lip() const { return kind == Kind::kLip; }
+  bool circuit() const { return kind == Kind::kCircuit; }
 };
 
 // By name; nullptr if unknown.

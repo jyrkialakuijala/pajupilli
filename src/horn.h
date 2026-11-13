@@ -48,6 +48,7 @@ class Horn : public Tube {
 
  private:
   void controlStep() override;
+  void settle() override;
   float sample() override;
 
   // A damped mass-spring, trapezoidal: x'' + g x' + w^2 x = F.
@@ -74,7 +75,10 @@ class Horn : public Tube {
     double stroke = 0.012;
     float cw = 0, cp = 0;   // link update: w+ = cw w + cp (p_from - p_to)
     float w1 = 0, w2 = 0;   // into the loop at a, out of it into a + 1
+    bool awake = false;     // the loop's air moves: stepped (always while linked)
   };
+  // A valve up: its loop, shut off, rings down to still air.
+  static bool still(const Bore& b, double area);
   void setValveCoefs(Valve& v);
 
   const LipParams& lp_;

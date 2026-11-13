@@ -25,6 +25,7 @@
 #include "analysis.h"
 #include "calibrate.h"
 #include "ensemble.h"
+#include "lead.h"
 #include "flute.h"
 #include "live.h"
 #include "player.h"
@@ -517,6 +518,41 @@ int main(int argc, char** argv) {
     }
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
     else if (a == "-nantest") return nanTest();
+    else if (a == "-leadpair") {  // two lead voices on A4, the second detuned: do they pull together?
+      const double det = std::atof(next());
+      const int others = std::atoi(next());  // more voices sounding (a chord's load), 0..6
+      std::vector<std::unique_ptr<Voice>> vs;
+      for (int k = 0; k < 2 + others; ++k) {
+        vs.emplace_back(new Voice(*findInstrument("lead-saw")));
+        vs.back()->seed(unsigned(k + 1));
+      }
+      vs[0]->player().noteOn(69, 90);
+      vs[1]->player().setTuning(det);
+      vs[1]->player().noteOn(69, 90);
+      for (int k = 0; k < others; ++k) vs[2 + k]->player().noteOn(48 + 7 * k, 90);
+      const int n = kFs * 3;
+      std::vector<float> x0(n), x1(n), tmp(4);
+      for (int j = 0; j < n; j += 4) {
+        vs[0]->render(x0.data() + j, 4);
+        vs[1]->render(x1.data() + j, 4);
+        for (int k = 2; k < int(vs.size()); ++k) vs[k]->render(tmp.data(), 4);
+      }
+      const int a0 = kFs, len = 2 * kFs;
+      const double f0 = estimatePitch(x0.data() + a0, len, kFs, 300, 600), f1 = estimatePitch(x1.data() + a0, len, kFs, 300, 600);
+      std::printf("detune %+.2f c, %d more voices: voice 1 %.4f Hz, voice 2 %.4f Hz, apart %+.3f c\n", det, others, f0, f1,
+                  1200 * std::log2(f1 / f0));
+      return 0;
+    }
+    else if (a == "-leadcore") {  // the lead's core before its autotune, against tools/circuit.py saw
+      Voice v(*findInstrument("lead-saw"));
+      Lead& l = static_cast<Lead&>(v.model());
+      for (int o = -3; o <= 3; ++o) {
+        const double f = l.measure(69 + 12 * o), t = 440 * std::exp2(o);
+        std::printf("%+d oct  %8.2f Hz  %+7.1f c  (autotune trim %+.1f c)\n", o, f, 1200 * std::log2(f / t),
+                    l.trim(69 + 12 * o));
+      }
+      return 0;
+    }
     else if (a == "-scatter") return scatter();
     else if (a == "-roomimp") {
       const RoomSpec* rs = findRoom(next());

@@ -283,6 +283,24 @@ def woodwinds():
         check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def played_notes():
+    """The oboe as live mode plays it (-note: calibrated, then a fresh attack at
+    velocity 90): every note in its register and in tune. (-cal alone missed
+    A4 sounding an octave up and E5 a twelfth up: the calibration listens to
+    a short, softer attack.)"""
+    from concurrent.futures import ThreadPoolExecutor
+    notes = (58, 59, 62, 65, 69, 72, 74, 76, 79, 81, 83, 85)
+
+    def one(m):
+        out = run(['-inst', 'oboe', '-note', str(m), '-secs', '1.5']).stdout
+        c = re.search(r'\(([+-]\d+) cents\)', out)
+        return m, int(c.group(1)) if c else None
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(one, notes))
+    bad = [f'{m}: {c:+d} c' if c is not None else f'{m}: silent' for m, c in res if c is None or abs(c) > 10]
+    check('oboe: notes played (-note) in their register and tune', not bad,
+          f'{len(notes) - len(bad)}/{len(notes)} within 10 c' + (f'; {bad}' if bad else ''))
+
 # The brass (src/brass.cc): the share of the written range that must sound in
 # its partial after calibration. (2026-11-13: horn 34/37; F2, F#2, G2, the
 # lowest valved partials 2 and 3, do not speak; G#2..B2 are 21..39 c off and
@@ -359,10 +377,43 @@ def passive_vs_tmm():
     worst = max(abs(float(o.split()[1])) for o in out)
     check('waveguide vs tmm.py (mode 1)', worst <= 3, ', '.join(out))
 
+def leads():
+    """The synth leads and the synth families (src/lead.cc): after the autotune
+    every note in tune (modulo the octave: a locked fifth, an octave divider or
+    formants make the period longer than the note's); lead-fifths' fifth locked
+    at exactly 3:2; random playing never blows up; NaN recovery; real time."""
+    # Worst error allowed (c): the detuned pairs (charang, the strings) and the
+    # quarter-frequency period of bass+lead measure wider.
+    slack = {'lead-charang': 9, 'lead-bass+lead': 14, 'synth-strings-1': 10, 'synth-strings-2': 8,
+             'lead-voice': 6, 'synth-voice': 6}
+    insts = ['lead-saw', 'lead-square', 'lead-calliope', 'lead-chiff', 'lead-charang', 'lead-voice',
+             'lead-fifths', 'lead-bass+lead', 'synth-bass-1', 'synth-bass-2', 'synth-strings-1',
+             'synth-strings-2', 'synth-voice', 'synth-brass-1', 'synth-brass-2', 'melodic-tom', 'synth-drum']
+    for inst in insts:
+        out = run(['-inst', inst, '-scale']).stdout
+        cs = [int(m) for m in re.findall(r'^\S+\s+\S+\s+\S+\s+([+-]\d+)', out, re.M)]
+        mod = [((c + 600) % 1200) - 600 for c in cs]
+        worst = max((abs(c) for c in mod), default=99)
+        check(f'{inst}: tuned by its autotune', len(cs) >= 38 and worst <= slack.get(inst, 3),
+              f'{len(cs)} notes, worst {worst} c (modulo the octave)')
+        if inst == 'lead-fifths':
+            # Locked at 3:2 the pair repeats every two of the note's periods: an
+            # octave under it, exactly. Unlocked, it beats and measures off.
+            locked = sum(1 for c in cs if abs(c + 1200) <= 1)
+            check('lead-fifths: the fifth locked at 3:2', locked == len(cs) and cs,
+                  f'{locked}/{len(cs)} notes at the pair\'s period (-1200 c) within 1 c')
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+        r = run(['-inst', inst, '-nantest'])
+        check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
+        ns = cpu_time(['-inst', inst, '-note', '57', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+        check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, brass):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

@@ -51,12 +51,12 @@ class Player : public Performer {
   double kFace_ = 1;
   double kW_, kY0_, kY0Exp_, kP_, kVibThroat_, breath_;
   double glottisClock_ = 1e9;
-  double vibPhase_ = 0;
+  Vibrato vib_;  // its own vibrato (performer.h)
   double lung_ = 0;
   double tongueClock_ = 1e9, tongueRelease_ = 0.005, tongueClosed_ = 0.004;
   double lungAttack_ = 0.005, sinceOff_ = 1e9;
   double flutterPhase_ = 0;
-  double vibRateMul_ = 1, vibDepthMul_ = 1, flutterRate_ = 27;  // this player's own
+  double flutterRate_ = 27;  // this player's own
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;

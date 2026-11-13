@@ -433,8 +433,23 @@ void Tube::holeLosses() {
   }
 }
 
+void Tube::settle() {
+  for (int i = 0; i < nHoles_; ++i) {
+    Hole& h = hole_[i];
+    if (!h.present) continue;
+    h.open = h.target;
+    h.wait = 0;
+  }
+  updateHoles(0);
+}
+
 void Tube::process(float* out, int n) {
   bool finite = true;
+  if (fresh_) {  // settled, and a control step at once with the new settings
+    fresh_ = false;
+    settle();
+    ctl_ = 0;
+  }
   for (int i = 0; i < n; ++i) {
     if (ctl_ == 0) controlStep();
     ctl_ = (ctl_ + 1) & 15;

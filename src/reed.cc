@@ -40,6 +40,14 @@ Reed::Reed(const Instrument& inst) : Tube(inst), rp_(inst.design->reed) {
   kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
   kFr_ = knob("PJ_REEDFR", 1);  // the reed's resonance, x the design's
   kQr_ = knob("PJ_REEDQ", 1);   // its damping, x the design's
+  // (Experiments: a double reed's duct loss, in place of the design's.)
+  psi_ = rp_.psi;
+  contact_ = knob("PJ_REEDCONTACT", 0);  // the blades' contact stiffness, x the reed's (0: the hard stop alone)
+  contactAt_ = knob("PJ_REEDCONTACTAT", 0.5);  // where the blades start to meet (share of the closure)
+  contactD_ = knob("PJ_REEDCONTACTD", 0.5);    // the contact's damping ratio
+  meetAt_ = knob("PJ_REEDMEETAT", 1);  // where the blades begin to meet (share of the closure; 1: at the tip only)
+  meet_ = knob("PJ_REEDMEET", 1);      // how the open width shrinks past it: (open share)^meet
+  if (const double psi = knob("PJ_REEDPSI", -1); psi >= 0) psi_ = psi;
   // The reed at the top: the grid's first cell centre (the mouthpiece's or the
   // reed's own volume is the first stretch of the bore profile).
   const double half = 0.5 * kC / (Bore::kCourantMax * fs_);
@@ -62,6 +70,16 @@ void Reed::resetAir() {
   Tube::resetAir();
   x_ = v_ = dp_ = u_ = pm_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
+}
+
+void Reed::settle() {
+  Tube::settle();
+  // The tongue and the glottis where the attack starts (not closing from rest first).
+  tongue_ = target_.tongue;
+  cur_.glottis = target_.glottis;
+  cur_.reed = target_.reed;  // the lips on the reed
+  cur_.noise = target_.noise;
+  cur_.air = target_.air;
 }
 
 void Reed::controlStep() {
@@ -99,6 +117,18 @@ void Reed::controlStep() {
   t11_ = i10 * hd + i11 * (1 - hd * g_);
   b0_ = i01 * dt;
   b1_ = i11 * dt;
+  // The same on the lay (x past the contact point): stiffer and more damped.
+  if (contact_ > 0) {
+    const double w2c = w2_ * (1 + contact_), gc = g_ + 2 * contactD_ * std::sqrt(contact_ * w2_);
+    const double detc = 1 + hd * gc + hd * hd * w2c;
+    const double j00 = (1 + hd * gc) / detc, j01 = hd / detc, j10 = -hd * w2c / detc, j11 = 1 / detc;
+    c00_ = j00 + j01 * (-hd * w2c);
+    c01_ = j00 * hd + j01 * (1 - hd * gc);
+    c10_ = j10 + j11 * (-hd * w2c);
+    c11_ = j10 * hd + j11 * (1 - hd * gc);
+    cb0_ = j01 * dt;
+    cb1_ = j11 * dt;
+  }
   updateHoles(blockDt);
   holeLosses();
 }
@@ -107,9 +137,25 @@ float Reed::sample() {
   const double dt = 1 / fs_;
   // --- The reed: the pressure across it (last sample's) pushes it shut.
   {
+    // (Experiments, off by default: PJ_REEDCONTACT.) A double reed's blades
+    // need not slam shut: past contactAt of the closure they meet
+    // progressively and the reed stiffens and is damped (Avanzini & van
+    // Walstijn 2004: a reed curling onto its lay). A spring of contact x the
+    // reed's own stiffness from the contact point on (implicit, trapezoidal:
+    // stable however stiff). The hard stop below stays the last resort.
+    // (On the oboe it took harmonics 6-10 down by 2-5 dB but sent 2-7 of 28
+    // notes to another register or a reed squeal.)
     const double f = dp_ * invMu_;
-    const double x = t00_ * x_ + t01_ * v_ + b0_ * f;
-    const double v = t10_ * x_ + t11_ * v_ + b1_ * f;
+    double x, v;
+    const double xc = contactAt_ * H_;
+    if (contact_ > 0 && x_ > xc) {
+      const double fc = f + contact_ * w2_ * xc;
+      x = c00_ * x_ + c01_ * v_ + cb0_ * fc;
+      v = c10_ * x_ + c11_ * v_ + cb1_ * fc;
+    } else {
+      x = t00_ * x_ + t01_ * v_ + b0_ * f;
+      v = t10_ * x_ + t11_ * v_ + b1_ * f;
+    }
     x_ = x;
     v_ = v;
     // It beats on the lay (the other blade): it stops there.
@@ -139,10 +185,25 @@ float Reed::sample() {
   float pOld, jIn;
   stepBore(&pOld, &jIn);
   const double c = bore_.compliance(ec_), beta = 0.5 * dt / c;
-  const double ur = kSweep_ * rp_.sr * v_;  // closing pushes air into the mouthpiece
+  // Closing pushes air into the mouthpiece. (Experiments, off by default:
+  // PJ_REEDMEETAT.) A double reed's blades meeting from the sides past
+  // meetAt of the closure: the parts in contact sweep no more and pass no
+  // flow, so the slit narrows and the flow fades out instead of stopping
+  // dead at the tip. (On the oboe: 1-3 dB off harmonics 6-10; the reed still
+  // crosses the last quarter of its closure within a sample or two.)
+  double sweep = kSweep_ * rp_.sr, width = rp_.width;
+  if (meetAt_ < 1) {
+    const double xc = meetAt_ * H_;
+    if (x_ > xc) {
+      const double open = std::max(0.0, (H_ - x_) / (H_ - xc + 1e-12));
+      sweep *= open;
+      width *= std::pow(open, meet_);
+    }
+  }
+  const double ur = sweep * v_;
   // Flow coefficient: Bernoulli through the slit, plus a double reed's duct.
-  const double wh = rp_.width * h_;
-  const double A = wh > 0 ? std::sqrt(2 / kRho) / std::sqrt(1 / (wh * wh) + rp_.psi / (rp_.sd * rp_.sd + 1e-30)) : 0;
+  const double wh = width * h_;
+  const double A = wh > 0 ? std::sqrt(2 / kRho) / std::sqrt(1 / (wh * wh) + psi_ / (rp_.sd * rp_.sd + 1e-30)) : 0;
   // (Tests: a small flow impulse, 1e-8 m^3/s per unit: the holes stay linear.)
   const double R = pm_ - pOld - beta * (jIn + ur + 1e-8 * testDp_);
   const double bA = beta * A;

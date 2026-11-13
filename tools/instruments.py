@@ -221,14 +221,27 @@ def sax(name, s, transpose, fs, reed, gain, title, top=None):
 # vents. Bore after Nederveen 1969 / Almeida et al. 2007 (the oboe reed).
 
 def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3..C#6', reed=None, family='oboe'):
+    v2 = reed is None  # the oboe's own geometry (the English horn keeps the one it was scaled from)
     names = ['oct2', 'oct1', 'C#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4',
              'C#4', 'C4', 'B3']
     fingers = {'C5', 'B4', 'A4', 'G4', 'F#4', 'E4'}
     nc = {'oct2', 'oct1', 'C#5', 'A#4', 'G#4', 'F4', 'D#4', 'C#4'}
 
-    def bore(end, top=1.0):
+    def bore_v1(end, top=1.0):  # (the English horn's, scaled from the first oboe fit)
         return [(0, 1.8 * top * s), (10 * s, 2.2 * top * s), (25 * s, 2.8 * top * s), (72 * s, 4.6 * s),
                 (end - 60 * s, 15.5 * s), (end - 40 * s, 16.5 * s), (end - 20 * s, 22.0 * s), (end, 36.0 * s)]
+
+    # The staple and the reed's cavity: a narrow cone from the reed (1.8 x top
+    # mm) meeting the body's cone at `staple` mm (fitted: with the reed's
+    # compliance it stands in for the missing apex, and sets how harmonic the
+    # resonances are). The bell: a gradual flare.
+    def bore(end, top=1.0, staple=72.0):
+        sl = (15.5 - 4.6) / (end / s - 60 - 72)  # the body's cone: 4.6 mm at 72 mm, 15.5 mm 80 mm above the end
+        dj = 4.6 + sl * (staple - 72)
+        d0 = 1.8 * top
+        return ([(0, d0 * s), (0.35 * staple * s, (d0 + 0.35 * (dj - d0)) * s), (staple * s, dj * s)] +
+                ([(72 * s, 4.6 * s)] if staple < 71 else []) +
+                [(end - 80 * s, 15.8 * s), (end - 50 * s, 17.0 * s), (end - 25 * s, 22.0 * s), (end, 32.0 * s)])
     apex = -147 * s
 
     def xs(m):  # where an open end would sound m (written)
@@ -236,7 +249,10 @@ def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3.
     holes = []
     for n in names:
         if n.startswith('oct'):
-            lo, hi = (100 * s, 170 * s) if n == 'oct2' else (160 * s, 240 * s)
+            # (The oboe's: near the second mode's pressure node, where they
+            # detune the first mode most: the second register then speaks.)
+            lo, hi = ((25 * s, 60 * s) if n == 'oct2' else (85 * s, 130 * s)) if v2 else \
+                ((100 * s, 170 * s) if n == 'oct2' else (160 * s, 240 * s))
             holes.append(hole(n, 0.5 * (lo + hi), 1.1 * s, 12 * s, padH=1.0 * s, cup=5 * s, flags=NCLOSED,
                               lo=lo, hi=hi))
             continue
@@ -247,8 +263,11 @@ def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3.
                           flags=(FINGER if n in fingers else 0) | (NCLOSED if n in nc else 0),
                           **({} if s == 1 else dict(padH=(8.0 if n in fingers else 2.5) * s, cup=(15.0 if n in fingers else 9.0) * s))))
     core = chromatic(holes, 'A#3')
+    # (The oboe's second register weighs less in the fit: the lips tune it;
+    # a first-register fingering pulled flat to serve its octave (D4, 22 c)
+    # spoke an octave up.)
     for m in range(midi('D5'), midi('C#6') + 1):
-        core[m] = (with_vent(holes, core[m - 12][0], 'oct1' if m <= midi('G#5') else 'oct2'), 2, 0.8)
+        core[m] = (with_vent(holes, core[m - 12][0], 'oct1' if m <= midi('G#5') else 'oct2'), 2, 0.5 if v2 else 0.8)
 
     def cand(m, notes):
         out = []
@@ -263,11 +282,12 @@ def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3.
                     out.append((p, n, len(vs)))
         return out
     return dict(name=name, title=title, family=family, kind='dreed', transpose=transpose, lo=midi('A#3'),
-                hi=midi('C#6'), fs=fs, gain=gain, offset=20, end=650 * s, bore_fn=bore, holes=holes, core=core,
-                candidates=cand, gap=7 * s, extra=[('top', 2.4, 1.2, 4.0)], scale=s,
+                hi=midi('C#6'), fs=fs, gain=gain, offset=-5 if v2 else 20, end=650 * s, bore_fn=bore if v2 else bore_v1, holes=holes,
+                core=core, candidates=cand, gap=7 * s, scale=s,
+                extra=[('top', 2.4, 0.6, 4.0), ('staple', 72.0, 30.0, 110.0)] if v2 else [('top', 2.4, 1.2, 4.0)],
                 doc="""A narrow cone and a double reed; octave vents for the second register,
                 the third register by search among vented fingerings.""",
-                reed=reed or dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.3, sr=3e-5, psi=0, sd=4.5e-6,
+                reed=reed or dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.6, sr=9e-5, psi=0, sd=4.5e-6,
                                   press=5000, pressHi=7000, vib=0))
 
 

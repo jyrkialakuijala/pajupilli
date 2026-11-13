@@ -149,14 +149,15 @@ void Player::noteOff(int midi) {
 // firm push, with a lot of air a full kick overblows past the note (piccolo D7).
 void Player::seed(unsigned s) {
   rng_ = 4242u + 7907u * s;
+  vib_.seed(s);
   if (s == 0) return;  // the default player keeps its sequence (tests, golden files)
   for (int i = 0; i < 4; ++i) urand();
   // Players differ: vibrato rate +-8 %, depth +-15 %, flutter 23..31 Hz, all
   // starting at a random point of their cycles.
-  vibRateMul_ = 1 + 0.08 * urand();
-  vibDepthMul_ = 1 + 0.15 * urand();
+  vib_.rateMul = 1 + 0.08 * urand();
+  vib_.depthMul = 1 + 0.15 * urand();
   flutterRate_ = 27 + 4 * urand();
-  vibPhase_ = M_PI * (1 + urand());
+  vib_.setPhase(M_PI * (1 + urand()));
   flutterPhase_ = M_PI * (1 + urand());
 }
 
@@ -392,11 +393,11 @@ void Player::render(float* out, int n) {
     // Vibrato: pressure modulation in the mouth, fading in after 300 ms. A
     // share comes from the lungs (abdomen), the rest from the throat: the
     // glottis is held a little narrowed and pulses (Hwang & Thorpe 2000).
-    // Each player's own rate, drifting a little with the breath support (~1 Hz wander).
-    vibPhase_ += 2 * M_PI * vibRate_ * vibRateMul_ * (1 + 0.05 * wander_ * w2b_) * bdt;
-    if (vibPhase_ > 2 * M_PI) vibPhase_ -= 2 * M_PI;
-    const double vib = vibDepth_ * vibDepthMul_ * std::min(1.0, std::max(0.0, sinceOn_ - 0.3) / 0.4);
-    const double sv = std::sin(vibPhase_);
+    // Each player's own rotating vibrato (performer.h: Vibrato), its rate
+    // drifting a little with the breath support (~1 Hz wander), breathing.
+    const double sv = vib_.step(bdt, vibRate_ * (1 + 0.05 * wander_ * w2b_), sinceOn_,
+                                std::clamp(dyn_ + breathCtl_, 0.0, 1.0), wander_);
+    const double vib = vibDepth_ * vib_.depthMul * vib_.env();
     // Accented attack: a short pressure overshoot.
     const double accent = 1 + 0.25 * velAccent_ * std::exp(-sinceOn_ / 0.04);
     const double vt = kVibThroat_ * vib, vl = (1 - kVibThroat_) * vib;

@@ -16,7 +16,8 @@ Performer::Performer(Tube& t) : tube_(t), inst_(t.instrument()), fs_(t.fs()) {
   for (double& d : dynHi) d = 1;
   kRetongue_ = knob("PJ_RETONGUE", 100);  // an overlapped key this hard is tongued
   kDvTongue_ = knob("PJ_DVTONGUE", 30);   // ... or this much harder than the key before
-  kDvGlide_ = knob("PJ_DVGLIDE", 30);     // an overlapped key this much softer glides
+  kDvGlide_ = knob("PJ_DVGLIDE", 30);     // an overlapped key this much softer ...
+  kGlideVel_ = knob("PJ_GLIDEVEL", 45);   // ... and this soft at most glides (a deliberate touch)
   kGlide_ = knob("PJ_GLIDE", 1);          // the glide's time (x; 0: never glide)
   kStaccato_ = knob("PJ_STACCATO", 0.12); // held shorter than this (s): a tongue stop
   kDetache_ = knob("PJ_DETACHE", 0.08);   // a gap shorter than this (s): "du"
@@ -39,7 +40,9 @@ Performer::Articulation Performer::decide(int midi, int velocity, bool overlap) 
   const double hard = std::max(0.3, hardness_);
   if (overlap && prev >= 0) {
     if (velocity >= kRetongue_ / hard || dv >= kDvTongue_) return kArtTongueLegato;
-    if (kGlide_ > 0 && dv <= -kDvGlide_ && prev != midi && std::abs(midi - prev) <= 12) {
+    // A glide is a gesture: the new key pressed very softly while the old one
+    // is held (ordinary legato varies by 30 in velocity: it must not glide).
+    if (kGlide_ > 0 && dv <= -kDvGlide_ && velocity <= kGlideVel_ && prev != midi && std::abs(midi - prev) <= 12) {
       // Can the pitch glide? A pan flute's pipes cannot; a jet's register
       // change on the same fingering is a jump, not a glide (a brass player's
       // lips glide through the partials: a rip).
@@ -123,6 +126,40 @@ void Performer::listen(const float* x, int m, double& corr, double cents, double
     }
     prevBp_ = y;
   }
+}
+
+double Vibrato::step(double dt, double rate, double sinceOn, double support, double wander) {
+  static const double kNoise = knob("PJ_VIBNOISE", 1);
+  auto smooth = [](double x) { x = std::clamp(x, 0.0, 1.0); return x * x * (3 - 2 * x); };
+  if (sinceOn < last_) {  // an attack: this note's own onset
+    delay_ = 0.3 * (1 + 0.3 * urand());
+    fade_ = 0.4 * (1 + 0.3 * urand());
+    curve_ = std::exp2(0.6 * urand());
+    start_ = urand() < -0.8 ? 0.675 + 0.125 * urand() : 1.0;
+  }
+  last_ = sinceOn;
+  // Breathing: two low-passed noises (unit std), the speed's and the depth's.
+  // The speed's within a few pulses (0.15 s: ~1 Hz), the depth's slower.
+  static const double kRateTau = knob("PJ_VIBRATETAU", 0.15);
+  constexpr double kTau = 0.6;
+  const double kr = std::sqrt(6 * dt / kRateTau) * std::sqrt(2.0) * kNoise * wander;
+  const double k = std::sqrt(6 * dt / kTau) * std::sqrt(2.0) * kNoise * wander;
+  n1_ += kr * urand() - dt / kRateTau * n1_;
+  rateN_ += (n1_ - rateN_) * dt / kRateTau;
+  d1_ += k * urand() - dt / kTau * d1_;
+  depthN_ += (d1_ - depthN_) * dt / kTau;
+  const double t = sinceOn - delay_;
+  env_ = std::pow(smooth(t / fade_), curve_);
+  const double speed = rate * rateMul * (start_ + (1 - start_) * smooth(t / (1.5 * fade_))) *
+                       std::max(0.3, 1 + 0.15 * rateN_) * (1 + 0.06 * (support - 0.5));
+  const double a = 2 * M_PI * speed * dt, c = std::cos(a), s = std::sin(a);
+  const double re = re_ * c - im_ * s;
+  im_ = re_ * s + im_ * c;
+  re_ = re;
+  const double m = 1.5 - 0.5 * (re_ * re_ + im_ * im_);
+  re_ *= m;
+  im_ *= m;
+  return re_ * std::max(0.0, 1 + 0.20 * depthN_);
 }
 
 }  // namespace pajupilli

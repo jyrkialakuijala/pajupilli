@@ -39,6 +39,7 @@ class Reed : public Tube {
 
  private:
   void controlStep() override;
+  void settle() override;
   float sample() override;
 
   const ReedParams& rp_;
@@ -55,6 +56,13 @@ class Reed : public Tube {
   double pm_ = 0, u_ = 0;
   double glotLp_ = 0, noiseLp_ = 0, noiseHp_ = 0, glotA_, noiseA_, noiseHpA_;
   double kNoise_, kSweep_, kLipH_, kGlotNoise_, kFr_ = 1, kQr_ = 1;
+  double psi_ = 0;  // the double reed's duct loss (the design's, or PJ_REEDPSI)
+  // (Experiments, off by default.) The blades' progressive closing: a contact
+  // spring past contactAt (PJ_REEDCONTACT*), and its trapezoid matrix; the
+  // slit narrowing from the sides past meetAt (PJ_REEDMEET*).
+  double contact_ = 0, contactAt_ = 0.5, contactD_ = 0.5;
+  double c00_ = 1, c01_ = 0, c10_ = 0, c11_ = 1, cb0_ = 0, cb1_ = 0;
+  double meetAt_ = 1, meet_ = 1;
 };
 
 }  // namespace pajupilli

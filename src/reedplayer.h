@@ -44,7 +44,7 @@ class ReedPlayer : public Performer {
   double graceLeft_ = 0;
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
-  double vibPhase_ = 0, vibRateMul_ = 1, vibDepthMul_ = 1;
+  Vibrato vib_;  // its own vibrato (performer.h)
   double flutterPhase_ = 0, flutterRate_ = 27;
   double kEarStart_ = 0, kEarRange_ = 120, kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_;
   uint32_t rng_ = 4242;

@@ -59,6 +59,7 @@ void Bore::setBore(const std::function<double(double)>& diameter, double embX, d
   foot_ = std::min(kCells - 1, int(std::floor((footX - x0_) / dx_ + 0.5)));
   // The used cells, past the foot by at least one idle cell (p[foot] reads 0).
   n_ = std::min(kCells, (foot_ / kVec + 1) * kVec);
+  listDirty_ = true;
   std::memset(cellVol_, 0, sizeof cellVol_);
   std::memset(series_, 0, sizeof series_);
   std::memset(ifaceExtra_, 0, sizeof ifaceExtra_);
@@ -176,13 +177,43 @@ void Bore::buildNode(int cell) {
   }
 }
 
+// A cell is plain when its node update is exactly p += v0 J: no branch (the
+// identity for q and l, nothing from the room) and no branch flow left in q or
+// l (a plain cell keeps them as they are, so this holds until the next change).
+void Bore::classify(int i) {
+  bool plain = s.q[i] == 0 && s.l[i] == 0 && k.m[0][0][i] == 1 && k.m[0][2][i] == 0;
+  for (int r = 1; r < 3; ++r)
+    for (int c = 0; c < 3; ++c) plain &= k.m[r][c][i] == (r == c ? 1.0f : 0.0f);
+  for (int r = 0; r < 3; ++r) plain &= (r == 0 || k.v[r][i] == 0) && k.e[r][i] == 0;
+  if (full_[i] == !plain) return;
+  full_[i] = !plain;
+  listDirty_ = true;
+}
+
+// A vector with 2 or more full cells: its full update as a vector costs less.
+void Bore::listFull() {
+  nFull_ = 0;
+  for (int c = 0; c < n_ / kVec; ++c) {
+    int m = 0;
+    for (int i = c * kVec; i < (c + 1) * kVec; ++i) m += full_[i];
+    dense_[c] = m >= 2;
+    if (dense_[c]) continue;
+    for (int i = c * kVec; i < (c + 1) * kVec; ++i)
+      if (full_[i]) fullList_[nFull_++] = i;
+  }
+  listDirty_ = false;
+}
+
 void Bore::update() {
   if (dirtyU_) {
     buildU();
     dirtyU_ = false;
   }
   if (!dirty_) return;
-  for (int i = 0; i < n_; ++i) buildNode(i);
+  for (int i = 0; i < n_; ++i) {
+    buildNode(i);
+    classify(i);
+  }
   dirty_ = false;
 }
 
@@ -202,16 +233,36 @@ void Bore::step(int ec, float* pOld, float* J, float pRoom) {
   }
   *pOld = p[ec];
   *J = u[ec - 1] - u[ec];
-  // Continuity with the side branches (u[-1] is the zero pad: the cork).
+  // Continuity (u[-1] is the zero pad: the cork). The few cells with a branch
+  // first, from the old pressures (their new p set aside), then each vector:
+  // a dense one in full, the others as plain cells; then the few cells' p put back.
+  if (listDirty_) listFull();
   float* __restrict q = s.q;
   float* __restrict l = s.l;
-  for (int i = 0; i < n; ++i) {
+  float pFull[kCells];
+  for (int b = 0; b < nFull_; ++b) {
+    const int i = fullList_[b];
     const float j = u[i - 1] - u[i];
     const float p0 = p[i], q0 = q[i], l0 = l[i];
-    p[i] = k.m[0][0][i] * p0 + k.m[0][1][i] * q0 + k.m[0][2][i] * l0 + k.v[0][i] * j + k.e[0][i] * pRoom;
+    pFull[b] = k.m[0][0][i] * p0 + k.m[0][1][i] * q0 + k.m[0][2][i] * l0 + k.v[0][i] * j + k.e[0][i] * pRoom;
     q[i] = k.m[1][0][i] * p0 + k.m[1][1][i] * q0 + k.m[1][2][i] * l0 + k.v[1][i] * j + k.e[1][i] * pRoom;
     l[i] = k.m[2][0][i] * p0 + k.m[2][1][i] * q0 + k.m[2][2][i] * l0 + k.v[2][i] * j + k.e[2][i] * pRoom;
   }
+  const float* __restrict v0 = k.v[0];
+  for (int c = 0; c < n; c += kVec) {
+    if (!dense_[c / kVec]) {
+      for (int i = c; i < c + kVec; ++i) p[i] += v0[i] * (u[i - 1] - u[i]);
+      continue;
+    }
+    for (int i = c; i < c + kVec; ++i) {
+      const float j = u[i - 1] - u[i];
+      const float p0 = p[i], q0 = q[i], l0 = l[i];
+      p[i] = k.m[0][0][i] * p0 + k.m[0][1][i] * q0 + k.m[0][2][i] * l0 + k.v[0][i] * j + k.e[0][i] * pRoom;
+      q[i] = k.m[1][0][i] * p0 + k.m[1][1][i] * q0 + k.m[1][2][i] * l0 + k.v[1][i] * j + k.e[1][i] * pRoom;
+      l[i] = k.m[2][0][i] * p0 + k.m[2][1][i] * q0 + k.m[2][2][i] * l0 + k.v[2][i] * j + k.e[2][i] * pRoom;
+    }
+  }
+  for (int b = 0; b < nFull_; ++b) p[fullList_[b]] = pFull[b];
 }
 
 }  // namespace pajupilli

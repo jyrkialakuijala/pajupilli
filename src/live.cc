@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "ensemble.h"
+#include "lead.h"
 #include "player.h"
 
 namespace pajupilli {
@@ -128,7 +129,7 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()) {
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();
     hi_ = p.hi();
@@ -205,9 +206,27 @@ class Controls {
         if (!breathPad_) p_.all(&Performer::setBreath, joyBreath_);
         break;
       case 64: p_.setHold(v >= 64); break;  // sustain pedal: keep blowing
-      case 70: p_.all(&Performer::setDynamics, x); break;
+      case 70:
+        // A synth: K1 spreads the filter per key (its level is K8's).
+        if (circuit_) {
+          p_.all(&Performer::setFormantSpread, x);
+          const int st = int(std::lround(12 * x));
+          if (st != lastSpread_) std::fprintf(stderr, "formant spread: each key within +-%d semitones\n", st);
+          lastSpread_ = st;
+        } else {
+          p_.all(&Performer::setDynamics, x);
+        }
+        break;
       case 71: p_.all(&Performer::setBrightness, 0.3 + 2.2 * x); break;
-      case 72: p_.all(&Performer::setAir, x); break;
+      case 72:
+        p_.all(&Performer::setAir, x);
+        if (circuit_) {  // a synth: K3 is the filter's resonance; say its Q
+          const double res = LeadPlayer::resonance(x);
+          const int q10 = int(std::lround(10 * Lead::ladderQ(res)));
+          if (q10 != lastQ10_) std::fprintf(stderr, "resonance %.2f: Q %.1f%s\n", res, q10 / 10.0, res >= 1 ? " (self-oscillating)" : "");
+          lastQ10_ = q10;
+        }
+        break;
       case 73: p_.all(&Performer::setVibrato, 0.15 * x); break;
       case 74: p_.all(&Performer::setVibratoRate, 4 + 3 * x); break;
       case 75: p_.all(&Performer::setHardness, 0.5 + 1.5 * x); break;
@@ -222,6 +241,8 @@ class Controls {
   int sounding_[128] = {};
   int lo_, hi_, transpose_;
   bool breathPad_ = false;
+  bool circuit_ = false;  // a synth lead: K2 cutoff, K3 resonance
+  int lastQ10_ = -1, lastSpread_ = -1;
   double joyBreath_ = 0;
 
  public:

@@ -20,10 +20,12 @@
 // The viscothermal loss sqrt(jw) is a constant plus three first-order sections
 // (fitted 50 Hz .. 12 kHz within 10 %); each section is one state per interface.
 //
-// Layout for AVX-512: every per-cell array is alignas(64) float[96] (6 vectors
-// of 16 floats). The per-sample loops run over all 128 cells with no branches;
-// cells without a hole carry identity coefficients. Coefficients change only
-// when the geometry or the keys move, once per block.
+// Layout for AVX-512: every per-cell array is alignas(64) float[kRow]. The
+// per-sample loops run over the used cells in vectors of 16 with no branches.
+// Most cells have no hole: their node update is p += v0 J alone; the cells
+// with a branch take the full 3x3 update (by vectors where they are many, one
+// by one where they are few). Coefficients
+// change only when the geometry or the keys move, once per block.
 #pragma once
 
 #include <cstdint>
@@ -36,14 +38,18 @@ constexpr int kCells = 512;        // room for the longest bore (a horn in F at 
 constexpr int kVec = 16;          // floats per AVX-512 register
 constexpr int kLossSections = 3;  // sqrt(jw) fit
 constexpr int kPad = 16;          // zero padding on both sides of p and u
+// Rows of the per-cell arrays: one vector longer than kCells, so that cell i of
+// each array falls in a different L1 set (at 2 KB apart, all ~25 of them
+// shared a few sets and evicted each other).
+constexpr int kRow = kCells + kVec;
 
 struct alignas(64) BoreState {
   // Padded so p[i + 1] and u[i - 1] are plain loads (no branches at the ends).
   alignas(64) float pbuf[kPad + kCells + kPad];
   alignas(64) float ubuf[kPad + kCells + kPad];
-  alignas(64) float psi[kLossSections][kCells];  // loss section states, per interface
-  alignas(64) float q[kCells];                   // branch flow out of the cell
-  alignas(64) float l[kCells];                   // flow through the radiation inertance
+  alignas(64) float psi[kLossSections][kRow];  // loss section states, per interface
+  alignas(64) float q[kRow];                   // branch flow out of the cell
+  alignas(64) float l[kRow];                   // flow through the radiation inertance
   float* p() { return pbuf + kPad; }
   float* u() { return ubuf + kPad; }
   const float* p() const { return pbuf + kPad; }
@@ -53,12 +59,12 @@ struct alignas(64) BoreState {
 // Per-cell coefficients of one leapfrog step.
 struct alignas(64) BoreCoefs {
   // u update:  u+ = au u - bu (p[i+1] - p[i]) - sum_k ck psi_k ;  psi_k+ = a_k psi_k + g_k (u+ - u)
-  alignas(64) float au[kCells], bu[kCells], ck[kLossSections][kCells];
+  alignas(64) float au[kRow], bu[kRow], ck[kLossSections][kRow];
   float a[kLossSections], g[kLossSections];
   // node update, x = (p, q, l):  x+ = M x + v J,  J = u[i-1] - u[i]
-  alignas(64) float m[3][3][kCells];
-  alignas(64) float v[3][kCells];
-  alignas(64) float e[3][kCells];  // x+ += e pRoom: the room's pressure at the opening
+  alignas(64) float m[3][3][kRow];
+  alignas(64) float v[3][kRow];
+  alignas(64) float e[3][kRow];  // x+ += e pRoom: the room's pressure at the opening
 };
 
 // What a side branch at a cell looks like, all in SI units (m, kg, s).
@@ -110,7 +116,11 @@ class Bore {
   double compliance(int cell) const;  // C of the cell incl. a closed chimney (m^3/Pa)
   void update();  // rebuild coefficients if something changed
   // A branch whose coefficients are rebuilt at once (only this cell).
-  void setBranchNow(int cell, const Branch& b) { branch_[cell] = b; buildNode(cell); }
+  void setBranchNow(int cell, const Branch& b) {
+    branch_[cell] = b;
+    buildNode(cell);
+    classify(cell);
+  }
 
   // Brass: lumped and network pieces (after setBore).
   // Extra volume at a cell (m^3): a mouthpiece's cup.
@@ -148,6 +158,8 @@ class Bore {
  private:
   void buildU();
   void buildNode(int cell);
+  void classify(int cell);
+  void listFull();
   double dt_, dx_, fs_, x0_ = 0;
   int foot_ = 0, ec_ = 0, n_ = kVec;
   double cellVol_[kCells] = {};  // lumped extra volume (cork cavity) (m^3)
@@ -160,6 +172,14 @@ class Bore {
   double kappa_[kCells] = {};   // sqrt(jw) loss per length at each interface
   Branch branch_[kCells];
   bool dirty_ = true;
+  // Cells whose node update needs the full 3x3 matrix (a branch, or a branch's
+  // flow left over); every other cell is p += v0 J (step()'s fast path). A
+  // vector of 16 cells with several of them takes the full update as a whole
+  // (dense_); the others' few go one by one from fullList_.
+  bool full_[kCells] = {};
+  bool dense_[kCells / kVec] = {};
+  int fullList_[kCells], nFull_ = 0;
+  bool listDirty_ = true;
 };
 
 }  // namespace pajupilli

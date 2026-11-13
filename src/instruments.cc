@@ -70,6 +70,8 @@ extern const int kNumDesigned;
 // The brass (src/brass.cc).
 extern const Instrument kBrass[];
 extern const int kNumBrass;
+extern const Instrument kLeads[];
+extern const int kNumLeads;
 
 const Instrument* findInstrument(const std::string& name) {
   for (const Instrument& i : kFlutes)
@@ -78,6 +80,8 @@ const Instrument* findInstrument(const std::string& name) {
     if (name == kDesigned[k].name) return &kDesigned[k];
   for (int k = 0; k < kNumBrass; ++k)
     if (name == kBrass[k].name) return &kBrass[k];
+  for (int k = 0; k < kNumLeads; ++k)
+    if (name == kLeads[k].name) return &kLeads[k];
   return nullptr;
 }
 
@@ -88,6 +92,7 @@ std::string instrumentNames() {
   for (const Instrument& i : kFlutes) s += (s.empty() ? "" : ", ") + std::string(i.name);
   for (int k = 0; k < kNumDesigned; ++k) s += ", " + std::string(kDesigned[k].name);
   for (int k = 0; k < kNumBrass; ++k) s += ", " + std::string(kBrass[k].name);
+  for (int k = 0; k < kNumLeads; ++k) s += ", " + std::string(kLeads[k].name);
   return s;
 }
 

@@ -7,6 +7,7 @@
 #include "flute.h"
 #include "horn.h"
 #include "hornplayer.h"
+#include "lead.h"
 #include "player.h"
 #include "reed.h"
 #include "reedplayer.h"
@@ -83,12 +84,14 @@ void Resampler::process(const float* in, float* out, int n) {
 std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.reed()) return std::unique_ptr<Tube>(new Reed(inst));
   if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));
+  if (inst.circuit()) return std::unique_ptr<Tube>(new Lead(inst));
   return std::unique_ptr<Tube>(new Flute(inst));
 }
 
 std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
   if (t.instrument().reed()) return std::unique_ptr<Performer>(new ReedPlayer(static_cast<Reed&>(t)));
   if (t.instrument().lip()) return std::unique_ptr<Performer>(new HornPlayer(static_cast<Horn&>(t)));
+  if (t.instrument().circuit()) return std::unique_ptr<Performer>(new LeadPlayer(static_cast<Lead&>(t)));
   return std::unique_ptr<Performer>(new Player(static_cast<Flute&>(t)));
 }
 

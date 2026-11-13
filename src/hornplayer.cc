@@ -42,12 +42,13 @@ HornPlayer::HornPlayer(Horn& h) : Performer(h), horn_(h) {
 
 void HornPlayer::seed(unsigned s) {
   rng_ = 4242u + 7907u * s;
+  vib_.seed(s);
   if (s == 0) return;
   for (int i = 0; i < 4; ++i) urand();
-  vibRateMul_ = 1 + 0.08 * urand();
-  vibDepthMul_ = 1 + 0.15 * urand();
+  vib_.rateMul = 1 + 0.08 * urand();
+  vib_.depthMul = 1 + 0.15 * urand();
   flutterRate_ = 27 + 4 * urand();
-  vibPhase_ = M_PI * (1 + urand());
+  vib_.setPhase(M_PI * (1 + urand()));
   flutterPhase_ = M_PI * (1 + urand());
 }
 
@@ -206,10 +207,10 @@ void HornPlayer::render(float* out, int n) {
     Embouchure e = horn_.embouchure();
     double lungTarget = 0;
     // Vibrato (from the breath), fading in after 300 ms; a horn player seldom uses it.
-    vibPhase_ += 2 * M_PI * vibRate_ * vibRateMul_ * (1 + 0.05 * wander_ * w2b_) * bdt;
-    if (vibPhase_ > 2 * M_PI) vibPhase_ -= 2 * M_PI;
-    const double vib = vibDepth_ * vibDepthMul_ * std::clamp((sinceOn_ - 0.3) / 0.4, 0.0, 1.0);
-    const double sv = std::sin(vibPhase_);
+    // (performer.h: Vibrato, a rotating complex number, breathing.)
+    const double sv = vib_.step(bdt, vibRate_ * (1 + 0.05 * wander_ * w2b_), sinceOn_,
+                                std::clamp(dyn_ + breathCtl_, 0.0, 1.0), wander_);
+    const double vib = vibDepth_ * vib_.depthMul * vib_.env();
     if (note_ >= 0) {
       const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], std::max(dynLo[note_], dynHi[note_]));
       const double f = glideFrequency();  // (a glide: the lips slide through the partials)

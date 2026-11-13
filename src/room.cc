@@ -10,9 +10,11 @@ namespace {
 
 constexpr RoomSpec kRooms[] = {
     {"dry", 0, 0, 2},
+    {"booth", 40, 0.3, 1.5},      // a small, dead room (a drum booth)
     {"studio", 150, 0.5, 2},      // a small studio, damped
     {"hall", 2500, 1.8, 3},       // a chamber-music hall
     {"church", 15000, 4.0, 6},    // a stone church
+    {"gated", 3000, 4.0, 3, 0.35},  // a big live room behind a gate (the 80s snare)
 };
 constexpr double kC = 343;
 
@@ -181,6 +183,20 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
       lp_[k] = b0_[k] * raw + a1_[k] * lp_[k];
       x[k] = lp_[k];
     }
+    // The gate, keyed by the sound going in: open while it is within 20 dB
+    // of its recent peak, and spec.gate seconds after; then shut in ~15 ms.
+    float g = 1;
+    if (spec_.gate > 0) {
+      float in = 0;
+      for (int s = 0; s < ns; ++s) in += std::fabs(src[s][i]);
+      gateEnv_ = std::max(in, gateEnv_ * 0.9995f);
+      gatePeak_ = std::max(gateEnv_, gatePeak_ * float(std::exp(-1 / (2.0 * fs_))));
+      if (gateEnv_ > std::max(1e-5f, 0.1f * gatePeak_)) gateHold_ = float(spec_.gate);
+      else gateHold_ = std::max(0.0f, gateHold_ - float(1 / fs_));
+      const float target = gateHold_ > 0 ? 1.0f : 0.0f;
+      gateGain_ += (target - gateGain_) * float(1 - std::exp(-1 / ((target > gateGain_ ? 0.001 : 0.015) * fs_)));
+      g = gateGain_;
+    }
     // The reverberant field at each listener.
     for (int t = 0; t < ns + 2; ++t) {
       const float* dir = &outDir_[t * kLines];
@@ -193,7 +209,7 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
         }
         atSource[t][i] = acc;
       } else {
-        (t == ns ? left : right)[i] += lg * micDiffuse_ * acc;
+        (t == ns ? left : right)[i] += lg * micDiffuse_ * g * acc;
       }
     }
     // Early sound at the microphones.

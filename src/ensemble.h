@@ -26,9 +26,15 @@
 // ear with its lips. Every pair asks for its interval's nearest simple ratio
 // (fifth 3/2 +2 c, major third 5/4 -14 c, minor third 6/5 +16 c, ...), the
 // simpler and closer the harder; a least-squares solve gives each flute its
-// offset, pulled weakly to equal temperament and strongly to where a note
-// already sounding sits (a new note fits the chord, the chord does not slide,
-// and a progression does not drift). Solved when the sounding set changes.
+// offset. Notes younger than 150 ms are still being placed: if they are fewer
+// than the notes already sounding, those stay where they are and the young fit
+// them (the chord does not slide, a progression does not drift); if they are
+// as many or more (a chord struck or rolled, a new chord over one held note),
+// they are placed together with their mean on equal temperament, and the
+// older minority moves to fit them. Solved when the sounding set changes, and
+// every 100 ms while it does not: the notes heal towards 0 c (time constant
+// 3 s, PJ_JIHEAL), as far as their intervals let them; a note alone, or with
+// no harmonic reason to be off, ends at 0 c.
 //
 // The room (room.h): the instruments sit in it, sound into it and hear it in
 // their bores, the silent ones too. Without a room the silent flutes are not
@@ -87,7 +93,10 @@ class Ensemble {
     double lastOff = -1e9;   // when its last key went up (s)
     bool active = false;     // being rendered
     int tunedNote = -1;      // the note its tuning was set for
+    int ageNote = -1;        // the note sounding, and since when (s): its age
+    double noteAt = -1e9;
     double cents = 0;        // its offset from equal temperament
+    double gl = 1, gr = 1;   // its pan (no room): gains left and right
     std::vector<float> room; // the room's pressure here, next block
   };
   void init(const std::vector<Member>& members, const RoomSpec* room);
@@ -106,8 +115,11 @@ class Ensemble {
   void block(float* left, float* right, int n);
 
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
+  static constexpr double kFresh = 0.25;  // silent this long after a release: a fresh start
   std::vector<Slot> f_;
   bool mixed_ = false;
+  bool panned_ = false;  // a stereo mix by each voice's pan (no room)
+  double healAt_ = 0;    // when the tuning last healed (s)
   int lo_ = 127, hi_ = 0;
   int owner_[128];
   int pitch_[128];
@@ -120,7 +132,14 @@ class Ensemble {
   bool ji_;                 // PJ_JI (1): adaptive just intonation
   long long tuneSig_ = -1;  // the sounding set last tuned for
   std::vector<std::vector<float>> buf_;
-  std::unique_ptr<Room> room_;
+  // Three reverb channels, each a room of its own: small (the drums, the
+  // synth basses), main (the room chosen; everyone else), gated (a big room
+  // behind a gate: for the snare).
+  // A source sounds into its channel's room and hears that room back.
+  std::unique_ptr<Room> rooms_[3];
+  std::vector<int> roomSlots_[3];
+  bool room_ = false;  // in rooms at all (not dry)
+  static int reverbChannel(const Instrument& in);
   float roomFb_ = std::getenv("PJ_ROOMFB") ? float(std::atof(std::getenv("PJ_ROOMFB"))) : 1.0f;  // room into the bores
   std::vector<float> srcBuf_;  // physical pressures for the room
   std::vector<float> qL_, qR_; // rendered, not yet handed out
