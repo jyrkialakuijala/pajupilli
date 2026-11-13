@@ -83,8 +83,12 @@ void Reed::controlStep() {
   const double mu = rp_.k / (2 * M_PI * fr) / (2 * M_PI * fr);  // mass per area (kg/m^2)
   invMu_ = 1 / mu;
   w2_ = wr * wr;
-  // (The tongue rests on the reed only while the player blows.)
-  g_ = kQr_ * rp_.qr * std::sqrt(lip) * wr + (cur_.lung > 1 ? (1 - tongue_) * 3 * wr : 0);
+  // (The tongue rests on the reed once the player has the reed in the mouth;
+  // at rest, never blown, the reed is free: the passive response, -imp. After
+  // a note, a staccato tongue stop held a lightly damped reed (the shawm's)
+  // closed but free to move: its swept flow and the bore rang up from silence.)
+  if (cur_.lung > 1) played_ = true;
+  g_ = kQr_ * rp_.qr * std::sqrt(lip) * wr + (played_ ? (1 - tongue_) * 3 * wr : 0);
   const double dt = 1 / fs_, hd = 0.5 * dt;
   const double det = 1 + hd * g_ + hd * hd * w2_;
   // (I - dt/2 A)^-1 (I + dt/2 A), A = [[0, 1], [-w2, -g]]; F enters v.

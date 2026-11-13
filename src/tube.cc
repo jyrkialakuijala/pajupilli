@@ -194,6 +194,24 @@ void Tube::setHoles(const char* pattern, double fingerSpeed) {
     if (!hole_[i].present) continue;
     const char c = i < n ? pattern[i] : 'o';
     hole_[i].target = c == 'x' ? 0 : c == 'h' ? (hole_[i].finger ? kHalf_ : 0.5) : 1;
+    hole_[i].glideStroke = 0;
+  }
+  if (glide_ != 0) {
+    // The holes starting a stroke, in the order the fingers reach them.
+    int idx[64], k = 0;
+    for (int i = 0; i < nHoles_ && k < 64; ++i) {
+      const Hole& h = hole_[i];
+      if (!h.present || h.target == h.open) continue;
+      if (h.closing == (h.target > h.open)) idx[k++] = i;
+    }
+    const bool up = glide_ > 0;
+    std::sort(idx, idx + k, [&](int a, int b) { return up ? hole_[a].x > hole_[b].x : hole_[a].x < hole_[b].x; });
+    const double g = std::abs(glide_);
+    for (int j = 0; j < k; ++j) {
+      hole_[idx[j]].glideWait = g * j / k;
+      hole_[idx[j]].glideStroke = std::max(0.010, 1.5 * g / k);
+    }
+    glide_ = 0;
   }
 }
 
@@ -279,6 +297,11 @@ void Tube::updateHoles(double dtBlock) {
       h.stroke = (byFinger ? 0.010 / fingerSpeed_ : 0.016) * jitter;
       h.wait = 0;
       if ((h.closing ? closers : openers) > 1 && dtBlock > 0) h.wait = keyDelay();
+      if (h.glideStroke > 0) {  // a glide: slowly, one finger after another
+        h.stroke = h.glideStroke * jitter;
+        h.wait = h.glideWait;
+        h.glideStroke = 0;
+      }
     }
     if (h.wait > 0) {
       h.wait -= dtBlock;

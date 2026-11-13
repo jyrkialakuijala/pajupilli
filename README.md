@@ -215,8 +215,8 @@ The same air column and room, with these new parts (`research/horns.md` has the 
   in the first interfaces. The waveguide matches `tools/brass.py` within 4 cents, except
   partials 3–6 (up to 13 c), which turn back in the flare.
 - **The valves** (`src/horn.*`): each loop is a bore of its own, linked to the two cells at the
-  valve's port. Pressing a valve shuts the port while the links open over a ~12 ms stroke, so
-  half-valves are real. The loops are fitted so partials 4–12 drop by their semitones;
+  valve's port. Pressing a valve shuts the port while the links open over a ~7 ms stroke, so
+  half-valves are real (a slower stroke left a hole in valve slurs). The loops are fitted so partials 4–12 drop by their semitones;
   combinations come out sharp, as on a real horn (1-2-3 by ~55 cents).
 - **The lips**: an outward-striking valve (the mouth pressure opens them into the cup) at about
   0.85 of the note, plus a weaker inward-striking second mode 1.3× higher. A one-mass lip alone
@@ -227,8 +227,13 @@ The same air column and room, with these new parts (`research/horns.md` has the 
   swept flow, solved with the cup each sample.
 - **The horn player** (`src/hornplayer.*`): valves and partial from a fingering table, with the
   standard alternates (another partial, other valves; up high, partial 15 instead of a sharp
-  valved 16). Breath rises as f^1.45 with the note. "ta" / "da" / breath attacks. A slur across
-  partials gets a brief push of lips and air towards the new note. The ear trims a held note only
+  valved 16). Breath rises as f^1.45 with the note. "ta" / "da" / breath attacks, each with a push
+  of breath that settles over ~80 ms (less when already loud): without it a note took 120–250 ms to
+  speak, with it 30–60 ms (A2 ~100 ms). A slur across partials overshoots the lips towards the new
+  note by a share of the gap to the next partial (high up the partials lie a semitone apart, so a
+  fixed overshoot landed on the neighbour), with a push of air, stronger going up; a valve-only
+  slur just moves the valves. A key let go is caught for 40 ms: the next key in that time slurs
+  from the old note instead of restarting it, so a keyboard legato need not overlap the keys. The ear trims a held note only
   slowly and slightly (errors over 5 cents, at most 0.8 % of the lips' tension), because a fast or
   wide one pushed notes over the jump in their slot and made them waver.
 - **The calibration** for brass scans each note's lips across its slot and keeps the steady
@@ -325,7 +330,7 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   | duduk | 16 / 17 | C4 silent |
   | shawm | 10 / 13 (D4–D5) | D#4 -118 c, F#4 -38 c, D4 -10 c; the second register is open |
 
-  | horn | 34 / 37 (C3–F5 within ~10 c on `-scale`; held notes steady within 2 c and a few % in level) | F2, F#2, G2 do not speak; G#2–B2 16–39 c off; some notes hold only a narrow dynamic range; slurs G4→C4 and C3→F3 land ~20 c sharp |
+  | horn | 37 / 37 (C3–F5 within ~10 c on `-scale`; held notes steady within 2 c and a few % in level; notes speak in 30–60 ms; legato scale ~10 ms per change more than 6 dB down) | F#2–G#2 22–28 c off; C#4, D4 ~15 c sharp; many notes hold only a narrow dynamic range (loudest often 0.5); a slur down to G3 from C4 or D4 lands ~55 c flat; slurs crossing partials with valves in the low register (F3→G3, A3↔Bb3) dip for 20–65 ms |
 
   The designs' passive resonances are within a few cents of their notes (rms 0–10 c on the
   core fingerings; the saxophones and oboe 16–48 c, their octaves stretched: the mouthpiece's

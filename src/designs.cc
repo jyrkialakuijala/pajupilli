@@ -125,6 +125,62 @@ const NoteInfo kOboeNotes[] = {
 };
 const Design kOboeDesign = {kOboeBore, 8, kOboeHoles, 17, kOboeNotes, 3.73, 568.9, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.3, 3e-05, 0, 4.5e-06, 5000, 7000, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
+// English horn in F, written Bb3..C#6
+// A narrow cone and a double reed; octave vents for the second register,
+// the third register by search among vented fingerings.
+const BorePoint kEnglishHornBore[] = {
+    {0.0, 3.44}, {15.0, 4.20}, {37.5, 5.35}, {108.0, 6.90}, {763.4, 23.25}, {793.4, 24.75}, {823.4, 33.00}, {853.4, 54.00}};
+const HoleDef kEnglishHornHoles[] = {
+    {254.7, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 1 oct2
+    {360.0, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 2 oct1
+    {294.2, 4.80, 12.8, 3.8, 13.5, kNormallyClosed},  // 3 C#5
+    {337.9, 5.34, 12.4, 12.0, 22.5, kFingerHole},  // 4 C5
+    {328.7, 5.87, 12.0, 12.0, 22.5, kFingerHole},  // 5 B4
+    {355.8, 6.41, 11.6, 3.8, 13.5, kNormallyClosed},  // 6 A#4
+    {412.4, 6.94, 11.2, 12.0, 22.5, kFingerHole},  // 7 A4
+    {433.9, 7.48, 10.9, 3.8, 13.5, kNormallyClosed},  // 8 G#4
+    {482.4, 8.01, 10.5, 12.0, 22.5, kFingerHole},  // 9 G4
+    {499.4, 8.55, 10.1, 12.0, 22.5, kFingerHole},  // 10 F#4
+    {542.2, 9.09, 9.8, 3.8, 13.5, kNormallyClosed},  // 11 F4
+    {580.5, 9.62, 9.4, 12.0, 22.5, kFingerHole},  // 12 E4
+    {624.0, 10.16, 9.0, 3.8, 13.5, kNormallyClosed},  // 13 D#4
+    {660.4, 10.69, 8.6, 3.8, 13.5, 0},  // 14 D4
+    {703.2, 11.23, 8.2, 3.8, 13.5, kNormallyClosed},  // 15 C#4
+    {765.8, 11.76, 7.9, 3.8, 13.5, 0},  // 16 C4
+    {933.8, 12.30, 7.5, 3.8, 13.5, 0},  // 17 B3
+};
+const NoteInfo kEnglishHornNotes[] = {
+    {"xxxxxxxxxxxxxxxxx", 1},  // 58 A#3 (+110 c passive)
+    {"xxxxxxxxxxxxxxxxo", 1},  // 59 B3 (+10 c passive)
+    {"xxxxxxxxxxxxxxxoo", 1},  // 60 C4 (-7 c passive)
+    {"xxxxxxxxxxxxxxooo", 1},  // 61 C#4 (+10 c passive)
+    {"xxxxxxxxxxxxxoxoo", 1},  // 62 D4 (-13 c passive)
+    {"xxxxxxxxxxxxooxoo", 1},  // 63 D#4 (-16 c passive)
+    {"xxxxxxxxxxxoxoxoo", 1},  // 64 E4 (-27 c passive)
+    {"xxxxxxxxxxooxoxoo", 1},  // 65 F4 (-22 c passive)
+    {"xxxxxxxxxoxoxoxoo", 1},  // 66 F#4 (-23 c passive)
+    {"xxxxxxxxooxoxoxoo", 1},  // 67 G4 (-49 c passive)
+    {"xxxxxxxoooxoxoxoo", 1},  // 68 G#4 (-25 c passive)
+    {"xxxxxxoxooxoxoxoo", 1},  // 69 A4 (-73 c passive)
+    {"xxxxxooxooxoxoxoo", 1},  // 70 A#4 (+15 c passive)
+    {"xxxxoxoxooxoxoxoo", 1},  // 71 B4 (-7 c passive)
+    {"xxxooxoxooxoxoxoo", 1},  // 72 C5 (-56 c passive)
+    {"xxoooxoxooxoxoxoo", 1},  // 73 C#5 (-49 c passive)
+    {"xoxxxxxxxxxxxoxoo", 2},  // 74 D5 (+41 c passive)
+    {"xoxxxxxxxxxxooxoo", 2},  // 75 D#5 (+47 c passive)
+    {"xoxxxxxxxxxoxoxoo", 2},  // 76 E5 (+39 c passive)
+    {"xoxxxxxxxxooxoxoo", 2},  // 77 F5 (+55 c passive)
+    {"xoxxxxxxxoxoxoxoo", 2},  // 78 F#5 (+53 c passive)
+    {"xoxxxxxxooxoxoxoo", 2},  // 79 G5 (+37 c passive)
+    {"xoxxxxxoooxoxoxoo", 2},  // 80 G#5 (+65 c passive)
+    {"oxxxxxoxooxoxoxoo", 2},  // 81 A5 (+16 c passive)
+    {"oxxxxooxooxoxoxoo", 2},  // 82 A#5 (+128 c passive)
+    {"oxxxoxoxooxoxoxoo", 2},  // 83 B5 (+82 c passive)
+    {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (+77 c passive)
+    {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+93 c passive)
+};
+const Design kEnglishHornDesign = {kEnglishHornBore, 8, kEnglishHornHoles, 17, kEnglishHornNotes, 3.73, 853.4, false, nullptr, 0, {0.008, 0.0003, 3.2e+07, 1700, 0.3, 0.0001, 0, 1e-05, 4000, 5500, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
 // Bassoon, Bb1..Eb4
 // A long narrow cone and a double reed; small holes with long oblique
 // chimneys; flick-key vents for the second register.
@@ -255,6 +311,78 @@ const NoteInfo kShawmNotes[] = {
 };
 const Design kShawmDesign = {kShawmBore, 6, kShawmHoles, 7, kShawmNotes, 3.73, 554.9, false, nullptr, 0, {0.012, 0.0006, 1e+07, 2500, 0.12, 5e-05, 0, 1.6e-05, 2800, 3800, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
+// Shehnai in C, C4..G5
+// A narrow cone with a flared metal bell, a small double reed between the
+// lips; seven finger holes, half-holing for the komal notes.
+const BorePoint kShehnaiBore[] = {
+    {0.0, 4.30}, {25.0, 6.46}, {50.0, 5.50}, {482.3, 20.00}, {517.3, 30.00}, {552.3, 70.00}};
+const HoleDef kShehnaiHoles[] = {
+    {188.1, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 1 1
+    {201.8, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 2 2
+    {237.3, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 3 3
+    {281.4, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 4 4
+    {332.9, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 5 5
+    {348.5, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 6 6
+    {402.1, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 7 7
+};
+const NoteInfo kShehnaiNotes[] = {
+    {"xxxxxxx", 1},  // 60 C4 (+5 c passive)
+    {"xxxxxxh", 1},  // 61 C#4 (+3 c passive)
+    {"xxxxxxo", 1},  // 62 D4 (-0 c passive)
+    {"xxxxxho", 1},  // 63 D#4 (+2 c passive)
+    {"xxxxxoo", 1},  // 64 E4 (-1 c passive)
+    {"xxxxooo", 1},  // 65 F4 (-9 c passive)
+    {"xxxhooo", 1},  // 66 F#4 (-7 c passive)
+    {"xxxoooo", 1},  // 67 G4 (-14 c passive)
+    {"xxhooxo", 1},  // 68 G#4 (-0 c passive)
+    {"xxooooo", 1},  // 69 A4 (+0 c passive)
+    {"xhoxooo", 1},  // 70 A#4 (+0 c passive)
+    {"xoooooo", 1},  // 71 B4 (-0 c passive)
+    {"ooooooo", 1},  // 72 C5 (-0 c passive)
+    {"xxxxxxh", 2},  // 73 C#5 (-3 c passive)
+    {"xxxxxxo", 2},  // 74 D5 (-1 c passive)
+    {"xxxxxho", 2},  // 75 D#5 (-9 c passive)
+    {"xxxxxoo", 2},  // 76 E5 (+3 c passive)
+    {"xxxxooo", 2},  // 77 F5 (+14 c passive)
+    {"xxxoxox", 2},  // 78 F#5 (+3 c passive)
+    {"xxxoooo", 2},  // 79 G5 (+28 c passive)
+};
+const Design kShehnaiDesign = {kShehnaiBore, 6, kShehnaiHoles, 7, kShehnaiNotes, 3.73, 552.3, false, nullptr, 0, {0.008, 0.0004, 2e+07, 2600, 0.3, 4e-05, 0, 8e-06, 3000, 4500, 0.3}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
+// Bagpipe chanter (Great Highland), G4..A5
+// A conical chanter, its double reed in the bag (no lips, steady
+// pressure); eight holes, low G to high A.
+const BorePoint kBagpipeBore[] = {
+    {0.0, 2.67}, {20.0, 4.01}, {308.9, 14.00}, {328.9, 18.00}, {338.9, 26.00}};
+const HoleDef kBagpipeHoles[] = {
+    {104.5, 5.00, 5.0, 8.0, 15.0, kFingerHole},  // 1 thumb
+    {127.7, 5.50, 5.0, 8.0, 15.0, kFingerHole},  // 2 L1
+    {138.0, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 3 L2
+    {161.0, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 4 L3
+    {190.2, 6.50, 5.0, 8.0, 15.0, kFingerHole},  // 5 R1
+    {201.9, 6.50, 5.0, 8.0, 15.0, kFingerHole},  // 6 R2
+    {230.2, 6.00, 5.0, 8.0, 15.0, kFingerHole},  // 7 R3
+    {261.5, 5.50, 5.0, 8.0, 15.0, kFingerHole},  // 8 R4
+};
+const NoteInfo kBagpipeNotes[] = {
+    {"xxxxxxxx", 1},  // 67 G4 (-0 c passive)
+    {"xxxxxxxh", 1},  // 68 G#4 (+1 c passive)
+    {"xxxxxxxo", 1},  // 69 A4 (-0 c passive)
+    {"xxxxxxho", 1},  // 70 A#4 (+5 c passive)
+    {"xxxxxxoo", 1},  // 71 B4 (+0 c passive)
+    {"xxxxxhox", 1},  // 72 C5 (-1 c passive)
+    {"xxxxxooo", 1},  // 73 C#5 (+0 c passive)
+    {"xxxxoooo", 1},  // 74 D5 (-0 c passive)
+    {"xxxhoxoo", 1},  // 75 D#5 (-4 c passive)
+    {"xxxooooo", 1},  // 76 E5 (-0 c passive)
+    {"hxxxxhxo", 1},  // 77 F5 (+2 c passive)
+    {"xxoooooo", 1},  // 78 F#5 (-0 c passive)
+    {"xooooooo", 1},  // 79 G5 (-0 c passive)
+    {"hooooooo", 1},  // 80 G#5 (+4 c passive)
+    {"oooooooo", 1},  // 81 A5 (-0 c passive)
+};
+const Design kBagpipeDesign = {kBagpipeBore, 5, kBagpipeHoles, 8, kBagpipeNotes, 3.73, 338.9, false, nullptr, 0, {0.009, 0.00035, 3e+07, 2200, 0.15, 4e-05, 0, 1e-05, 7000, 7500, -1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
 // Alto recorder in F (Baroque fingering), F4..E6
 // A duct forms the jet; a reverse-conical bore; the thumb half-holed opens
 // the second register. The breath sets the pitch: louder is sharper.
@@ -299,6 +427,43 @@ const NoteInfo kRecorderNotes[] = {
     {"xxooooxooo", 3},  // 88 E6 (+1 c passive)
 };
 const Design kRecorderDesign = {kRecorderBore, 8, kRecorderHoles, 10, kRecorderNotes, 3.73, 432.5, false, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.0011, 0.012, 0.003, 0.012, 0.002, 0.055, 0.0002, 250, 1500}};
+
+// Tin whistle in D, D5..A6
+// A duct on a cylinder, six finger holes; the second octave by overblowing
+// the same fingerings. The breath sets the pitch.
+const BorePoint kWhistleBore[] = {
+    {0.0, 12.50}, {258.8, 12.50}};
+const HoleDef kWhistleHoles[] = {
+    {110.1, 4.91, 1.2, 8.0, 15.0, kFingerHole},  // 1 1
+    {133.5, 7.08, 1.2, 8.0, 15.0, kFingerHole},  // 2 2
+    {147.7, 4.78, 1.2, 8.0, 15.0, kFingerHole},  // 3 3
+    {172.6, 3.96, 1.2, 8.0, 15.0, kFingerHole},  // 4 4
+    {180.7, 4.31, 1.2, 8.0, 15.0, kFingerHole},  // 5 5
+    {203.2, 3.57, 1.2, 8.0, 15.0, kFingerHole},  // 6 6
+};
+const NoteInfo kWhistleNotes[] = {
+    {"xxxxxx", 1},  // 74 D5 (-12 c passive)
+    {"xxxxxh", 1},  // 75 D#5 (+1 c passive)
+    {"xxxxxo", 1},  // 76 E5 (-1 c passive)
+    {"xxxxho", 1},  // 77 F5 (+10 c passive)
+    {"xxxxoo", 1},  // 78 F#5 (+1 c passive)
+    {"xxxooo", 1},  // 79 G5 (-4 c passive)
+    {"xxhoox", 1},  // 80 G#5 (-1 c passive)
+    {"xxoooo", 1},  // 81 A5 (-1 c passive)
+    {"xhoxox", 1},  // 82 A#5 (+3 c passive)
+    {"xooooo", 1},  // 83 B5 (+0 c passive)
+    {"oxxooo", 1},  // 84 C6 (-1 c passive)
+    {"oooooo", 1},  // 85 C#6 (+0 c passive)
+    {"xxxxxx", 2},  // 86 D6 (+18 c passive)
+    {"xxxxxh", 2},  // 87 D#6 (+3 c passive)
+    {"xxxxxo", 2},  // 88 E6 (+2 c passive)
+    {"xxxxox", 2},  // 89 F6 (-4 c passive)
+    {"xxxxoo", 2},  // 90 F#6 (-2 c passive)
+    {"xxxooo", 2},  // 91 G6 (+7 c passive)
+    {"xxhooo", 2},  // 92 G#6 (-1 c passive)
+    {"xxoooo", 2},  // 93 A6 (+1 c passive)
+};
+const Design kWhistleDesign = {kWhistleBore, 2, kWhistleHoles, 6, kWhistleNotes, 1.87, 258.8, false, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.001, 0.008, 0.002, 0.008, 0.0015, 0.025, 0.0002, 300, 2600}};
 
 // Shakuhachi 1.8 (in D), D4..C#6
 // End-blown: the lips cover part of the top's rim, which bends the pitch
@@ -452,6 +617,65 @@ const PipeDef kPanflutePipes[] = {
     {95, 32.64, 6.69},
     {96, 30.27, 6.50}};
 const Design kPanfluteDesign = {kPanfluteBore, 2, nullptr, 0, kPanfluteNotes, 1.87, 200.0, true, kPanflutePipes, 30, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0.0005, 0, 0, 0, 0}};
+
+// Blown bottles (one per note), C4..C6
+// One bottle per note, blown across the neck (a Helmholtz resonator).
+const BorePoint kBottleBore[] = {
+    {0.0, 20.00}, {1000.0, 20.00}};
+const NoteInfo kBottleNotes[] = {
+    {"", 1},  // 60 C4 (+0 c passive)
+    {"", 1},  // 61 C#4 (+0 c passive)
+    {"", 1},  // 62 D4 (+0 c passive)
+    {"", 1},  // 63 D#4 (+0 c passive)
+    {"", 1},  // 64 E4 (+0 c passive)
+    {"", 1},  // 65 F4 (+0 c passive)
+    {"", 1},  // 66 F#4 (+0 c passive)
+    {"", 1},  // 67 G4 (+0 c passive)
+    {"", 1},  // 68 G#4 (+0 c passive)
+    {"", 1},  // 69 A4 (+0 c passive)
+    {"", 1},  // 70 A#4 (+0 c passive)
+    {"", 1},  // 71 B4 (+0 c passive)
+    {"", 1},  // 72 C5 (+0 c passive)
+    {"", 1},  // 73 C#5 (+0 c passive)
+    {"", 1},  // 74 D5 (+0 c passive)
+    {"", 1},  // 75 D#5 (+0 c passive)
+    {"", 1},  // 76 E5 (+0 c passive)
+    {"", 1},  // 77 F5 (+0 c passive)
+    {"", 1},  // 78 F#5 (+0 c passive)
+    {"", 1},  // 79 G5 (+0 c passive)
+    {"", 1},  // 80 G#5 (+0 c passive)
+    {"", 1},  // 81 A5 (+0 c passive)
+    {"", 1},  // 82 A#5 (+0 c passive)
+    {"", 1},  // 83 B5 (+0 c passive)
+    {"", 1},  // 84 C6 (+0 c passive)
+};
+const PipeDef kBottlePipes[] = {
+    {60, 101.85, 70.00, 60.00, 20.00},
+    {61, 97.42, 67.06, 57.85, 19.43},
+    {62, 93.16, 64.24, 55.78, 18.88},
+    {63, 89.10, 61.55, 53.78, 18.34},
+    {64, 85.22, 58.96, 51.85, 17.82},
+    {65, 81.52, 56.49, 50.00, 17.31},
+    {66, 77.99, 54.11, 48.21, 16.82},
+    {67, 74.44, 51.84, 46.48, 16.34},
+    {68, 71.15, 49.66, 44.81, 15.87},
+    {69, 68.19, 47.58, 43.21, 15.42},
+    {70, 65.25, 45.58, 41.66, 14.98},
+    {71, 62.22, 43.67, 40.17, 14.56},
+    {72, 59.40, 41.83, 38.73, 14.14},
+    {73, 57.06, 40.08, 37.34, 13.74},
+    {74, 54.31, 38.39, 36.00, 13.35},
+    {75, 52.16, 36.78, 34.72, 12.97},
+    {76, 49.83, 35.24, 33.47, 12.60},
+    {77, 47.58, 33.76, 32.27, 12.24},
+    {78, 45.50, 32.34, 31.12, 11.89},
+    {79, 43.56, 30.98, 30.00, 11.55},
+    {80, 41.51, 29.68, 28.93, 11.22},
+    {81, 39.82, 28.43, 27.89, 10.91},
+    {82, 37.81, 27.24, 26.89, 10.59},
+    {83, 36.21, 26.10, 25.93, 10.29},
+    {84, 34.73, 25.00, 25.00, 10.00}};
+const Design kBottleDesign = {kBottleBore, 2, nullptr, 0, kBottleNotes, 1.87, 200.0, true, kBottlePipes, 25, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0.0015, 0, 0, 0, 0}};
 
 // Soprano saxophone in Bb, written Bb3..D6
 // A conical bore: all harmonics, the octave key opens a vent (body or neck)
@@ -709,18 +933,23 @@ const Design kBaritoneSaxDesign = {kBaritoneSaxBore, 6, kBaritoneSaxHoles, 22, k
 extern const Instrument kDesigned[] = {
     {"clarinet", -2, 52, 84, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kClarinetDesign, "clarinet"},
     {"oboe", 0, 58, 85, 1, 1, 1, 48000, 0, false, false, 0, 0.35, Kind::kDoubleReed, &kOboeDesign, "oboe"},
+    {"english-horn", -7, 58, 85, 1.5, 1, 1, 48000, 0, false, false, 0, 0.4, Kind::kDoubleReed, &kEnglishHornDesign, "oboe"},
     {"bassoon", 0, 34, 63, 1, 1, 1, 24000, 0, false, false, 0, 0.6, Kind::kDoubleReed, &kBassoonDesign, "bassoon"},
     {"duduk", 0, 57, 73, 1, 1, 1, 48000, 0, false, false, 0, 0.3, Kind::kDoubleReed, &kDudukDesign, "duduk"},
     {"shawm", 0, 62, 74, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kShawmDesign, "shawm"},
+    {"shehnai", 0, 60, 79, 1, 1, 1, 48000, 0, false, false, 0, 0.25, Kind::kDoubleReed, &kShehnaiDesign, "shehnai"},
+    {"bagpipe", 0, 67, 81, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kBagpipeDesign, "bagpipe"},
     {"recorder", 0, 65, 88, 1, 1, 1, 48000, 0, false, false, 0, 1, Kind::kDuct, &kRecorderDesign, "recorder"},
+    {"whistle", 0, 74, 93, 1, 1, 0.8, 96000, 0, false, false, 0, 0.8, Kind::kDuct, &kWhistleDesign, "whistle"},
     {"shakuhachi", 0, 62, 85, 1, 1, 1.3, 48000, 0, false, false, 0, 1, Kind::kEndBlown, &kShakuhachiDesign, "shakuhachi"},
     {"ocarina", 0, 69, 89, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kDuct, &kOcarinaDesign, "ocarina"},
     {"panflute", 0, 67, 96, 1, 1, 0.8, 96000, 0, false, false, 0, 1, Kind::kEndBlown, &kPanfluteDesign, "panflute"},
+    {"bottle", 0, 60, 84, 1, 1, 1, 96000, 0, false, false, 0, 1, Kind::kEndBlown, &kBottleDesign, "bottle"},
     {"soprano-sax", -2, 58, 86, 0.666667, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kSopranoSaxDesign, "sax"},
     {"alto-sax", -9, 58, 87, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kAltoSaxDesign, "sax"},
     {"tenor-sax", -14, 58, 87, 1.33333, 1, 1, 36000, 0, false, false, 0, 0.4, Kind::kReed, &kTenorSaxDesign, "sax"},
     {"baritone-sax", -21, 58, 87, 2, 1, 1, 24000, 0, false, false, 0, 0.45, Kind::kReed, &kBaritoneSaxDesign, "sax"},
 };
-extern const int kNumDesigned = 13;
+extern const int kNumDesigned = 18;
 
 }  // namespace pajupilli

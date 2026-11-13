@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+
+#include "knob.h"
 
 namespace pajupilli {
 
@@ -10,6 +14,74 @@ Performer::Performer(Tube& t) : tube_(t), inst_(t.instrument()), fs_(t.fs()) {
   for (int& f : fingering) f = 0;
   for (double& d : dynLo) d = 0;
   for (double& d : dynHi) d = 1;
+  kRetongue_ = knob("PJ_RETONGUE", 100);  // an overlapped key this hard is tongued
+  kDvTongue_ = knob("PJ_DVTONGUE", 30);   // ... or this much harder than the key before
+  kDvGlide_ = knob("PJ_DVGLIDE", 30);     // an overlapped key this much softer glides
+  kGlide_ = knob("PJ_GLIDE", 1);          // the glide's time (x; 0: never glide)
+  kStaccato_ = knob("PJ_STACCATO", 0.12); // held shorter than this (s): a tongue stop
+  kDetache_ = knob("PJ_DETACHE", 0.08);   // a gap shorter than this (s): "du"
+  release_ = knob("PJ_RELEASE", 0.030);   // the breath's release (s; knob 7 live)
+}
+
+Performer::Articulation Performer::articulate(int midi, int velocity, bool overlap) {
+  const Articulation a = decide(midi, velocity, overlap);
+  lastArt_ = a;
+  return a;
+}
+
+Performer::Articulation Performer::decide(int midi, int velocity, bool overlap) {
+  const int prev = note_;
+  const double dv = velocity - lastVel_;
+  lastVel_ = velocity;
+  lastOnAt_ = now_;
+  stopping_ = false;
+  cancelGlide();
+  const double hard = std::max(0.3, hardness_);
+  if (overlap && prev >= 0) {
+    if (velocity >= kRetongue_ / hard || dv >= kDvTongue_) return kArtTongueLegato;
+    if (kGlide_ > 0 && dv <= -kDvGlide_ && prev != midi && std::abs(midi - prev) <= 12) {
+      // Can the pitch glide? A pan flute's pipes cannot; a jet's register
+      // change on the same fingering is a jump, not a glide (a brass player's
+      // lips glide through the partials: a rip).
+      const NoteInfo *a = played(prev), *b = played(midi);
+      const bool pipes = inst_.design && inst_.design->nPipes > 0;
+      const bool jet = inst_.kind == Kind::kFlute || inst_.kind == Kind::kDuct || inst_.kind == Kind::kEndBlown;
+      const bool same = a && b && std::strcmp(a->holes, b->holes) == 0;
+      if (!pipes && !(jet && same)) {
+        glideFrom_ = prev;
+        glideT_ = 0;
+        glideEar_ = earCorr_;
+        const double soft = std::clamp((-dv - kDvGlide_) / 40, 0.0, 1.0);
+        glideDur_ = kGlide_ * (0.06 + 0.025 * std::abs(midi - prev)) * (1 + soft);
+        holeGlide_ = midi > prev ? glideDur_ : -glideDur_;
+        return kArtGlide;
+      }
+    }
+    return kArtSlur;
+  }
+  if (blowing_ || now_ - lastOffAt_ < kDetache_) return velocity > 90 / hard ? kArtTu : kArtDu;
+  if (velocity < 35 * hardness_) return kArtBreath;
+  if (velocity > 90 / hard) return kArtAccent;
+  return kArtTu;
+}
+
+void Performer::released() {
+  lastOffAt_ = now_;
+  if (now_ - lastOnAt_ < kStaccato_) {
+    stopping_ = true;
+    stopClock_ = 0;
+  }
+}
+
+double Performer::glideMix() const {
+  if (!gliding()) return 1;
+  const double t = glideT_ / glideDur_;
+  return t * t * (3 - 2 * t);
+}
+
+double Performer::glideCover(int note, double dyn) const {
+  if (!gliding()) return 1;
+  return std::exp((1 - glideMix()) * (std::log(coverAt(glideFrom_, dyn)) - std::log(coverAt(note, dyn))));
 }
 
 double Performer::coverAt(int note, double dyn) const {
@@ -24,7 +96,7 @@ double Performer::coverAt(int note, double dyn) const {
 // gives one period; the control follows the error (the lips move slowly, like
 // an ear correcting, so a fast trill is barely touched and a held note settles).
 void Performer::listen(const float* x, int m, double& corr, double cents, double clock, double slope,
-                       double tau, double dead) {
+                       double tau, double dead, double range) {
   const double f0 = noteFrequency(note_), w = 2 * M_PI * f0 / fs_;
   const double ft = f0 * std::exp2(cents / 1200);  // where the ear wants it
   const double r = std::exp(-M_PI * f0 / (3 * fs_));  // Q 3
@@ -41,6 +113,7 @@ void Performer::listen(const float* x, int m, double& corr, double cents, double
         if (f > f0 / 1.3 && f < f0 * 1.3) {
           double err = 1200 * std::log2(f / ft);
           heard_ = err;
+          if (std::fabs(err) > range) err = 0;
           err = err > dead ? err - dead : err < -dead ? err + dead : 0;
           corr -= err / slope * (1 / f) / tau;
           corr = std::clamp(corr, -0.4, 0.4);

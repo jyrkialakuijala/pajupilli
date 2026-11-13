@@ -44,6 +44,7 @@ class Reed : public Tube {
   const ReedParams& rp_;
   Embouchure target_, cur_;
   double tongue_ = 0;
+  bool played_ = false;  // blown at least once (the tongue may rest on the reed)
   // The reed: displacement towards closing and its velocity; the opening.
   double x_ = 0, v_ = 0, h_ = 0, dp_ = 0;
   // Per control block: rest opening, wr^2, damping, 1 / mu, trapezoid matrix.

@@ -388,7 +388,8 @@ def emit(results):
         out.append('};')
         if spec.get('pipes'):
             out.append(f"const PipeDef {cn}Pipes[] = {{")
-            out.append('    ' + ',\n    '.join(f'{{{m}, {L:.2f}, {d:.2f}}}' for m, L, d in spec['pipes']) + '};')
+            out.append('    ' + ',\n    '.join('{' + ', '.join([str(p[0])] + [f'{v:.2f}' for v in p[1:]]) + '}'
+                                                for p in spec['pipes']) + '};')
         r = spec.get('reed', {})
         j = spec.get('jet', {})
         reed = (f"{{{r.get('width', 0):g}, {r.get('h0', 0):g}, {r.get('k', 0):g}, {r.get('fr', 0):g}, "

@@ -220,29 +220,32 @@ def sax(name, s, transpose, fs, reed, gain, title, top=None):
 # staple stand for the missing apex. Small holes in a thick wall; two octave
 # vents. Bore after Nederveen 1969 / Almeida et al. 2007 (the oboe reed).
 
-def oboe():
+def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3..C#6', reed=None, family='oboe'):
     names = ['oct2', 'oct1', 'C#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4',
              'C#4', 'C4', 'B3']
     fingers = {'C5', 'B4', 'A4', 'G4', 'F#4', 'E4'}
     nc = {'oct2', 'oct1', 'C#5', 'A#4', 'G#4', 'F4', 'D#4', 'C#4'}
 
     def bore(end, top=1.0):
-        return [(0, 1.8 * top), (10, 2.2 * top), (25, 2.8 * top), (72, 4.6), (end - 60, 15.5), (end - 40, 16.5),
-                (end - 20, 22.0), (end, 36.0)]
-    apex = -147
+        return [(0, 1.8 * top * s), (10 * s, 2.2 * top * s), (25 * s, 2.8 * top * s), (72 * s, 4.6 * s),
+                (end - 60 * s, 15.5 * s), (end - 40 * s, 16.5 * s), (end - 20 * s, 22.0 * s), (end, 36.0 * s)]
+    apex = -147 * s
 
-    def xs(m):
-        return 349.5e3 / (2 * 440 * 2 ** ((m - 69) / 12)) + apex - 30
+    def xs(m):  # where an open end would sound m (written)
+        return 349.5e3 / (2 * 440 * 2 ** ((m + transpose - 69) / 12)) + apex - 30 * s
     holes = []
     for n in names:
         if n.startswith('oct'):
-            lo, hi = (100, 170) if n == 'oct2' else (160, 240)
-            holes.append(hole(n, 0.5 * (lo + hi), 1.1, 12, padH=1.0, cup=5, flags=NCLOSED, lo=lo, hi=hi))
+            lo, hi = (100 * s, 170 * s) if n == 'oct2' else (160 * s, 240 * s)
+            holes.append(hole(n, 0.5 * (lo + hi), 1.1 * s, 12 * s, padH=1.0 * s, cup=5 * s, flags=NCLOSED,
+                              lo=lo, hi=hi))
             continue
         m = midi(n)
         u = (73 - m) / 14
-        d = 3.2 + 5.0 * u
-        holes.append(hole(n, xs(m), d, 8.5 - 3.5 * u, flags=(FINGER if n in fingers else 0) | (NCLOSED if n in nc else 0)))
+        d = (3.2 + 5.0 * u) * s
+        holes.append(hole(n, xs(m), d, (8.5 - 3.5 * u) * s,
+                          flags=(FINGER if n in fingers else 0) | (NCLOSED if n in nc else 0),
+                          **({} if s == 1 else dict(padH=(8.0 if n in fingers else 2.5) * s, cup=(15.0 if n in fingers else 9.0) * s))))
     core = chromatic(holes, 'A#3')
     for m in range(midi('D5'), midi('C#6') + 1):
         core[m] = (with_vent(holes, core[m - 12][0], 'oct1' if m <= midi('G#5') else 'oct2'), 2, 0.8)
@@ -259,13 +262,25 @@ def oboe():
                         p = with_vent(holes, p, v)
                     out.append((p, n, len(vs)))
         return out
-    return dict(name='oboe', title='Oboe, Bb3..C#6', family='oboe', kind='dreed', transpose=0, lo=midi('A#3'),
-                hi=midi('C#6'), fs=48000, gain=0.35, offset=20, end=650, bore_fn=bore, holes=holes, core=core,
-                candidates=cand, gap=7, extra=[('top', 2.4, 1.2, 4.0)],
+    return dict(name=name, title=title, family=family, kind='dreed', transpose=transpose, lo=midi('A#3'),
+                hi=midi('C#6'), fs=fs, gain=gain, offset=20, end=650 * s, bore_fn=bore, holes=holes, core=core,
+                candidates=cand, gap=7 * s, extra=[('top', 2.4, 1.2, 4.0)], scale=s,
                 doc="""A narrow cone and a double reed; octave vents for the second register,
                 the third register by search among vented fingerings.""",
-                reed=dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.3, sr=3e-5, psi=0, sd=4.5e-6,
-                          press=5000, pressHi=7000, vib=0))
+                reed=reed or dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.3, sr=3e-5, psi=0, sd=4.5e-6,
+                                  press=5000, pressHi=7000, vib=0))
+
+
+# English horn (cor anglais) in F, written Bb3..C#6, sounding a fifth lower:
+# the oboe x 1.5 (tools/design.py -scale oboe english-horn 1.5; the real one
+# is close to it, with a bulb bell, not modelled: a plain flare). Its reed:
+# larger and softer, its resonance lower; its compliance sr / k (part of the
+# cone's apex volume) a little over 1.5^3 of the oboe's (at 1.5^3, with fr
+# 2000 Hz, the low notes played 40-80 c sharp with the lips at their loosest).
+
+def english_horn():
+    return oboe('english-horn', 1.5, -7, 48000, 0.4, 'English horn in F, written Bb3..C#6', family='oboe',
+                reed=dict(width=8e-3, h0=0.3e-3, k=3.2e7, fr=1700, qr=0.3, sr=1.0e-4, psi=0, sd=1.0e-5, press=4000, pressHi=5500, vib=0))
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +429,84 @@ def shawm():
 
 
 # ---------------------------------------------------------------------------
+# Shehnai (GM's "shanai"): a narrow conical wooden body with a flared metal
+# bell and a small double reed held between the lips (not behind a pirouette:
+# the lips damp it and bend the pitch: meend). Seven finger holes, opened from
+# the bottom for a major scale (Bilawal) from Sa; the komal notes by
+# half-holing; the second register by overblowing with firmer lips. Designed
+# 45 c flat (the reed pulls it up; at 15-30 c the low notes played 50-90 c flat).
+
+def shehnai():
+    names = ['1', '2', '3', '4', '5', '6', '7']
+    holes = [hole(n, 0, 6.0, 5.0, flags=FINGER) for n in names]
+    seq = ['B4', 'A4', 'G4', 'F4', 'E4', 'D4']  # hole k+1 open (all below open)
+    apex = -40
+
+    def xs(m):
+        return 349.5e3 / (2 * 440 * 2 ** ((m - 69) / 12)) + apex - 30
+    holes[0]['x'] = xs(midi('C5'))
+    for i, n in enumerate(seq):
+        holes[i + 1]['x'] = xs(midi(n))
+    core = {midi('C4'): ('x' * 7, 1, 1.0)}
+    for i, n in enumerate(['C5'] + seq):
+        core[midi(n)] = ('x' * i + 'o' * (7 - i), 1, 1.0)
+    for n in ('D', 'E', 'F', 'G'):  # the second register: the first's fingerings, overblown
+        core[midi(n + '5')] = (core[midi(n + '4')][0], 2, 0.7)
+
+    def bore(end, top=1.0):
+        return [(0, 2.8 * top), (25, 4.2 * top), (50, 5.5), (end - 70, 20.0), (end - 35, 30.0), (end, 70.0)]
+
+    def cand(m, notes):
+        return finger_cands(holes, core, m, notes, ns=(1,) if m <= midi('C5') else (2,))
+    return dict(name='shehnai', title='Shehnai in C, C4..G5', family='shehnai', kind='dreed', transpose=0,
+                lo=midi('C4'), hi=midi('G5'), fs=48000, gain=0.25, offset=45, end=xs(midi('C4')) + 60,
+                bore_fn=bore, holes=holes, core=core, candidates=cand, gap=12, extra=[('top', 1.0, 0.5, 2.0)],
+                doc="""A narrow cone with a flared metal bell, a small double reed between the
+                lips; seven finger holes, half-holing for the komal notes.""",
+                reed=dict(width=8e-3, h0=0.4e-3, k=2e7, fr=2600, qr=0.3, sr=4e-5, psi=0, sd=8e-6,
+                          press=3000, pressHi=4500, vib=0.3))
+
+
+# ---------------------------------------------------------------------------
+# Bagpipe (GM's "bag pipe"): a Great Highland chanter, its A at 440 Hz (the
+# pipes play near Bb today). A cone (4.5 -> 14 mm) with a small flared sole,
+# a thumb hole and seven finger holes; the double reed sits in the bag: no
+# lips, the bag's steady pressure (~7 kPa). Nine notes, low G to high A
+# (mixolydian), opened from the bottom; the semitones between by cross
+# fingering and half-holing. The player (src/reedplayer.cc) never tongues:
+# a repeated note is split by a grace note; the drones are not modelled.
+
+def bagpipe():
+    names = ['thumb', 'L1', 'L2', 'L3', 'R1', 'R2', 'R3', 'R4']
+    ds = [5.0, 5.5, 6.0, 6.0, 6.5, 6.5, 6.0, 5.5]
+    holes = [hole(n, 0, d, 5.0, flags=FINGER) for n, d in zip(names, ds)]
+    apex = -50
+
+    def xs(m):
+        return 349.5e3 / (2 * 440 * 2 ** ((m - 69) / 12)) + apex - 30
+    opens = ['A5', 'G5', 'F#5', 'E5', 'D5', 'C#5', 'B4', 'A4']  # hole k open (all below open)
+    for h, n in zip(holes, opens):
+        h['x'] = xs(midi(n))
+    holes[0]['x'] = holes[1]['x'] - 15  # the thumb above L1, on the back
+    core = {midi('G4'): ('x' * 8, 1, 1.0)}
+    for i, n in enumerate(reversed(opens)):  # A4 .. A5: one more hole open from the bottom
+        core[midi(n)] = ('x' * (7 - i) + 'o' * (i + 1), 1, 1.0)
+
+    def bore(end, top=1.0):
+        return [(0, 3.0 * top), (20, 4.5 * top), (end - 30, 14.0), (end - 10, 18.0), (end, 26.0)]
+
+    def cand(m, notes):
+        return finger_cands(holes, core, m, notes, thumb=0, ns=(1,))
+    return dict(name='bagpipe', title='Bagpipe chanter (Great Highland), G4..A5', family='bagpipe', kind='dreed',
+                transpose=0, lo=midi('G4'), hi=midi('A5'), fs=48000, gain=0.2, offset=20, end=xs(midi('G4')) + 30,
+                bore_fn=bore, holes=holes, core=core, candidates=cand, gap=10, extra=[('top', 1.0, 0.5, 2.0)],
+                doc="""A conical chanter, its double reed in the bag (no lips, steady
+                pressure); eight holes, low G to high A.""",
+                reed=dict(width=9e-3, h0=0.35e-3, k=3e7, fr=2200, qr=0.15, sr=4e-5, psi=0, sd=1e-5,
+                          press=7000, pressHi=7500, vib=-1))
+
+
+# ---------------------------------------------------------------------------
 # Alto recorder in F (Baroque fingering): a duct (windway ~1.1 x 12 mm), the
 # window and labium at the top, a reverse-conical bore (19 -> 12 mm), a thumb
 # hole and seven finger holes, the lowest two double. The thumb half-holed
@@ -455,6 +548,46 @@ def recorder():
                 doc="""A duct forms the jet; a reverse-conical bore; the thumb half-holed opens
                 the second register. The breath sets the pitch: louder is sharper.""",
                 jet=dict(h=1.1, width=12, w=3.0, window=12, chimney=2.0, channel=55, y0=0.2, press=250, pressHi=1500))
+
+
+# ---------------------------------------------------------------------------
+# Tin whistle in D (GM's "whistle"): a duct (a flat windway ~1 x 8 mm) on a
+# cylindrical tube (12.5 mm), six finger holes. The same fingerings in two
+# octaves (the second by blowing harder: the cylinder's second mode); C
+# natural is cross-fingered (oxxooo) or half-holed. The window is short
+# (2 mm) for the second octave to speak; B6 (the top of the second octave)
+# played ~80 c sharp: the range ends at A6.
+
+def whistle():
+    names = ['1', '2', '3', '4', '5', '6']  # top to bottom: left hand 1-3, right hand 4-6
+    ds = [6.8, 7.0, 6.2, 6.6, 7.0, 5.6]
+    holes = [hole(n, 0, d, 1.2, flags=FINGER) for n, d in zip(names, ds)]
+
+    def bore(end):
+        return [(0, 12.5), (end, 12.5)]
+    opens = ['C#6', 'B5', 'A5', 'G5', 'F#5', 'E5']  # hole k open (all below open): this note
+    for h, n in zip(holes, opens):
+        f = 440 * 2 ** ((midi(n) - 69) / 12)
+        h['x'] = 349.5e3 / (2 * f) - 30
+    seq = ['D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C#6']
+    core = {}
+    for i, n in enumerate(seq):  # i holes open from the bottom
+        pat = 'x' * (6 - i) + 'o' * i
+        core[midi(n)] = (pat, 1, 1.0)
+        if n != 'C#6':
+            core[midi(n) + 12] = (pat, 2, 0.8)
+    core[midi('C6')] = ('oxxooo', 1, 0.6)
+
+    def cand(m, notes):
+        # (the second octave overblown: a first mode up there needs nearly every hole open)
+        return finger_cands(holes, core, m, notes, thumb=None, max_cross=2, half=True,
+                            ns=(1,) if m < midi('D6') else (2,))
+    return dict(name='whistle', title='Tin whistle in D, D5..A6', family='whistle', kind='duct', transpose=0,
+                lo=midi('D5'), hi=midi('A6'), fs=96000, gain=0.8, end=300, bore_fn=bore, holes=holes, core=core,
+                candidates=cand, gap=7, emb=0.8, fit='xd',
+                doc="""A duct on a cylinder, six finger holes; the second octave by overblowing
+                the same fingerings. The breath sets the pitch.""",
+                jet=dict(h=1.0, width=8, w=2.0, window=8, chimney=1.5, channel=25, y0=0.2, press=300, pressHi=2600))
 
 
 # ---------------------------------------------------------------------------
@@ -576,8 +709,48 @@ def panflute():
                 doc="""One stopped pipe per note, blown across the rim.""", jet=dict(chimney=0.5))
 
 
+# ---------------------------------------------------------------------------
+# Blown bottles (GM's "blown bottle"): one bottle per note, blown across the
+# neck's rim, as a pan flute's pipes; tuned by the air above the water. A
+# Helmholtz resonator: the neck's air mass on the body's air spring. From a
+# wine bottle (body 70 mm, neck 20 x 60 mm) at C4 to a small vial at C6.
+
+def bottles():
+    lo, hi = midi('C4'), midi('C6')
+
+    def shape(m):
+        u = (m - lo) / (hi - lo)
+        return 70.0 * (25 / 70) ** u, 60.0 * (25 / 60) ** u, 20.0 * (10 / 20) ** u  # body d, neck length, neck d
+
+    def pipes(spec, Model):
+        out = []
+        for m in range(lo, hi + 1):
+            bd, nl, nd = shape(m)
+            t = 440 * 2 ** ((m - 69) / 12)
+            exc = 0.5 * 349.5 / (0.975 * spec['fs']) * 1e3
+            bore = [(0, nd), (nl, nd), (nl + 2, bd), (3000, bd)]
+            a, b = nl + 3, nl + 400
+            for _ in range(40):
+                L = 0.5 * (a + b)
+                sp = dict(spec, bore=bore, end=exc + L, closed=True, holes=[], excite=exc)
+                sp.pop('bore_fn', None)
+                pk = Model(sp).peaks('', 0.05 * t, 4 * t, m, step=2.0)  # the lowest: the Helmholtz mode
+                f = pk[0] if pk else None
+                if f is None or f > t:
+                    a = L
+                else:
+                    b = L
+            out.append((m, 0.5 * (a + b), bd, nl, nd))
+        return out
+    return dict(name='bottle', title='Blown bottles (one per note), C4..C6', family='bottle', kind='end',
+                transpose=0, lo=lo, hi=hi, fs=96000, gain=1.0, end=200, closed=True,
+                bore=[(0, 20.0), (1000, 20.0)], holes=[], core={}, pipes_fn=pipes, emb=1.0,
+                doc="""One bottle per note, blown across the neck (a Helmholtz resonator).""",
+                jet=dict(chimney=1.5))
+
+
 INSTRUMENTS = {}
-for f in (clarinet, oboe, bassoon, duduk, shawm, recorder, shakuhachi, ocarina, panflute,
+for f in (clarinet, oboe, english_horn, bassoon, duduk, shawm, shehnai, bagpipe, recorder, whistle, shakuhachi, ocarina, panflute, bottles,
           lambda: sax('soprano-sax', 2 / 3, -2, 48000, dict(width=11e-3, h0=0.8e-3, k=4.5e6, fr=2400, qr=0.3,
                       sr=4.3e-5, press=1700, pressHi=2300, vib=1), 0.5, 'Soprano saxophone in Bb, written Bb3..D6', midi('D6')),
           lambda: sax('alto-sax', 1.0, -9, 48000, dict(width=13e-3, h0=0.8e-3, k=4e6, fr=1900, qr=0.3,

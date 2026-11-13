@@ -27,6 +27,10 @@ class Tube {
   // hole a quarter open); left out: open. fingerSpeed scales how fast the
   // fingers move (key velocity: 1 = 10 ms, 2 = 5 ms). Springs take their own time.
   virtual void setHoles(const char* pattern, double fingerSpeed = 1);
+  // The next setHoles glides (a portamento) over |s| seconds: the fingers
+  // slide off and onto the holes one after another (s > 0, rising: from the
+  // bottom hole up; falling: from the top down), keys and valves move slowly.
+  void setGlide(double s) { glide_ = s; }
   // A pan flute: the pipe for this note (others: nothing).
   virtual void selectPipe(int /*midi*/) {}
   // Another instrument and player of the same kind: its own noise and key timing.
@@ -78,6 +82,7 @@ class Tube {
     double taClosed = 0;          // series length of the closed hole (negative, m)
     double a = 0;                 // bore radius at the hole (m)
     bool present = true;          // a piccolo has no C# and D holes (D foot)
+    double glideWait = 0, glideStroke = 0;  // a glide's stroke: its delay and time (s)
   };
 
   // Geometry, in this order: the bore (diameter at x from the top, the
@@ -112,6 +117,7 @@ class Tube {
   // Key ticks, DC blocker, output scale.
   float finish(float y);
 
+  double glide_ = 0;  // setGlide
   virtual void controlStep() = 0;
   virtual float sample() = 0;
 

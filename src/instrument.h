@@ -38,7 +38,9 @@ enum HoleFlags {
 struct HoleDef { double x, d, t, padH, cup; int flags; };
 
 // A pipe of a pan flute: its sounding note, length (mm, top to the stopper) and bore.
-struct PipeDef { int midi; double len, d; };
+// One pipe per note (a pan flute), or a bottle: a neck (length, diameter; 0:
+// none) over the body; len from the top to the closed end (mm).
+struct PipeDef { int midi; double len, d, neck = 0, neckD = 0; };
 
 // A reed: Bernoulli flow through the slit, the reed a damped mass-spring.
 struct ReedParams {

@@ -38,11 +38,15 @@ class ReedPlayer : public Performer {
   int stackTop_ = 0, stack_[16];
   int keyVel_ = 64;
   double lung_ = 0, lungAttack_ = 0.008, sinceOff_ = 1e9, sinceOn_ = 0;
+  // A bagpipe: the bag's steady pressure, no lips, no tongue; notes split by grace notes.
+  bool bag_ = false;
+  double lungHeld_ = 0;  // the breath while the note was blown (for the release)
+  double graceLeft_ = 0;
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   double vibPhase_ = 0, vibRateMul_ = 1, vibDepthMul_ = 1;
   double flutterPhase_ = 0, flutterRate_ = 27;
-  double kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_;
+  double kEarStart_ = 0, kEarRange_ = 120, kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_;
   uint32_t rng_ = 4242;
   double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0;
   double urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; }

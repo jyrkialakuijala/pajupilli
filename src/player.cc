@@ -69,7 +69,8 @@ void Player::noteOn(int midi, int velocity) {
   if (!info(midi)) return;
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
-  const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
+  const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
+  const Articulation art = articulate(midi, velocity, legato);
   // Slurring up into a higher register: the flutist kicks the jet over
   // (faster air, lips closer to the edge for a moment), or the old mode stays.
   if (legato && info(note_) && info(midi)->harmonic > info(note_)->harmonic) regKick_ = slurKick(midi);
@@ -91,22 +92,26 @@ void Player::noteOn(int midi, int velocity) {
     if (t) { trill_ = t; trillBase_ = t->lo + tr; }
     else if (!trill_ || (w != trill_->hi && w != trill_->lo)) { trill_ = nullptr; trillBase_ = -1; }
   }
-  if (trill_) regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick(midi) : 0;
+  if (trill_) {
+    regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick(midi) : 0;
+    cancelGlide();  // a trill is never a glide
+  }
   keyClock_ = 0;
   lastKey_ = midi;
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
   // from silence, velocity picks a breath attack, "tu" or an accented "t".
-  Attack a;
-  if (legato) a = kSlur;
-  else if (blowing_ || sinceOff_ < 0.08) a = kDu;
-  else if (velocity < 35 * hardness_) a = kBreath;
-  else if (velocity > 90 / std::max(0.3, hardness_)) a = kAccent;
-  else a = kTu;
+  // (Performer::articulate: overlap and velocity also choose tongued legato
+  // and a glide.)
+  const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
+                   : art == kArtTongueLegato || art == kArtDu ? kDu
+                   : art == kArtBreath ? kBreath
+                   : art == kArtAccent ? kAccent : kTu;
   // Velocity is also how much air: +-0.35 dynamics around the knob (64 = none).
-  // A slurred note moves there over ~60 ms; a new attack starts there.
-  velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
+  // A slurred note moves there over ~60 ms; a new attack starts there. (A
+  // glide's soft key is its sign, not a diminuendo.)
+  if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
   if (a != kSlur) velDyn_ = velDynTarget_;
   // Accent: a pressure overshoot growing with velocity above ~50 (tongued only).
   const double over = std::max(0.0, (velocity - 50) / 77.0);
@@ -136,6 +141,7 @@ void Player::noteOff(int midi) {
   } else if (!hold_) {
     blowing_ = false;  // stop blowing; the fingering stays
     sinceOff_ = 0;
+    released();
   }
 }
 
@@ -197,10 +203,11 @@ void Player::applyNote(Attack a) {
   // a faster finger lands the pad harder (a louder key click).
   flute_.selectPipe(note_);
   const char* ov = std::getenv("PJ_HOLES");  // any fingering (experiments)
+  flute_.setGlide(takeHoleGlide());
   flute_.setHoles(ov && *ov ? ov : holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
   // A new note: the lips start from its calibrated place; the ear takes over.
-  earCorr_ = 0;
+  if (!gliding()) earCorr_ = 0;
   earClock_ = 0;
   if (!onTrillKey_) lastCross_ = -1;
   switch (a) {
@@ -256,6 +263,8 @@ void Player::render(float* out, int n) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
     keyClock_ += bdt;
+    tick(bdt);
+    if (gliding()) glideEar();
     double lipTarget = trillCover_;
     const bool trillEar = onTrillKey_ && trill_;
     if (!trillEar && ear_ && note_ >= 0) {
@@ -282,8 +291,9 @@ void Player::render(float* out, int n) {
       // trill key the lower note's (the flutist keeps that embouchure; with the
       // upper note's own the flute's D6-Eb6 fell an octave).
       const int en = onTrillKey_ && trill_ && trill_->keepLips ? trillBase_ : note_;
-      const double f = noteFrequency(note_);
-      const double fw = noteFrequency(note_ - inst_.transpose), ke = inst_.emb;
+      // (A glide: the pitch the fingers pass.)
+      const double f = glideFrequency();
+      const double fw = f * std::exp2(-inst_.transpose / 12.0), ke = inst_.emb;
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
       const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], std::max(dynLo[en], dynHi[en]));
@@ -302,7 +312,7 @@ void Player::render(float* out, int n) {
                      ch = std::log(coverHiTrim[en]);
         if (dyn < 0.5) ct = cl + (cm - cl) * std::clamp((dyn - lo) / std::max(0.5 - lo, 1e-3), 0.0, 1.0);
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
-        ct = std::exp(ct);
+        ct = std::exp(ct) * glideCover(en, dyn);
       }
       e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_);
       // The face and lips load the window more as the pitch rises (Dickens
@@ -345,7 +355,7 @@ void Player::render(float* out, int n) {
         e.noise *= 1 - 0.5 * std::clamp((u - 0.83) / 0.17, 0.0, 1.0);
         // The breath tunes by ear on the note (the ear's correction), the
         // roll (pitch bend) blows harder or softer.
-        lungTarget = blowing_ ? p0 * coverTrim[en] * trillLip_ * std::exp(0.35 * (dyn - 0.5) + 0.4 * roll_) *
+        lungTarget = blowing_ ? p0 * coverTrim[en] * glideCover(en, dyn) * trillLip_ * std::exp(0.35 * (dyn - 0.5) + 0.4 * roll_) *
                                     pressScale_ * (1 + 0.5 * kKickP_ * regKick_)
                               : 0;
       }
@@ -371,6 +381,7 @@ void Player::render(float* out, int n) {
     sinceOff_ += bdt;
     if (tongueClock_ < tongueClosed_) e.tongue = 0;
     else e.tongue = std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
+    e.tongue *= tongueStop();  // a staccato note ends with the tongue
     // Flutter tongue: the tongue tip trills against the ridge (~27 Hz).
     if (flutter_ > 0) {
       // Never a machine: the rate drifts with the player's lips (~3 Hz wander).

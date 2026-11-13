@@ -88,7 +88,7 @@ class Horn : public Tube {
   // Mouth.
   double pm_ = 0, u_ = 0;
   double glotLp_ = 0, noiseLp_ = 0, noiseHp_ = 0, glotA_, noiseA_, noiseHpA_;
-  double kNoise_, kSweep_, kGlotNoise_, kQ_, kEps_, kPress_ = 1, kRelease_, kMu_, kHk_, kW_, kIn2_, kInQ_, kInA_, kQExp_;
+  double kNoise_, kSweep_, kGlotNoise_, kQ_, kEps_, kPress_ = 1, kRelease_, kStroke_, kMu_, kHk_, kW_, kIn2_, kInQ_, kInA_, kQExp_;
   Valve valve_[4];
   int nValves_ = 0;
 };

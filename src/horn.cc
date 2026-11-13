@@ -55,6 +55,7 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
   kQ_ = knob("PJ_LIPQ", 1);               // the lips' Q, x the design's
   kQExp_ = knob("PJ_LIPQEXP", 0.4);       // ... rising as (fl / 300 Hz)^this above 300 Hz
   kEps_ = knob("PJ_LIPEPS", 0.02) * 1e-3;  // the opening's smoothing near shut (m)
+  kStroke_ = knob("PJ_VALVESTROKE", 0.007);  // a valve's press (s): a slurring finger is quick (slower, the half-valve between the notes is a hole in the legato)
   kRelease_ = knob("PJ_VALVEUP", 1.3);    // a valve's spring: the return stroke, x the press
   kMu_ = knob("PJ_LIPMU", 1);             // the lips' mass per area, x the design's
   kHk_ = knob("PJ_LIPHK", 1);             // their rest opening, x the design's
@@ -138,9 +139,12 @@ void Horn::setHoles(const char* pattern, double fingerSpeed) {
     const int t = k < n && pattern[k] == 'x';
     if (t == v.target) continue;
     v.target = t;
-    // A finger presses in ~12 ms; the spring returns it a little slower.
-    v.stroke = 0.012 / fingerSpeed * (t ? 1 : kRelease_);
+    // A finger presses in ~7 ms; the spring returns it a little slower.
+    v.stroke = kStroke_ / fingerSpeed * (t ? 1 : kRelease_);
+    // A glide: the valve moves slowly, through half-valve.
+    if (glide_ != 0) v.stroke = std::max(v.stroke, std::abs(glide_));
   }
+  glide_ = 0;
 }
 
 void Horn::resetAir() {

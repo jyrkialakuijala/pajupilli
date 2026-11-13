@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -333,6 +334,10 @@ const char kUsage[] =
     "  -note M             play one note, print its pitch\n"
     "  -scale              play the whole range, print a tuning table\n"
     "  -demo               a slurred scale and a short phrase\n"
+    "  -seq \"EVENTS\"       play key events, print each note's articulation:\n"
+    "                      on N V, off N, wait S (overlap = slur; overlapped and\n"
+    "                      much harder = tongued legato, much softer = a glide;\n"
+    "                      held < 0.12 s = a staccato tongue stop)\n"
     "  -slur A B           slur from A into B, print pitch and level wobble\n"
     "  -imp M              passive resonances of a fingering\n"    "  -ramp M             register map: breath x0.25 .. x3 and back (-secs per way)\n"
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
@@ -365,6 +370,8 @@ const char kUsage[] =
     "                      flutes of their own\n"
     "\n"
     "Ensemble and room (live and -polydemo):\n"
+    "  (-inst flute, live and -polydemo: a pool of 4 or more is a flute choir,\n"
+    "   alto and bass flutes below the flute's range; PJ_FLUTESONLY=1: flutes)\n"
     "  -ensemble [LIST]    a flute choir instead of -poly: bass, alto, two flutes\n"
     "                      and a piccolo (default LIST bass,alto,flute,flute,piccolo);\n"
     "                      notes go to the instrument they suit, chords low to high\n"
@@ -469,6 +476,7 @@ int main(int argc, char** argv) {
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
   const char* dump = nullptr;  // window pressure, raw float32
+  std::string seq;  // -seq: "on N V", "off N", "wait S", ...
   if (argc < 2) { std::fputs(kUsage, stderr); return 1; }
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -488,6 +496,7 @@ int main(int argc, char** argv) {
     else if (a == "-secs") secs = std::atof(next());
     else if (a == "-dyn") dyn = std::atof(next());
     else if (a == "-demo") demo = true;
+    else if (a == "-seq") seq = next();
     else if (a == "-live") live = true;
     else if (a == "-selftest") { live = true; lopt.selfTest = true; }
     else if (a == "-dev") lopt.device = next();
@@ -541,7 +550,12 @@ int main(int argc, char** argv) {
     // One note: learn only that one (fast); otherwise the whole range.
     if (note >= 0 && !scale && !demo && !live) gCal = calibrate(*gInst, 440, nullptr, note, note);
     else if (ramp >= 0) gCal = calibrate(*gInst, 440, nullptr, ramp, ramp);
-    else gCal = calibrate(*gInst, 440, nullptr);
+    else {
+      // (Cached per build; a first start after a build learns every note:
+      // seconds for a flute, ~20 s for the horn. Keys are silent until then.)
+      if (live) std::fprintf(stderr, "calibrating the %s (the first start after a build takes a while)...\n", gInst->name);
+      gCal = calibrate(*gInst, 440, nullptr);
+    }
   }
   // Who plays: one instrument (-poly N of it) or an ensemble, each calibrated.
   std::vector<const Instrument*> members;
@@ -567,6 +581,20 @@ int main(int argc, char** argv) {
       }
       roster.push_back({in, c});
     }
+  }
+  // The flute's pool (live, -polydemo) is a flute choir: an alto and a bass
+  // flute (two of each from 8 players) join the flutes and take the notes
+  // below the flute's range; the flutes lead where several fit. (-poly 1..3:
+  // flutes only; -ensemble flute,flute,...: any other mix.)
+  if (roster.empty() && gInst == findInstrument("flute") && (live || polyDemo) && lopt.poly >= 4 &&
+      !std::getenv("PJ_FLUTESONLY")) {
+    const int low = lopt.poly >= 8 ? 2 : 1;
+    const Instrument *bass = findInstrument("bass"), *alto = findInstrument("alto");
+    for (const Instrument* in : {bass, alto}) {
+      cals.emplace_back(new Calibration(std::getenv("PJ_NOCAL") ? Calibration() : calibrate(*in, 440, nullptr)));
+      for (int k = 0; k < low; ++k) roster.push_back({in, cals.back().get()});
+    }
+    for (int k = 0; k < lopt.poly - 2 * low; ++k) roster.push_back({gInst, &gCal});
   }
   auto makeEnsemble = [&](int poly) {
     return roster.empty() ? std::unique_ptr<Ensemble>(new Ensemble(*gInst, gCal, poly, lopt.verbose || polyDemo, room))
@@ -713,6 +741,40 @@ int main(int argc, char** argv) {
     if (84 + t > top) t -= 12;  // the phrase an octave lower if the top is out of reach
     for (auto& n : tune) { pl.noteOn(n[0] + t, 90); play(n[1] * 0.16); pl.noteOff(n[0] + t); play(0.03); }
     play(0.8);
+  }
+  if (!seq.empty()) {
+    // A sequence of key events: how the player articulates each note.
+    Voice v(*gInst);
+    Performer& pl = v.player();
+    pl.setCalibration(gCal);
+    pl.setDynamics(dyn);
+    for (char& c : seq) if (c == ',' || c == ';') c = ' ';
+    std::istringstream is(seq);
+    std::string w;
+    double t = 0;
+    auto play = [&](double s) { std::vector<float> x(int(s * kFs)); v.render(x.data(), int(x.size())); all.insert(all.end(), x.begin(), x.end()); t += s; };
+    while (is >> w) {
+      if (w == "on") {
+        int m = 0, vel = 0;
+        is >> m >> vel;
+        if (!inRange(m, "-seq")) return 1;
+        pl.noteOn(m, vel);
+        std::printf("%6.3f s  on  %-4s v%-3d %s\n", t, noteName(m), vel, pl.articulation());
+      } else if (w == "off") {
+        int m = 0;
+        is >> m;
+        pl.noteOff(m);
+        std::printf("%6.3f s  off %s\n", t, noteName(m));
+      } else if (w == "wait") {
+        double s = 0;
+        is >> s;
+        play(s);
+      } else {
+        std::fprintf(stderr, "-seq: on N V, off N, wait S (not %s)\n", w.c_str());
+        return 1;
+      }
+    }
+    play(0.6);
   }
   if (out && !all.empty() && !writeWav(out, all, kFs)) {
     std::fprintf(stderr, "cannot write %s\n", out);

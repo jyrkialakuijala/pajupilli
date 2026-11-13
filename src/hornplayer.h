@@ -30,6 +30,7 @@ class HornPlayer : public Performer {
  private:
   enum Attack { kSlur, kBreath, kDa, kTa, kAccent };
   void applyNote(Attack a);
+  void stopBlowing();
 
   Horn& horn_;
   int held_[128] = {};
@@ -40,7 +41,11 @@ class HornPlayer : public Performer {
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   double vibPhase_ = 0, vibRateMul_ = 1, vibDepthMul_ = 1;
   double flutterPhase_ = 0, flutterRate_ = 27;
-  double kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_;
+  double kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
+  double tongueFloor_ = 0;
+  double pendingOff_ = 0;  // a key let go: the air stops when this runs out
+  double slurDip_ = 0;
+  double atkPush_ = 0;
   // A slur to another partial: the lips overshoot towards it and the air
   // pushes, briefly (log of the lips' factor; the breath's extra share).
   double slurLip_ = 0, slurAir_ = 0, sinceSlur_ = 1e9;

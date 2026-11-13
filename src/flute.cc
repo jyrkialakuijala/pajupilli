@@ -169,15 +169,19 @@ void Flute::buildPipe(int k) {
   const Design& d = *inst_.design;
   const PipeDef& p = d.pipes[k];
   pipe_ = k;
-  const double r = 0.5e-3 * p.d;
+  // (A bottle: the jet meets the neck's rim; the neck widens into the body over 2 mm.)
+  const double r = 0.5e-3 * (p.neck > 0 ? p.neckD : p.d);
   // The jet meets the rim at the top; the window branch sits half a cell in.
   cork_ = 0.5 * Bore::kC / (Bore::kCourantMax * fs_);
   embA_ = r;
   embRin_ = r;
   embLong_ = 2 * r;
   embChimney_ = d.jet.chimney;
-  const double dd = p.d * 1e-3;
-  setGeometry([dd](double) { return dd; }, cork_, cork_ + p.len * 1e-3, true);
+  const double dd = p.d * 1e-3, nl = p.neck * 1e-3, nd = p.neckD * 1e-3;
+  setGeometry([dd, nl, nd](double x) {
+    if (nl <= 0 || x >= nl + 2e-3) return dd;
+    return x <= nl ? nd : nd + (dd - nd) * (x - nl) / 2e-3;
+  }, cork_, cork_ + p.len * 1e-3, true);
   nHoles_ = 0;
   finishHoles();
   addRadiators(true, cork_);

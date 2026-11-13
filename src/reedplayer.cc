@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 #include "knob.h"
 
@@ -20,6 +21,12 @@ ReedPlayer::ReedPlayer(Reed& r) : Performer(r), reed_(r) {
   // reed's pitch moves with the breath and the attack far more than a
   // flute's); an ensemble's just intonation sets the target instead.
   ear_ = knob("PJ_REEDEAR", 1) > 0;
+  kEarStart_ = knob("PJ_REEDEARSTART", 0);  // s on the note before the ear listens
+  kEarRange_ = knob("PJ_REEDEARRANGE", 120);    // cents: a larger error is another regime
+  // A bagpipe's chanter reed sits in the bag: no lips to tune or bend with,
+  // the bag's pressure steady.
+  bag_ = std::strcmp(inst_.family, "bagpipe") == 0;
+  if (bag_) ear_ = false;
 }
 
 void ReedPlayer::seed(unsigned s) {
@@ -42,19 +49,38 @@ void ReedPlayer::noteOn(int midi, int velocity) {
   if (!info(midi)) return;
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
-  const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || (hold_ && velocity < 100));
+  const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
+  const Articulation art = articulate(midi, velocity, legato);
   note_ = midi;
   keyVel_ = velocity;
-  Attack a;
-  if (legato) a = kSlur;
-  else if (blowing_ || sinceOff_ < 0.08) a = kDu;
-  else if (velocity < 35 * hardness_) a = kBreath;
-  else if (velocity > 90 / std::max(0.3, hardness_)) a = kAccent;
-  else a = kTu;
-  velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
+  const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
+                   : art == kArtTongueLegato || art == kArtDu ? kDu
+                   : art == kArtBreath ? kBreath
+                   : art == kArtAccent ? kAccent : kTu;
+  // (A glide's soft key is its sign, not a diminuendo.)
+  if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
   if (a != kSlur) velDyn_ = velDynTarget_;
   const double over = std::max(0.0, (velocity - 50) / 77.0);
   velAccent_ = a == kAccent ? 1.2 * over : a == kTu ? 0.5 * over : 0;
+  if (bag_) {
+    // The bag: the same pressure whatever the key; the piper never tongues. A
+    // note struck again (or tongued) is split from the last by a grace note:
+    // high G, or E on high G and A; from silence the bag's air starts the reed.
+    velDynTarget_ = velDyn_ = velAccent_ = 0;
+    // (The bag keeps the reed going between keys: a key soon after a release is
+    // split by a grace note, not started again.)
+    if (a != kSlur && a != kBreath && (blowing_ || sinceOff_ < 0.08)) {
+      const int g = note_ < 79 + inst_.transpose ? 79 : 76;
+      if (const NoteInfo* gi = info(g + inst_.transpose)) {
+        reed_.setHoles(gi->holes, 2);
+        graceLeft_ = 0.030;
+      }
+      blowing_ = true;
+      return;
+    }
+    applyNote(a == kSlur ? kSlur : kBreath);
+    return;
+  }
   applyNote(a);
 }
 
@@ -73,15 +99,17 @@ void ReedPlayer::noteOff(int midi) {
   } else if (!hold_) {
     blowing_ = false;
     sinceOff_ = 0;
+    released();
   }
 }
 
 void ReedPlayer::applyNote(Attack a) {
   // PJ_HOLES: any fingering (experiments).
   const char* ov = std::getenv("PJ_HOLES");
+  reed_.setGlide(takeHoleGlide());
   reed_.setHoles(ov && *ov ? ov : info(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
   blowing_ = true;
-  earCorr_ = 0;
+  if (!gliding()) earCorr_ = 0;
   earClock_ = 0;
   lastCross_ = -1;
   switch (a) {
@@ -89,7 +117,7 @@ void ReedPlayer::applyNote(Attack a) {
     case kBreath:  // the reed starts on the breath alone: a slow push, no tongue
       tongueClosed_ = 0;
       tongueRelease_ = 0.001;
-      lungAttack_ = 0.040;
+      lungAttack_ = bag_ ? 0.015 : 0.040;  // (the bag is full: the arm's squeeze)
       break;
     case kDu:  // a light touch of the tongue on the reed
       tongueClosed_ = 0.002;
@@ -117,6 +145,9 @@ void ReedPlayer::render(float* out, int n) {
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
+    tick(bdt);
+    if (graceLeft_ > 0 && (graceLeft_ -= bdt) <= 0 && note_ >= 0) reed_.setHoles(info(note_)->holes, 2);
+    if (gliding()) glideEar();
     if (ear_ && note_ >= 0) earClock_ += bdt;
     {  // wander: breath support (~1 Hz), lips (~2 Hz)
       auto lp2 = [&](double& a, double& b, double hz) {
@@ -138,9 +169,10 @@ void ReedPlayer::render(float* out, int n) {
     const double jaw = std::max(0.0, rp.vib);
     const double sv = std::sin(vibPhase_);
     if (note_ >= 0) {
-      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], std::max(dynLo[note_], dynHi[note_]));
+      const double dyn = bag_ ? std::clamp(0.5, dynLo[note_], std::max(dynLo[note_], dynHi[note_]))
+                              : std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], std::max(dynLo[note_], dynHi[note_]));
       const double lo = noteFrequency(inst_.lo), hi = noteFrequency(inst_.hi);
-      const double fw = noteFrequency(note_ - inst_.transpose);
+      const double fw = glideFrequency() * std::exp2(-inst_.transpose / 12.0);
       const double u = std::clamp(std::log(fw / lo) / std::log(hi / lo), 0.0, 1.0);
       const double p0 = rp.press * std::pow(rp.pressHi / rp.press, u);
       const double accent = 1 + 0.2 * velAccent_ * std::exp(-sinceOn_ / 0.05);
@@ -148,7 +180,7 @@ void ReedPlayer::render(float* out, int n) {
         lungTarget = p0 * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * pressScale_ * accent;
       // The lips: calibrated per note and dynamics; a little looser when loud;
       // the bend; the ear; the jaw vibrato.
-      double lip = coverAt(note_, dyn) * std::exp(-kDynLip_ * (dyn - 0.5) + kRollLip_ * roll_);
+      double lip = coverAt(note_, dyn) * glideCover(note_, dyn) * std::exp(-kDynLip_ * (dyn - 0.5) + kRollLip_ * roll_);
       if (ear_) lip *= std::exp(earCorr_);
       lip *= 1 + 0.04 * wander_ * w2b_;
       lip *= 1 + 2 * jaw * vib * sv;
@@ -161,6 +193,13 @@ void ReedPlayer::render(float* out, int n) {
     sinceOn_ += bdt;
     sinceOff_ += bdt;
     e.tongue = tongueClock_ < tongueClosed_ ? 0 : std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
+    e.tongue *= tongueStop();
+    // The release: as the breath falls, the lips (and the bag's piper, the
+    // fingers' grip on the bag) let the reed close with it. (On the breath
+    // alone a reed played near its closing pressure passed its loudest point
+    // on the way down: up to 3-4 dB louder after the key was up.)
+    if (blowing_) lungHeld_ = lung_;
+    else if (lungHeld_ > 0) e.tongue *= std::clamp(lung_ / lungHeld_, 0.0, 1.0);
     if (flutter_ > 0) {  // flutter tongue (or a growl)
       flutterPhase_ += 2 * M_PI * flutterRate_ * bdt;
       if (flutterPhase_ > 2 * M_PI) flutterPhase_ -= 2 * M_PI;
@@ -172,7 +211,9 @@ void ReedPlayer::render(float* out, int n) {
     e.air = air_;
     reed_.setEmbouchure(e);
     reed_.process(out + i, m);
-    if (ear_ && note_ >= 0) listen(out + i, m, earCorr_, earCents_, earClock_, 150, 0.05);
+    // (An error over 120 cents is another regime, not a matter for the lips:
+    // chasing the attack's flat start pushed the duduk's A4 into G4.)
+    if (ear_ && note_ >= 0 && earClock_ > kEarStart_) listen(out + i, m, earCorr_, earCents_, earClock_, 150, 0.05, 0, kEarRange_);
   }
 }
 
