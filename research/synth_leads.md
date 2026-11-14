@@ -384,3 +384,110 @@ Measured (`tools/test.py leads`): every note within 3 c of its target modulo the
 where two cores are detuned on purpose (charang 7 c, strings 6–8 c) or the period is the ÷4's
 (bass+lead 11 c). lead-fifths: every note's pair repeats at exactly twice the note's period (the
 fifth locked at 3:2 within 1 c, 54/54 notes). 280–400 ns per sample each.
+
+## The pads (GM 89–96)
+
+Each pad keeps the core (the expo converter and the ramp), its vibrato LFO and the ladder; the
+new parts sit between the core and the ladder, after the ladder, or (the echo) after the amplifier.
+
+| Pad | New part | Measured (A3, 4 s) |
+|---|---|---|
+| pad-new-age | ring modulator on two cores' sines (2.76×), struck and decaying (τ 1.6 s), after the ladder | bell ~3 dB under the pad at the attack; core tuned within 7 c (bell out) |
+| pad-warm | output transformer: flux = the voltage low-passed at 25 Hz, gain 1 − 0.4 tanh²(flux/0.5) | within 6 c |
+| pad-polysynth | RC high-pass (140 Hz) before the ladder | within 4 c |
+| pad-choir | no circuit: three singers per key (src/singer.h), puhuja's vocal tract (44-section FDTD line, its fitted a e i o u area functions) on a glottis at f0 (Bernoulli flow with inertance, jitter, shimmer, turbulence); K2 the vowel, K3 the breath | formants (A2–C3) u 301/1303, o 649/1069, a 967/1667, e 464/1647, i 244/2258 Hz (puhuja: 303/1205, 599/1029, 852/1471, 471/1603, 209/2232); in tune ±3 c; 208 ns/sample |
+| pad-bowed | slip noise in the last 20 % of each ramp; formant bank at 280, 460, 1150, 2700 Hz | within 2 c |
+| pad-metallic | four free-free metal pipes (1, 1.2, 2.5, 3.5 × the note, the upper three at −6 dB; before: 1, 1.4, 13/8, 19/8 at full level; modes 1, 2.756, 5.404 ×; T60 4 s / m^0.6), joined at the top, each bowed (STK bow table, rosin noise); stereo from two microphone heights (0.33, 0.62 of the length: the fundamental in the same sign at both, modes 2 and 3 opposite) | pipes at exactly 1.000/1.400/1.625/2.375; L/R correlation ~0.6; a bow's quadrature mistake (velocity read 90° off the force: no energy in) and the core's autotune trim wrongly applied to the pipes (−131 c) both found and fixed |
+| pad-halo | BBD echo after the amplifier: 340 ms, feedback 0.55, 2-pole 3.5 kHz and tanh in the loop | within 4 c |
+| pad-sweep | six first-order all-passes at 180 Hz–4.5 kHz, swept at 0.12 Hz, feedback 0.55 | within 7 c |
+
+All under 350 ns per sample (≤ 1.7 % of a core). `PJ_INHARM=0` takes the bell and the ring out,
+so the tests can read the core's pitch.
+
+## FX 3, crystal (GM 99): `fx-crystal`
+
+A glass plate as a modal model. `tools/glass.py` builds a 16 × 16 Kirchhoff plate (stiffness
+D L², L the periodic 5-point Laplacian) on a torus (no boundary), mass ρ(x) = 1 + 0.5 sin(2πx/16)
++ 0.2 cos(4πx/16 + 1) (0.34–1.52), and solves K φ = ω² M φ; the 64 lowest modes (the rigid one
+left out) and their mass-normalised shapes go to `src/glass_data.h`.
+
+- The spectrum: 1.000, 1.022 (pair), 1.164, 1.997 (pair), 2.344 (pair), 3.739 (pair), 4.088, 4.233 …
+  Waves along y come in pairs (the mass does not vary along y).
+- Pitch: through the pixel-difference pickups the first mode carries 78 % of the energy over 8
+  random strikes (the 1.022 pair, moving alike at the paired pixels, 6 %; the 1.164 mode 17 %);
+  the first mode is put on the note (`PJ_GLASSPITCH`). With single-point pickups it had been the
+  pair. Near the first mode's nodal lines the 1.164 mode leads (~2.6 semitones up). The
+  autocorrelation tracker is fooled by the beating cluster; the test scans the spectrum instead.
+- The hammer: felt, a raised-cosine push under half the first mode's period (0.5–4 ms, shorter
+  for a hard key) at a random point (bilinear between cells); each mode gets its shape there.
+- Decay: T60 = 6 s · ratio^-0.7 (≥ 0.25 s) while a key or the pedal holds; 0.4 s damped.
+- Pickups: left = the velocity difference of two random pixels, right = of two others, drawn per
+  voice (its seed). A difference cancels what moves both pixels alike, so each side hears its own
+  modes: L/R correlation ~0.1 in the chord demo (dry). The difference picks up 14 dB more than one
+  point: trim −5.5 dB; random playing peaks at 0.39. 203 ns/sample.
+
+### Bowing, the room, the per-key pipe (pad-metallic, fx-crystal)
+
+- **Bow turns:** every bow reverses every 5–9 s on its own timer (each pipe's, each crystal voice's),
+  turning in ~60 ms; the friction passes zero and the stick-slip catches again the other way: a
+  4 dB dip that recovers in ~0.5 s.
+- **The crystal's bow** sits where the first mode leads the next three most (best of 12 random
+  places), its hair averaging the short waves (drive / (1 + (ratio/1.6)²)); every mode gets the
+  first mode's coupling (with each mode's own, the fast-decaying high modes won). Held, the note
+  is sustained 13–15 dB under the strike, in tune (−1 to +2 c) from C3 to C7.
+- **The room:** each mode is pushed by the room's pressure at the instrument (the reverberant field
+  and the other players' direct sound: src/room.cc atSource) as strongly as it radiates
+  (reciprocity), and loses the matching radiation damping. An energy budget per voice lets the
+  room give back at most 90 % of what the modes gave (a credit fading over ~1 s); a push that
+  takes energy out is always allowed. Without the budget the coupling blew up at 1e-4 (crystal)
+  and 1e-3 (metallic); with it, stable at 1e-2. Default PJ_ROOMCOUPLE 3e-5: voices take back
+  −4 … +9 % net of what they give (PJ_ROOMSTATS=1 prints it). A silent instrument takes nothing.
+- **The crystal's pickups:** the first mode in the same sign at both sides (opposite, the middle
+  cancelled the note, −71 dB) and equally loud there (unequal, one side ~2 dB louder). In the
+  hall the ensemble's stage layout itself leans left (~3–4 dB, pad-warm too).
+- **The metallic's highest pipe:** per key, a ratio in (1, 3): over 16 (60 %), 12 or 10; prime
+  numerators (80 %), else odd composites (C3 17/12, C#3 19/16, D3 43/16, E3 13/10, F#3 17/16 …).
+
+### pad-halo: a formant cascade with the room
+
+- Five Klatt resonators in cascade (y = A x + B y1 + C y2, unity gain at DC): F 350→750, 900→1250,
+  2300→2600, 3300→3500, 4300→4500 Hz from a soft to a hard key (× (f0/220)^0.12), bandwidths 80, 100,
+  140, 200, 260 Hz, each wandering ~5 % over seconds.
+- Stereo: what each resonator adds (its output less its input) at its own place, per key (a
+  hash): F1 within ±0.2 (it is the strongest: off-centre it tilted the balance 3–5 dB), F2–F5
+  anywhere in ±0.9.
+- Widths per attack: × the key's own factor (a hash, 0.8–1.25), × 1 ± 15 % per resonator, ×
+  (1.4 − 0.8 velocity): a hard key 0.6× (sharper, louder peaks), a soft one 1.4×.
+- The room: its pressure at the instrument, soft-limited (tanh at 0.5 Pa), into every resonator.
+  In the hall's chord demo (at the final trim) the room's part is −31 dB at 0.05, −25 at 0.1, −19
+  at 0.2, −4 at 0.4 (the loop building on itself), and from 0.8 louder than the sound.
+  (Before the trim the onset was at ~0.2: the loop's gain includes the instrument's loudness.)
+- The compressor (PJ_HALOCOMP): each resonator's contribution lifted towards 0.7 × the main
+  oscillator's envelope (5 ms / 150 ms followers, 3:1: gain (target/level)^(2/3) in 0.25..4,
+  smoothed 10 ms), passed on so down the cascade. At A3: 1.7–2.9 kHz −18 → −8 dB, 2.9–4 kHz
+  −31 → −12, 4–5.5 kHz −40 → −22 (re the strongest band). It lifts the room's part too (0.1:
+  −12 dB, 0.2 −6, 0.4 −2) but bounds the loop: its target is the source's level, so without
+  the source the resonators fall to 0.25×. PJ_HALOROOM default 0.025 (~−25 dB).
+- The narrow widths once put a formant on G#3's 3rd harmonic (the tracker read a fifth up); with
+  the compressor no note misreads.
+- The cascade's peaks made it 7.3 dB louder: trim −5.0 dB.
+- Whole-sound control (PJ_HALOWHOLE, default 4): each resonator's gain × (source / whole sound
+  heard d_k ago)^3, d_k 0.2–0.6 s per resonator (per voice). A delayed negative loop through a
+  shared quantity: it oscillates, the resonators taking turns. Held A3: each formant band's level
+  against the others swings 3.0–5.4 dB (std; 1.4–2.6 without), the whole ~2 dB, period ~0.8 s.
+  At ×8 the gains sit on their limits. At an attack the delayed whole is still silence: floored at
+  0.7 × the source, and each lifted contribution capped at 1.5 × the source (without: every gain
+  at 4 in five stages, peaks of 12 in the chord demo).
+- Slower and gentler (at the user's ear): envelopes integrate over 1.5 s (were 5 ms / 150 ms),
+  gains glide over 0.1 s (were 10 ms), own lift 1.5:1 (was 3:1), whole-sound control (src/whole)^1.5
+  (was ^3), gains within 0.5–2 (were 0.25–4). Held A3: each formant's share swings 2.1–2.9 dB, the
+  whole ~1.9 dB with a ~3 s period (was 0.8 s). Trim −1.9 dB.
+- Per-key formants: F_k = lo_k + u_k (hi_k − lo_k), u_k the radical inverse of (key + 1) in base
+  2, 3, 5, 7, 11 (a Halton sequence: neighbouring keys far apart, any run of keys even); ranges F1
+  250–850, F2 800–2300, F3 2000–3200, F4 3000–4200, F5 3800–5000 Hz; F2 ≥ 1.25 F1; × (1 + 0.16
+  (velocity − 0.5)). Over keys 36–96 each formant has 10–14 keys in every fifth of its range.
+  (Replaces the fixed oo..ah pair.)
+  On some keys a formant pair sits on the 2nd and 3rd harmonics (D4: F1 841, F2 1051 Hz around
+  its 3rd at 881): the autocorrelation tracker reads a fifth up (D4, D#5, G5) or an octave down
+  (Bb6). The tone, not the pitch; the test reads the core with the cascade out (PJ_INHARM=0).
+  Lower formants on average met more of the source: +3.4 dB, trim −5.3 dB.

@@ -5,7 +5,7 @@ Run from the repo root after `make flute scalar`. Each check prints ok/FAIL;
 exit status 1 if any check fails. "info" lines report but do not fail (they
 become checks once the planned fix lands).
 """
-import math, os, re, resource, subprocess, sys, time
+import math, os, re, resource, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FLUTE = os.path.join(ROOT, 'flute')
@@ -305,8 +305,9 @@ def played_notes():
 # its partial after calibration. (2026-11-13: horn 34/37; F2, F#2, G2, the
 # lowest valved partials 2 and 3, do not speak; G#2..B2 are 21..39 c off and
 # C#4, D4 14..16 c: 6 of 34 over 10 c.)
-BRASS = {'horn': 0.9}
-lo_steady = {'horn': 45}  # (above the notes that do not speak)
+BRASS = {'horn': 0.9, 'trumpet': 0.95, 'muted-trumpet': 0.95, 'trombone': 0.95, 'tuba': 0.95}
+lo_steady = {'horn': 45, 'trumpet': 55, 'muted-trumpet': 55, 'trombone': 41, 'tuba': 37}  # (above the notes that do not speak)
+hi_steady = {'horn': 78, 'trumpet': 83, 'muted-trumpet': 83, 'trombone': 78, 'tuba': 66}
 
 
 def brass():
@@ -327,7 +328,7 @@ def brass():
         # Steady notes: a held note's pitch and level do not wander or beat
         # (a slot can hold two states; the player keeps clear of the jump).
         bad = []
-        for m in range(lo_steady[inst], 78, 3):
+        for m in range(lo_steady[inst], hi_steady[inst], 3):
             for d in ('0.3', '0.6', '0.9'):
                 t = run(['-inst', inst, '-note', str(m), '-secs', '2', '-dyn', d]).stdout
                 ps = float(re.search(r'pitch wobble ([\d.]+)', t).group(1))
@@ -335,7 +336,7 @@ def brass():
                 if ps > 5 or lw > 25:
                     bad.append(f'{m}@{d}: {ps:.0f} c {lw:.0f} %')
         check(f'{inst}: held notes steady', len(bad) <= 1,
-              f'pitch within 5 c rms, level within 25 % from 0.4 s, MIDI {lo_steady[inst]}..77 x 3 dynamics'
+              f'pitch within 5 c rms, level within 25 % from 0.4 s, MIDI {lo_steady[inst]}..{hi_steady[inst] - 1} x 3 dynamics'
               + (f'; {bad}' if bad else ''))
         r = run(['-inst', inst, '-fuzz', '10', '1'])
         check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
@@ -345,19 +346,25 @@ def brass():
         check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     import brass as tmmb
-    worst, out = 0, []
-    for combo in ('', '123'):
-        pat = ''.join('x' if str(k) in combo else 'o' for k in (1, 2, 3))
-        line = run(['-inst', 'horn', '-imp', '53'], env={'PJ_NOCAL': '1', 'PJ_IMPHOLES': pat}).stdout
-        got = [float(v) for v in line.split(':')[1].split('(')[0].split()]
-        ref = [(n, f) for n, f, c, l in tmmb.report(tmmb.HORN, combo) if 2 <= n <= 12]
-        errs = [1200 * math.log2(min(got, key=lambda g: abs(math.log(g / f))) / f) for n, f in ref]
-        w = max(abs(e) for e in errs)
-        worst = max(worst, w)
-        out.append(f'{combo or "open"} worst {w:.1f} c')
-    # (Partials 3..6 turn back in the flare, which 11 mm cells resolve coarsely: up to
-    # 13 c there, the rest within 4; Bilbao & Chick's FDTD met measured horns within 1 %.)
-    check('horn waveguide vs brass.py (partials 2..12)', worst <= 15, ', '.join(out))
+    # name, sounding MIDI for -imp, [(fingering for the waveguide, valves, slide position for brass.py)], partials
+    cases = [('horn', 53, [('ooo', '', 1), ('xxx', '123', 1)], (2, 12)),
+             ('trumpet', 60, [('ooo', '', 1), ('xxo', '12', 1)], (3, 10)),  # (partial 2: a broad peak, the receiver's sub-cell gap moves it 15..30 c)
+             ('trombone', 46, [('1o', '', 1), ('7o', '', 7), ('1x', 'F', 1)], (2, 10)),
+             ('tuba', 36, [('oooo', '', 1), ('ooox', '4', 1)], (2, 10))]
+    for name, midi, fings, (plo, phi) in cases:
+        worst, out = 0, []
+        for pat, combo, pos in fings:
+            line = run(['-inst', name, '-imp', str(midi)], env={'PJ_NOCAL': '1', 'PJ_IMPHOLES': pat}).stdout
+            got = [float(v) for v in line.split(':')[1].split('(')[0].split()]
+            ref = [(n, f) for n, f, c, l in tmmb.report(tmmb.INSTS[name], combo, pos) if plo <= n <= phi]
+            errs = [1200 * math.log2(min(got, key=lambda g: abs(math.log(g / f))) / f) for n, f in ref]
+            w = max(abs(e) for e in errs)
+            worst = max(worst, w)
+            out.append(f'{pat} worst {w:.1f} c')
+        # (The horn's partials 3..6 turn back in the flare, which 11 mm cells
+        # resolve coarsely: up to 13 c there; Bilbao & Chick's FDTD met measured
+        # horns within 1 %.)
+        check(f'{name} waveguide vs brass.py (partials {plo}..{phi})', worst <= 15, ', '.join(out))
 
 
 def passive_vs_tmm():
@@ -385,29 +392,87 @@ def leads():
     # Worst error allowed (c): the detuned pairs (charang, the strings) and the
     # quarter-frequency period of bass+lead measure wider.
     slack = {'lead-charang': 9, 'lead-bass+lead': 14, 'synth-strings-1': 10, 'synth-strings-2': 8,
-             'lead-voice': 6, 'synth-voice': 6}
+             'lead-voice': 6, 'synth-voice': 6, 'pad-new-age': 8, 'pad-warm': 7, 'pad-choir': 8, 'pad-sweep': 8,
+             'pad-halo': 5, 'pad-polysynth': 5}
     insts = ['lead-saw', 'lead-square', 'lead-calliope', 'lead-chiff', 'lead-charang', 'lead-voice',
              'lead-fifths', 'lead-bass+lead', 'synth-bass-1', 'synth-bass-2', 'synth-strings-1',
-             'synth-strings-2', 'synth-voice', 'synth-brass-1', 'synth-brass-2', 'melodic-tom', 'synth-drum']
+             'synth-strings-2', 'synth-voice', 'synth-brass-1', 'synth-brass-2', 'melodic-tom', 'synth-drum',
+             'pad-new-age', 'pad-warm', 'pad-polysynth', 'pad-choir', 'pad-bowed', 'pad-metallic', 'pad-halo',
+             'pad-sweep', 'fx-crystal']
+    # The bell (new age) and the pipes (metallic) are inharmonic, and the
+    # halo's per-key formants can put a pair on the 2nd and 3rd harmonics
+    # (the tracker then reads a fifth up): their cores' tuning is read with
+    # those parts out (PJ_INHARM=0).
+    inharm = {'pad-new-age', 'pad-metallic', 'pad-halo'}
     for inst in insts:
-        out = run(['-inst', inst, '-scale']).stdout
-        cs = [int(m) for m in re.findall(r'^\S+\s+\S+\s+\S+\s+([+-]\d+)', out, re.M)]
-        mod = [((c + 600) % 1200) - 600 for c in cs]
-        worst = max((abs(c) for c in mod), default=99)
-        check(f'{inst}: tuned by its autotune', len(cs) >= 38 and worst <= slack.get(inst, 3),
-              f'{len(cs)} notes, worst {worst} c (modulo the octave)')
-        if inst == 'lead-fifths':
-            # Locked at 3:2 the pair repeats every two of the note's periods: an
-            # octave under it, exactly. Unlocked, it beats and measures off.
-            locked = sum(1 for c in cs if abs(c + 1200) <= 1)
-            check('lead-fifths: the fifth locked at 3:2', locked == len(cs) and cs,
-                  f'{locked}/{len(cs)} notes at the pair\'s period (-1200 c) within 1 c')
+        if inst == 'fx-crystal':
+            crystal()
+        else:
+            tuned(inst, slack, inharm)
         r = run(['-inst', inst, '-fuzz', '10', '1'])
         check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
         r = run(['-inst', inst, '-nantest'])
         check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
         ns = cpu_time(['-inst', inst, '-note', '57', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
         check(f'real-time margin ({inst})', ns < 800, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def wav_mono(path):
+    """A float32 or int16 WAV as a list of floats (channels averaged)."""
+    import struct
+    b = open(path, 'rb').read()
+    i, ch, bits = 12, 1, 16
+    while i < len(b):
+        cid, n = b[i:i + 4], struct.unpack('<I', b[i + 4:i + 8])[0]
+        if cid == b'fmt ':
+            ch, bits = struct.unpack('<H', b[i + 10:i + 12])[0], struct.unpack('<H', b[i + 22:i + 24])[0]
+        if cid == b'data':
+            d = b[i + 8:i + 8 + n]
+            x = struct.unpack(f'<{n // 4}f', d) if bits == 32 else [v / 32768 for v in struct.unpack(f'<{n // 2}h', d)]
+            return [sum(x[k:k + ch]) / ch for k in range(0, len(x) - ch + 1, ch)]
+        i += 8 + n + (n & 1)
+    return []
+
+
+def crystal():
+    """fx-crystal (a struck torus plate, tools/glass.py): its pitch is its first mode (the
+    autocorrelation tracker of -scale is fooled by the beating cluster 1, 1.022, 1.164): a
+    strike's spectrum near the note, scanned in 1 c steps (Goertzel over 0.5 s), peaks on it."""
+    import tempfile
+    worst = 0
+    for note in (48, 60, 72):
+        path = os.path.join(tempfile.gettempdir(), f'pj_crystal_{os.getpid()}.wav')
+        run(['-inst', 'fx-crystal', '-note', str(note), '-secs', '1', '-o', path])
+        x = wav_mono(path)[2400:2400 + 24000]
+        os.remove(path)
+        f0 = 440 * 2 ** ((note - 69) / 12)
+        best, bc = -1, 0
+        for c in range(-40, 41):
+            w = 2 * math.pi * f0 * 2 ** (c / 1200) / 48000
+            k, s1, s2 = 2 * math.cos(w), 0.0, 0.0
+            for v in x:
+                s1, s2 = v + k * s1 - s2, s1
+            p = s1 * s1 + s2 * s2 - k * s1 * s2
+            if p > best:
+                best, bc = p, c
+        worst = max(worst, abs(bc))
+    check('fx-crystal: the first mode on the note', worst <= 3, f'worst {worst} c (C3, C4, C5)')
+
+
+def tuned(inst, slack, inharm):
+    """One synth's tuning over its range (-scale), modulo the octave; lead-fifths' lock."""
+    out = run(['-inst', inst, '-scale'], env={'PJ_INHARM': '0'} if inst in inharm else None).stdout
+    cs = [int(m) for m in re.findall(r'^\S+\s+\S+\s+\S+\s+([+-]\d+)', out, re.M)]
+    mod = [((c + 600) % 1200) - 600 for c in cs]
+    worst = max((abs(c) for c in mod), default=99)
+    check(f'{inst}: tuned by its autotune', len(cs) >= 38 and worst <= slack.get(inst, 3),
+          f'{len(cs)} notes, worst {worst} c (modulo the octave)')
+    if inst == 'lead-fifths':
+        # Locked at 3:2 the pair repeats every two of the note's periods: an
+        # octave under it, exactly. Unlocked, it beats and measures off.
+        locked = sum(1 for c in cs if abs(c + 1200) <= 1)
+        check('lead-fifths: the fifth locked at 3:2', locked == len(cs) and cs,
+              f'{locked}/{len(cs)} notes at the pair\'s period (-1200 c) within 1 c')
 
 
 def strings():
@@ -430,12 +495,91 @@ def strings():
     check('fuzz 10 s (double-bass)', r.returncode == 0, r.stdout.strip())
     ns = cpu_time(['-inst', 'double-bass', '-note', '45', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
     check('real-time margin (double-bass)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The same bass under the bow (-inst contrabass): the string is caught once a period (a clear
+    # pitch, in tune) on every string, low and high and in the harmonics; a slur moves the pitch
+    # under one bow.
+    cents, clar = [], []
+    for note in (28, 33, 38, 43, 36, 47, 52, 57, 64, 67, 74, 79, 84):
+        r = run(['-inst', 'contrabass', '-note', str(note), '-secs', '2'])
+        c = re.search(r'\(([+-]\d+) cents\) clarity ([\d.-]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    check('contrabass: bowed notes in tune', max(abs(c) for c in cents) <= 10, f'cents {cents}')
+    check('contrabass: bowed notes clear', min(clar) >= 0.7, f'clarity {clar}')
+    r = run(['-inst', 'contrabass', '-slur', '45', '48'])
+    c = re.search(r'mean ([+-]\d+) cents', r.stdout)
+    check('contrabass: a slur arrives in tune', bool(c) and abs(int(c.group(1))) <= 12, r.stdout.strip()[-120:])
+    r = run(['-inst', 'contrabass', '-fuzz', '10', '1'])
+    check('fuzz 10 s (contrabass)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'contrabass', '-note', '45', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (contrabass)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+# The ethnic and percussive families on the modal engine (src/modal.cc,
+# src/modalinst.cc): no blow-ups, NaN recovery (the key struck again), real
+# time, and the pitched ones in tune (three notes of their range).
+MODALS = ['sitar', 'banjo', 'shamisen', 'koto', 'kalimba', 'fiddle', 'tinkle-bell', 'agogo', 'steel-drums',
+          'woodblock', 'taiko', 'reverse-cymbal',
+          # the sound effects (src/sfx.cc)
+          'fret-noise', 'breath-noise', 'seashore', 'bird-tweet', 'telephone', 'helicopter', 'applause', 'gunshot']
+# (Modulo the octave: a banjo's or a shamisen's fundamental is weak, a pan's
+# octave blooms over it; the taiko's pitch is not clear enough to track.)
+MODAL_PITCHED = {'sitar': (50, 62, 74), 'banjo': (55, 64, 76), 'shamisen': (52, 62, 66), 'koto': (55, 62, 74),
+                 'kalimba': (60, 72, 84), 'fiddle': (60, 69, 81), 'steel-drums': (62, 72, 84),
+                 'tinkle-bell': (55, 72, 84)}
+
+
+def struck_cents(inst, midi, harmonics=8):
+    """A plucked or struck note's tuning (cents): rendered, its first 0.4 s
+    (a banjo's note is nearly gone by the time -note listens), the best fit of
+    a harmonic series within +-100 c of the target (a sum of log magnitudes
+    over harmonics 1..8: a weak fundamental or a strong octave do not fool it)."""
+    import numpy as np
+    from scipy.io import wavfile
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'n.wav')
+        run(['-inst', inst, '-note', str(midi), '-secs', '1', '-o', path])
+        fs, x = wavfile.read(path)
+    x = x.astype(float)
+    if x.ndim > 1:
+        x = x.mean(1)
+    seg = x[int(0.03 * fs):int(0.43 * fs)]
+    if np.sqrt(np.mean(seg ** 2)) < 1e-5:
+        return None
+    X = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 17)) + 1e-12
+    df = fs / (1 << 17)
+    f0 = 440 * 2 ** ((midi - 69) / 12)
+    best, bc = -1e30, 0
+    for c in range(-100, 101):
+        f = f0 * 2 ** (c / 1200)
+        sc = sum(np.log(X[int(round(k * f / df))]) for k in range(1, harmonics + 1) if k * f < fs / 2.2)
+        if sc > best:
+            best, bc = sc, c
+    return bc
+
+
+def modals():
+    for inst in MODALS:
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        peak = float(re.search(r'peak ([\d.]+)', r.stdout).group(1))
+        # (A peak under 8: a single hardest hit peaks near 1, but ten seconds of
+        # random keys on a sitar's twenty ringing strings add up.)
+        check(f'fuzz 10 s ({inst})', r.returncode == 0 and peak < 8, r.stdout.strip())
+        r = run(['-inst', inst, '-nantest'])
+        check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
+        ns = cpu_time(['-inst', inst, '-note', '64', '-secs', '10']) / (10 * 48000) * 1e9
+        check(f'real-time margin ({inst})', ns < 1000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+        if inst in MODAL_PITCHED:
+            # (A kalimba's first overtone, ~5.9 x, would pull a harmonic fit flat: its fundamental alone.)
+            out = [struck_cents(inst, m, 1 if inst == 'kalimba' else 8) for m in MODAL_PITCHED[inst]]
+            bad = [c for c in out if c is None or abs(c) > 15]
+            check(f'{inst}: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
 
 
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

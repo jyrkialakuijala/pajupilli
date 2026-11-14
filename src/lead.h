@@ -61,6 +61,7 @@
 
 #include "knob.h"
 #include "performer.h"
+#include "singer.h"
 #include "tube.h"
 
 namespace pajupilli {
@@ -101,7 +102,55 @@ struct LeadPatch {
   // and sustain, a pitch envelope (semitones at a full-velocity strike, falling
   // with its time constant, s: a drum's skin).
   double relMul = 1, fltA = 0.006, fltD = 0.25, fltS = 0.25, pitchEnv = 0, pitchTau = 0.05;
+  // The pads' parts (GM 89-96):
+  //   - bell: the core's sine times the second core's sine (a ring modulator
+  //     on two inharmonic cores: the partials at the sum and the difference),
+  //     struck at each attack and dying away with bellTau (s), after the ladder;
+  //   - xfmr: an output transformer whose core saturates with its flux (the
+  //     voltage's integral: low notes compress, the bass thickens);
+  //   - hpf: an RC high-pass before the ladder (Hz);
+  //   - ensemble: three bucket-brigade lines from one input, their delays
+  //     swept by a slow and a fast LFO, 120 degrees apart (a string machine's);
+  //   - bow: a slip noise near each reset of the ramp (a bow letting go of the
+  //     string once a period); body: the formant bank at fixed wood resonances;
+  //   - xring: a Gilbert cell multiplying the ramp by the second core's ramp;
+  //   - echo: a bucket-brigade delay after the amplifier, regenerating (its
+  //     time in ms, its feedback), its clock's low-pass and compander in the loop;
+  //   - phaser: six all-pass stages (JFETs as variable resistors) swept by a
+  //     slow LFO (Hz), fed back, mixed with the dry: moving notches.
+  double bell = 0, bellTau = 1.2, xfmr = 0, hpf = 0, ensemble = 0, bow = 0, body = 0, xring = 0;
+  double echo = 0, echoMs = 300, echoFb = 0.5, phaser = 0, phaserRate = 0.15;
+  // Singers (src/singer.h) in place of the core and the ladder: puhuja's
+  // vocal tract on a glottis at the note's pitch, this many per voice.
+  int singers = 0;
+  // Metal pipes (pad-metallic): four tubes hanging from their tops, tuned to
+  // 1, 1.2, 2.5 and 3.5 x the note (the upper three quieter), each ringing in its bending modes (a
+  // free-free tube's: 1, 2.76, 5.40 x its own), joined at the top (the ends
+  // move in every mode: the joint passes them all on), each bowed: stick-slip
+  // friction against a bow moving at the envelope's speed.
+  double pipes = 0;
+  // A glass plate (-inst fx-crystal): 16 x 16, its edges joined into a torus,
+  // its mass varying along x (tools/glass.py: its 64 lowest modes), struck
+  // by a felt hammer at a random place at each attack; no core, no ladder.
+  double plate = 0;
+  // A cascade of formant resonators (pad-halo): five two-pole resonators at
+  // the ranges of human speech, each feeding the next (a cascade formant
+  // synthesizer's vocal tract); what each adds is heard from its own place,
+  // left to right; the room's sound reaches back into all of them.
+  double cascade = 0;
+  // The vibrato knob's position at start (live: K6, 0..1 of its travel); -1:
+  // the program's usual (0.05 of depth, ~42/127).
+  double vibKnob = -1;
 };
+
+// A lead's default vibrato depth for the live start (Performer::setVibrato's
+// units), or -1 for the program's usual.
+double leadDefaultVibrato(const Instrument& inst);
+// How clearly harmonic a lead's sound is, 0..1 (1: one clean periodic tone;
+// less with detuned or chorused oscillators, ensembles, formant cascades,
+// singers; least for a bell, metal pipes, glass, a drum's falling skin): the
+// ensemble's just intonation moves its top note less the lower this is.
+double leadClarity(const Instrument& inst);
 
 class Lead : public Tube {
  public:
@@ -115,11 +164,14 @@ class Lead : public Tube {
     double vibDepth = 0, vibRate = 5;  // the LFO's depth (semitones, peak) and nominal rate (Hz)
     int strike = 0;    // counts the attacks (a chiff pings on each)
     double vel = 0.5;  // the attacking key's speed 0..1
+    double vowel = 2, breath = 0.35;  // singers: the vowel (0 u, 1 o, 2 a, 3 e, 4 i), breathiness 0..1
+    bool gate = false;                // a key (or the hold pedal) down: the crystal's damper off
   };
   const LeadPatch& patch() const { return *patch_; }
   void setControls(const Controls& c) { ctl_ = c; }
   void seed(unsigned s) override;
   double testResponse() const override { return v_; }
+  const float* takeSide(int n) override;
   void resetAir() override;
   // The core's frequency at a control voltage (as a note, no trim), measured
   // by running the core alone for a few periods (the autotune; tests).
@@ -217,6 +269,102 @@ class Lead : public Tube {
   std::vector<float> bbd_;
   int bbdPos_ = 0;
   double chPh1_ = 0, chPh2_ = 0.37, bbdLp_ = 0;
+  // The pads' parts: the second core runs (for its own sound, a bell or a
+  // ring); the bell's strike; the transformer's flux; the high-pass; the
+  // ensemble's LFOs; the echo line; the phaser's stages.
+  std::vector<Singer> singers_;
+  static constexpr int kPipeModes = 12;
+  int nPipe_ = 0;
+  double pRe_[kPipeModes] = {}, pIm_[kPipeModes] = {}, pC_[kPipeModes] = {}, pS_[kPipeModes] = {},
+         pR_[kPipeModes] = {}, pG_[kPipeModes] = {}, pW_[kPipeModes] = {};
+  int pK_[kPipeModes] = {};  // each mode's pipe
+  // Stereo: the left and the right microphones' projections of each mode,
+  // the pipes' difference this sample, the side signal kept for the mixer.
+  double pL_[kPipeModes] = {}, pRt_[kPipeModes] = {}, pipeSide_ = 0, pipeMid_ = 0;
+  // The felt hammers: at each attack two pipes (chosen at random) are struck,
+  // the others bowed. Each struck pipe: where along it (share from the top),
+  // the hammer's time on it (s; negative: not yet), its contact time (s),
+  // its strength; each mode's shape at the hammer.
+  bool hit_[4] = {};
+  double pipeTop_ = 3.5;
+  // The cascade: its resonators' coefficients and states, each formant's slow
+  // wander, the side signal (what each adds, at its place).
+  static constexpr int kCasc = 5;
+  double cA_[kCasc] = {}, cB_[kCasc] = {}, cC_[kCasc] = {}, cY1_[kCasc] = {}, cY2_[kCasc] = {}, cWander_[kCasc] = {};
+  double cascSide_ = 0;
+  double cBwMul_[kCasc] = {1, 1, 1, 1, 1};
+  double cPan_[kCasc] = {0, -0.3, 0.7, -0.8, 0.8};
+  double cF_[kCasc] = {500, 1500, 2500, 3500, 4500};  // the formants on this key (Hz, before velocity and pitch)  // each resonator's place on this key (left negative)
+  // The compressor: the main oscillator's envelope (the cascade's input),
+  // each resonator's contribution's envelope, each one's gain.
+  double cEnvSrc_ = 0, cEnv_[kCasc] = {}, cGain_[kCasc] = {1, 1, 1, 1, 1};
+  // ... and the whole sound's envelope, kept per control block (16 samples)
+  // for the resonators' delayed views of it; each one's delay.
+  static constexpr int kTotRing = 4096;  // blocks (~1.4 s at 48 kHz)
+  float cTotRing_[kTotRing] = {};
+  int cTotPos_ = 0, cTotSub_ = 0;
+  double cEnvTot_ = 0, cDelay_[kCasc] = {0.23, 0.37, 0.51, 0.29, 0.44};  // s  // this attack's widths: the key's own, a little chance, the velocity
+  bool hamDamped_[4] = {}, gHamDamped_[2] = {};  // the felt has met the motion at its point (once per blow)  // the highest pipe's tuning on the key struck (pipeTopRatio)
+  // The glass plate: its modes (rotations), their decay, the two pickups'
+  // view of each, the hammer (its weights into the modes, its time, contact,
+  // strength), the last sample's difference for the sides.
+  static constexpr int kGlassMax = 64;
+  int nGlass_ = 0;
+  double gRe_[kGlassMax] = {}, gIm_[kGlassMax] = {}, gC_[kGlassMax] = {}, gS_[kGlassMax] = {}, gR_[kGlassMax] = {};
+  double gL_[kGlassMax] = {}, gRt_[kGlassMax] = {}, gG_[kGlassMax] = {};
+  // Two felt hammers (their weights into the modes, times, contacts,
+  // strengths) and the bow (each mode's shape at the bow's place).
+  double gHW_[2][kGlassMax] = {}, gHamT_[2] = {1, 1}, gHamDur_[2] = {0.002, 0.002}, gHamAmp_[2] = {};
+  double gBW_[kGlassMax] = {}, glassSide_ = 0;
+  void glassControl(double dt);
+  // The room's pressure at this instrument's place (Pa; src/room.h: the
+  // reverberant field and the others' direct sound), one per sample; 0 dry.
+  // The room's energy budget (pad-metallic, fx-crystal): what the modes have
+  // given the room lately; the room may give back at most 90 % of it.
+  double roomCredit_ = 0;
+  // The bows' direction (pad-metallic: one per pipe; fx-crystal: the first):
+  // +1 or -1, the bow's present share of it (it turns in ~60 ms), the time
+  // to its next turn (5-9 s, each bow its own).
+  double bowDir_[4] = {1, 1, 1, 1}, bowNow_[4] = {1, 1, 1, 1}, bowTurn_[4] = {7, 7, 7, 7};
+  void bowStep(int k, double dt) {
+    if ((bowTurn_[k] -= dt) <= 0) {
+      bowDir_[k] = -bowDir_[k];
+      bowTurn_[k] = 5 + 4 * (0.5 + 0.5 * urand());
+    }
+    bowNow_[k] += (1 - std::exp(-dt / 0.06)) * (bowDir_[k] - bowNow_[k]);
+  }
+  void bowStart(int k) {  // a new note: either way, its own timer
+    bowDir_[k] = bowNow_[k] = urand() < 0 ? -1 : 1;
+    bowTurn_[k] = 5 + 4 * (0.5 + 0.5 * urand());
+  }
+  double roomScale(double eOut, double eIn) {
+    roomCredit_ = roomCredit_ * roomLeak_ + 0.9 * eOut;
+    roomOut_ += eOut;
+    if (eIn <= 0) { roomIn_ += eIn; return 1; }  // the room taking energy out: always
+    const double s = eIn > roomCredit_ ? std::max(0.0, roomCredit_ / eIn) : 1.0;
+    roomCredit_ -= s * eIn;
+    roomIn_ += s * eIn;
+    roomWanted_ += eIn;
+    return s;
+  }
+  double roomLeak_ = 1, roomOut_ = 0, roomIn_ = 0, roomWanted_ = 0;  // (and totals: tests)
+  double roomP() {
+    if (roomPos_ < roomN_) pRoom_ = room_[roomPos_++];
+    return pRoom_;
+  }
+  double glassSample();
+  double hPos_[4] = {0.5, 0.5, 0.5, 0.5}, hamT_[4] = {1, 1, 1, 1}, hamDur_[4] = {0.005, 0.005, 0.005, 0.005},
+         hamAmp_[4] = {}, hW_[kPipeModes] = {};
+  std::vector<float> side_, sideOut_;
+  double pipeStrike_ = 0, pipeJoint_ = 0, pipeNoiseLp_ = 0;
+  bool core2_ = false;
+  double inharm_ = 1;
+  double bellEnv_ = 0, flux_ = 0, xfA_ = 0, hpLp_ = 0, hpA_ = 0, ensS_ = 0, ensF_ = 0.21;
+  std::vector<float> echo_;
+  int echoPos_ = 0;
+  double echoLp1_ = 0, echoLp2_ = 0, echoPh_ = 0, echoLpA_ = 0;
+  double apZ_[6] = {}, apA_ = 0, phY_ = 0, phPh_ = 0;
+  double echoStep(double x);
   // The core's state.
   double v_ = 0.3, dead_ = 0, blepNext_ = 0, prevOut_ = 0;
   double slope_ = 0;  // dV/dt this block

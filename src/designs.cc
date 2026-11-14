@@ -71,7 +71,11 @@ const Design kClarinetDesign = {kClarinetBore, 9, kClarinetHoles, 19, kClarinetN
 
 // Oboe, Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,
-// the third register by search among vented fingerings.
+// the third register by search among vented fingerings. The reed: the lips
+// damp it well (1/Q 0.9), and its blades meet from the sides over the last
+// 25 % of the closure (the slit narrows instead of slamming shut): a steadier,
+// rounder tone (a slammed reed beat against an inharmonic bore resonance,
+// sidebands ~15 dB under the harmonics: rough).
 const BorePoint kOboeBore[] = {
     {0.0, 2.36}, {35.2, 3.37}, {100.6, 5.23}, {543.7, 15.80}, {573.7, 17.00}, {598.7, 22.00}, {623.7, 32.00}};
 const HoleDef kOboeHoles[] = {
@@ -123,7 +127,7 @@ const NoteInfo kOboeNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.6, 9e-05, 0, 4.5e-06, 5000, 7000, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // English horn in F, written Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,

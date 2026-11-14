@@ -130,7 +130,8 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked()) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked()), bowed_(inst.plucked() && bowedBass(inst)) {
+    singing_ = std::strcmp(inst.name, "pad-choir") == 0;
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();
     hi_ = p.hi();
@@ -221,14 +222,25 @@ class Controls {
       case 71:
         p_.all(&Performer::setBrightness, 0.3 + 2.2 * x);
         if (plucked_) {  // the double bass: K2 is where the right hand plucks
-          const char* place = BassPlayer::pluckPlaceName(0.3 + 2.2 * x);
-          if (place != lastPlace_) std::fprintf(stderr, "plucking: %s\n", place);
+          const char* place = bowed_ ? BowPlayer::bowPlaceName(0.3 + 2.2 * x) : BassPlayer::pluckPlaceName(0.3 + 2.2 * x);
+          if (place != lastPlace_) std::fprintf(stderr, "%s: %s\n", bowed_ ? "bowing" : "plucking", place);
           lastPlace_ = place;
+        }
+        if (singing_) {  // the choir: K2 is the vowel
+          const double b = 0.3 + 2.2 * x, v = b <= 1 ? 2 * (b - 0.3) / 0.7 : 2 + 2 * (b - 1) / 1.5;
+          static const char* const kNames[5] = {"uuh", "ooh", "aah", "eeh", "iih"};
+          const char* name = kNames[std::clamp(int(std::lround(v)), 0, 4)];
+          if (name != lastPlace_) std::fprintf(stderr, "vowel: %s\n", name);
+          lastPlace_ = name;
         }
         break;
       case 72:
         p_.all(&Performer::setAir, x);
-        if (circuit_) {  // a synth: K3 is the filter's resonance; say its Q
+        if (singing_) {  // the choir: K3 is the singers' breath
+          const int b = int(std::lround(10 * x));
+          if (b != lastQ10_) std::fprintf(stderr, "breath %.1f\n", b / 10.0);
+          lastQ10_ = b;
+        } else if (circuit_) {  // a synth: K3 is the filter's resonance; say its Q
           const double res = LeadPlayer::resonance(x);
           const int q10 = int(std::lround(10 * Lead::ladderQ(res)));
           if (q10 != lastQ10_) std::fprintf(stderr, "resonance %.2f: Q %.1f%s\n", res, q10 / 10.0, res >= 1 ? " (self-oscillating)" : "");
@@ -250,7 +262,9 @@ class Controls {
   int lo_, hi_, transpose_;
   bool breathPad_ = false;
   bool circuit_ = false;  // a synth lead: K2 cutoff, K3 resonance
-  bool plucked_ = false;  // the double bass: K2 the plucking place
+  bool plucked_ = false;
+  bool bowed_ = false;    // ... under the bow: K2 the bow's place
+  bool singing_ = false;  // the choir (singers, src/singer.h): K2 the vowel, K3 the breath  // the double bass: K2 the plucking place
   const char* lastPlace_ = nullptr;
   int lastQ10_ = -1, lastSpread_ = -1;
   double joyBreath_ = 0;
@@ -288,7 +302,10 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
     std::fprintf(stderr, "note: no real-time priority (run with rtprio to reduce xruns)\n");
   mlockall(MCL_CURRENT | MCL_FUTURE);
 
-  player.all(&Performer::setVibrato, 0.05);
+  {  // the vibrato at start: the program's usual, or the instrument's own (a lead patch's: pad-halo low)
+    const double v = inst.circuit() ? leadDefaultVibrato(inst) : -1;
+    player.all(&Performer::setVibrato, v >= 0 ? v : 0.05);
+  }
   Controls ctl(player, inst, o);
   ctl.init();
   std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());

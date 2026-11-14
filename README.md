@@ -4,7 +4,7 @@ A real-time physical model of a Boehm concert flute (B foot), played from an
 Akai MPK mini mk3. Also the piccolo, alto flute and bass flute, and other woodwinds
 on the same air column: recorder, ocarina, shakuhachi, pan flute, clarinet, the
 saxophones (soprano, alto, tenor, baritone), oboe, bassoon, duduk and shawm, and the
-first brass instrument, the horn in F (`-inst`).
+brass: horn in F, trumpet (open and with a Harmon mute), trombone and tuba (`-inst`).
 
 - The bore is a 1-D acoustic waveguide: 96 pressure points at 48 kHz (7.5 mm apart),
   stored as 6 × 16 float32 so the loops compile to AVX-512. Geometry from a measured
@@ -90,7 +90,12 @@ off): every pair asks for its interval's nearest simple ratio (fifth +2 c, major
 -14 c, minor third +16 c, ...), simpler and closer intervals weighing more; a least-squares
 solve gives each flute its offset (within ±30 c), weakly pulled to equal temperament, and
 a note already sounding stays where it is so a new note fits the chord and progressions do
-not drift. Each flute gets there with its lips, by ear. It prints `tune: C4 +1 E4 -12 G4 +3`.
+not drift. The highest note is tuned less: it is pulled to equal temperament, the more the
+less clearly harmonic its sound (shimmer, vibrato, an inharmonic spectrum: the pads' bell,
+pipes, glass; `PJ_TOPPULL`), and the notes under it find the chord's justness. Such sounds
+are also corrected at most 11 c (the pads and effects always; others by how unclear: a clean
+tone keeps the full ±35 c); a note at its limit is held there and the others fit it. Each flute gets
+there with its lips, by ear. It prints `tune: C4 +1 E4 -12 G4 +3`.
 In the demo the flutes reach their targets within 1-2 cents and the chords' measured
 roughness (Sethares, from the partials) drops by 21 %.
 
@@ -211,6 +216,10 @@ or half-holes, a hole), key clicks, the radiation and the room. New:
 | `-inst` | What | Range (written) | Model rate |
 |---|---|---|---|
 | `horn` | single horn in F (sounds a fifth lower), three valves | C3–C6 (partials 2–16) | 32 kHz |
+| `trumpet` | B♭ trumpet (sounds a tone lower), three valves, the 3rd slide kicked out for 1+3, 1+2+3 | F#3–C6 (partials 2–8) | 48 kHz |
+| `muted-trumpet` | the trumpet with a Harmon mute, stem out (GM 60) | F#3–C6 | 48 kHz |
+| `trombone` | tenor trombone with F attachment: a moving slide | C2–F5 (at pitch) | 32 kHz |
+| `tuba` | CC tuba, four valves | E1–F4 (at pitch) | 20 kHz |
 
 The same air column and room, with these new parts (`research/horns.md` has the physics):
 
@@ -250,6 +259,45 @@ The same air column and room, with these new parts (`research/horns.md` has the 
   and breath that land in tune both ways. It retunes at each dynamic as far as the note holds.
   `-note` prints each held note's pitch and level wobble; `make test` checks them.
 
+The trumpet, trombone and tuba were added on the same machinery, each researched first
+(`research/trumpet.md`, `trombone.md`, `tuba.md`, `mutes.md`):
+
+- **Trumpet**: the Smith-Watkins trumpet that Bilbao & Chick measured (their published bore,
+  digitised; its transfer matrices meet their measured resonances 1–7 within 1 %), the main
+  tuning slide pulled 45 mm for warm breath, valve loops fitted on it. 1+3 and 1+2+3 are
+  27 and 48 cents sharp: the ring finger kicks the 3rd slide out 31 / 57 mm for them, as
+  players do. Lips: Adachi & Sato's trumpet mass and width (via Harrison et al.), the
+  resonance at ~0.75 of the note; the inward mode's share 1.5× the horn's (with the horn's,
+  each slot was sharp but for its bottom edge, where slurs failed).
+- **Muted trumpet** (GM 60's usual sound, the "Miles Davis" Harmon, stem out): the mute's cork
+  seals the bell 55 mm in, and its neck (36 → 44 mm), chamber (88 × 85 mm) and 17 mm exit are
+  the bore's last cells. That gives a parasitic resonance near 160 Hz below the trumpet's own,
+  the low notes pulled sharp and the high ones flat (the lips take it up), a chamber formant
+  near 2 kHz and 16–25 dB less below 1 kHz.
+- **Trombone**: the Conn 8H Bilbao & Chick measured (peaks 1–16 within ~1 %), with an F
+  attachment (966 mm loop). **The slide moves**: its 134 cells (both legs and the crook) stretch
+  together. Each cell's mass, volume and losses scale with the extension; the grid stays, and
+  the Courant number only falls. Positions 1–7 add 172–1184 mm of tube (travel 86–592 mm),
+  fitted so partials 3–8 drop by their semitones; the F side's positions are wider apart.
+  The slide takes 30–90 ms between positions; a glide (a soft overlapping key) is a real
+  glissando, the partials sliding together. A legato on one partial gets the light "da" of
+  the legato tongue while the slide travels. From A♭4 up the bore's partials are 8–35 c sharp,
+  so the chart lowers those positions ("+75": mm of tube more), as players shade them.
+- **Tuba**: no published tuba bore was found, so the shape (throat, cone to a 19.5 mm valve
+  cylinder, two-part cone, Bessel bell to 470 mm; 5.05 m) is fitted to the resonances measured
+  on a Besson BE994 (Mattéoli et al. 2022), transposed to C. Four non-compensating valves; the
+  combinations and some single valves are 40–120 cents sharp on this bore, so the chart pulls
+  the last pressed valve's slide for those notes ("+613" mm of tube for E1 on 2-3-4).
+- **Brassiness** (all but the horn): at ff the outgoing wave steepens towards a shock in the
+  narrow bore. The wave leaving the cylinder is time-warped (each sample travels at c + βu,
+  overtaken samples merge) and the difference from the linear wave radiates from the bell,
+  shaped as measured spectra fall above 2–3 kHz. The trumpet's ff centroid rises from ~1 to
+  ~1.7 kHz; pp–mf it adds nothing.
+- **Dynamics**: louder, the player presses the lips together (the rest opening shrinks), so
+  they still shut each cycle under the higher breath, and the breath spans more (×3 pp to ff
+  around mezzo-forte): the trumpet's ff is 10–12 dB over its mf.
+- GM 61 "brass section": an ensemble, e.g. `-ensemble trumpet,trumpet,horn,trombone,tuba`.
+
 ### Double bass (plucked)
 
 `-inst double-bass` is a jazz double bass plucked by hand (GM 33), E1 to G4
@@ -267,6 +315,92 @@ The same air column and room, with these new parts (`research/horns.md` has the 
 - **Knobs:** dynamics scales the pull, brightness moves the plucking point, vibrato rocks the
   stopping finger.
 
+`-inst contrabass` is the same bass under the bow (GM 44), E1 to G4, harmonics to C6:
+
+- **Bow:** the hair grips the string by friction and lets it slip back once a period; the string
+  also twists under it. The force follows the bow's speed and place, between the least that holds
+  the note and the most the string bears.
+- **Strokes:** a key is a stroke, down-bow and up-bow in turn; its velocity is the bow's speed. A
+  soft key eases in, a hard one bites. A long note turns the bow when it runs out.
+- **Legato:** overlapping keys are one stroke: the left hand moves, or the bow crosses to the next
+  string. Releasing the new key with the old one still held goes back to it (a trill). Keys
+  pressed together (within 60 ms) are a double stop.
+- **Knobs and pads:** brightness is the bow's place (over the fingerboard to the bridge), air its
+  pressure, the joystick forward a swell, the mute pad held a tremolo, vibrato the fingertip.
+- **By ear:** the stopping finger trembles by a few cents, and the player evens weak and booming
+  notes with the bow (`tools/bowlevels.py`).
+
+### Ethnic and percussive (modes)
+
+The GM ethnic (105–112) and percussive (113–120) families, each researched first
+(`research/sitar_shamisen.md`, `banjo_koto.md`, `kalimba_fiddle.md`, `steelpan_taiko.md`,
+`bells_blocks.md`), on one modal engine (`src/modal.*`, `src/modalinst.*`): `-inst sitar`, `banjo`,
+`shamisen`, `koto`, `kalimba`, `fiddle`, `tinkle-bell`, `agogo`, `steel-drums`, `woodblock`, `taiko`,
+`reverse-cymbal` (the bagpipe and shehnai are woodwinds; the melodic tom and synth drum are circuits).
+One voice is one instrument, its player giving the keys to strings, tines, note areas or bells.
+
+- **The engine**: each vibrator is its lowest modes, each a damped oscillator stepped exactly
+  (its free motion over a sample a matrix of four numbers), in two directions a hair apart. Strings
+  push a bridge (tension × slope); the body's modes at the bridge move, and their acceleration
+  drives every string back: the strings not played ring along. A stopped note is the string made
+  again at its shorter length (frequencies, mass, bridge force, obstacles). A bend or a pressed
+  string retunes it adiabatically (energy / frequency kept), so a bend neither pumps energy in nor
+  loses it.
+- **Contact**: an obstacle under a string's end (a sitar's jawari, a shamisen's sawari) is a few
+  linear contact patches solved with each step in closed form (van Walstijn, Bridges & Mehes 2016's
+  tanpura scheme), stable at a bone bridge's ~1e8 N/m. The jawari's curve is the measured 0.6 m⁻¹:
+  the buzz blooms ~0.3 s after the stroke (the centroid from ~1 to ~2.6 kHz) and fades over seconds.
+- **Mallets** (sticks, bachi, clapper, rubber tips) are masses on a Hertz contact (F = K c^1.5),
+  solved with the step by Newton (an explicit contact rang up on a light bell).
+- **Sitar**: Ma (F#3) and jod as melody strings, drones and two chikari (struck after a loud
+  stroke), 13 tarafs ringing in sympathy; a soft key above a held one within a fifth is a meend
+  (the string pulled along its fret), the joystick pulls it up to a fourth. **Banjo**: a Deering
+  Eagle II as Woodhouse, Politzer & Mansour measured it, the light bridge on the Mylar head (the
+  500–800 Hz formant; it is loud and dies fast). **Shamisen**: silk strings, the first buzzing on
+  the sawari, the skin's measured modes (Kokubun), the bachi meeting the skin a moment after the
+  string. **Koto**: 13 strings at 147 N tuned to hirajōshi by their bridges, notes between pressed
+  behind the bridge (oshide, reaching pitch just after the pluck); the kiri body's modes
+  (Coaldrake). **Kalimba**: tines with the measured 1 : 5.9 overtone, over a ~400 Hz box,
+  pressed slowly and let go by the nail. **Fiddle**: bowed **waveguide** strings (two delay
+  lines split at the bow, the stick-slip table where they meet, as STK's), whose bridge force
+  drives the violin body's measured modes (A0, CBR, B1−, B1+, the bridge hill); a modal string
+  under a bow needs modes that turn too far in one sample for the friction's solve.
+- **Tinkle bell**: from C5 up a small English handbell (1 : 3 : 4.8 : 5.4 …, doublets); below C5 (down to C3) a tuned church bell, its partials relative to the strike note 0.5 (hum) : 1 (prime) : 1.2 (the minor-third tierce) : 1.5 : 2 (nominal) : 2.5 : 2.67 : 3 : 4, struck once by a soft felt hammer much lighter than the bell (no click: the strike blooms). **Agogo**: conical
+  iron shells (Rayleigh's ring law), the oval mouth splitting each pair. **Steel drums**: one
+  note area per key on one pan (they ring in sympathy), modes at 1, 2, 4× coupled as Monteil,
+  Thomas & Touzé measured: the octave takes the energy within ~20 ms (the pan's bloom).
+  **Woodblock**: the lip and its cavity (1 : 1.15), decaying in tens of ms, struck by a stick in contact ~0.5 ms (a quieter click). **Taiko**: the
+  nagado-daiko's measured modes, the lowest split by the two heads through the air, a hard hit
+  stretching the head (up to a semitone sharp at first). **Reverse cymbal** (allowed to be
+  non-physical): a physically rendered crash (dense modes, the measured damping law) played
+  backwards, its swell faster for higher keys.
+- Levels: their raw loudness spans 50 dB; each is set to the common loudness, the struck ones
+  held down so the hardest hit peaks near full scale. `make test`: no blow-ups, NaN recovery,
+  real time (the sitar ~0.6 µs per sample, the rest 0.04–0.35), and the pitched ones in tune
+  (within ~7 c on three notes).
+
+### Sound effects
+
+GM 121–128 as physical systems too (`src/sfx.*`, on the modal instrument's frame):
+`-inst fret-noise` (a fingertip sliding over a wound string's windings, 0.25 mm apart: a squeak
+at the slide's speed, the string and a guitar body ringing with it), `breath-noise` (the choir's
+vocal tract whispering: the folds apart, the glottis's turbulence through the tract, the key
+choosing the mouth's shape), `seashore` (bubbles: each rings at Minnaert's frequency 3.26 / R,
+damped and chirping upward as van den Doel models liquid sounds, their sizes from a power law,
+their rate following each wave's crash, wash and backwash), `bird-tweet` (the syrinx's labia as a
+van der Pol valve driven by pressure and tension gestures after Gardner et al.: syllables sweeping
+down, the beak's resonance following the note), `telephone` (a polarised ringer: the 20 Hz ring
+current, 2 s on and 4 s off, turns the armature against its spring, ~18 Hz, and its steel ball
+swings into one gong, then the other, through Hertz contacts solved with the step; each gong 16
+modes of 4 numbers, frequency, decay, shape at the strike, radiation: a stamped bowl's (m, n)
+families as doublets), `helicopter` (the blade-vortex slap once a blade passage, the thickness
+noise, the tail rotor, the turbine; spinning up and down), `applause` (an audience of up to 960
+clappers in 40 rows, each with their own hands, the air between the palms a resonance as Peltola et
+al. measured; most keep their own rhythm, some seek the beat: slower, their phases pulled toward
+their nearest fellow seekers' and the hall's, so a rhythm emerges in the wash as Neda et al. found;
+the key sets the crowd's size), `gunshot` (the bullet's N-wave, then the muzzle blast as Friedlander's
+wave and its ground reflection; lower keys a larger calibre).
+
 ### Synth leads (analog circuits)
 
 `-inst lead-saw` is GM's sawtooth lead (82), built from a circuit rather than a stored waveform
@@ -283,6 +417,22 @@ synths:
 | Synth voice | `synth-voice` |
 | Synth brass | `synth-brass-1`, `synth-brass-2` |
 | Percussion | `melodic-tom`, `synth-drum` |
+| Pads (GM 89–96) | `pad-new-age`, `pad-warm`, `pad-polysynth`, `pad-choir`, `pad-bowed`, `pad-metallic`, `pad-halo`, `pad-sweep` |
+| Effects | `fx-crystal` (GM 99) |
+
+Each pad keeps the core, its vibrato and the ladder, and adds a part of its own:
+
+| Pad | Its circuit |
+|---|---|
+| `pad-new-age` | a bell on each attack: the core's sine ring-modulated by a second core 2.76× above, dying in ~1.6 s |
+| `pad-warm` | two cores 8 c apart into a saturating output transformer: low notes compress and thicken |
+| `pad-polysynth` | a swept pulse and the octave below through an RC high-pass before the ladder, and the chorus |
+| `pad-choir` | not a circuit: three singers per key, each a vocal tract as in puhuja (a transmission line in puhuja's vowel shapes) on a glottis at the note's pitch. They sing aah, eeh, iih, ooh or uuh: K2 moves the vowel from uuh (left) through ooh, aah (middle) and eeh to iih (right), K3 is their breath |
+| `pad-bowed` | a slip noise once a period (the bow letting go) and the formant bank at a wooden body's resonances |
+| `pad-metallic` | four metal pipes hanging from their tops, joined there, tuned to 1×, 1.2× and 2.5× the note, and the highest one to the key's own ratio between 1 and 3 (mostly a prime over 16, sometimes over 12 or 10: 17/16, 19/16, 29/16, 37/16, 17/12 …). The upper three are quieter: −9, −12 and −12 dB under the note’s pipe. Each rings in its own bending modes (1, 2.76, 5.40×). On each attack two pipes, chosen at random, are struck by soft felt hammers at random places along them and ring free; the other two are bowed (stick-slip; they swell in over about a second), and each bow changes direction every 5–9 s. The pipes give sound to the room and take some back (no more than ~90 % of what they gave), so the room, other instruments and other pipes set them ringing. Two microphones at different heights give left and right; the ramp through the ladder is a quiet layer under them |
+| `pad-halo` | soft source and pitched breath through a cascade of five formant resonators, each feeding the next and wandering slowly. Each key has its own formants, and over the keys each spreads evenly across its range in human speech (F1 250–850, F2 800–2300, F3 2000–3200, F4 3000–4200, F5 3800–5000 Hz; a hard key a little higher); their widths (Q) are each key's own, vary a little on every key press, and narrow with velocity (a hard key rings sharper); what each adds is heard from its own place, different on each key (F1 near the middle, the others anywhere left to right). A slow compressor on each resonator (it integrates over 1.5 s), governed by the main oscillator's level, lifts what it adds gently towards that level (1.5:1, within ±6 dB). Each compressor also hears the whole sound, late (each its own delay, 0.2–0.6 s), and turns down when the whole was louder than the source: a slow loop that never quite settles, so the formants take turns (each swinging 2–3 dB, the whole breathing about every 3 s). The room's sound reaches back into all of them, about 25 dB under the sound; it cannot ring by itself, since without the source the compressor turns the resonators down. Then the chorus and a regenerating bucket-brigade echo after the amplifier. Live, its vibrato starts low (K6 at 17/127; the others start at ~42/127) |
+| `fx-crystal` | not a circuit: a glass plate of 16 × 16 points whose edges are joined into a torus, its mass varying along x. Two felt hammers strike it at random places on each attack, and a bow keeps it singing (it swells in like a pad and changes direction every 5–9 s). Its 64 lowest modes come from `tools/glass.py`; they are inharmonic (1, 1.022, 1.164, 2.00, 2.34, 3.74 …), the first is on the note. Held keys ring, released ones are damped over ~1.5 s. It gives sound to the room and takes some back (at most ~90 % of what it gave), from the room, other instruments and other crystals. Left is the difference of two random pixels, right of two others (per voice; the note in the middle, the other modes apart) |
+| `pad-sweep` | two detuned ramps, a filter opening over seconds, and a six-stage JFET phaser swept at 0.12 Hz |
 
 Lead-saw's circuit:
 
@@ -395,6 +545,10 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   | duduk | 16 / 17 | C4 silent |
   | shawm | 10 / 13 (D4–D5) | D#4 -118 c, F#4 -38 c, D4 -10 c; the second register is open |
 
+  | trumpet | 31 / 31 within 1 c after calibration; held notes steady | soft notes stop near mf (softer, they fall into a flat regime); low notes ~20 dB softer than high |
+  | muted-trumpet | 31 / 31 within 1 c | (as the trumpet) |
+  | trombone | 42 / 42 within 2 c, wide dynamics on most | the shaded high notes (A♭4–E5) hold a narrower range |
+  | tuba | 38 / 38, 3 over 10 c (A♭1–B♭1 −17..−47 c) | E1–E♭2 hold only near mf |
   | horn | 37 / 37 (C3–F5 within ~10 c on `-scale`; held notes steady within 2 c and a few % in level; notes speak in 30–60 ms; legato scale ~10 ms per change more than 6 dB down) | F#2–G#2 22–28 c off; C#4, D4 ~15 c sharp; many notes hold only a narrow dynamic range (loudest often 0.5); a slur down to G3 from C4 or D4 lands ~55 c flat; slurs crossing partials with valves in the low register (F3→G3, A3↔Bb3) dip for 20–65 ms |
 
   The designs' passive resonances are within a few cents of their notes (rms 0–10 c on the

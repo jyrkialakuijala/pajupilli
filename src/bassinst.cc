@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
+#include "bowlevels_data.h"
 #include "knob.h"
 
 namespace pajupilli {
@@ -28,10 +30,17 @@ const int kFlatVel = 72;   // up to this: the flat finger; above: the stacked pu
 
 extern const Instrument kPlucked[] = {
     {"double-bass", 0, 28, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "bass"},
+    {"contrabass", 0, 28, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "bass"},
 };
-extern const int kNumPlucked = 1;
+extern const int kNumPlucked = 2;
 
-BassModel::BassModel(const Instrument& inst) : Tube(inst), bass_(inst.fs) {}
+bool bowedBass(const Instrument& inst) { return std::strcmp(inst.name, "contrabass") == 0; }
+
+BassModel::BassModel(const Instrument& inst) : Tube(inst), bass_(inst.fs), bowed_(bowedBass(inst)) {
+  // Under the bow the bass is heard from further away (a hall's microphone:
+  // the whole body), with a little of the f-hole and the bridge.
+  if (bowed_) bass_.setMics(knob("PJ_ARCO_FAR", 0.55), knob("PJ_ARCO_HOLE", 0.3), knob("PJ_ARCO_PICKUP", 0.15));
+}
 
 void BassModel::resetAir() {
   Tube::resetAir();
@@ -41,8 +50,10 @@ void BassModel::resetAir() {
 float BassModel::sample() {
   last_ = bass_.sample(float(testDp_));  // (tests: a force on the bridge's bass foot)
   testDp_ = 0;
-  side_.push_back(float(0.7 * outScale()) * bass_.side());
-  return finish(0.7f * last_);  // (a mezzo-forte pluck peaks near 0.1)
+  // (A mezzo-forte pluck peaks near 0.1; the bow gives the string far more.)
+  const float g = bowed_ ? 1.0f : 0.7f;
+  side_.push_back(g * float(outScale()) * bass_.side());
+  return finish(g * last_);
 }
 
 // The plucking place from the brightness knob (0.3 .. 2.5, the knob's whole
@@ -290,6 +301,281 @@ void BassPlayer::render(float* out, int n) {
       --rakeNext_;
       rakeClock_ = 0.028;
       blowing_ = true;
+    }
+    m_.process(out + i, m);
+  }
+}
+
+// ---------------------------------------------------------------- the bow
+
+// The bow's place from the brightness knob (0.3 .. 2.5), as a share of the
+// sounding length from the bridge:
+//   knob 0     over the fingerboard's end (sul tasto): 0.20
+//   knob 0.32  the usual place (at rest): 0.11
+//   knob 1     at the bridge (sul ponticello): 0.03
+double BowPlayer::bowPlace(double brightness) {
+  const double x = std::clamp((brightness - 0.3) / 2.2, 0.0, 1.0);
+  return x < 0.32 ? 0.20 * std::pow(0.11 / 0.20, x / 0.32) : 0.11 * std::pow(0.03 / 0.11, (x - 0.32) / 0.68);
+}
+
+const char* BowPlayer::bowPlaceName(double brightness) {
+  const double w = bowPlace(brightness);
+  return w > 0.16 ? "over the fingerboard (sul tasto)" : w > 0.125 ? "towards the fingerboard" : w > 0.09 ? "the usual place"
+       : w > 0.055 ? "towards the bridge" : "at the bridge (sul ponticello)";
+}
+
+BowPlayer::BowPlayer(BassModel& m) : BassPlayer(m) {}
+
+void BowPlayer::seed(unsigned s) {
+  BassPlayer::seed(s);
+  vib_.seed(s);
+  vib_.rateMul = 1 + 0.08 * urand();
+  vib_.depthMul = 1 + 0.15 * urand();
+  vib_.setPhase(M_PI * (1 + urand()));
+}
+
+void BowPlayer::setHold(bool h) {
+  hold_ = h;
+  if (!h)
+    for (int s = 0; s < 4; ++s)
+      if (on_[s] && key_[s] < 0) lift(s);
+}
+
+// Which string, stopped where (as the plucked bass chooses), or which
+// harmonic.
+void BowPlayer::place(int& s, int midi, int& stopNote, int& harmonic) const {
+  harmonic = 0;
+  stopNote = midi;
+  s = -1;
+  if (midi > kTop) {
+    // Harmonics: an open string's 2nd to 4th where there is one (the bow
+    // holds those well); otherwise the note an octave (a twelfth, two
+    // octaves) lower, stopped, and touched at its half (third, quarter).
+    static const int kSemis[3] = {12, 19, 24};
+    for (int n = 2; n <= 4 && s < 0; ++n)
+      for (int k = 3; k >= 0 && s < 0; --k)
+        if (midi == kOpen[k] + kSemis[n - 2] && key_[k] < 0) { s = k; harmonic = n; stopNote = kOpen[k]; }
+    if (s < 0) {
+      // (Not stopped in the last fifth of the neck if a lower stop will do:
+      // the short string there is hard to hold in two.)
+      harmonic = midi - 12 <= kTop - 7 ? 2 : midi - 19 <= kTop - 7 ? 3 : midi - 24 <= kTop - 7 ? 4 : midi - 12 <= kTop ? 2 : 3;
+      stopNote = midi - (harmonic == 2 ? 12 : harmonic == 3 ? 19 : 24);
+      s = pickString(stopNote);
+    }
+  } else {
+    s = pickString(midi);
+  }
+}
+
+// The bow comes to string s for this key (newStroke: from the air; else it
+// is already moving: a slur across the strings).
+void BowPlayer::start(int s, int midi, int stopNote, int harmonic, int velocity, bool newStroke) {
+  Bass& b = m_.bass();
+  const int semis = stopNote - kOpen[s];
+  // (A stiff string's harmonics run sharp: the hand stops an artificial one
+  // ~7 c lower, by ear.)
+  b.finger(s, semis ? b.openLength(s) / std::exp2((semis - (harmonic ? 0.07 : 0.0)) / 12.0) : 0);
+  harmN_[s] = harmonic ? harmonic : 1;
+  if (harmonic) b.touch(s, harmonic, 1e9, knob("PJ_ARCO_TOUCH", 6000));
+  key_[s] = midi;
+  since_[s] = 0;
+  harm_[s] = harmonic != 0;
+  vel_[s] = velocity;
+  on_[s] = true;
+  strokeT_[s] = newStroke ? 0 : 0.5;
+  if (semis > 0) hand_ = semis;
+  lastVel_ = velocity;
+  lastString_ = s;
+  note_ = midi;
+  blowing_ = true;
+  sinceAny_ = 0;
+}
+
+void BowPlayer::lift(int s) {
+  Bass& b = m_.bass();
+  on_[s] = false;
+  // The bow leaves (the release knob: slower); the string rings on under
+  // the finger, which then lets it go.
+  b.bow(s, dir_ * speed_[s], 0, dist_[s], std::clamp(0.7 * release_, 0.015, 0.4));
+  b.damp(s, std::clamp(0.3 / std::max(0.01, release_), 1.5, 14.0));
+}
+
+void BowPlayer::noteOn(int midi, int velocity) {
+  if (midi < inst_.lo || midi > inst_.hi) return;
+  static const double glideVel = knob("PJ_GLIDEVEL", 45), dvGlide = knob("PJ_DVGLIDE", 30);
+  Bass& b = m_.bass();
+  down_[midi] = true;
+  order_[midi] = ++clock_;
+  int sounding = 0;
+  for (int s = 0; s < 4; ++s) sounding += on_[s] && key_[s] >= 0;
+  const bool chord = sounding > 0 && lastOn_ < 0.06;
+  lastOn_ = 0;
+  int s, stopNote, harmonic;
+  if (sounding > 0 && !chord) {
+    // Legato: the same stroke goes on; the note last begun moves.
+    int from = lastString_ >= 0 && on_[lastString_] && key_[lastString_] >= 0 ? lastString_ : -1;
+    for (int k = 0; k < 4 && from < 0; ++k)
+      if (on_[k] && key_[k] >= 0) from = k;
+    const int old = key_[from];
+    const bool wasHarm = harm_[from];
+    key_[from] = -1;
+    place(s, midi, stopNote, harmonic);
+    if (s == from && !harmonic && !wasHarm) {
+      // The left hand alone: a finger down or up, a shift for a wider step;
+      // the glide gesture (a soft key under a held one): a slow slide.
+      const int semis = stopNote - kOpen[s], step = std::abs(midi - old);
+      const bool slide = velocity <= glideVel && velocity - lastVel_ <= -dvGlide;
+      b.setLength(s, semis ? b.openLength(s) / std::exp2(semis / 12.0) : 0,
+                  slide ? 0.07 + 0.022 * step : step <= 4 ? 0.018 : 0.03 + 0.004 * step);
+      key_[s] = midi;
+      since_[s] = std::min(since_[s], 0.25);  // (the vibrato eases back in)
+      if (!slide) vel_[s] = velocity;
+      if (semis > 0) hand_ = semis;
+      lastVel_ = velocity;
+      note_ = midi;
+      sinceAny_ = 0;
+      return;
+    }
+    lift(from);  // the bow crosses to another string, moving on
+    m_.bass().damp(from, 25);
+    start(s, midi, stopNote, harmonic, velocity, false);
+    return;
+  }
+  if (!chord) {  // a new stroke: the other way (after a rest: a down-bow)
+    dir_ = sinceAny_ > 1.0 ? 1 : -dir_;
+    travel_ = 0;
+  }
+  place(s, midi, stopNote, harmonic);
+  if (on_[s]) b.damp(s, 60);
+  start(s, midi, stopNote, harmonic, velocity, true);
+}
+
+void BowPlayer::noteOff(int midi) {
+  down_[midi] = false;
+  for (int s = 0; s < 4; ++s) {
+    if (key_[s] != midi) continue;
+    if (hold_) {  // the pedal: the bow stays on
+      key_[s] = -1;
+      continue;
+    }
+    // A key still held that no string plays (the note this one was slurred
+    // from): back to it, in the same stroke.
+    int back = -1;
+    for (int k = inst_.lo; k <= inst_.hi; ++k) {
+      if (!down_[k] || (back >= 0 && order_[k] < order_[back])) continue;
+      bool playing = false;
+      for (int t = 0; t < 4; ++t) playing |= key_[t] == k;
+      if (!playing) back = k;
+    }
+    key_[s] = -1;
+    if (back >= 0) {
+      int s2, stopNote, harmonic;
+      place(s2, back, stopNote, harmonic);
+      if (s2 == s && !harmonic && !harm_[s]) {
+        const int semis = stopNote - kOpen[s], step = std::abs(back - midi);
+        m_.bass().setLength(s, semis ? m_.bass().openLength(s) / std::exp2(semis / 12.0) : 0, step <= 4 ? 0.018 : 0.03 + 0.004 * step);
+        key_[s] = back;
+        note_ = back;
+        if (semis > 0) hand_ = semis;
+      } else {
+        lift(s);
+        m_.bass().damp(s, 25);
+        start(s2, back, stopNote, harmonic, vel_[s], false);
+      }
+      continue;
+    }
+    lift(s);
+  }
+  bool any = false;
+  for (int s = 0; s < 4; ++s) any |= key_[s] >= 0;
+  if (!any) {
+    blowing_ = false;
+    for (int s = 0; s < 4; ++s) blowing_ |= on_[s];
+    if (!blowing_) released();
+  } else if (midi == note_) {
+    for (int s = 0; s < 4; ++s)
+      if (key_[s] >= 0) note_ = key_[s];
+  }
+}
+
+void BowPlayer::render(float* out, int n) {
+  constexpr int kBlock = 16;
+  Bass& b = m_.bass();
+  for (int i = 0; i < n; i += kBlock) {
+    const int m = std::min(kBlock, n - i);
+    const double bdt = m / fs_;
+    tick(bdt);
+    sinceAny_ += bdt;
+    lastOn_ += bdt;
+    // The arm is not a motor: the bow's speed drifts a little (~1 Hz).
+    drift1_ += std::sqrt(6 * bdt / 0.25) * urand() - bdt / 0.25 * drift1_;
+    drift_ += (drift1_ - drift_) * bdt / 0.25;
+    // Nor is the stopping finger a fret: the pitch trembles by a few cents
+    // (the hand's own tremor, a noise under ~4 Hz). So a note never sits
+    // exactly on an open string's overtone, which would swallow it (the open
+    // string, ringing along at exactly that pitch, holds the bridge still).
+    static const double kTremor = knob("PJ_ARCO_TREMOR", 3.0);
+    trem1_ += std::sqrt(6 * bdt / 0.04) * urand() - bdt / 0.04 * trem1_;
+    tremor_ += (trem1_ - tremor_) * bdt / 0.04;
+    // Tremolo (the mute pad held): the bow shakes, ~13 strokes a second.
+    const bool trem = flutter_ > 0;
+    bool turned = false;
+    if (trem && (tremClock_ -= bdt) <= 0) {
+      dir_ = -dir_;
+      tremClock_ = (1 / 13.0) * (1 + 0.15 * urand());
+      turned = true;
+    }
+    double sinceOn = 1e9, fastest = 0;
+    for (int s = 0; s < 4; ++s)
+      if (on_[s] && key_[s] > kOpen[s] && !harm_[s]) sinceOn = std::min(sinceOn, since_[s]);
+    const double support = std::clamp(dyn_ + breathCtl_, 0.0, 1.0);
+    const double vib = vib_.step(bdt, 0.85 * vibRate_, sinceOn, support, wander_) * vib_.env() * vib_.depthMul;
+    const double cents = 230 * (vibDepth_ + 0.04 * std::max(0.0, breathCtl_)) * vib;
+    for (int s = 0; s < 4; ++s) {
+      since_[s] += bdt;
+      if (!on_[s]) continue;
+      strokeT_[s] += bdt;
+      const double v = vel_[s] / 127.0;
+      // The bow's speed: 5 cm/s (pp) to ~50 cm/s (ff), with the dynamics knob
+      // and the joystick's swell.
+      double speed = (0.05 + 0.45 * v * v) * (0.6 + 0.8 * dyn_) * (1 + 1.3 * std::max(0.0, breathCtl_)) *
+                     (1 + 0.05 * wander_ * drift_);
+      if (trem) speed *= 0.75;
+      // By ear: a note the bass answers weakly gets more bow, a booming one
+      // less (tools/bowlevels.py: 70 % of the difference, at most 6 dB).
+      static const double kEven = knob("PJ_ARCO_EVEN", 0.7);
+      const int li = key_[s] - kBowLevelLo;
+      if (li >= 0 && li < int(sizeof kBowLevels / sizeof kBowLevels[0]))
+        speed *= std::pow(10.0, std::clamp(-kEven * double(kBowLevels[li]), -6.0, 6.0) / 20);
+      // Its place: the knob's; a louder note nearer the bridge. Between the
+      // bridge and the fingerboard's end.
+      const double beta = bowPlace(brightness_) * (1.12 - 0.3 * v);
+      const double dist = std::clamp(beta * b.length(s) / harmN_[s], 0.012, 0.19);
+      // Its pressure, the air knob; a hard key bites at the start (martele);
+      // a harmonic wants a light, fast bow.
+      const double bite = std::clamp((vel_[s] - 100) / 27.0, 0.0, 1.0) * std::max(0.0, 1 - strokeT_[s] / 0.07);
+      double pressure = std::clamp(0.5 + 1.1 * (air_ - 0.35) + 0.3 * bite, -0.3, 1.2);
+      if (harm_[s]) pressure -= 0.15;
+      // How fast the stroke starts: a soft key eases in over ~130 ms, a hard
+      // one in ~12 ms (the hardness knob scales it); a change of direction
+      // takes ~15 ms.
+      const double attack = std::clamp((0.14 - 0.13 * v) / hardness_, 0.008, 0.25);
+      const double rise = trem ? 0.006 : strokeT_[s] < 3 * attack ? attack : 0.015;
+      // (The hair is laid on the string first, then drawn: the force is there
+      // before the speed. Drawn before it grips, the string whistles.)
+      static const double kLead = knob("PJ_ARCO_LEAD", 0.25);
+      b.bow(s, dir_ * speed, b.bowForce(s, speed, dist, pressure, harmN_[s]), dist, rise, std::max(0.004, kLead * rise));
+      speed_[s] = speed;
+      dist_[s] = dist;
+      fastest = std::max(fastest, speed);
+      b.bend(s, key_[s] > kOpen[s] && !harm_[s] ? cents + 200 * roll_ + kTremor * wander_ * tremor_ : 0.0);
+    }
+    // The bow has a length (~55 cm of hair): used up, it turns.
+    travel_ += fastest * bdt;
+    if (turned) travel_ = 0;
+    if (travel_ > 0.5 && !trem) {
+      dir_ = -dir_;
+      travel_ = 0;
     }
     m_.process(out + i, m);
   }

@@ -41,7 +41,7 @@ class HornPlayer : public Performer {
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   Vibrato vib_;  // its own vibrato (performer.h)
   double flutterPhase_ = 0, flutterRate_ = 27;
-  double kDynP_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
+  double kDynP_, kDynH_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
   double tongueFloor_ = 0;
   double pendingOff_ = 0;  // a key let go: the air stops when this runs out
   double slurDip_ = 0;
@@ -50,6 +50,8 @@ class HornPlayer : public Performer {
   // pushes, briefly (log of the lips' factor; the breath's extra share).
   double slurLip_ = 0, slurAir_ = 0, sinceSlur_ = 1e9;
   int prevNote_ = -1;
+  int prevSlideNote_ = -1;  // (the last note, for its slide position)
+  double kSlideTongue_;
   int prevPartial_ = -1;
   uint32_t rng_ = 4242;
   double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0;

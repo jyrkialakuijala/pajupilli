@@ -51,6 +51,10 @@ class Tube {
   // pressure in the window; a reed: a volume flow into the mouthpiece), and
   // the response seen there (window flow; mouthpiece pressure).
   virtual void testDrive(double v) { testDp_ = v; }
+  // A model that sounds differently to its two sides (the double bass, the
+  // metal pipes): the last n samples' difference (left = out + side, right =
+  // out - side), taken once; null if it has none.
+  virtual const float* takeSide(int /*n*/) { return nullptr; }
   virtual double testResponse() const = 0;
   // Clear all air motion (keys and settings stay); done automatically on NaN.
   virtual void resetAir();

@@ -45,6 +45,7 @@ class Horn : public Tube {
   double lipOpening() const { return h_; }
   double lipFlow() const { return u_; }
   double valve(int i) const { return valve_[i].s; }
+  double slide() const { return slideNow_; }  // the slide's extension (mm of tube)
 
  private:
   void controlStep() override;
@@ -95,6 +96,23 @@ class Horn : public Tube {
   double kNoise_, kSweep_, kGlotNoise_, kQ_, kEps_, kPress_ = 1, kRelease_, kStroke_, kMu_, kHk_, kW_, kIn2_, kInQ_, kInA_, kQExp_;
   Valve valve_[4];
   int nValves_ = 0;
+  // The slide: its cells (stretched evenly), where it is (mm of added tube)
+  // and where it goes, over a stroke (s).
+  int slideA_ = 0, slideB_ = 0;
+  double slideLen_ = 0;  // the slide's tube in 1st position (m)
+  double slideNow_ = 0, slideFrom_ = 0, slideTo_ = 0, slideT_ = 1, slideDur_ = 0.05;
+  void setSlide(double mm);
+  // Brassiness: the outgoing wave at cell nlCell_, its samples' arrival times
+  // at the bell (earlier the higher the pressure: c + beta u), warped onto the
+  // output's clock; the difference from the linear wave radiates.
+  static constexpr int kNlRing = 256, kNlLook = 48;
+  int nlCell_ = -1;
+  double nlK_ = 0, nlD0_ = 0, nlGain_ = 0, nlPrev_ = 0, nlPrev2_ = 0, nlLpA_ = 1, nlLpB_ = 1, nlLp1_ = 0, nlLp2_ = 0;
+  float nlVal_[kNlRing] = {};
+  double nlT_[kNlRing] = {};
+  long nlIn_ = 0, nlOut_ = 0;
+  double nlMax_ = -1e9;
+  double brassy(double pPlus);
 };
 
 }  // namespace pajupilli

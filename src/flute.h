@@ -33,6 +33,7 @@ struct Embouchure {
   double face = 1;          // the face and lip load on the window: extra window
                             // length in units of 2 mm (the instrument's size)
   double reed = 1;          // (reeds) lip force on the reed, x mezzo-forte
+  double lipPress = 1;      // (brass) the lips pressed together: their rest opening, x
 };
 
 class Flute : public Tube {

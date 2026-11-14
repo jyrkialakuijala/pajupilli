@@ -39,6 +39,7 @@ Bore::Bore(double fs) : fs_(fs) {
   std::memset(&s, 0, sizeof(s));
   std::memset(&k, 0, sizeof(k));
   std::fill(gate_, gate_ + kCells, 1.0);
+  std::fill(stretch_, stretch_ + kCells, 1.0);
   for (int j = 0; j < kLossSections; ++j) {
     const double h = 0.5 * kFitW[j] * dt_;
     k.a[j] = float((1 - h) / (1 + h));
@@ -64,6 +65,7 @@ void Bore::setBore(const std::function<double(double)>& diameter, double embX, d
   std::memset(series_, 0, sizeof series_);
   std::memset(ifaceExtra_, 0, sizeof ifaceExtra_);
   std::fill(gate_, gate_ + kCells, 1.0);
+  std::fill(stretch_, stretch_ + kCells, 1.0);
   for (Branch& b : branch_) b = Branch();
   const double endLen = footX - (x0_ + (foot_ - 0.5) * dx_);  // 0 .. dx
   for (int i = 0; i < kCells; ++i) {
@@ -135,7 +137,8 @@ void Bore::buildU() {
     // A part-open valve port: its area shrinks (more mass) and the flow through
     // it separates, a resistance ~ rho c / S (1 / open - 1) / 2 (per length here).
     const double g = gate_[i];
-    const double l = kRho * (1 + extra / dx_) / (sa * g * dt_), kap = kappa_[i];
+    const double st = 0.5 * (stretch_[i] + stretch_[i + 1 < kCells ? i + 1 : i]);
+    const double l = kRho * (st + extra / dx_) / (sa * g * dt_), kap = kappa_[i] * st;
     const double r = g < 1 ? 0.5 * kRho * kC / sa * (1 / g - 1) / dx_ : 0;
     const double d = l + 0.5 * kap * (kFitC0 + sumCG) + 0.5 * r;
     k.au[i] = float((l - 0.5 * kap * (kFitC0 - sumCG) - 0.5 * r) / d);
@@ -146,7 +149,7 @@ void Bore::buildU() {
 }
 
 double Bore::compliance(int cell) const {
-  return (area_[cell] * dx_ + branch_[cell].vol + cellVol_[cell]) / (kRho * kC * kC);
+  return (area_[cell] * dx_ * stretch_[cell] + branch_[cell].vol + cellVol_[cell]) / (kRho * kC * kC);
 }
 
 void Bore::setSeries(int cell, double len) {

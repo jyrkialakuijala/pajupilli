@@ -89,6 +89,7 @@ class Performer {
   }
   int sounding() const { return note_; }
   bool busy() const { return blowing_; }
+  double vibrato() const { return vibDepth_; }  // the vibrato knob's depth (setVibrato)
   // Play this note `cents` off its tempered pitch, tuned by ear with the lips.
   void setTuning(double cents) { ear_ = true; earCents_ = cents; }
   void setEar(bool on) { ear_ = on; }  // listen and tune held notes with the lips

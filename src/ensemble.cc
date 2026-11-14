@@ -8,6 +8,7 @@
 #include <string>
 
 #include "knob.h"
+#include "lead.h"
 
 namespace pajupilli {
 
@@ -64,7 +65,7 @@ Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes
                    const RoomSpec* room)
     : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
   // (A plucked instrument is one voice: its player takes the keys to its strings.)
-  init(std::vector<Member>(inst.plucked() ? 1 : std::max(1, maxFlutes), Member{&inst, &cal}), room);
+  init(std::vector<Member>(inst.oneVoice() ? 1 : std::max(1, maxFlutes), Member{&inst, &cal}), room);
 }
 
 void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
@@ -366,6 +367,9 @@ void Ensemble::noteOn(int key, int velocity) {
     for (int k = 0; k < 128; ++k)
       if (owner_[k] >= 0 && pressT_[k] > lastT) { lastT = pressT_[k]; lastVel = vel_[k]; }
     own = !(velocity <= glideVel && velocity - lastVel <= -dvGlide);
+    // The pads have no portamento: every key its own voice, always.
+    if (std::strcmp(f_[0].v->instrument().family, "pad") == 0 || std::strcmp(f_[0].v->instrument().family, "fx") == 0)
+      own = true;  // (nor the effects: a struck plate does not slide)
   }
   if (mixed_) {
     if (own && deal(key, velocity)) return;
@@ -595,6 +599,31 @@ void Ensemble::retune() {
         }
       }
   }
+  // How clear each note's pitch is (its sound's harmonicity, blurred by its
+  // vibrato: the usual live 0.05 x0.67), and how far it may be corrected:
+  // the pads and the effects (a shimmer, an inharmonic spectrum) and any
+  // sound this unclear at most 11 c; a clean tone the full kMaxCents (from
+  // clarity 0.95; 0.75 and under: 11).
+  double clar[64], capC[64];
+  for (int i = 0; i < n; ++i) {
+    const Performer& p = f_[idx[i]].v->player();
+    const Instrument& in = f_[idx[i]].v->instrument();
+    double h = in.circuit() ? leadClarity(in) : in.oneVoice() ? 0.9 : 1.0;
+    h /= 1 + p.vibrato() / 0.1;
+    clar[i] = h;
+    const bool pad = std::strcmp(in.family, "pad") == 0 || std::strcmp(in.family, "fx") == 0;
+    capC[i] = pad ? 11.0 : 11 + (kMaxCents - 11) * std::clamp((h - 0.75) / 0.2, 0.0, 1.0);
+  }
+  // The highest note and its pull to equal temperament (above, in solve).
+  int top = -1;
+  double topPull = 0;
+  {
+    static const double kTopPull = knob("PJ_TOPPULL", 1);
+    for (int i = 0; i < n; ++i)
+      if (top < 0 || note[i] > note[top]) top = i;
+    if (n < 2 || kTopPull <= 0) top = -1;
+    if (top >= 0) topPull = kTopPull * (0.4 + 2.5 * (1 - clar[top]));
+  }
   bool pin[64] = {};
   double pinTo[64] = {}, c[64];
   bool meanOn = true;  // the young's mean held at 0 (dropped once an old note is at its limit)
@@ -610,6 +639,15 @@ void Ensemble::retune() {
       else { l = kToTempered; a = s.cents; }  // the old minority: free, near where it is
       A[i][i] += l;
       b[i] += l * a;
+    }
+    // The highest note tuned less: pulled to equal temperament (the chord's
+    // justness found more by the notes under it), the more so the less
+    // clearly harmonic its sound (a shimmer, a vibrato, an inharmonic
+    // spectrum: there is less of a pitch to lock): 0.4 for a clean tone up to
+    // 2.9 (the pairs' weights are 0.05..1). PJ_TOPPULL scales it (0: none).
+    if (top >= 0) {
+      A[top][top] += topPull;
+      // (its target: 0 c)
     }
     if (ny > 0 && !oldStay && meanOn)  // kMean (sum of the young's c / ny)^2: their mean at 0
       for (int i = 0; i < n; ++i)
@@ -653,12 +691,33 @@ void Ensemble::retune() {
     const double lim = std::clamp(c[i], s.cents - kMaxMove_, s.cents + kMaxMove_);
     if (lim != c[i]) { pin[i] = true; pinTo[i] = lim; again = true; }
   }
+  // A note past its correction limit (capC: the unclear sounds' 11 c): pinned
+  // there, and the others solved again around it.
+  for (int i = 0; i < n; ++i)
+    if (!pin[i] && std::fabs(c[i]) > capC[i]) {
+      pin[i] = true;
+      pinTo[i] = std::clamp(c[i], -capC[i], capC[i]);
+      again = true;
+    }
   // An old note at its limit: it cannot meet the young halfway, so the
   // young fit it (the intervals before their mean on 0 c; the healing brings
   // the chord back to 0 c afterwards).
   if (again) {
     meanOn = false;
     solve();
+    // (Solved around the pins, another may now pass its limit: pinned too, at
+    // most once each.)
+    for (int pass = 0; pass < n; ++pass) {
+      bool more = false;
+      for (int i = 0; i < n; ++i)
+        if (!pin[i] && std::fabs(c[i]) > capC[i]) {
+          pin[i] = true;
+          pinTo[i] = std::clamp(c[i], -capC[i], capC[i]);
+          more = true;
+        }
+      if (!more) break;
+      solve();
+    }
   }
   for (int i = 0; i < n; ++i) {
     Slot& s = f_[idx[i]];

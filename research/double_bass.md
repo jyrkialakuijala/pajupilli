@@ -330,6 +330,86 @@ Cost: 1.2–2.0 µs per sample (6–10 % of a core). Tests: `tools/test.py strin
 - **Open:** almost nothing above 1.2 kHz reaches the output (−73 dB re the low band): the bridge
   model and the microphones pass too little there.
 
+## 7d. Expressive playing (2026-11-13)
+
+- **The right hand by velocity:** up to 45 the thumb; to 72 the flat finger (the index's side along
+  the string); to 99 the stacked pull; from 100 the pull turned outward (snap, then slap).
+  Fast notes: fingertips in turn, by the bridge. K2: the plucking place, from the middle of the
+  string to behind the bridge.
+- **The stopping finger on the joystick:** sideways slides it up to two semitones either way;
+  forward rocks it (vibrato on top of the knob's). Stopped notes are slid into from 5–20 c below.
+- **Ghost notes and the rake:** the mute pad (pad 2) held makes plucks dead (11 dB quieter, gone by
+  a further 15 dB within 0.2 s); struck, it rakes three muted strings 28 ms apart.
+- **Note endings:** a short note (under 0.15 s) is stopped dry, the strings that rang along too
+  (−23 dB at 150 ms); a note held over 0.6 s is let go slowly and its neighbours ring on.
+- **Which string:** by the line: staying on the last note's string and near the hand's place
+  cost less than crossing or shifting; an open string is taken when it is clearly nearer.
+- **The strings' height (K3):** turned up, the action goes down to 0.35 of its height and the
+  attack growls more (1–4 kHz in the first 0.3 s from −36 to −15 dB re the lows). The growl does
+  not yet last through the note.
+- **The pluck's definition:** the string leaves the pad's edge at once at the end of its slide,
+  the bridge's top is 60 g (its sway 440 Hz, well damped, up-down 1500 Hz), and a microphone
+  close to the top by the bridge hears the top's acceleration. 1.2–3.5 kHz is now about −44 dB
+  re the lows (it was −73 dB).
+- **Along the strings:** the bridge's top tips towards the neck or the tail, each string is a
+  spring along its length, the tailpiece a mass between the short lengths and its cord (about
+  207 Hz). Measured effect on the notes' levels and decays around it: under 1 dB. A stronger
+  path than the strings' angle over the bridge would be needed for it to matter.
+- **Strings from older records.** Fundamental's decay and the 2nd and 3rd overtones' levels at
+  the start: Ella Fitzgerald, *Body and Soul*: 20 dB/s, −5, −18 dB; Louis Armstrong, *On the
+  Sunny Side of the Street*: 34 dB/s, −19, −32 dB (darker and shorter than *Ku'damm*: 17 dB/s,
+  −3, −16 dB: probably plain gut). The model's default rings longer (14 dB/s, as asked);
+  `PJ_BASS_OLDGUT=1` gives the old records' decay.
+- **Loudness:** all instruments are trimmed to a common loudness (`tools/levels.py`,
+  `src/levels_data.h`): the saxes were up to 9.5 dB over the median, the bass 3 dB under.
+
+## 7e. Under the bow (`-inst contrabass`)
+
+The same strings, bridge and body, with a bow instead of the fingers (`Bass::bow`, `BowPlayer`).
+
+**The contact.** The hair grips the string by friction: up to 0.9 × the bow's force while they move
+together (sticking), falling with the slipping speed to 0.35 × (half-way at 8 cm/s). Each sample
+the string's velocity under the hair without the bow is known from its modes; the bow's force adds
+to it in proportion (the modes' shapes under the 16 mm of hair); the friction curve and that line
+are intersected (Friedlander's construction, with its hysteresis: a sticking string sticks while it
+can, a slipping one slips while it can). Each string is bowed along the bridge's crown at its notch
+(the outer strings 24° towards the top).
+
+What had to be added for the string to be caught once a period (Helmholtz's motion):
+- **The string's twist.** Without it every string slipped 6 to 25 times a period at any force. The
+  string rolls under the hair: a well-damped spring (at once it gives 1 / (2 · 2 Z) per newton, as
+  torsional waves running off; held, it springs back at 4 × the string's frequency).
+- **A band limit.** The bow acts on the modes below about 3.8 kHz (above, a force held for one
+  sample is too coarse: with all 64 modes a heavy bow froze the short strings).
+- **Enough force.** Measured over strings, positions, speeds and bow places (the playable window,
+  β the bow's place as a share of the sounding length, Z the wave resistance, v the bow's speed):
+  least ≈ (0.01 + 0.68 β) Z v / β², most ≈ (0.5 + 8 β) Z v / β. The player presses between the two
+  (the air knob). At the bridge (β 0.05) they almost meet. The low strings need much force: the open
+  E at 40 cm/s and β 0.11 holds only from 14 N (a real bow gives perhaps 5 to 10 N); the player's
+  speeds stay lower.
+- **The force before the speed.** With both rising together some notes took up to 580 ms to speak
+  (an octave or a whistle first); with the force there in a quarter of the time, 40 to 180 ms.
+
+**Findings.**
+- All stopped notes E1 to G4 play within 6 c, harmonics to C6 within 2 c after the hand stops the
+  artificial ones 7 c lower (a stiff string's harmonics run sharp).
+- A bowed harmonic did not speak with a touching finger modelled only as damping; the bow now
+  drives only every n-th mode under such a finger.
+- A note on an open string's overtone (A2 with the A string's second) lost 9 dB of its fundamental:
+  the open string, ringing at exactly that pitch, holds the bridge still there (with the other
+  strings damped: no dip). Real, but real pitches are never that exact: the stopping finger now
+  trembles by ~3 c.
+- Notes still differ: 15 dB between the weakest and the strongest (3.5 dB std against their
+  neighbours), almost unchanged by the body's damping or the microphones. The player evens them by
+  ear (`tools/bowlevels.py`, `src/bowlevels_data.h`: 70 % of each note's difference in bow speed):
+  1.3 dB std, the worst 4.7 dB.
+- Cost: 2.5 µs a sample (12 % of a core), as the plucked bass.
+
+**Not done / open.** Not compared with a recording of a bowed bass yet (none looked for in
+`~/Music`). No pizzicato, col legno or bouncing bow (spiccato is only a short stroke). Sustained
+double stops only for keys pressed within 60 ms (later keys are a slur). Random playing peaks at
+1.13 (clipping at the extreme).
+
 ## 8. Sources found
 
 - Guettler, Buen & Askenfelt, "An in-depth analysis of the double bass–stage floor contact" (the

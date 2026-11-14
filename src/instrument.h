@@ -16,7 +16,8 @@ enum class Kind {
   kDoubleReed, // a double reed: oboe, bassoon, duduk, shawm
   kLip,        // the lips buzzing in a cup mouthpiece: horn (src/brass.cc)
   kCircuit,    // an analog circuit: the synth leads (src/lead.cc)
-  kString      // plucked strings on a body: the double bass (src/bass.cc)
+  kString,     // plucked strings on a body: the double bass (src/bass.cc)
+  kModal       // modes of strings, tines, bells, heads: the ethnic and percussive families (src/modal.cc)
 };
 
 struct NoteInfo {
@@ -105,6 +106,24 @@ struct LipParams {
   double r2, q2, a2;
   const ValveDef* valves;
   int nValves;
+  // A trombone's slide: the tubes between slideX0 and slideX1 (mm from the
+  // lips, cylindrical) lengthen by slide[k] mm of tube in position k + 1 (the
+  // notes' patterns then start with the position, '1'..'7', the trigger
+  // valves after it).
+  const double* slide = nullptr;
+  double slideX0 = 0, slideX1 = 0;
+  // Brassiness (research/horns.md 6.2, N1): the steepening of the outgoing
+  // wave over this length (m) of the narrow bore, read at x (mm from the lips).
+  double nlLen = 0, nlX = 0;
+  // A trumpet's 3rd-valve slide, kicked out for 1+3 and 1+2+3 (mm of tube
+  // added to valve 3's loop): those combinations are sharp otherwise.
+  double ring13 = 0, ring123 = 0;
+  // Louder, the player presses the lips together (and the mouthpiece on
+  // them): the rest opening x e^(-dynH (dyn - 0.5)), so they still shut each
+  // cycle under the higher breath (the brassy, loud buzz).
+  double dynH = 0;
+  // The breath from pp to ff: x e^(dynP (dyn - 0.5)) (0: the player's own, 1.2).
+  double dynP = 0;
 };
 
 struct Design {
@@ -156,6 +175,10 @@ struct Instrument {
   bool lip() const { return kind == Kind::kLip; }
   bool circuit() const { return kind == Kind::kCircuit; }
   bool plucked() const { return kind == Kind::kString; }
+  bool modal() const { return kind == Kind::kModal; }
+  // One voice takes every key (its player gives the keys to its strings,
+  // tines or bars); nothing to calibrate (tuned by their lengths).
+  bool oneVoice() const { return plucked() || modal(); }
 };
 
 // By name; nullptr if unknown.

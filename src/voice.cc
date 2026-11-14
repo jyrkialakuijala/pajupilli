@@ -8,6 +8,7 @@
 #include "horn.h"
 #include "hornplayer.h"
 #include "bassinst.h"
+#include "modalinst.h"
 #include "lead.h"
 #include "player.h"
 #include "reed.h"
@@ -83,8 +84,8 @@ void Resampler::process(const float* in, float* out, int n) {
 }
 
 const float* Voice::side(int n) {
-  if (!instrument().plucked() || !rs_.identity()) return nullptr;
-  return static_cast<BassModel&>(*model_).takeSide(n);
+  if (!rs_.identity()) return nullptr;
+  return model_->takeSide(n);
 }
 
 std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
@@ -92,6 +93,7 @@ std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));
   if (inst.circuit()) return std::unique_ptr<Tube>(new Lead(inst));
   if (inst.plucked()) return std::unique_ptr<Tube>(new BassModel(inst));
+  if (inst.modal()) return std::unique_ptr<Tube>(new ModalModel(inst));
   return std::unique_ptr<Tube>(new Flute(inst));
 }
 
@@ -99,7 +101,11 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
   if (t.instrument().reed()) return std::unique_ptr<Performer>(new ReedPlayer(static_cast<Reed&>(t)));
   if (t.instrument().lip()) return std::unique_ptr<Performer>(new HornPlayer(static_cast<Horn&>(t)));
   if (t.instrument().circuit()) return std::unique_ptr<Performer>(new LeadPlayer(static_cast<Lead&>(t)));
-  if (t.instrument().plucked()) return std::unique_ptr<Performer>(new BassPlayer(static_cast<BassModel&>(t)));
+  if (t.instrument().plucked()) {
+    BassModel& b = static_cast<BassModel&>(t);
+    return std::unique_ptr<Performer>(bowedBass(t.instrument()) ? new BowPlayer(b) : new BassPlayer(b));
+  }
+  if (t.instrument().modal()) return std::unique_ptr<Performer>(new ModalPlayer(static_cast<ModalModel&>(t)));
   return std::unique_ptr<Performer>(new Player(static_cast<Flute&>(t)));
 }
 

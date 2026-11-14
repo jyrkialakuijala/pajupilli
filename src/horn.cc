@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "knob.h"
@@ -109,6 +110,25 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
     v.loop->update();
     setValveCoefs(v);
   }
+  // The slide's cells: those wholly inside its tubes.
+  if (lp_.slide) {
+    slideA_ = std::max(1, int(std::ceil(lp_.slideX0 * 1e-3 / dx)));
+    slideB_ = std::min(bore_.footCell() - 1, int(lp_.slideX1 * 1e-3 / dx));
+    slideLen_ = (slideB_ - slideA_) * dx;
+  }
+  if (lp_.nlLen > 0) {
+    nlCell_ = std::clamp(int(lp_.nlX * 1e-3 / dx), 1, bore_.footCell() - 1);
+    // A simple wave's sample at pressure p+ arrives earlier by L beta p+ / (rho c^3) (in samples x fs).
+    nlK_ = knob("PJ_BRASSY", 1) * lp_.nlLen * 1.2 / (kRho * kC * kC * kC) * fs_;
+    // The linear wave's time from here to the bell (to line up with it).
+    nlD0_ = (d.end * 1e-3 - (nlCell_ + 0.5) * dx) / kC * fs_;
+    // Above the bell's cut-off the wave passes out whole: its flow grows as
+    // sqrt(S) along the flare (its power kept).
+    const double sc = bore_.area(nlCell_), sb = M_PI * 0.25 * std::pow(diameterAt(d, d.end * 1e-3), 2);
+    nlGain_ = std::sqrt(sb / sc) * sc / (kRho * kC);
+    nlLpA_ = 1 - std::exp(-2 * M_PI * 2500 / fs_);
+    nlLpB_ = 1 - std::exp(-2 * M_PI * std::min(8000.0, 0.3 * fs_) / fs_);
+  }
   bore_.update();
   addRadiators(false, 0);
   target_.tongue = 0;
@@ -134,7 +154,46 @@ void Horn::setValveCoefs(Valve& v) {
 
 void Horn::setHoles(const char* pattern, double fingerSpeed) {
   fingerSpeed = std::clamp(fingerSpeed, 0.25, 4.0);
+  if (lp_.slide && ((*pattern >= '1' && *pattern <= '7') || (*pattern >= 'A' && *pattern <= 'G'))) {
+    // The slide: a quick arm, ~60 ms from 1st to 7th, a little longer the
+    // further it goes; a glide: the player's own time (a glissando).
+    // '1'..'7': the positions; 'A'..'G': the same with the trigger's loop in
+    // (the positions further apart).
+    // A shaded position: "+12" after the valves, mm of tube more (or less).
+    double to = *pattern <= '7' ? lp_.slide[*pattern - '1'] : lp_.slide[7 + *pattern - 'A'];
+    ++pattern;
+    if (const char* sh = std::strpbrk(pattern, "+-")) to = std::max(0.0, to + std::atof(sh));
+    if (to != slideTo_) {
+      slideFrom_ = slideNow_;
+      slideTo_ = to;
+      slideT_ = 0;
+      const double reach = std::fabs(to - slideFrom_) / std::max(1.0, lp_.slide[6]);
+      slideDur_ = (0.03 + 0.06 * std::sqrt(reach)) / std::sqrt(fingerSpeed);
+      if (glide_ != 0) slideDur_ = std::max(slideDur_, std::abs(glide_));
+    }
+  }
   const int n = int(std::strlen(pattern));
+  {
+    // The valves' slides, set before the note speaks: a trumpet's ring finger
+    // kicks the 3rd slide out for 1+3 and 1+2+3; a shade ("+40" after the
+    // valves: mm of tube) pulls the slide of the last valve pressed (a tuba
+    // player's for a sharp combination).
+    auto down = [&](int k) { return k < n && pattern[k] == 'x'; };
+    double extra[4] = {};
+    if (nValves_ >= 3 && down(0) && down(2)) extra[2] = down(1) ? lp_.ring123 : lp_.ring13;
+    if (!lp_.slide)
+      if (const char* sh = std::strpbrk(pattern, "+-"))
+        for (int k = nValves_ - 1; k >= 0; --k)
+          if (down(k)) { extra[k] += std::atof(sh); break; }
+    for (int k = 0; k < nValves_; ++k) {
+      Valve& v = valve_[k];
+      // (Only out: a loop shorter than its cells would break the Courant limit.)
+      const double st = std::max(1.0, 1 + extra[k] * 1e-3 / (v.n * bore_.dx()));
+      if (v.loop->stretch(0) == st) continue;
+      for (int i = 0; i < v.n; ++i) v.loop->setStretch(i, st);
+      v.loop->update();
+    }
+  }
   for (int k = 0; k < nValves_; ++k) {
     Valve& v = valve_[k];
     const int t = k < n && pattern[k] == 'x';
@@ -158,11 +217,16 @@ void Horn::settle() {
     bore_.setGate(v.a, 1 - v.s);
     setValveCoefs(v);
   }
+  if (lp_.slide && slideT_ < 1) {
+    slideT_ = 1;
+    setSlide(slideTo_);
+  }
   bore_.update();
   // The tongue and the glottis where the attack starts (not closing from rest first).
   tongue_ = target_.tongue;
   cur_.glottis = target_.glottis;
   cur_.reed = target_.reed;
+  cur_.lipPress = target_.lipPress;
   cur_.noise = target_.noise;
   cur_.air = target_.air;
 }
@@ -177,6 +241,9 @@ void Horn::resetAir() {
   out_.x = out_.v = in_.x = in_.v = 0;
   dp_ = u_ = pm_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
+  nlIn_ = nlOut_ = 0;
+  nlMax_ = -1e9;
+  nlPrev_ = nlPrev2_ = nlLp1_ = nlLp2_ = 0;
 }
 
 // Still: the flow and the loss states below ~1 mPa of plane-wave pressure,
@@ -197,6 +264,34 @@ bool Horn::still(const Bore& b, double area) {
   return true;
 }
 
+void Horn::setSlide(double mm) {
+  slideNow_ = mm;
+  if (slideB_ <= slideA_) return;
+  const double st = 1 + mm * 1e-3 / slideLen_;
+  for (int i = slideA_; i < slideB_; ++i) bore_.setStretch(i, st);
+}
+
+// Burgers without dispersion: each sample of the outgoing wave travels at
+// c + beta u; samples overtaken merge (a shock: the arrival times kept
+// monotonic). Returns the warped wave on the output's clock, less the linear.
+double Horn::brassy(double pp) {
+  const long in = nlIn_++;
+  // Arrival times (samples, less the common travel time): earlier by K p+.
+  nlMax_ = std::max(nlMax_, in - nlK_ * pp);
+  nlT_[in & (kNlRing - 1)] = nlMax_;
+  nlVal_[in & (kNlRing - 1)] = float(pp);
+  // Read kNlLook samples behind (a compression, arriving early, is in by then).
+  const double T = double(in - kNlLook);
+  if (T < 1) return 0;
+  if (nlOut_ < in - kNlRing + 2) nlOut_ = in - kNlRing + 2;
+  while (nlOut_ + 1 < in && nlT_[(nlOut_ + 1) & (kNlRing - 1)] <= T) ++nlOut_;
+  const int a = int(nlOut_ & (kNlRing - 1)), b = int((nlOut_ + 1) & (kNlRing - 1));
+  const double ta = nlT_[a], tb = nlT_[b];
+  const double f = tb > ta ? std::clamp((T - ta) / (tb - ta), 0.0, 1.0) : 1.0;
+  const double warped = nlVal_[a] + f * (nlVal_[b] - nlVal_[a]);
+  return warped - nlVal_[(in - kNlLook) & (kNlRing - 1)];
+}
+
 void Horn::controlStep() {
   const double blockDt = 16 / fs_;
   const double a = 1 - std::exp(-blockDt / 0.002);  // 2 ms smoothing
@@ -210,7 +305,8 @@ void Horn::controlStep() {
   tongue_ += (1 - std::exp(-blockDt / 0.001)) * (target_.tongue - tongue_);
   // The lips: resonance fl, rest opening hk / fl, mass mu per area.
   const double fl = std::clamp(cur_.reed, 20.0, 2000.0);
-  H_ = std::clamp(kHk_ * lp_.hk / fl, 0.0, 1.5e-3);
+  cur_.lipPress += (1 - std::exp(-blockDt / 0.02)) * (target_.lipPress - cur_.lipPress);
+  H_ = std::clamp(kHk_ * lp_.hk / fl * cur_.lipPress, 0.0, 3e-3);  // (a tuba's low notes: 2.5 mm)
   // The lips' Q: higher as their tension rises (the top notes need a sharper
   // lip to speak; lower down a sharp one splits the slot in two regimes).
   const double q = lp_.q * kQ_ * std::pow(std::max(1.0, fl / 300), kQExp_);
@@ -230,6 +326,11 @@ void Horn::controlStep() {
     v.s = smoothstep(v.t);
     bore_.setGate(v.a, 1 - v.s);
     setValveCoefs(v);
+    moved = true;
+  }
+  if (lp_.slide && slideT_ < 1) {
+    slideT_ = std::min(1.0, slideT_ + blockDt / slideDur_);
+    setSlide(slideFrom_ + (slideTo_ - slideFrom_) * smoothstep(slideT_));
     moved = true;
   }
   if (moved) bore_.update();
@@ -311,7 +412,27 @@ float Horn::sample() {
   p[ec_] = float(2 * pmid - pOld);
   u_ = u + un;
   dp_ = pm_ - pmid;
-  return finish(radiate(0));
+  float y = radiate(0);
+  if (nlCell_ >= 0) {
+    const float* pb = bore_.s.p();
+    const float* ub = bore_.s.u();
+    const int c = nlCell_;
+    const double pPlus = 0.5 * (pb[c] + kRho * kC / bore_.area(c) * 0.5 * (ub[c - 1] + ub[c]));
+    // The difference's flow out of the bell, radiated as the bell's (d/dt),
+    // when the linear wave from here gets there (it was read kNlLook late).
+    // A shock is a jump within a sample here; differentiated, a spike. Real
+    // ones lose their tops in the bell (the wave spreads, the losses) and
+    // radiate ~ -10 dB/oct above a 2..3 kHz transition (Fletcher & Tarnopolsky
+    // 1999): a pole at 2.5 kHz and one at 8.
+    nlLp1_ += nlLpA_ * (brassy(pPlus) - nlLp1_);
+    nlLp2_ += nlLpB_ * (nlLp1_ - nlLp2_);
+    const double q = nlGain_ * nlLp2_;
+    const int at = std::max(1, radDelay_[0] + int(std::lround(nlD0_)) - kNlLook);
+    outRing_[(outPos_ + at) & (kOutRing - 1)] += float(radGain_[0] * 0.5 * (q - nlPrev2_));
+    nlPrev2_ = nlPrev_;
+    nlPrev_ = q;
+  }
+  return finish(y);
 }
 
 }  // namespace pajupilli

@@ -117,6 +117,7 @@ void impulse(int midi) {
     float y;
     fl.process(&y, 1);
     q[i] = fl.testResponse();
+    if (std::getenv("PJ_IMPOUT")) q[i] = y;  // the radiated sound instead
   }
   if (const char* dump = std::getenv("PJ_IMPDUMP")) {  // the impulse response (Pa per 1e-8 m^3/s), float64
     if (FILE* f = std::fopen(dump, "wb")) {
@@ -126,7 +127,7 @@ void impulse(int midi) {
   }
   // DFT magnitude on a fine grid, peaks below 4 kHz.
   std::printf("%s fingering %s, %s peaks (Hz):", noteName(midi), holes, gInst->reed() || gInst->lip() ? "impedance" : "admittance");
-  const double df = 0.5, f0 = 50;  // peaks parabolic in log magnitude
+  const double df = 0.5, f0 = 20;  // peaks parabolic in log magnitude (from 20 Hz: a tuba's valved second partial)
   std::vector<double> lm;
   for (double f = f0; f < 4000 / gInst->scale; f += df) {
     // Goertzel
@@ -169,7 +170,9 @@ int fuzz(double secs, unsigned seed) {
   for (long n = 0; n < long(secs * kFs); n += 64) {
     if (u(rng) < 0.02) {
       const int m = lo + int(u(rng) * span);
-      pl.noteOn(m, 1 + int(u(rng) * 126));
+      const int vel = 1 + int(u(rng) * 126);
+      if (std::getenv("PJ_FUZZLOG")) std::fprintf(stderr, "%.3f on %d %d\n", n / double(kFs), m, vel);
+      pl.noteOn(m, vel);
       if (held >= 0 && u(rng) < 0.7) pl.noteOff(held);
       held = m;
     }
@@ -182,6 +185,8 @@ int fuzz(double secs, unsigned seed) {
     if (u(rng) < 0.003) pl.setHold(u(rng) < 0.5);
     v.render(x.data(), 64);
     for (float v : x) { bad |= !std::isfinite(v); peak = std::max(peak, double(std::fabs(v))); }
+    static FILE* dump = std::getenv("PJ_FUZZRAW") ? std::fopen(std::getenv("PJ_FUZZRAW"), "wb") : nullptr;
+    if (dump) std::fwrite(x.data(), 4, 64, dump);  // (raw float32 at 48 kHz, to look at a peak)
   }
   std::printf("fuzz %.0f s seed %u: peak %.3f, resets %d, %s\n", secs, seed, peak, fl.resets(),
               bad || fl.resets() ? "FAIL" : "ok");
@@ -198,8 +203,20 @@ int nanTest() {
   std::vector<float> x(kFs / 2);
   v.render(x.data(), int(x.size()));
   fl.testDrive(NAN);
+  // (A plucked or struck note does not come back after the reset clears it:
+  // the key again.)
+  if (gInst->modal()) {
+    v.render(x.data(), 64);
+    pl.noteOn((gInst->design ? (gInst->lo + gInst->hi) / 2 : 69) + gInst->transpose, 80);
+    x.resize(3 * kFs);  // (a reversed cymbal swells for ~2 s)
+  }
   v.render(x.data(), int(x.size()));
-  const double r = rms(x.data() + x.size() / 2, int(x.size() / 2));
+  // (A struck sound may be over in 50 ms: its peak, not the second half's level.)
+  double r = rms(x.data() + x.size() / 2, int(x.size() / 2));
+  if (gInst->modal()) {
+    r = 0;
+    for (float s : x) r = std::max(r, double(std::fabs(s)));
+  }
   bool finite = true;
   for (float v : x) finite &= std::isfinite(v);
   std::printf("nan recovery: resets %d, finite %d, rms after %.4f: %s\n", fl.resets(), finite, r,
@@ -322,7 +339,13 @@ const char kUsage[] =
     "  -inst NAME          flute (default, B foot), flute-c (C foot), piccolo,\n"
     "                      alto or bass; recorder, ocarina, shakuhachi, panflute;\n"
     "                      clarinet, soprano-sax, alto-sax, tenor-sax, baritone-sax;\n"
-    "                      oboe, bassoon, duduk, shawm; horn (in F, valves).\n"
+    "                      oboe, bassoon, duduk, shawm; horn (in F, valves),\n"
+    "                      trumpet, muted-trumpet (Harmon), trombone (slide), tuba;\n"
+    "                      sitar, banjo, shamisen, koto, kalimba, fiddle; tinkle-bell,\n"
+    "                      agogo, steel-drums, woodblock, taiko, reverse-cymbal;\n"
+    "                      fret-noise, breath-noise, seashore, bird-tweet, telephone,\n"
+    "                      helicopter, applause, gunshot (and the synth leads, pads,\n"
+    "                      the double bass: -inst nosuch lists them all).\n"
     "                      Notes are sounding MIDI\n"
     "                      pitches (flute 59..96, piccolo 74..107, alto 55..83,\n"
     "                      bass 48..74; -note out of range prints the range)\n"

@@ -9,8 +9,10 @@
 namespace pajupilli {
 
 HornPlayer::HornPlayer(Horn& h) : Performer(h), horn_(h) {
-  kDynP_ = knob("PJ_HORNDYNP", 1.2);     // breath: x3.3 from pp to ff
-  kDynLip_ = knob("PJ_HORNDYNLIP", 0);    // louder: the lips' tension (the calibration sets it)
+  kDynP_ = knob("PJ_HORNDYNP", 1.2);     // breath: x3.3 from pp to ff (or the design's dynP)
+  if (inst_.design && inst_.design->lip && inst_.design->lip->dynP > 0 && !std::getenv("PJ_HORNDYNP")) kDynP_ = inst_.design->lip->dynP;
+  kDynLip_ = knob("PJ_HORNDYNLIP", 0);
+  kDynH_ = knob("PJ_LIPDYNH", 1);       // the lips pressed together when loud, x the design's    // louder: the lips' tension (the calibration sets it)
   kVelDyn_ = knob("PJ_VELDYN", 0.35);
   kRollLip_ = knob("PJ_ROLLLIP", 0.06);   // lip bend: the lips' resonance x e^(+-0.06)
   kP_ = knob("PJ_P", 1);
@@ -37,7 +39,8 @@ HornPlayer::HornPlayer(Horn& h) : Performer(h), horn_(h) {
   // ... and how far it lets the air through (0: it stops it; partly open, the
   // old note is not cut off).
   kSlurTongueFloor_ = knob("PJ_HORNSLURTONGUEFLOOR", 0);
-  kLegatoGap_ = knob("PJ_HORNLEGATO", 0.04);  // a key let go: the air stays this long for a slur (s)
+  kLegatoGap_ = knob("PJ_HORNLEGATO", 0.04);
+  kSlideTongue_ = knob("PJ_SLIDETONGUE", 0.02);  // a trombone's legato tongue: the air dipped this long (s)  // a key let go: the air stays this long for a slur (s)
 }
 
 void HornPlayer::seed(unsigned s) {
@@ -153,6 +156,17 @@ void HornPlayer::applyNote(Attack a) {
     tongueFloor_ = kSlurTongueFloor_;
     tongueClock_ = 0;
   }
+  // A trombone's slur on one partial: the slide moves, and the soft "da" of
+  // the legato tongue dips the air while it travels (without it, a smear; a
+  // glide keeps the smear: the glissando).
+  if (a == kSlur && !glide && inst_.design->lip->slide && prevPartial_ == played(note_)->harmonic &&
+      prevSlideNote_ >= 0 && played(prevSlideNote_) && *played(note_)->holes != *played(prevSlideNote_)->holes) {
+    tongueClosed_ = kSlideTongue_;
+    tongueRelease_ = 0.012;
+    tongueFloor_ = 0.3;
+    tongueClock_ = 0;
+  }
+  prevSlideNote_ = note_;
   prevPartial_ = played(note_)->harmonic;
   if (a != kSlur) tongueFloor_ = 0;
   switch (a) {
@@ -232,6 +246,7 @@ void HornPlayer::render(float* out, int n) {
       // oscillation can stay on the sharp side of a jump in the slot.
       fl *= std::exp(slurLip_ * slur - slurDip_ * (std::exp(-sinceSlur_ / kSlurDipT_) - slur) * (sinceSlur_ < 1e8));
       e.reed = fl;
+      e.lipPress = std::exp(-lp.dynH * kDynH_ * std::max(0.0, dyn - 0.5));
     }
     // Lungs: a fast push, a slower release.
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;

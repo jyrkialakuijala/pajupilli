@@ -542,7 +542,7 @@ static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) 
 Calibration calibrate(const Instrument& inst, double a4, FILE* log, int lo, int hi) {
   if (lo < 0) lo = inst.lo + inst.transpose;
   if (hi < 0) hi = inst.hi + inst.transpose;
-  if (inst.plucked()) {  // strings are tuned by their lengths: nothing to find
+  if (inst.oneVoice()) {  // strings (tines, bars) are tuned by their lengths: nothing to find
     Calibration cal;
     for (int m = lo; m <= hi; ++m) cal.ok[m] = true;
     return cal;

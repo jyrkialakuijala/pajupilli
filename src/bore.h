@@ -129,6 +129,17 @@ class Bore {
   // between cell i and i + 1: a constriction narrower than its cells (a throat).
   void setInterfaceLength(int i, double len) { ifaceExtra_[i] = len; dirtyU_ = true; }
   double interfaceArea(int i) const { return areaI_[i]; }
+  // A trombone's slide: cell i (and the interface after it) stand for s >= 1
+  // times their length, a cylinder's mass, volume and losses all x s (the grid
+  // stays; c dt / (s dx) only falls, so it stays stable). Its node at once.
+  void setStretch(int i, double s) {
+    if (stretch_[i] == s) return;
+    stretch_[i] = s;
+    dirtyU_ = true;
+    buildNode(i);
+    classify(i);
+  }
+  double stretch(int i) const { return stretch_[i]; }
   // A valve port: the interface's open share (1 open .. 0 shut). Part open, it
   // is narrower (more mass) and loses the flow's energy (a resistance).
   void setGate(int i, double open) {
@@ -166,6 +177,7 @@ class Bore {
   double series_[kCells] = {};   // series length per cell (m)
   double ifaceExtra_[kCells] = {};  // extra length per interface (m)
   double gate_[kCells];          // valve ports: open share per interface
+  double stretch_[kCells];       // a slide's cells: length x this (setStretch)
   bool dirtyU_ = false;
   double area_[kCells] = {};    // cell areas (m^2)
   double areaI_[kCells] = {};   // interface areas (m^2): between cell i and i + 1

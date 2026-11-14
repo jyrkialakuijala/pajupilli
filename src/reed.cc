@@ -176,7 +176,8 @@ float Reed::sample() {
   const double dpg = std::max(std::fabs(cur_.lung - pm_), 1.0);
   const double gg = ag * std::sqrt(2 / (kRho * dpg));
   const double gIn = 1 / (1 / gg + kAirwayR);
-  const double cm = kMouthVol / (kRho * kC * kC);
+  static const double kMouthMul = knob("PJ_MOUTHVOL", 1);  // (experiments: the mouth's volume, x)
+  const double cm = kMouthMul * kMouthVol / (kRho * kC * kC);
   const double vg = gIn * (cur_.lung - pm_) / ag;
   glotLp_ += glotA_ * (whiteNoise() - glotLp_);
   const double hiss = kGlotNoise_ * 0.5 * kRho * vg * vg * glotLp_;

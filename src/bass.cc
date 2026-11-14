@@ -31,12 +31,17 @@ const float kTailK = kTailM * float(std::pow(2 * M_PI * 48, 2)), kTailC = kTailM
 constexpr float kBridgeKx = 2e5f, kBridgeCx = 60.0f, kCordK = 1.5e5f, kCordC = 30.0f, kSinA = 0.10f, kSinB = 0.26f;
 // The fingerboard against the string: a stiff, lossy one-sided spring.
 constexpr float kBoardK = 3e4f, kBoardC = 1.5f;
+// The rosin: sticking friction, slipping friction at high speed, and the
+// slipping speed at which it is half-way between them (m/s).
+const float kMuS = float(knob("PJ_MUS", 0.9)), kMuD = float(knob("PJ_MUD", 0.35)), kMuV = float(knob("PJ_MUV", 0.08));
+// The bow's hair on the string: 16 mm wide.
+constexpr double kHair = 0.016;
 }  // namespace
 
 Bass::Bass(double fs) : fs_(fs), dt_(1 / fs), body_(fs) {
   // The body's losses: its resonances ring for a few tenths of a second (Q
   // about 45 at the wood resonance, 45 at the air resonance).
-  body_.setDamping(16.0, 1.6e-6, 9.0);
+  body_.setDamping(knob("PJ_BODY_RATE", 16.0), 1.6e-6, 9.0);
   kSymp_ = knob("PJ_BASS_SYMP", 1) > 0;
   kAfter_ = knob("PJ_BASS_AFTER", 1) > 0;
   kTail_ = knob("PJ_BASS_TAIL", 1) > 0;
@@ -48,6 +53,11 @@ Bass::Bass(double fs) : fs_(fs), dt_(1 / fs), body_(fs) {
   for (int s = 0; s < kStrings; ++s) {
     // The notches: 28 mm apart, the E string on the bass side.
     str_[s].notch = float(0.028 * (s - 1.5));
+    // The bridge's crown: the bow lies along it, 16 degrees more from one
+    // string to the next (the E string's stroke leans away from the top
+    // towards the middle, the G string's the other way).
+    str_[s].bowSin = float(std::sin(-0.28 * (s - 1.5)));
+    str_[s].bowCos = float(std::cos(-0.28 * (s - 1.5)));
     // PJ_BASS_OLDGUT (0..1): plain gut as on 1950s records, where the
     // fundamental dies at 20-34 dB/s (measured: Ella Fitzgerald's "Body and
     // Soul", Louis Armstrong's "On the Sunny Side of the Street"); the
@@ -156,10 +166,93 @@ void Bass::tune(Str& s) {
     s.clear[p] = x > 0 ? float(0.0002 + action_ * d.action * (span / (d.length - kBoardEnd_)) * u) : 1e9f;
     for (int k = 1; k <= kModes; ++k) s.board[p][k - 1] = x > 0 ? float(std::sin(k * M_PI * x / len)) : 0.0f;
   }
+  if (s.bowOn) bowShape(s);
+}
+
+// The bow's hair at bowDist from the bridge: each mode's shape averaged over
+// its width.
+void Bass::bowShape(Str& s) {
+  const double x = std::clamp(s.len - s.bowDist, 0.03 * s.len, 0.97 * s.len);
+  double sum = 0, br = 0;
+  for (int k = 1; k <= kModes; ++k) {
+    const int i = k - 1;
+    const double a = k * M_PI * kHair / (2 * s.len);
+    // (Modes turning more than ~0.5 rad a sample, above 3.8 kHz, are left
+    // to themselves, the more the higher: the hair is too wide and soft for
+    // them, and a force held for a sample is too coarse.)
+    static const double kWmax = knob("PJ_BOW_WMAX", 0.5);
+    const double taper = 1 / (1 + std::pow(s.wdt[0][i] / kWmax, 6));
+    // (Under a finger lying at 1/n of the string only every n-th mode lives:
+    // the bow drives those.)
+    const double sh = s.decay[0][i] > 0 && k % s.touchN == 0 ? taper * std::sin(k * M_PI * x / s.len) * (a > 1e-9 ? std::sin(a) / a : 1.0) : 0.0;
+    s.bowShape[i] = float(sh);
+    sum += sh * sh;
+    br += sh * s.bridgeIn[i];
+  }
+  s.bowSum = float(sum);
+  s.bowBr = float(br);
+  // The twist's wave resistance: kTors x the string's own, sqrt(T mu).
+  const double mu = s.def.tension / std::pow(2 * s.def.length * s.def.f0, 2);
+  static const double kTors = knob("PJ_BOW_TORS", 2.0);
+  s.bowTwR = float(2 * M_PI * 4 * s.def.f0);
+  s.bowTors = kTors > 0 ? float(1 / (2 * kTors * std::sqrt(s.def.tension * mu))) : 0.0f;
+}
+
+void Bass::finger(int si, double stoppedLength) {
+  Str& s = str_[si];
+  const double len = stoppedLength > 0 ? stoppedLength : s.def.length;
+  s.touchClock = 1e9;
+  s.touchN = 1;
+  s.damping = false;
+  if (std::fabs(len - s.len) > 1e-6 || s.stopped != (stoppedLength > 0) || s.bendCents != 0) {
+    s.len = s.lenFrom = s.lenTo = len;
+    s.glideT = 1e9;
+    s.bendCents = 0;
+    s.stopped = stoppedLength > 0;
+    tune(s);
+  }
+}
+
+// The force a bow needs (Schelleng's limits, here as measured on this model
+// over the four strings, positions, speeds and bow places): at least
+// ~(0.01 + 0.68 beta) Z v / beta^2 for the string to be caught once a period
+// (below: it slips twice or more, the whistling surface sound), at most
+// ~(0.5 + 8 beta) Z v / beta (above: it cannot let go in time: the note goes
+// flat, then creaks); Z the string's wave resistance, beta the bow's place
+// as a share of the sounding length. Near the bridge the two almost meet.
+// `pressure` 0..1 goes from the least to the most (as a ratio).
+double Bass::bowForce(int si, double speed, double where, double pressure, int harmonic) const {
+  const Str& s = str_[si];
+  const double mu = s.def.tension / std::pow(2 * s.def.length * s.def.f0, 2);
+  const double z = std::sqrt(s.def.tension * mu), beta = std::clamp(where * harmonic / s.len, 0.02, 0.3), v = std::fabs(speed);
+  const double lo = (0.01 + 0.68 * beta) * z * v / (beta * beta), hi = std::max(1.05 * lo, (0.5 + 8 * beta) * z * v / beta);
+  return std::min(20.0, lo * std::pow(hi / lo, pressure));
+}
+
+void Bass::bow(int si, double speed, double force, double where, double rise, double riseForce) {
+  Str& s = str_[si];
+  if (force > 0 && (!s.bowOn || std::fabs(where - s.bowDist) > 0.002)) {
+    s.bowDist = where;
+    bowShape(s);
+  }
+  s.bowVTo = float(speed);
+  s.bowFTo = float(std::max(0.0, force));
+  s.bowK = float(1 - std::exp(-dt_ / std::max(1e-3, rise)));
+  s.bowKF = float(1 - std::exp(-dt_ / std::max(1e-3, riseForce > 0 ? riseForce : rise)));
+  if (force > 0 && !s.bowOn) {
+    s.bowOn = true;
+    s.slipping = false;
+    s.bowTw = 0;
+    s.fingerClock = 1e9;  // (no finger's pluck under the bow)
+    s.damping = false;
+  }
+  if (s.bowOn) s.active = true;
 }
 
 void Bass::reset() {
   for (Str& s : str_) {
+    s.bowOn = false;
+    s.bowV = s.bowF = s.bowVTo = s.bowFTo = 0;
     std::memset(s.q, 0, sizeof s.q);
     std::memset(s.v, 0, sizeof s.v);
     std::memset(s.aq, 0, sizeof s.aq);
@@ -253,17 +346,21 @@ void Bass::setLength(int si, double stoppedLength, double glide) {
   s.glideT = 0;
   s.glideDur = std::max(1e-3, glide);
   s.damping = false;
+  s.touchClock = 1e9;
+  s.touchN = 1;
 }
 
-void Bass::touch(int si, int n, double secs) {
+void Bass::touch(int si, int n, double secs, double rate) {
   Str& s = str_[si];
   for (int k = 1; k <= kModes; ++k) {
     // The fingertip's flesh at L / n takes each mode by its motion there.
     const double m = std::sin(k * M_PI / n);
-    s.touch[k - 1] = float(std::exp(-900 * m * m * dt_));
+    s.touch[k - 1] = float(std::exp(-rate * m * m * dt_));
   }
   s.touchClock = 0;
   s.touchDur = secs;
+  s.touchN = secs > 1 ? n : 1;  // (held: for the bow)
+  if (s.bowOn) bowShape(s);
 }
 
 void Bass::pluckBehind(int si, double depth) {
@@ -287,8 +384,23 @@ void Bass::bend(int si, double cents) {
   Str& s = str_[si];
   if (!s.stopped) cents = 0;
   if (std::fabs(cents - s.bendCents) < 0.05) return;
+  // The fingertip rocks: the string a little shorter or longer. Every mode's
+  // frequency by the same ratio (the rest of tune() stays as it is).
+  const float r = float(std::exp2((cents - s.bendCents) / 1200));
   s.bendCents = cents;
-  tune(s);
+  for (int d = 0; d < 2; ++d)
+    for (int i = 0; i < kModes; ++i) {
+      s.w[d][i] *= r;
+      s.wdt[d][i] *= r;
+      s.cs[d][i] = std::cos(s.wdt[d][i]);
+      s.sn[d][i] = std::sin(s.wdt[d][i]);
+    }
+  for (int i = 0; i < kModes; ++i) {
+    s.slope[i] *= r;
+    s.stretch[i] *= r * r;
+  }
+  s.invModalMass *= r;
+  if (s.bowOn) bowShape(s);
 }
 
 void Bass::damp(int si, double rate) {
@@ -324,7 +436,7 @@ void Bass::control() {
     for (int i = 0; i < 16; ++i) e = std::max(e, std::fabs(s.v[0][i]) + std::fabs(s.v[1][i]));
     const bool finger = s.fingerClock < kRise_ + kHold_ + s.slip + s.cut + 0.01 || s.behindClock < 1.0;
     s.behindClock += bdt;
-    s.active = finger || e > 1e-7f || std::fabs(ay_) + std::fabs(az_) > 1e-3f;
+    s.active = finger || s.bowOn || e > 1e-7f || std::fabs(ay_) + std::fabs(az_) > 1e-3f;
     // (A low action: the string may graze the board for as long as it swings wide.)
     s.boardOn = kBoard_ && s.boardClock < (action_ < 0.8 ? 1.5 : 0.4);
     s.boardClock += bdt;
@@ -360,11 +472,59 @@ float Bass::sample(float testForce) {
     }
     const bool held = c < kRise_ + kHold_;
     s.fingerClock += dt_;
-    const float drive[2] = {float(ff * std::sin(s.fingerAngle)) * s.invModalMass,
-                            float(ff * std::cos(s.fingerAngle)) * s.invModalMass};
+    float drive[2] = {float(ff * std::sin(s.fingerAngle)) * s.invModalMass,
+                      float(ff * std::cos(s.fingerAngle)) * s.invModalMass};
+    const float* shape = s.finger;
+    if (s.bowOn) {
+      s.bowV += s.bowK * (s.bowVTo - s.bowV);
+      s.bowF += s.bowKF * (s.bowFTo - s.bowF);
+      if (s.bowFTo <= 0 && s.bowF < 2e-3f) {  // the bow has left the string
+        s.bowOn = false;
+        s.bowF = 0;
+        drive[0] = drive[1] = 0;
+      } else {
+        // The string's velocity under the hair, along the stroke, after this
+        // sample's other forces; the bow's force f adds Y f to it.
+        float vy = 0, vz = 0;
+        for (int i = 0; i < kModes; ++i) {
+          vy += s.v[0][i] * s.bowShape[i];
+          vz += s.v[1][i] * s.bowShape[i];
+        }
+        const float vh = s.bowSin * (vy + dt * s.bowBr * ay_) + s.bowCos * (vz + dt * s.bowBr * az_);
+        // The string also rolls under the hair: it twists (its surface ahead
+        // of its middle by bowTw), a well-damped spring: at once it gives
+        // yt f (torsional waves running off along the string, mostly lost);
+        // held, it winds up only so far (it springs back at bowTwR, a few
+        // times the string's own frequency).
+        const float yt = s.bowTors;
+        const float back = s.bowTwR * s.bowTw;
+        const float Y = dt * s.invModalMass * s.bowSum + yt;
+        // The rosin is not even along the hair: the grip flickers (the bow's
+        // hiss), a noise through a low-pass.
+        rng_ = rng_ * 1664525u + 1013904223u;
+        s.bowNoise += 0.3f * (((rng_ >> 8) * (2.0f / 16777216.0f) - 1) - s.bowNoise);
+        static const float kBowNoise = float(knob("PJ_BOW_NOISE", 0.5));
+        const float Fn = s.bowF * (1 + kBowNoise * s.bowNoise);
+        const float a = vh - back - s.bowV;  // the string's surface against the hair, without friction
+        const float A = std::fabs(a), sg = a > 0 ? 1.0f : -1.0f;
+        const bool canStick = A <= Y * Fn * kMuS;
+        // Slipping at speed u > 0 (the same way as a): u = A - Y Fn mu(u),
+        // mu(u) = muD + (muS - muD) / (1 + u / v0): the larger root.
+        const float a1 = A - Y * Fn * kMuD;
+        const float disc = (a1 + kMuV) * (a1 + kMuV) - 4 * kMuV * Y * Fn * (kMuS - kMuD);
+        const float u = disc >= 0 ? 0.5f * (a1 - kMuV + std::sqrt(disc)) : -1.0f;
+        const bool canSlip = u > 0;
+        s.slipping = s.slipping ? canSlip || !canStick : !canStick;
+        const float f = s.slipping ? -sg * Fn * (kMuD + (kMuS - kMuD) / (1 + std::max(u, 0.0f) / kMuV)) : -a / Y;
+        s.bowTw += dt * (yt * f - back);
+        drive[0] = f * s.bowSin * s.invModalMass;
+        drive[1] = f * s.bowCos * s.invModalMass;
+        shape = s.bowShape;
+      }
+    }
     // The finger on the string damps it while it holds, and the left hand
     // when it lies on it.
-    const float extra = s.damping ? float(std::exp(-s.dampRate * dt_)) : held ? float(std::exp(-s.holdDamp * dt_)) : 1.0f;
+    const float extra = s.damping ? float(std::exp(-s.dampRate * dt_)) : held && !s.bowOn ? float(std::exp(-s.holdDamp * dt_)) : 1.0f;
     // The stretch: the tension's rise turns every mode a little faster.
     float eps = 0;
     if (kTmod_) {
@@ -409,7 +569,7 @@ float Bass::sample(float testForce) {
       const float a = acc[d] * accOn;
       for (int i = 0; i < kModes; ++i) {
         // Forces as a step in velocity, then the mode's own rotation and decay.
-        float vv = v[i] + dt * (drive[d] * s.finger[i] + s.bridgeIn[i] * a);
+        float vv = v[i] + dt * (drive[d] * shape[i] + s.bridgeIn[i] * a);
         if (d == 0 && touching) vv += dt * boardF[i];
         const float x = q[i] * s.w[d][i];
         // (The extra turn del, kept a pure rotation: c^2 + s^2 = 1.)

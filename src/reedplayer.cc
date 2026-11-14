@@ -176,7 +176,10 @@ void ReedPlayer::render(float* out, int n) {
       const double fw = glideFrequency() * std::exp2(-inst_.transpose / 12.0);
       const double u = std::clamp(std::log(fw / lo) / std::log(hi / lo), 0.0, 1.0);
       const double p0 = rp.press * std::pow(rp.pressHi / rp.press, u);
-      const double accent = 1 + 0.2 * velAccent_ * std::exp(-sinceOn_ / 0.05);
+      // (The attack's accent no higher than the note's loudest calibrated
+      // pressure: past it, a low oboe note breaks into its octave and stays.)
+      const double hiP = std::exp(kDynP_ * (std::max(dynLo[note_], dynHi[note_]) - dyn));
+      const double accent = std::min(1 + 0.2 * velAccent_ * std::exp(-sinceOn_ / 0.05), std::max(1.0, hiP));
       if (blowing_)
         lungTarget = p0 * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * pressScale_ * accent;
       // The lips: calibrated per note and dynamics; a little looser when loud;

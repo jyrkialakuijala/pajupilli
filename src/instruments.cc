@@ -79,6 +79,8 @@ extern const Instrument kLeads[];
 extern const int kNumLeads;
 extern const Instrument kPlucked[];
 extern const int kNumPlucked;
+extern const Instrument kModals[];
+extern const int kNumModals;
 
 // The instruments at a common loudness: each one's trim (tools/levels.py),
 // as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
@@ -101,6 +103,8 @@ const Instrument* findInstrument(const std::string& name) {
     if (name == kLeads[k].name) return &kLeads[k];
   for (int k = 0; k < kNumPlucked; ++k)
     if (name == kPlucked[k].name) return &kPlucked[k];
+  for (int k = 0; k < kNumModals; ++k)
+    if (name == kModals[k].name) return &kModals[k];
   return nullptr;
 }
 
@@ -113,6 +117,7 @@ std::string instrumentNames() {
   for (int k = 0; k < kNumBrass; ++k) s += ", " + std::string(kBrass[k].name);
   for (int k = 0; k < kNumLeads; ++k) s += ", " + std::string(kLeads[k].name);
   for (int k = 0; k < kNumPlucked; ++k) s += ", " + std::string(kPlucked[k].name);
+  for (int k = 0; k < kNumModals; ++k) s += ", " + std::string(kModals[k].name);
   return s;
 }
 

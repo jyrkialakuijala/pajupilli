@@ -82,11 +82,37 @@ class Bass {
   // sounding length for a moment after the pluck: every overtone that moves
   // there dies under it, and the n-th and its multiples ring on. Call after
   // pluck().
-  void touch(int s, int n, double secs = 0.09);
+  void touch(int s, int n, double secs = 0.09, double rate = 900);
   // Pluck string s on the wrong side of the bridge, between it and the
   // tailpiece: a short, high ping (the string's 6th overtone), whatever the
   // left hand does.
   void pluckBehind(int s, double depth);
+  // The bow on string s (arco): its speed along its stroke (m/s; the sign is
+  // the stroke's direction: down-bow positive), the force pressing it on the
+  // string (N; 0: it leaves the string), where (m from the bridge), and how
+  // fast speed and force get there (s; riseForce: the force's own time, if
+  // not the speed's). Call again whenever they change.
+  //   The hair grips the string by its rosin: while they move together the
+  // string sticks to it (friction up to 0.9 x the force); pulled off, it
+  // slips back under a weaker friction that falls with the slipping speed
+  // (0.35 x at high speed), until it is caught again: once a period, the
+  // string's kink running round (Helmholtz's motion). Solved every sample
+  // with the string's own answer to the force (Friedlander's construction,
+  // with its hysteresis: a sticking string sticks while it can, a slipping
+  // one slips while it can: so a heavy bow plays flat, then crushes the
+  // note; a light fast one whistles on the surface). Each string is bowed
+  // along the bridge's crown at its notch: the outer strings partly towards
+  // the top.
+  void bow(int s, double speed, double force, double where, double rise = 0.02, double riseForce = 0);
+  // The force for that speed and place: pressure 0 (the least that holds the
+  // note) .. 1 (the most the string bears).
+  // (harmonic n: the string swings in n parts, each as a string of its own.)
+  double bowForce(int s, double speed, double where, double pressure, int harmonic = 1) const;
+  // The left hand alone: string s stopped at this length (0: open), at once.
+  void finger(int s, double stoppedLength);
+  double length(int s) const { return str_[s].len; }
+  bool bowing(int s) const { return str_[s].bowOn; }
+  bool slipping(int s) const { return str_[s].bowOn && str_[s].slipping; }  // (tests)
   void bend(int s, double cents);           // vibrato: the fingertip rocks
   // The left hand lies on the string: it dies at `rate` (1/s; a firm stop ~70,
   // a light touch ~10 lets it ring out).
@@ -116,11 +142,19 @@ class Bass {
     alignas(64) float cs[2][kModes], sn[2][kModes], w[2][kModes], wdt[2][kModes], decay[2][kModes];
     alignas(64) float touch[kModes];  // a touching finger's damping of each mode, per sample
     double touchClock = 1e9, touchDur = 0;
+    int touchN = 1;
     alignas(64) float turn[kModes];  // the plane of each mode's swing turns (rad per sample)
     alignas(64) float bridgeIn[kModes], slope[kModes], finger[kModes], stretch[kModes];
     alignas(64) float board[kBoard][kModes];
     float clear[kBoard] = {};
     float invModalMass = 0, notch = 0;
+    // The bow: each mode's shape under the hair, their squares' sum, the
+    // bridge's motion as seen there; speed, force (and where they are going).
+    alignas(64) float bowShape[kModes] = {};
+    float bowSum = 0, bowBr = 0, bowV = 0, bowF = 0, bowVTo = 0, bowFTo = 0, bowK = 0.01f, bowKF = 0.01f, bowSin = 0, bowCos = 1;
+    float bowNoise = 0, bowTors = 0, bowTw = 0, bowTwR = 0;
+    double bowDist = 0;
+    bool bowOn = false, slipping = true;
     // The finger: a force along its pull (N), rising, held, then slipping off.
     double fingerTarget = 0, fingerClock = 1e9, fingerAngle = 0.3, slip = 0.0012, cut = 0.00015, holdDamp = 12;
     double boardClock = 1e9, dampClock = 0, dampRate = 40, behindClock = 1e9;
@@ -130,6 +164,7 @@ class Bass {
     float aInvModalMass = 0;
   };
   void tune(Str& s);     // the modes' coefficients at the present length
+  void bowShape(Str& s);
   void control();        // every 16 samples: slides, vibrato, which strings sound
   double fs_, dt_;
   BassBody body_;

@@ -3,9 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <numeric>
 #include <vector>
 
+#include "glass_data.h"
 #include "knob.h"
 
 namespace pajupilli {
@@ -91,6 +95,42 @@ Board& board() {
 
 }  // namespace
 
+// pad-metallic's highest pipe: its tuning on each key, fixed per key (a hash
+// of it), between 1 and 3: over 16 mostly (60 %), else over 12 or 10; the
+// numerator a prime mostly (80 %), else an odd composite: 17/16, 19/16,
+// 29/16, 37/16, 17/12, 23/10 ...
+static double pipeTopRatio(int key) {
+  static const auto table = [] {
+    std::array<double, 128> t{};
+    auto isPrime = [](int n) {
+      if (n < 2) return false;
+      for (int d = 2; d * d <= n; ++d)
+        if (n % d == 0) return false;
+      return true;
+    };
+    for (int k = 0; k < 128; ++k) {
+      uint64_t z = uint64_t(k) * 0x9E3779B97F4A7C15ull + 0x632BE59BD9B4E019ull;
+      auto next = [&z] {
+        z += 0x9E3779B97F4A7C15ull;
+        uint64_t x = z;
+        x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+        x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+        return (x ^ (x >> 31)) >> 11;  // 53 bits
+      };
+      auto u01 = [&] { return double(next()) / double(1ull << 53); };
+      const double ud = u01();
+      const int den = ud < 0.6 ? 16 : ud < 0.8 ? 12 : 10;
+      const bool prime = u01() < 0.8;
+      std::vector<int> nums;  // numerators n with 1 < n / den < 3
+      for (int n = den + 1; n < 3 * den; ++n)
+        if (n % 2 == 1 && isPrime(n) == prime && std::gcd(n, den) == 1) nums.push_back(n);
+      t[k] = double(nums[std::min(nums.size() - 1, size_t(u01() * nums.size()))]) / den;
+    }
+    return t;
+  }();
+  return table[std::clamp(key, 0, 127)];
+}
+
 // The GM synth leads (81-88): one core and one ladder each, and between
 // them each its own sound circuit (research/synth_leads.md section 4).
 const LeadPatch kPatches[] = {
@@ -172,6 +212,63 @@ const LeadPatch kPatches[] = {
     [] { LeadPatch p{"synth-drum"}; p.saw = 0.1; p.sine = 1; p.chiff = 1; p.ampA = 0.0007; p.ampD = 0.22; p.ampS = 0;
          p.cutoff = 6; p.fltEnv = 1.2; p.fltA = 0.001; p.fltD = 0.06; p.fltS = 0; p.resScale = 0.8; p.pitchEnv = 12;
          p.pitchTau = 0.045; p.relMul = 0.4; return p; }(),
+    // The pads (GM 89-96): slow to speak, slow to let go; the same core and
+    // ladder, each its own circuit.
+    // 89 New Age: a warm sine-and-ramp pad, and on each attack a bell: the
+    // core's sine ring-modulated by a second core 2.76 x above (its partials
+    // at 3.76 and 1.76 x the note: a struck metal bar's), dying in ~1.6 s.
+    [] { LeadPatch p{"pad-new-age"}; p.saw = 0.25; p.sine = 0.8; p.bell = 0.9; p.secondSemis = 12 * std::log2(2.76);
+         p.bellTau = 1.6; p.chorus = 0.8; p.ampA = 0.18; p.ampD = 1.5; p.ampS = 0.85; p.cutoff = 0; p.fltEnv = 0.3;
+         p.fltA = 0.2; p.fltD = 1.5; p.fltS = 0.5; p.resScale = 0.3; p.relMul = 2.5; return p; }(),
+    // 90 Warm: two cores 8 c apart, ramp, sine and the octave below, a low
+    // cutoff, through a saturating output transformer, and the chorus.
+    [] { LeadPatch p{"pad-warm"}; p.second = 0.9; p.detune = 0.08; p.saw = 0.7; p.sine = 0.6; p.sub = 0.3; p.xfmr = 1;
+         p.chorus = 0.9; p.ampA = 0.35; p.ampD = 2; p.ampS = 0.9; p.cutoff = -6; p.fltEnv = 0.4; p.fltA = 0.5;
+         p.fltD = 2; p.fltS = 0.6; p.resScale = 0.35; p.relMul = 3; return p; }(),
+    // 91 Polysynth: a swept pulse, the ramp and the octave below, an RC high-
+    // pass taking the mud out before the ladder, an envelope that opens it,
+    // the chorus (the 1980s poly's single-chip voice).
+    [] { LeadPatch p{"pad-polysynth"}; p.pulse = 0.6; p.pwm = 0.18; p.sub = 0.4; p.hpf = 140; p.chorus = 1;
+         p.ampA = 0.015; p.ampD = 0.9; p.ampS = 0.75; p.cutoff = 2; p.fltEnv = 1.0; p.fltA = 0.01; p.fltD = 0.6;
+         p.fltS = 0.35; p.resScale = 0.5; p.relMul = 1.6; return p; }(),
+    // 92 Choir: not a circuit: three singers per key, each a vocal tract as
+    // puhuja's (src/singer.h) on a glottis at the note's pitch, singing aah,
+    // eeh, iih, ooh or uuh (the brightness knob: dark u .. bright i); the air
+    // knob their breath. Slow to swell, slow to let go.
+    [] { LeadPatch p{"pad-choir"}; p.singers = 3; p.ampA = 0.25; p.ampD = 1.5; p.ampS = 0.9; p.relMul = 2.5;
+         return p; }(),
+    // 93 Bowed: the ramp (a bowed string's motion is a ramp) and a sine, a slip
+    // noise where the bow lets go each period, the formant bank at a wooden
+    // body's fixed resonances; a slow bow.
+    [] { LeadPatch p{"pad-bowed"}; p.saw = 0.7; p.sine = 0.4; p.bow = 0.6; p.formants = 1; p.body = 1;
+         p.ampA = 0.45; p.ampD = 2; p.ampS = 0.95; p.cutoff = 4; p.fltEnv = 0.3; p.fltA = 0.6; p.fltD = 2; p.fltS = 0.7;
+         p.resScale = 0.3; p.relMul = 2; return p; }(),
+    // 94 Metallic: four metal pipes hanging from their tops, joined there,
+    // tuned to 1, 1.2, 2.5 and 3.5 x the note (the three upper ones half as
+    // loud), each in its bending modes
+    // (1, 2.76, 5.40 x), each bowed (stick-slip); the ramp through the ladder
+    // a quiet layer under them; the chorus after.
+    [] { LeadPatch p{"pad-metallic"}; p.saw = 0.6; p.pipes = 1; p.chorus = 0.5; p.ampA = 0.15; p.ampD = 2.5;
+         p.ampS = 0.85; p.cutoff = 6; p.fltEnv = 0.5; p.fltA = 0.05; p.fltD = 1.5; p.fltS = 0.4; p.resScale = 0.6;
+         p.relMul = 3; return p; }(),
+    // 95 Halo: a sine and a narrow pulse, pitched breath, through a cascade
+    // of five formant resonators (each feeding the next, each heard from its
+    // own place, the room reaching back into them), the chorus, and a
+    // regenerating bucket-brigade echo after the amplifier (340 ms, darker
+    // each time round).
+    [] { LeadPatch p{"pad-halo"}; p.vibKnob = 17 / 127.0; p.sine = 0.7; p.saw = 0.2; p.pulse = 0.4; p.pw = 0.25; p.cascade = 1; p.breath = 0.25;
+         p.comb = 0.7; p.chorus = 0.6; p.echo = 0.45; p.echoMs = 340; p.echoFb = 0.55; p.ampA = 0.5; p.ampD = 2;
+         p.ampS = 0.9; p.cutoff = 14; p.fltEnv = 0.2; p.resScale = 0.2; p.relMul = 3; return p; }(),
+    // 99 FX 3 (crystal): a glass plate, 16 x 16, its edges joined into a
+    // torus, its mass varying along x, struck by two felt hammers at random
+    // places each attack, and bowed (the bow swells with the envelope: a pad);
+    // held keys ring, released ones are damped slowly.
+    [] { LeadPatch p{"fx-crystal"}; p.plate = 1; p.ampA = 0.3; p.ampD = 2; p.ampS = 0.9; p.relMul = 2; return p; }(),
+    // 96 Sweep: two ramps 10 c apart, a resonant ladder opened over seconds by
+    // a slow filter envelope, and a six-stage phaser swept at 0.12 Hz.
+    [] { LeadPatch p{"pad-sweep"}; p.saw = 0.8; p.second = 0.8; p.detune = 0.1; p.phaser = 1; p.phaserRate = 0.12;
+         p.ampA = 0.3; p.ampD = 2; p.ampS = 0.9; p.cutoff = -10; p.fltEnv = 1.4; p.fltA = 2.5; p.fltD = 3; p.fltS = 0.6;
+         p.resScale = 0.85; p.relMul = 2.5; return p; }(),
 };
 constexpr int kNumPatches = int(sizeof(kPatches) / sizeof(kPatches[0]));
 
@@ -193,8 +290,44 @@ extern const Instrument kLeads[] = {
     {"synth-brass-2", 0, 36, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "brass"},
     {"melodic-tom", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "tom"},
     {"synth-drum", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "drum"},
+    {"pad-new-age", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-warm", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-polysynth", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-choir", 0, 41, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-bowed", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-metallic", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-halo", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"pad-sweep", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "pad"},
+    {"fx-crystal", 0, 48, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kCircuit, &kLeadSawDesign, "fx"},
 };
 extern const int kNumLeads = int(sizeof(kLeads) / sizeof(kLeads[0]));
+
+double leadDefaultVibrato(const Instrument& inst) {
+  for (const LeadPatch& p : kPatches)
+    if (std::strcmp(p.name, inst.name) == 0) return p.vibKnob >= 0 ? 0.15 * p.vibKnob : -1;  // (K6: 0.15 x its travel)
+  return -1;
+}
+
+double leadClarity(const Instrument& inst) {
+  for (const LeadPatch& p : kPatches)
+    if (std::strcmp(p.name, inst.name) == 0) {
+      double h = 1;
+      if (p.detune > 0 || (p.second > 0 && p.syncWin == 0)) h *= 0.8;  // two cores beating
+      if (p.chorus > 0) h *= 0.9;
+      if (p.ensemble > 0) h *= 0.8;
+      if (p.phaser > 0) h *= 0.9;
+      if (p.cascade > 0) h *= 0.75;  // the halo's wandering, turn-taking formants
+      if (p.singers > 0) h *= 0.7;   // three singers, a few cents apart
+      if (p.breath > 0.3) h *= 0.9;
+      if (p.bell > 0) h *= 0.6;
+      if (p.xring > 0) h *= 0.4;
+      if (p.pipes > 0) h *= 0.35;
+      if (p.plate > 0) h *= 0.3;
+      if (p.pitchEnv > 0) h *= 0.4;
+      return h;
+    }
+  return 1;
+}
 
 Lead::Lead(const Instrument& inst) : Tube(inst) {
   patch_ = &kPatches[0];
@@ -208,14 +341,31 @@ Lead::Lead(const Instrument& inst) : Tube(inst) {
     const double w = 2 * M_PI * 650 / fs_, al = std::sin(w) / (2 * 0.6), a0 = 1 + al;
     nb_[0] = 1 / a0; nb_[1] = -2 * std::cos(w) / a0; nb_[2] = 1 / a0;
     nb_[3] = -2 * std::cos(w) / a0; nb_[4] = (1 - al) / a0;
+    const LeadPatch& P = *patch_;
+    core2_ = P.second > 0 || P.bell > 0 || P.xring > 0;
+    inharm_ = knob("PJ_INHARM", 1);  // (tests: 0 takes out the bell, the pipes, the halo's cascade, to read the core's pitch)
+    if (P.echo > 0) echo_.assign(size_t(0.6 * fs_), 0.0f);
+    echoLpA_ = 1 - std::exp(-2 * M_PI * 3500 / fs_);  // the BBD's clock filter
+    xfA_ = 1 - std::exp(-2 * M_PI * 25 / fs_);         // the transformer's magnetizing corner
+    hpA_ = 1 - std::exp(-2 * M_PI * std::max(P.hpf, 1.0) / fs_);
   }
+  if (patch_->singers > 0) {
+    singers_.resize(patch_->singers);
+    for (int k = 0; k < patch_->singers; ++k) singers_[k].init(fs_, 0, k);
+  }
+  roomLeak_ = std::exp(-1 / fs_);  // the room's credit fades over ~1 s
   kAnalog_ = knob("PJ_ANALOG", 1);
   kWander_ = knob("PJ_FILTERWANDER", 1);
   id_ = board().join();
   seed(0);
 }
 
-Lead::~Lead() { board().leave(id_); }
+Lead::~Lead() {
+  board().leave(id_);
+  if (roomOut_ > 0 && std::getenv("PJ_ROOMSTATS"))
+    std::fprintf(stderr, "room energy: gave %.3g, took back %.3g (%.0f %%; the room offered %.0f %% of it)\n", roomOut_, roomIn_,
+                 100 * roomIn_ / roomOut_, 100 * roomWanted_ / roomOut_);
+}
 
 void Lead::seed(unsigned s) {
   Tube::seed(s);
@@ -265,6 +415,60 @@ void Lead::seed(unsigned s) {
     C2_ = nominal ? 1e-9 : 1e-9 * (1 + 0.05 * urand());
     pwmPh_ = nominal ? 0 : M_PI * urand();
   }
+  for (size_t k = 0; k < singers_.size(); ++k) singers_[k].init(fs_, s, int(k));
+  if (!simple_ && patch_->cascade > 0)  // each resonator's delay on the whole sound, its own (0.2-0.6 s)
+    for (double& d : cDelay_) d = s == 0 ? d : 0.2 + 0.4 * (0.5 + 0.5 * urand());
+  if (!simple_ && patch_->plate > 0) {
+    // The pickups: left the difference of two pixels of the plate, right of
+    // two others, chosen at random for each voice: a difference cancels what
+    // moves both points alike, so each side hears its own blend of the modes
+    // (a mode's sound: its velocity there, a little more for the higher: a
+    // plate radiates them better).
+    int px[4][2];
+    // A pair hears the first mode (the note, which the bow holds) as the
+    // difference of its shape at the two pixels: draw again until that is
+    // at least a third of the largest possible, so no side is boosted from
+    // near-silence below.
+    double maxDiff = 0;
+    {
+      float lo = 1e9f, hi = -1e9f;
+      for (int x = 0; x < kGlassN; ++x)
+        for (int y = 0; y < kGlassN; ++y) {
+          lo = std::min(lo, kGlassShape[0][x][y]);
+          hi = std::max(hi, kGlassShape[0][x][y]);
+        }
+      maxDiff = hi - lo;
+    }
+    for (int pair = 0; pair < 2; ++pair)
+      for (int tries = 0; tries < 64; ++tries) {
+        for (int i = 2 * pair; i < 2 * pair + 2; ++i) {
+          px[i][0] = std::min(kGlassN - 1, int(kGlassN * (0.5 + 0.5 * urand())));
+          px[i][1] = std::min(kGlassN - 1, int(kGlassN * (0.5 + 0.5 * urand())));
+        }
+        const double d = kGlassShape[0][px[2 * pair][0]][px[2 * pair][1]] - kGlassShape[0][px[2 * pair + 1][0]][px[2 * pair + 1][1]];
+        if (std::fabs(d) >= maxDiff / 3) break;
+      }
+    for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
+      const double w = std::pow(double(kGlassRatio[k]), 0.5);
+      auto g = [&](int i) { return double(kGlassShape[k][px[i][0]][px[i][1]]); };
+      gL_[k] = w * (g(0) - g(1));
+      gRt_[k] = w * (g(2) - g(3));
+    }
+    // The first mode in the same sign on both sides (a pair's two pixels
+    // swapped otherwise): the note sits in the middle, the other modes
+    // differ between the sides. (Opposite, the middle cancelled the note.)
+    if (gL_[0] * gRt_[0] < 0)
+      for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) gRt_[k] = -gRt_[k];
+    // The two sides equally loud where it counts: on the first mode (the
+    // bow holds it; a strike's energy is mostly there too), both sides'
+    // pickups brought to their mean. (Unequal, one side was ~2 dB louder.)
+    const double em = std::sqrt(std::fabs(gL_[0] * gRt_[0]));
+    const double sl = em / std::max(std::fabs(gL_[0]), 1e-9), sr = em / std::max(std::fabs(gRt_[0]), 1e-9);
+    for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
+      gL_[k] *= sl;
+      gRt_[k] *= sr;
+    }
+  }
   resetAir();
   autotune();
 }
@@ -281,6 +485,7 @@ void Lead::resetAir() {
       for (const Board::V& x : b.v) b.sumIout += x.iout;
     }
   }
+  for (Singer& g : singers_) g.reset();
   v_ = vlo_;
   dead_ = blepNext_ = prevOut_ = 0;
   std::fill(y_, y_ + 4, 0.0);
@@ -298,6 +503,30 @@ void Lead::resetAir() {
     bbdLp_ = 0;
     for (int k = 0; k < 4; ++k) fmA_[k] = fmB_[k] = 0;
     nz_[0] = nz_[1] = 0;
+    bellEnv_ = flux_ = hpLp_ = phY_ = 0;
+    std::fill(pRe_, pRe_ + kPipeModes, 0.0);
+    std::fill(pIm_, pIm_ + kPipeModes, 0.0);
+    pipeStrike_ = pipeJoint_ = pipeNoiseLp_ = pipeSide_ = pipeMid_ = 0;
+    for (int k = 0; k < 4; ++k) { hit_[k] = false; hamT_[k] = 1; }
+    std::fill(gRe_, gRe_ + kGlassMax, 0.0);
+    std::fill(gIm_, gIm_ + kGlassMax, 0.0);
+    gHamT_[0] = gHamT_[1] = 1;
+    roomCredit_ = 0;
+    std::fill(cY1_, cY1_ + kCasc, 0.0);
+    std::fill(cY2_, cY2_ + kCasc, 0.0);
+    std::fill(cEnv_, cEnv_ + kCasc, 0.0);
+    std::fill(cGain_, cGain_ + kCasc, 1.0);
+    cEnvSrc_ = cEnvTot_ = 0;
+    std::fill(cTotRing_, cTotRing_ + kTotRing, 0.0f);
+    cascSide_ = 0;
+    glassSide_ = 0;
+    // A struck plate is silent until struck again: after a reset (a NaN) with
+    // a key held, the player strikes it again (never at power-on: no key).
+    if (patch_->plate > 0 && ctl_.gate) lastStrike_ = ctl_.strike - 1;
+    side_.clear();
+    std::fill(echo_.begin(), echo_.end(), 0.0f);
+    echoLp1_ = echoLp2_ = 0;
+    std::fill(apZ_, apZ_ + 6, 0.0);
   }
 }
 
@@ -391,7 +620,7 @@ void Lead::autotune() {
     const double note = 12.0 * k;
     const double f = measure(note);
     tune_[k] = f > 0 ? 1200 * std::log2(noteFrequency(int(note)) / f) : 0;
-    if (simple_ || patch_->second == 0) continue;
+    if (simple_ || !core2_) continue;
     const double f2 = measureC(note, C2_);  // the second core, its own trim
     tune2_[k] = f2 > 0 ? 1200 * std::log2(noteFrequency(int(note)) / f2) : 0;
   }
@@ -407,6 +636,19 @@ void Lead::controlStep() {
   const double blockDt = 16 / fs_;
   Board& b = board();
   b.update(id_, blockDt, kAnalog_);
+  if (!simple_ && patch_->plate > 0) {
+    glassControl(blockDt);
+    return;
+  }
+  if (!singers_.empty()) {
+    // The singers: the lungs' pressure from the envelope and the dynamics
+    // (~0 .. 1.1 kPa), each its own vibrato at the LFO's depth and rate.
+    const double f0 = noteFrequency(69) * std::exp2((ctl_.note - 69) / 12);
+    const double lung = 1100 * std::max(ctl_.level, 0.0);
+    for (Singer& g : singers_)
+      g.control(f0, ctl_.vowel, lung, ctl_.breath, ctl_.vibDepth, ctl_.vibRate, ctl_.note, blockDt);
+    return;
+  }
   // The voice's temperature wanders a little (tenths of a degree over minutes),
   // and the board warms with what is played.
   tempDrift_ += std::sqrt(blockDt) * 0.004 * urand() - blockDt / 60 * tempDrift_;
@@ -425,7 +667,7 @@ void Lead::controlStep() {
   slope_ = coreCurrent(noteW, temp) / C_;
   if (!simple_) {
     const LeadPatch& P = *patch_;
-    if (P.second > 0) {
+    if (core2_) {
       const double n2 = noteW + P.secondSemis + P.detune;
       const double u = std::clamp(n2 / 12, 0.0, 10.0);
       const int k = std::min(9, int(u));
@@ -444,6 +686,74 @@ void Lead::controlStep() {
     if (ctl_.strike != lastStrike_) {  // an attack: the chiff's burst; a new syllable
       lastStrike_ = ctl_.strike;
       chiffEnv_ = 0.3 + 0.7 * ctl_.vel;
+      bellEnv_ = 0.4 + 0.6 * ctl_.vel;
+      if (P.cascade > 0) {
+        // The resonators' widths for this attack: the key's own (a hash of
+        // it: 0.8..1.25, the same key always alike), each resonator a little
+        // chance (+-15 %), and the velocity: a hard key narrower (0.6), a
+        // soft one wider (1.4).
+        const int key = int(std::lround(ctl_.note));
+        uint64_t z = uint64_t(key) * 0xD1B54A32D192ED03ull + 0x8CB92BA72F3D8DD7ull;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        z ^= z >> 31;
+        const double keyMul = std::exp2(0.32 * (double(z >> 11) / double(1ull << 53) * 2 - 1));
+        const double velMul = 1.4 - 0.8 * std::clamp(ctl_.vel, 0.0, 1.0);
+        for (int k = 0; k < kCasc; ++k) cBwMul_[k] = keyMul * velMul * (1 + 0.15 * urand());
+        // Each key its own formants: over the keys, each spread evenly over
+        // its range in human speech (F1 250-850, F2 800-2300, F3 2000-3200,
+        // F4 3000-4200, F5 3800-5000 Hz): a Halton sequence over the key
+        // (the radical inverse in base 2, 3, 5, 7, 11), so neighbours lie
+        // far apart and any run of keys fills each range; F2 at least 1.25 x
+        // F1 (they never cross).
+        {
+          static const double lo[kCasc] = {250, 800, 2000, 3000, 3800}, hi[kCasc] = {850, 2300, 3200, 4200, 5000};
+          static const int base[kCasc] = {2, 3, 5, 7, 11};
+          for (int k = 0; k < kCasc; ++k) {
+            double u = 0, f = 1;
+            for (int n = key + 1; n > 0; n /= base[k]) {
+              f /= base[k];
+              u += f * (n % base[k]);
+            }
+            cF_[k] = lo[k] + u * (hi[k] - lo[k]);
+          }
+          cF_[1] = std::max(cF_[1], 1.25 * cF_[0]);
+        }
+        // Each key its own placement (the same key always alike): F1, the
+        // strongest, near the middle (+-0.2); F2..F5 anywhere in +-0.9.
+        for (int k = 0; k < kCasc; ++k) {
+          z += 0x9E3779B97F4A7C15ull;
+          uint64_t q = z;
+          q = (q ^ (q >> 30)) * 0xBF58476D1CE4E5B9ull;
+          q = (q ^ (q >> 27)) * 0x94D049BB133111EBull;
+          q ^= q >> 31;
+          const double u = double(q >> 11) / double(1ull << 53) * 2 - 1;
+          cPan_[k] = (k == 0 ? 0.2 : 0.9) * u;
+        }
+      }
+      if (P.pipes > 0) {
+        // Two pipes struck by soft felt hammers, anywhere along them (a node
+        // of a mode there leaves it out), the second a moment after the first;
+        // the other two bowed. The felt stays on under half a period
+        // (0.6-4 ms, shorter for a hard key): faster modes it barely moves.
+        const int a = std::min(3, int(4 * (0.5 + 0.5 * urand())));                     // any pipe ..
+        const int b = (a + 1 + std::min(2, int(3 * (0.5 + 0.5 * urand())))) % 4;  // .. and another
+        pipeTop_ = pipeTopRatio(int(std::lround(ctl_.note)));
+        for (int k = 0; k < 4; ++k) {
+          bowStart(k);
+          hit_[k] = k == a || k == b;
+          if (!hit_[k]) continue;
+          hPos_[k] = 0.05 + 0.9 * (0.5 + 0.5 * urand());
+          hamT_[k] = k == a ? 0 : -(0.005 + 0.035 * (0.5 + 0.5 * urand()));
+          hamDamped_[k] = false;
+          {  // the felt's contact: under half the pipe's period (a stiffer, higher pipe throws it off sooner)
+            const double kTuneH[4] = {1, 1.2, 2.5, pipeTop_};
+            const double fp = noteFrequency(69) * std::exp2((ctl_.note - 69) / 12) * kTuneH[k];
+            hamDur_[k] = std::clamp(0.4 / fp, 0.0006, 0.004) * (1.3 - 0.6 * ctl_.vel) * (1 + 0.2 * urand());
+          }
+          hamAmp_[k] = 0.7 * (0.3 + 0.7 * ctl_.vel) * (1 + 0.15 * urand());
+        }
+      }
       if (P.scat > 0) {
         // The vowel from the key's speed (soft u, a, i, hard ei), now and
         // then a neighbour; the stop mostly alternating d, b.
@@ -455,6 +765,85 @@ void Lead::controlStep() {
         scClose_ = 0.010 + 0.015 * (1 - ctl_.vel);  // a soft syllable lingers in the closure
       }
     }
+    if (P.bell > 0) bellEnv_ *= std::exp(-blockDt / P.bellTau);
+    if (P.pipes > 0) {
+      // The pipes' modes at the present pitch (vibrato included): each a
+      // decaying rotation (T60 ~4 s for a pipe's fundamental, shorter for its
+      // higher modes); peak gain 1 at resonance; above 0.45 fs left out.
+      // (The highest pipe's tuning is the key's own: pipeTopRatio.)
+      const double kTune[4] = {1, 1.2, 2.5, pipeTop_};
+      static const double kMode[3] = {1, 2.756, 5.404},
+                          kWeight[3] = {1, 0.55, 0.3};
+      // (The three upper pipes stand further from the microphones: half as
+      // loud as the note's own, -6 dB; PJ_PIPEUPPER.)
+      static const double kUpper = knob("PJ_PIPEUPPER", 0.5);
+      // (The note with the vibrato, without the core's autotune trim: that
+      // corrects the core's own frequency, not the pipes'.)
+      const double fNow = noteFrequency(69) * std::exp2((note - trim(ctl_.note) / 100 - 69) / 12);
+      int n = 0;
+      for (int k = 0; k < 4; ++k)
+        for (int m = 0; m < 3; ++m) {
+          const double f = fNow * kTune[k] * kMode[m];
+          if (f > 0.45 * fs_) continue;
+          const double th = 2 * M_PI * f / fs_, t60 = 4.0 / std::pow(kMode[m], 0.6);
+          pR_[n] = std::exp(-6.9078 / (t60 * fs_));
+          pC_[n] = std::cos(th);
+          pS_[n] = std::sin(th);
+          pG_[n] = 1 - pR_[n];
+          pW_[n] = kWeight[m];
+          pK_[n] = k;
+          // What the two microphones hear of this mode: the left one nearer
+          // the low pipes, the right one the high; the left facing the pipes
+          // a third of the way down, the right 0.62: there each mode's shape
+          // (a free-free tube's) has its own value and sign. The fundamental
+          // the same sign at both (the middle keeps it; at 0.224 is its
+          // node), the second and third modes opposite (the overtones spread).
+          static const double kBeta[3] = {4.7300, 7.8532, 10.9956}, kSig[3] = {0.98250, 1.00078, 0.99997};
+          auto shape = [&](double h) {
+            const double b = kBeta[m] * h;
+            return 0.5 * (std::cosh(b) + std::cos(b) - kSig[m] * (std::sinh(b) + std::sin(b)));
+          };
+          hW_[n] = shape(hPos_[k]);  // the hammer's blow into this mode
+          // (Further down, at the user's ear: the 1.2x pipe another 3 dB, the
+          // 2.5x and the key's own top pipe another 6: -9, -12, -12 dB under
+          // the note's pipe.)
+          static const double kMore[4] = {1, 0.7079, 0.5012, 0.5012};
+          const double loud = k == 0 ? 1.0 : kUpper * kMore[k];
+          pL_[n] = loud * kWeight[m] * (1 - 0.5 * k / 3.0) * shape(0.33);
+          pRt_[n] = loud * kWeight[m] * (0.5 + 0.5 * k / 3.0) * shape(0.62);
+          ++n;
+        }
+      for (int i = n; i < nPipe_; ++i) pRe_[i] = pIm_[i] = 0;
+      nPipe_ = n;
+      for (int k = 0; k < 4; ++k) bowStep(k, blockDt);  // each bow turns now and then
+    }
+    if (P.cascade > 0) {
+      // The cascade's resonators (Klatt's: y = A x + B y1 + C y2, unity gain
+      // at DC): the key's own formants (cF_, set at the attack), a little
+      // higher for a hard key and a higher note; each wandering slowly
+      // (a few % over seconds: the halo's shimmer); their widths this
+      // attack's (cBwMul_).
+      static const double bw[kCasc] = {80, 100, 140, 200, 260};
+      const double a = std::clamp(ctl_.vel, 0.0, 1.0), sc = std::pow(f0 / 220, 0.12), T = 1 / fs_;
+      for (int k = 0; k < kCasc; ++k) {
+        cWander_[k] += std::sqrt(blockDt) * 0.05 * urand() - blockDt / 2.5 * cWander_[k];
+        // The key's own formant (cF_), a hard key ~8 % higher, a soft one lower.
+        const double f = std::min(sc * cF_[k] * (1 + 0.16 * (a - 0.5)) * (1 + cWander_[k]), 0.45 * fs_);
+        const double b = bw[k] * cBwMul_[k];
+        cC_[k] = -std::exp(-2 * M_PI * b * T);
+        cB_[k] = 2 * std::exp(-M_PI * b * T) * std::cos(2 * M_PI * f * T);
+        cA_[k] = 1 - cB_[k] - cC_[k];
+      }
+    }
+    if (P.phaser > 0) {
+      // The phaser's JFETs: their resistance (and the stages' corner) swept
+      // exponentially by a slow triangle-ish LFO, 180 Hz .. 4.5 kHz.
+      phPh_ += P.phaserRate * blockDt;
+      if (phPh_ > 1) phPh_ -= 1;
+      const double u = 0.5 - 0.5 * std::cos(2 * M_PI * phPh_);
+      const double t = std::tan(M_PI * 180 * std::exp2(4.64 * u) / fs_);
+      apA_ = (t - 1) / (t + 1);
+    }
     {  // the chiff's resonator: ~4 x the note, Q 6
       const double fc = std::clamp(4 * f0, 900.0, 0.4 * fs_);
       chiffG_ = std::tan(M_PI * fc / fs_);
@@ -465,6 +854,15 @@ void Lead::controlStep() {
       static const double q[4] = {9, 13, 18, 20};
       for (int k = 0; k < 4; ++k) {
         fmG_[k] = std::tan(M_PI * std::min(F[k], 0.45 * fs_) / fs_);
+        fmK_[k] = 1 / q[k];
+        fmGain_[k] = G[k];
+      }
+    } else if (P.formants > 0 && P.body > 0) {
+      // A wooden body's resonances: the air mode, the main wood modes, the
+      // bridge hill; fixed, whatever the note.
+      static const double F[4] = {280, 460, 1150, 2700}, q[4] = {5, 7, 6, 4}, G[4] = {1.0, 0.8, 0.6, 0.45};
+      for (int k = 0; k < 4; ++k) {
+        fmG_[k] = std::tan(M_PI * F[k] / fs_);
         fmK_[k] = 1 / q[k];
         fmGain_[k] = G[k];
       }
@@ -588,7 +986,7 @@ double Lead::events(double slope, double vStart, double vPre, double d, bool res
   ff2Next_ = ff2_ + c2c;
   // The second core: its own ramp, reset at its top; soft sync: at the first
   // core's reset, if it is within the window of its top, it fires then.
-  if (patch_->second > 0) {
+  if (core2_) {
     double avail = dt;
     if (dead2_ > 0) {
       const double u = std::min(dead2_, avail);
@@ -684,6 +1082,15 @@ double Lead::sound(double saw) {
   if (P.sub2 > 0) m += P.sub2 * half * ff2Out_;
   if (P.ring > 0) m += P.ring * r * ff1Out_;
   if (P.second > 0) m += P.second * (out2_ - mid);
+  if (P.xring > 0)  // a Gilbert cell: both inputs through their differential pairs, multiplied
+    m += inharm_ * P.xring * half * std::tanh(1.5 * r / half) * std::tanh(1.5 * (out2_ - mid) / half);
+  if (P.bow > 0) {
+    // The bow lets go near the end of each ramp (the string's slip): a burst
+    // of rosin noise once a period.
+    const double ph = std::clamp((v_ - vloNow_) / (vhiNow_ - vloNow_), 0.0, 1.0);
+    const double w = std::max(0.0, (ph - 0.8) / 0.2);
+    m += P.bow * half * 0.6 * w * w * whiteNoise();
+  }
   if (P.scat > 0) {
     m *= srcGain_;
     if (burst_ > 1e-3) {  // the stop's release: a few ms of noise
@@ -743,6 +1150,10 @@ double Lead::sound(double saw) {
     }
   }
   if (P.fold > 0) m = half * std::sin(P.fold * 1.4 * m / half);
+  if (P.hpf > 0) {  // the RC high-pass before the ladder
+    hpLp_ += hpA_ * (m - hpLp_);
+    m -= hpLp_;
+  }
   return m;
 }
 
@@ -759,6 +1170,209 @@ double Lead::post(double y) {
     chiffB_ = 2 * v2 - chiffB_;
     y += P.chiff * 1.2 * v1;
     chiffEnv_ *= std::exp(-1 / (0.025 * fs_));
+  }
+  if (P.bell > 0 && bellEnv_ > 1e-4) {
+    // The bell: the two cores' sines (each ramp rectified and rounded) into a
+    // ring modulator; past the ladder, so it rings bright over the pad.
+    const double mid = 0.5 * (vhi_ + vlo_), half = 0.5 * (vhiNow_ - vloNow_);
+    auto sine = [&](double v) { return std::tanh(1.6 * (2 * std::fabs(v - mid) / half - 1)) / std::tanh(1.6); };
+    y += inharm_ * P.bell * 3.0 * bellEnv_ * sine(v_) * sine(v2_);
+  }
+  if (P.pipes > 0) {
+    // The pipes, each bowed. At the bow (near the pipe's end) the pipe moves
+    // at v (its modes' sum); the bow at vb (faster as the envelope swells).
+    // Friction (a bow table, as STK's): F = Fb dv (|dv| s + 0.75)^-4, at most
+    // Fb dv: the pipe sticks to a slow bow and is dragged along, then slips;
+    // the friction falls as the slip quickens (energy in: the pipe sings).
+    // The joint at the top: every mode moves the ends; what all the pipes
+    // move there pushes each of them.
+    // The rosin's grain: a little noise in the friction, which starts the
+    // stick-slip from rest.
+    static const double kFb = knob("PJ_BOWFORCE", 50), kJoint = knob("PJ_PIPEJOINT", 0.15);
+    const double lv = std::max(level_, 0.0), vb0 = 0.04 + 0.22 * lv, fb = kFb;
+    double v[4] = {}, f[4];
+    // (A mode is a rotation z, the force entering its real part; at resonance
+    // the real part is in phase with the force: the velocity.)
+    for (int i = 0; i < nPipe_; ++i) v[pK_[i]] += pW_[i] * pRe_[i];
+    for (int k = 0; k < 4; ++k) {
+      if (hit_[k]) {  // struck, not bowed: it rings free
+        f[k] = 0;
+        continue;
+      }
+      const double dv = vb0 * bowNow_[k] - v[k];  // (the bow either way; it turns every 5-9 s)
+      f[k] = fb * (dv * std::min(1.0, std::pow(std::fabs(dv) * 5 + 0.75, -4.0)) + 0.01 * lv * whiteNoise());
+    }
+    // The hammers: a raised-cosine push over the felt's contact time, into
+    // each mode as its shape at the hammer (velocity, a blow's impulse).
+    // As the felt lands it deadens the motion under it: the pipe's velocity
+    // at the struck point drops by 40 % (the smallest change to the
+    // modes that does it: each mode by its shape there; PJ_FELTDAMP).
+    static const double kFelt = knob("PJ_FELTDAMP", 0.4);
+    double ham[4] = {};
+    for (int k = 0; k < 4; ++k) {
+      if (!hit_[k]) continue;
+      if (hamT_[k] >= 0 && !hamDamped_[k]) {
+        hamDamped_[k] = true;
+        double v = 0, w2 = 0;
+        for (int i = 0; i < nPipe_; ++i)
+          if (pK_[i] == k) {
+            v += hW_[i] * pRe_[i];
+            w2 += hW_[i] * hW_[i];
+          }
+        if (w2 > 1e-12)
+          for (int i = 0; i < nPipe_; ++i)
+            if (pK_[i] == k) pRe_[i] -= kFelt * v * hW_[i] / w2;
+      }
+      const double t = hamT_[k], d = hamDur_[k];
+      if (t >= 0 && t < d) {
+        const double s = std::sin(M_PI * t / d);
+        ham[k] = hamAmp_[k] * 2 / (d * fs_) * s * s;
+      }
+      if (t < d) hamT_[k] += 1 / fs_;
+    }
+    // The room (as the glass's): each mode pushed by the pressure at the pipes
+    // as strongly as it radiates (its weight at the microphones, x 2.5 x 0.3
+    // to Pa at 1 m): the room's sound, the other instruments', the other
+    // pipes' at their pitches.
+    // ... and its radiation's damping, reciprocal (as the glass's).
+    static const double kRoom = knob("PJ_ROOMCOUPLE", 3e-5), kRoomDamp = knob("PJ_ROOMDAMP", 1);
+    const double pr = kRoom * 0.3 * 2.5 * roomP();
+    // (The energy budget as the glass's: the room gives back at most ~90 %
+    // of what the pipes gave it.)
+    double eOut = 0, eIn = 0;
+    for (int i = 0; i < nPipe_; ++i) {
+      const double in = pW_[i] * f[pK_[i]] + kJoint * pipeJoint_;
+      const double a = 0.3 * 2.5 * (pL_[i] + pRt_[i]), d = kRoomDamp * kRoom * a * a, rr = pR_[i] * (1 - d);
+      const double re = rr * (pC_[i] * pRe_[i] - pS_[i] * pIm_[i]) + pG_[i] * in + hW_[i] * ham[pK_[i]];
+      const double im = rr * (pS_[i] * pRe_[i] + pC_[i] * pIm_[i]);
+      eOut += (1 - (1 - d) * (1 - d)) * (pRe_[i] * pRe_[i] + pIm_[i] * pIm_[i]);
+      const double push = pr * (pL_[i] + pRt_[i]);
+      eIn += 2 * re * push + push * push;
+      pRe_[i] = re;
+      pIm_[i] = im;
+    }
+    const double sc = roomScale(eOut, eIn);
+    double l = 0, r = 0, joint = 0;
+    for (int i = 0; i < nPipe_; ++i) {
+      pRe_[i] += sc * pr * (pL_[i] + pRt_[i]);
+      l += pL_[i] * pRe_[i];
+      r += pRt_[i] * pRe_[i];
+      joint += pRe_[i];
+    }
+    pipeJoint_ = joint;
+    // The microphones' middle and their difference (the two sides): heard
+    // past the amplifier (the pipes ring on their own: the bow's speed
+    // follows the envelope, a struck pipe rings out after the key); the ramp
+    // through the ladder a quiet layer, through the amplifier.
+    pipeMid_ = inharm_ * P.pipes * 5.0 * 0.5 * (l + r);
+    pipeSide_ = inharm_ * P.pipes * 5.0 * 0.5 * (l - r);
+    y = 0.4 * y;
+  }
+  if (P.xfmr > 0) {
+    // The output transformer: its flux follows the voltage's integral (above
+    // the magnetizing corner); as the core saturates the inductance falls
+    // and the low notes lose their peaks (compressed, thickened).
+    flux_ += xfA_ * (y - flux_);
+    const double s = std::tanh(flux_ / 0.5);
+    y *= 1 - 0.4 * P.xfmr * s * s;
+  }
+  if (P.phaser > 0) {
+    // Six all-pass stages (first order, each at the JFETs' corner), the
+    // output fed back into the first; half the dry beside: notches move.
+    double a = y + 0.55 * phY_;
+    for (double& z : apZ_) {
+      const double o = apA_ * a + z;
+      z = a - apA_ * o;
+      a = o;
+    }
+    phY_ = a;
+    y = 0.6 * y + P.phaser * 0.6 * a;
+  }
+  if (P.cascade > 0 && inharm_ > 0) {  // (tests: PJ_INHARM=0 leaves it out, to read the core's pitch)
+    // The cascade: each resonator feeds the next; the room's pressure at the
+    // instrument (soft-limited) enters every one of them. PJ_HALOROOM: 0.025,
+    // the room's part ~25 dB under the sound (in the hall's chord demo, with
+    // the compressor below lifting it too: 0.1 -12 dB, 0.2 -6, 0.4 -2). It
+    // cannot ring by itself: the compressor's target is the oscillator's
+    // level, so with the key's source gone its gains fall to 0.25. What each
+    // resonator adds (its output less its input) is heard from its own
+    // place (left negative), each key its own (cPan_: F1 near the middle).
+    static const double kRoom = knob("PJ_HALOROOM", 0.025);
+    const double pr = kRoom * std::tanh(roomP() / 0.5) * 0.5;
+    // A compressor on each resonator, governed by the main oscillator: what
+    // a resonator adds (its output less its input) is lifted towards ~0.7 of
+    // the oscillator's level, gently and slowly (the envelopes integrate over
+    // 1.5 s; 1.5:1, so the gain goes as (target / level)^(1/3), within
+    // 0.5..2, gliding over 0.1 s) and passed on so to the next: the formants
+    // drift up towards the source's level, a quiet one most. PJ_HALOCOMP 0:
+    // none.
+    static const double kComp = knob("PJ_HALOCOMP", 1);
+    static const double aAtt = 1 - std::exp(-1 / (1.5 * fs_)), aRel = aAtt, aG = 1 - std::exp(-1 / (0.1 * fs_));
+    auto follow = [&](double& e, double v) { e += (v > e ? aAtt : aRel) * (v - e); };
+    follow(cEnvSrc_, std::fabs(y));
+    double x = y, side = 0;
+    for (int k = 0; k < kCasc; ++k) {
+      const double in = x + pr;
+      const double out = cA_[k] * in + cB_[k] * cY1_[k] + cC_[k] * cY2_[k];
+      cY2_[k] = cY1_[k];
+      cY1_[k] = out;
+      const double d = out - x;
+      follow(cEnv_[k], std::fabs(d));
+      if (kComp > 0) {
+        // Its own lift (towards the oscillator's level, 1.5:1), times its
+        // delayed view of the whole sound: louder than the oscillator a
+        // moment ago, it turns down (as (src / whole)^1.5), quieter, up. Each
+        // resonator with its own delay (0.2-0.6 s), all hearing the same
+        // whole (which they make together): a slow loop that does not quite
+        // settle; the formants take turns. PJ_HALOWHOLE scales the 1.5.
+        static const double kWhole = knob("PJ_HALOWHOLE", 2);
+        const int back = int(cDelay_[k] * fs_ / 16);
+        // (The delayed whole no lower than 0.7 x the source: at an attack it
+        // is still silence, and every gain would leap to its limit.)
+        const double tot = std::max(double(cTotRing_[(cTotPos_ - back + 2 * kTotRing) % kTotRing]), 0.7 * cEnvSrc_);
+        const double own = std::pow((0.7 * cEnvSrc_ + 1e-6) / (cEnv_[k] + 1e-6), 1.0 / 3.0);
+        const double whole = std::pow((cEnvSrc_ + 1e-6) / (tot + 1e-6), 0.75 * kWhole);
+        // Whatever the gains say, a resonator's lifted contribution stays
+        // under 1.5 x the source (the five stages cannot pile up).
+        const double cap = std::max(0.5, 1.5 * (cEnvSrc_ + 1e-6) / (cEnv_[k] + 1e-6));
+        const double g = std::clamp(own * whole, 0.5, std::min(2.0, cap));
+        cGain_[k] += aG * (1 + kComp * (g - 1) - cGain_[k]);
+      }
+      side -= cPan_[k] * cGain_[k] * d;  // (the side adds to the left: a left place, negative, adds there)
+      x += cGain_[k] * d;
+    }
+    cascSide_ = 0.5 * side;
+    // The whole sound's envelope, into the ring the resonators read late.
+    follow(cEnvTot_, std::fabs(x));
+    if (++cTotSub_ >= 16) {
+      cTotSub_ = 0;
+      cTotPos_ = (cTotPos_ + 1) % kTotRing;
+      cTotRing_[cTotPos_] = float(cEnvTot_);
+    }
+    y = x;
+  }
+  if (P.ensemble > 0) {
+    // Three bucket-brigade lines from one input (the string machine's): each
+    // delay ~5 ms swept by a slow (0.6 Hz) and a fast (6 Hz) LFO, the three
+    // 120 degrees apart: a shimmering crowd from one voice.
+    const int n = int(bbd_.size());
+    bbdLp_ += 0.5 * (y - bbdLp_);
+    bbd_[bbdPos_] = float(bbdLp_);
+    ensS_ += 0.62 / fs_;
+    ensF_ += 6.1 / fs_;
+    if (ensS_ > 1) ensS_ -= 1;
+    if (ensF_ > 1) ensF_ -= 1;
+    double w = 0;
+    for (int k = 0; k < 3; ++k) {
+      const double ms = 5 + 1.6 * std::sin(2 * M_PI * (ensS_ + k / 3.0)) + 0.22 * std::sin(2 * M_PI * (ensF_ + k / 3.0));
+      const double rp = bbdPos_ - ms * 1e-3 * fs_;
+      const int i0 = int(std::floor(rp));
+      const double fr = rp - i0;
+      const double a = bbd_[(i0 + 2 * n) % n], b = bbd_[(i0 + 1 + 2 * n) % n];
+      w += a + fr * (b - a);
+    }
+    bbdPos_ = (bbdPos_ + 1) % n;
+    y = 0.5 * y + P.ensemble * 0.35 * w;
   }
   if (P.chorus > 0) {
     // A bucket-brigade line, two taps swept by their own LFOs (0.6, 0.83 Hz)
@@ -785,6 +1399,24 @@ double Lead::post(double y) {
 }
 
 float Lead::sample() {
+  if (!simple_ && patch_->plate > 0) {
+    if (testDp_ != 0) gRe_[0] += testDp_;  // (tests: a NaN, or a kick)
+    testDp_ = 0;
+    const double y = glassSample();
+    static const float kWidth = float(knob("PJ_GLASSWIDTH", 0.8));
+    const double g = 0.3 * outScale() * inst_.gain * levelTrim(inst_);
+    if (side_.size() > (1u << 17)) side_.erase(side_.begin(), side_.begin() + (1 << 16));
+    side_.push_back(std::isfinite(glassSide_) ? float(kWidth * g * glassSide_) : 0.0f);
+    return finish(float(0.3 * y));
+  }
+  if (!singers_.empty()) {
+    static const double kGain = knob("PJ_CHOIRGAIN", 0.2);
+    if (testDp_ != 0) singers_[0].kick(testDp_);  // (tests: a NaN, or a kick)
+    testDp_ = 0;
+    double y = 0;
+    for (Singer& g : singers_) y += g.sample();
+    return finish(float(kGain * y));
+  }
   double saw;
   coreStep(saw);
   // Into the ladder: the ramp around its middle, attenuated to tens of mV (a
@@ -819,11 +1451,212 @@ float Lead::sample() {
   // The OTA: its gain from the envelope's bias current; when closed it still
   // leaks the always-running oscillator; its control feedthrough steps with
   // the bias (the DC blocker makes it a thump); hum picked up on the way out.
-  const double vca = level_ * 2.0 * std::tanh(0.5 * y) + ka * (bleed_ * y + ft_ * level_) + board().hum;
+  double vca = level_ * 2.0 * std::tanh(0.5 * y) + ka * (bleed_ * y + ft_ * level_) + board().hum;
+  if (!simple_ && patch_->pipes > 0) vca += pipeMid_;  // the pipes, past the amplifier
   // Into the mixer's 1 kohm: the ground's current. (A NaN stays in this voice:
   // it resets itself; the board must not keep it.)
   board().output(id_, std::isfinite(vca) ? vca * 1e-3 : 0.0);
-  return finish(float(0.3 * vca));
+  if (!simple_ && patch_->pipes > 0) {
+    // The side: the pipes' difference through the same amplifier (its gain
+    // at the envelope), at the output's scale and the instrument's trim; at
+    // most a few seconds kept when no mixer takes it (single-voice renders).
+    static const float kWidth = float(knob("PJ_PIPEWIDTH", 0.8));
+    const double g = 0.3 * outScale() * inst_.gain * levelTrim(inst_);
+    if (side_.size() > (1u << 17)) side_.erase(side_.begin(), side_.begin() + (1 << 16));
+    side_.push_back(std::isfinite(pipeSide_) ? float(kWidth * g * pipeSide_) : 0.0f);
+  }
+  if (!simple_ && patch_->cascade > 0) {
+    // The side: what the resonators add at their places, through the same
+    // amplifier (its gain now), at the output's scale and the trim.
+    const double g = 0.3 * 2.0 * level_ * outScale() * inst_.gain * levelTrim(inst_);
+    if (side_.size() > (1u << 17)) side_.erase(side_.begin(), side_.begin() + (1 << 16));
+    side_.push_back(std::isfinite(cascSide_) ? float(g * cascSide_) : 0.0f);
+  }
+  return finish(float(0.3 * (simple_ || patch_->echo == 0 ? vca : echoStep(vca))));
+}
+
+const float* Lead::takeSide(int n) {
+  if (simple_ || (patch_->pipes == 0 && patch_->plate == 0 && patch_->cascade == 0)) return nullptr;
+  sideOut_.assign(n, 0.0f);
+  const int have = int(side_.size()), m = std::min(n, have);
+  std::copy(side_.end() - m, side_.end(), sideOut_.end() - m);
+  side_.clear();
+  return sideOut_.data();
+}
+
+// The glass plate, per block: its modes at the note (no vibrato: a struck
+// plate's pitch is its own), their decay (glass rings long: T60 ~6 s for the
+// first mode, shorter up the spectrum; a released key's damper: 1.5 s), and
+// at an attack two felt hammers, the second 5-40 ms after the first, each at
+// a random place on the torus, each mode excited as its shape there; under
+// half the first mode's period on the glass (0.5-4 ms, shorter for a harder
+// key); and the bow moved to a random place.
+void Lead::glassControl(double dt) {
+  // (The pitch: the lowest modes, 1, 1.022 (a pair) and 1.164, beat within a
+  // critical band. Heard through the pixel-difference pickups the first mode
+  // carries most of a strike's energy (78 % over 8 random strikes; the pair,
+  // moving alike at the paired pixels, mostly cancels: 6 %): it is put on
+  // the note. A strike near its nodal lines lets the 1.164 mode lead, ~2.6
+  // semitones up: the hammer's place is part of the sound. PJ_GLASSPITCH: the
+  // ratio put on the note.)
+  static const double kPitch = knob("PJ_GLASSPITCH", 1.0);
+  const double f1 = noteFrequency(69) * std::exp2((ctl_.note - 69) / 12) / kPitch;
+  int n = 0;
+  for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
+    const double f = f1 * kGlassRatio[k];
+    if (f > 0.45 * fs_) break;  // (the ratios ascend)
+    double t60 = std::max(0.25, 6.0 * std::pow(double(kGlassRatio[k]), -0.7));
+    if (!ctl_.gate) t60 = std::min(t60, 1.5);
+    gR_[k] = std::exp(-6.9078 / (t60 * fs_));
+    gG_[k] = 1 - gR_[0];  // the bow's force into the mode: the same for all (the first mode's peak gain 1)
+    gC_[k] = std::cos(2 * M_PI * f / fs_);
+    gS_[k] = std::sin(2 * M_PI * f / fs_);
+    ++n;
+  }
+  for (int k = n; k < nGlass_; ++k) gRe_[k] = gIm_[k] = 0;
+  nGlass_ = n;
+  bowStep(0, dt);  // the bow turns every 5-9 s
+  if (ctl_.strike != lastStrike_) {
+    lastStrike_ = ctl_.strike;
+    // Each mode's shape at a random place (bilinear between the cells).
+    auto place = [&](double* w) {
+      const double x = kGlassN * (0.5 + 0.5 * urand()), y = kGlassN * (0.5 + 0.5 * urand());
+      const int x0 = int(std::floor(x)), y0 = int(std::floor(y));
+      const double fx = x - x0, fy = y - y0;
+      for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
+        auto g = [&](int i, int j) { return double(kGlassShape[k][i % kGlassN][j % kGlassN]); };
+        w[k] = (1 - fx) * ((1 - fy) * g(x0, y0) + fy * g(x0, y0 + 1)) + fx * ((1 - fy) * g(x0 + 1, y0) + fy * g(x0 + 1, y0 + 1));
+      }
+    };
+    for (int h = 0; h < 2; ++h) {
+      place(gHW_[h]);
+      gHamDur_[h] = std::clamp(0.4 / f1, 0.0005, 0.004) * (1.3 - 0.6 * ctl_.vel) * (1 + 0.2 * urand());
+      gHamAmp_[h] = 0.5 * (0.2 + 0.8 * ctl_.vel) * (1 + 0.1 * urand());
+      gHamT_[h] = h == 0 ? 0 : -(0.005 + 0.035 * (0.5 + 0.5 * urand()));
+      gHamDamped_[h] = false;
+    }
+    bowStart(0);
+    // The bow: where the first mode (the note) leads the other low modes
+    // most, of twelve random places (the player bows where the glass sings
+    // its note: elsewhere the bow locks onto the 1.022 pair, which the
+    // pickups' differences mostly cancel, or onto the 1.164 mode, 2.6
+    // semitones up). The measure: the first mode's shape there against the
+    // next three's.
+    {
+      double best[kGlassMax], bestA = -1;
+      for (int t = 0; t < 12; ++t) {
+        place(gBW_);
+        const double others = gBW_[1] * gBW_[1] + gBW_[2] * gBW_[2] + gBW_[3] * gBW_[3];
+        const double a = gBW_[0] * gBW_[0] / (others + 0.05);
+        if (a > bestA) {
+          bestA = a;
+          std::copy(gBW_, gBW_ + kGlassMax, best);
+        }
+      }
+      std::copy(best, best + kGlassMax, gBW_);
+    }
+    // The bow's hair is a few cells wide: it averages the short waves out
+    // (the bow drives and feels the low modes, barely the high).
+    for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
+      const double q = kGlassRatio[k] / 1.6;
+      gBW_[k] /= 1 + q * q;
+    }
+  }
+}
+
+// One sample of the glass: the hammers' raised-cosine pushes into the modes,
+// the bow (as the metal pipes': stick-slip against the plate's velocity at
+// the bow, an STK bow table, a little rosin noise to start it; its speed
+// follows the envelope, so the plate swells and holds like a pad), the modes
+// turning and decaying; the two pickups (left and right); returns their
+// middle, keeps their difference for the sides.
+double Lead::glassSample() {
+  // As each felt lands it deadens the motion under it: the plate's velocity
+  // at that point drops by 40 % (each mode by its shape there).
+  static const double kFelt = knob("PJ_FELTDAMP", 0.4);
+  double ham[2] = {};
+  for (int h = 0; h < 2; ++h) {
+    if (gHamT_[h] >= 0 && !gHamDamped_[h]) {
+      gHamDamped_[h] = true;
+      double v = 0, w2 = 0;
+      for (int k = 0; k < nGlass_; ++k) {
+        v += gHW_[h][k] * gRe_[k];
+        w2 += gHW_[h][k] * gHW_[h][k];
+      }
+      if (w2 > 1e-12)
+        for (int k = 0; k < nGlass_; ++k) gRe_[k] -= kFelt * v * gHW_[h][k] / w2;
+    }
+    const double t = gHamT_[h], d = gHamDur_[h];
+    if (t >= 0 && t < d) {
+      const double s = std::sin(M_PI * t / d);
+      ham[h] = gHamAmp_[h] * 2 / (d * fs_) * s * s;
+    }
+    if (t < d) gHamT_[h] += 1 / fs_;
+  }
+  level_ += 0.02 * (ctl_.level - level_);
+  static const double kFb = knob("PJ_GLASSBOW", 50);
+  const double lv = std::max(level_, 0.0), vb = (0.05 + 0.3 * lv) * bowNow_[0];  // (it turns every 5-9 s)
+  double v = 0;
+  for (int k = 0; k < nGlass_; ++k) v += gBW_[k] * gRe_[k];
+  const double dv = vb - v;
+  const double fb = lv > 1e-4 ? kFb * (dv * std::min(1.0, std::pow(std::fabs(dv) * 5 + 0.75, -4.0)) + 0.01 * lv * whiteNoise()) : 0;
+  // The room: the plate gives its sound to the room and takes some back, as
+  // it takes the other instruments' (the glasses' too, at their pitches):
+  // each mode pushed by the pressure at the plate as strongly as it radiates
+  // (reciprocity: its weight at the pickups, x 0.3 to Pa at 1 m). PJ_ROOMCOUPLE
+  // (0: none): the default keeps a mode's own sound back from the room well
+  // under its damping (no howl).
+  // And what it gives the room it loses (the radiation's damping, reciprocal
+  // to the coupling: (its weight)^2 x the coupling x PJ_ROOMDAMP, the
+  // strongest return expected): no mode takes back more than it gives.
+  static const double kRoom = knob("PJ_ROOMCOUPLE", 3e-5), kRoomDamp = knob("PJ_ROOMDAMP", 1);
+  const double pr = kRoom * 0.3 * 0.5 * roomP();
+  // The budget (what radiation took out this sample, what the room's push
+  // would put in), then the push, scaled to stay within it: the plate never
+  // takes more from the room than ~90 % of what it gave.
+  double eOut = 0, eIn = 0;
+  for (int k = 0; k < nGlass_; ++k) {
+    const double a = 0.3 * 0.5 * (gL_[k] + gRt_[k]), d = kRoomDamp * kRoom * a * a, rr = gR_[k] * (1 - d);
+    const double re = rr * (gC_[k] * gRe_[k] - gS_[k] * gIm_[k]) + gHW_[0][k] * ham[0] + gHW_[1][k] * ham[1] +
+                      gG_[k] * gBW_[k] * fb;
+    const double im = rr * (gS_[k] * gRe_[k] + gC_[k] * gIm_[k]);
+    eOut += (1 - (1 - d) * (1 - d)) * (gRe_[k] * gRe_[k] + gIm_[k] * gIm_[k]);
+    const double push = pr * (gL_[k] + gRt_[k]);
+    eIn += 2 * re * push + push * push;
+    gRe_[k] = re;
+    gIm_[k] = im;
+  }
+  const double s = roomScale(eOut, eIn);
+  double l = 0, r = 0;
+  for (int k = 0; k < nGlass_; ++k) {
+    gRe_[k] += s * pr * (gL_[k] + gRt_[k]);
+    l += gL_[k] * gRe_[k];
+    r += gRt_[k] * gRe_[k];
+  }
+  glassSide_ = 0.5 * (l - r);
+  return 0.5 * (l + r);
+}
+
+// The echo: a bucket-brigade line after the amplifier, its clock wavering a
+// little (0.3 Hz), the line's low-pass (two poles at the clock filter's
+// 3.5 kHz) and its compander's soft limit inside the loop: each repeat darker
+// and rounder.
+double Lead::echoStep(double x) {
+  const LeadPatch& P = *patch_;
+  const int n = int(echo_.size());
+  echoPh_ += 0.3 / fs_;
+  if (echoPh_ > 1) echoPh_ -= 1;
+  const double d = std::min(P.echoMs * 1e-3 * fs_ * (1 + 0.004 * std::sin(2 * M_PI * echoPh_)), n - 2.0);
+  const double rp = echoPos_ - d;
+  const int i0 = int(std::floor(rp));
+  const double fr = rp - i0;
+  const double a = echo_[(i0 + 2 * n) % n], b = echo_[(i0 + 1 + 2 * n) % n];
+  const double wet = a + fr * (b - a);
+  echoLp1_ += echoLpA_ * (x + P.echoFb * wet - echoLp1_);
+  echoLp2_ += echoLpA_ * (echoLp1_ - echoLp2_);
+  echo_[echoPos_] = float(2 * std::tanh(0.5 * echoLp2_));
+  echoPos_ = (echoPos_ + 1) % n;
+  return x + P.echo * wet;
 }
 
 // ---------------------------------------------------------------------------
@@ -898,7 +1731,9 @@ void LeadPlayer::noteOn(int midi, int velocity) {
   keyVel_ = velocity;
   // Legato: the envelopes go on (a slur), or start again from where they are
   // (tongued legato: a harder key re-triggers); a glide slides the CV.
-  glideTau_ = art == kArtGlide ? std::max(0.02, glideDur_ / 2.5) : 0;
+  // (The pads have no portamento: a glide gesture is a plain slur there.)
+  const bool pad = std::strcmp(lead_.instrument().family, "pad") == 0 || std::strcmp(lead_.instrument().family, "fx") == 0;
+  glideTau_ = art == kArtGlide && !pad ? std::max(0.02, glideDur_ / 2.5) : 0;
   if (art == kArtSlur || art == kArtGlide) {
     gate(true, false);
   } else {
@@ -1005,7 +1840,16 @@ void LeadPlayer::render(float* out, int n) {
       c.res = resonance(air_ + 0.4 * (velAmt_ - 0.5)) * P.resScale;
     }
     c.level = amp_.v * (0.4 + 0.6 * dyn) * (0.6 + 0.4 * velAmt_);
+    {
+      // Singers: the brightness knob is the vowel, u (0.3) o a (rest, 1.0) e i
+      // (2.5); PJ_VOWEL (0..4) fixes it; the air knob is their breath.
+      static const double kVowel = knob("PJ_VOWEL", -1);
+      const double b = std::clamp(brightness_, 0.3, 2.5);
+      c.vowel = kVowel >= 0 ? kVowel : b <= 1 ? 2 * (b - 0.3) / 0.7 : 2 + 2 * (b - 1) / 1.5;
+      c.breath = std::clamp(air_, 0.0, 1.0);
+    }
     c.strike = strike_;
+    c.gate = gate_;
     c.vel = velAmt_;
     lead_.setControls(c);
     lead_.process(out + i, m);
