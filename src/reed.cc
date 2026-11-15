@@ -78,6 +78,7 @@ void Reed::settle() {
   tongue_ = target_.tongue;
   cur_.glottis = target_.glottis;
   cur_.reed = target_.reed;  // the lips on the reed
+  cur_.reedDamp = target_.reedDamp;
   cur_.noise = target_.noise;
   cur_.air = target_.air;
 }
@@ -88,6 +89,7 @@ void Reed::controlStep() {
   auto glide = [a](double& c, double t) { c += a * (t - c); };
   glide(cur_.lung, target_.lung);
   glide(cur_.reed, target_.reed);
+  glide(cur_.reedDamp, target_.reedDamp);
   glide(cur_.noise, target_.noise);
   glide(cur_.air, target_.air);
   cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
@@ -106,7 +108,7 @@ void Reed::controlStep() {
   // a note, a staccato tongue stop held a lightly damped reed (the shawm's)
   // closed but free to move: its swept flow and the bore rang up from silence.)
   if (cur_.lung > 1) played_ = true;
-  g_ = kQr_ * rp_.qr * std::sqrt(lip) * wr + (played_ ? (1 - tongue_) * 3 * wr : 0);
+  g_ = kQr_ * rp_.qr * cur_.reedDamp * std::sqrt(lip) * wr + (played_ ? (1 - tongue_) * 3 * wr : 0);
   const double dt = 1 / fs_, hd = 0.5 * dt;
   const double det = 1 + hd * g_ + hd * hd * w2_;
   // (I - dt/2 A)^-1 (I + dt/2 A), A = [[0, 1], [-w2, -g]]; F enters v.

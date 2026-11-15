@@ -127,7 +127,7 @@ const NoteInfo kOboeNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // English horn in F, written Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,

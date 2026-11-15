@@ -196,7 +196,10 @@ or half-holes, a hole), key clicks, the radiation and the room. New:
 - **The reed player** (`src/reedplayer.*`): breath by the note and the dynamics, the lips tune
   (calibrated per note, soft / mezzo-forte / loud), "tu", "du", breath attacks, slurs; vibrato
   from the breath (oboe, bassoon, shawm), the jaw (saxophones) or both (duduk), none on the
-  clarinet; the player listens and tunes each held note with the lips.
+  clarinet; the player listens and tunes each held note with the lips. At the oboe's top
+  (C6, C#6) the player rolls the lips out, taking less reed, as oboists do for the sharp
+  third register: less lip on the blades, half the damping at C#6. Bitten harder instead,
+  C#6 held its register only at the top of the bite, 19 c sharp; rolled out, it plays in tune.
 - **A duct** (recorder, ocarina): the windway and window fixed, the breath alone sets the pitch,
   so louder is sharper; the calibration learns each note's breath. **End-blown** (shakuhachi,
   pan flute): the flute's lips on the open top, the coverage bending the pitch.

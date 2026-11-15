@@ -189,6 +189,9 @@ void ReedPlayer::render(float* out, int n) {
       lip *= 1 + 0.04 * wander_ * w2b_;
       lip *= 1 + 2 * jaw * vib * sv;
       e.reed = lip;
+      // The top notes: the lips rolled out (less lip on the blades).
+      const int top = inst_.hi + inst_.transpose;
+      e.reedDamp = std::pow(rp.roll, std::clamp((note_ - (top - 2)) / 2.0, 0.0, 1.0));
     }
     // Lungs: a fast push, a slower release.
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;

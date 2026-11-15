@@ -63,6 +63,10 @@ struct ReedParams {
   // stop alone). Meeting gradually, the flow is not cut at once: fewer high
   // harmonics (a dark, soft-reed sound).
   double meetAt = 1, contact = 0;
+  // The top notes: the player relaxes the jaw and takes less reed (the lips
+  // rolled out): less lip on the blades, their damping x roll at the top
+  // note, from x1 a whole tone below.
+  double roll = 1;
 };
 
 // A duct or the lips at an open end: the jet and the window it crosses.
