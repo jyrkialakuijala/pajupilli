@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The waveguide (./flute -imp) against the transfer-matrix model (tools/tmm.py):
+"""The waveguide (./pajupilli -imp) against the transfer-matrix model (tools/tmm.py):
 the first three resonances of every first- and second-octave fingering, per
 instrument, in cents. The grid's hole-position compensation is fitted with this.
 
@@ -20,7 +20,7 @@ def fdtd_peaks(inst, midi, pattern=None, env=None):
     e.update(env or {})
     if pattern:
         e['PJ_IMPHOLES'] = pattern
-    out = subprocess.run([os.path.join(ROOT, 'flute'), '-inst', inst, '-imp', str(midi)],
+    out = subprocess.run([os.path.join(ROOT, 'pajupilli'), '-inst', inst, '-imp', str(midi)],
                          capture_output=True, text=True, env=e, cwd=ROOT).stdout
     return [float(v) for v in out.split(':', 1)[1].split('(')[0].split()]
 

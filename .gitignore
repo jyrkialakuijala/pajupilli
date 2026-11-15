@@ -1,5 +1,5 @@
-/flute
-/flute-scalar
+/pajupilli
+/pajupilli-scalar
 *.wav
 __pycache__/
 listen/

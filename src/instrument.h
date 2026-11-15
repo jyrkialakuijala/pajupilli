@@ -67,6 +67,11 @@ struct ReedParams {
   // rolled out): less lip on the blades, their damping x roll at the top
   // note, from x1 a whole tone below.
   double roll = 1;
+  // A skilled player's start: as the tongue leaves the reed, the air column
+  // is already set ringing at the note (m^3/s, the peak of a few cycles of
+  // flow at its pitch into the mouthpiece; 0: none). The note then speaks in
+  // its register at once, not after the reed has found it.
+  double prime = 0;
 };
 
 // A duct or the lips at an open end: the jet and the window it crosses.

@@ -138,6 +138,7 @@ void ReedPlayer::applyNote(Attack a) {
   lungAttack_ *= 1 + 0.15 * wander_ * urand();
   tongueClock_ = 0;
   sinceOn_ = 0;
+  primePending_ = inst_.design->reed.prime > 0;
 }
 
 void ReedPlayer::render(float* out, int n) {
@@ -201,6 +202,15 @@ void ReedPlayer::render(float* out, int n) {
     sinceOff_ += bdt;
     e.tongue = tongueClock_ < tongueClosed_ ? 0 : std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
     e.tongue *= tongueStop();
+    if (primePending_ && note_ >= 0 && tongueClock_ >= tongueClosed_) {
+      // The skilled start: the column set ringing at the note as the tongue
+      // leaves (scaled with the breath: a soft start rings it less).
+      static const double kPrime = knob("PJ_PRIME", 1.0), kCycles = knob("PJ_PRIMECYC", 4);
+      const double hz = glideFrequency() * std::exp2(-inst_.transpose / 12.0);
+      const double p0 = rp.press * std::pow(rp.pressHi / rp.press, 0.5);
+      reed_.prime(kPrime * rp.prime * std::sqrt(std::max(lungTarget, 0.0) / p0), hz, kCycles);
+      primePending_ = false;
+    }
     // The release: as the breath falls, the lips (and the bag's piper, the
     // fingers' grip on the bag) let the reed close with it. (On the breath
     // alone a reed played near its closing pressure passed its loudest point

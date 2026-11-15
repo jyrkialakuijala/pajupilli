@@ -21,6 +21,15 @@ const NoteInfo kBassNotes[64] = {
 #undef N
 };
 const Design kBassDesign = {nullptr, 0, nullptr, 0, kBassNotes, 0, 0, false, nullptr, 0, {}, {}};
+const NoteInfo kPianoNotes[88] = {
+#define N {"", 1}
+    N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N,
+    N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N,
+    N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N,
+    N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N, N
+#undef N
+};
+const Design kPianoDesign = {nullptr, 0, nullptr, 0, kPianoNotes, 0, 0, false, nullptr, 0, {}, {}};
 const int kOpen[4] = {28, 33, 38, 43};
 const int kTop = 67;  // G4: the top of the stopped notes
 const int kThumbVel = 45;  // up to this velocity: the thumb
@@ -31,8 +40,18 @@ const int kFlatVel = 72;   // up to this: the flat finger; above: the stacked pu
 extern const Instrument kPlucked[] = {
     {"double-bass", 0, 28, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "bass"},
     {"contrabass", 0, 28, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "bass"},
+    // The concert grand (src/piano.cc, src/pianoinst.cc): A0 .. C8.
+    {"grand-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // A 121 cm upright (src/upright.cc): its scale and board.
+    {"upright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The Yamaha CP-80 electric grand (src/cp80.cc): A0 .. C8.
+    {"electric-grand", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The Hohner Clavinet D6, E7 and C (src/clavinet.cc): F1 .. E6.
+    {"clavinet", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    {"clavinet-e7", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    {"clavinet-c", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
 };
-extern const int kNumPlucked = 2;
+extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 
 bool bowedBass(const Instrument& inst) { return std::strcmp(inst.name, "contrabass") == 0; }
 

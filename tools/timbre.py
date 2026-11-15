@@ -18,7 +18,7 @@ NOTES = {60: [0, -7, -14, -20, -25], 67: [-2, -9, -16, -22, -27],
 
 def spectrum(env, note, dyn=0.5):
     with tempfile.NamedTemporaryFile(suffix='.wav') as f:
-        subprocess.run([os.path.join(ROOT, 'flute'), '-note', str(note), '-secs', '0.8',
+        subprocess.run([os.path.join(ROOT, 'pajupilli'), '-note', str(note), '-secs', '0.8',
                         '-dyn', str(dyn), '-o', f.name], env=env, check=True,
                        stdout=subprocess.DEVNULL)
         x = np.fromfile(f.name, dtype=np.float32)[11:]

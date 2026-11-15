@@ -8,8 +8,8 @@ become checks once the planned fix lands).
 import math, os, re, resource, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FLUTE = os.path.join(ROOT, 'flute')
-SCALAR = os.path.join(ROOT, 'flute-scalar')
+FLUTE = os.path.join(ROOT, 'pajupilli')
+SCALAR = os.path.join(ROOT, 'pajupilli-scalar')
 failures = []
 # The flute family: name, sounding minus written pitch, written range.
 FAMILY = (('flute-c', 0, 60, 96), ('piccolo', 12, 62, 95), ('alto', -5, 60, 88), ('bass', -12, 60, 86))
@@ -212,7 +212,7 @@ def room():
 def parity():
     """The portable build plays the same notes (pitch and level), R22."""
     if not os.path.exists(SCALAR):
-        check('scalar parity', False, 'flute-scalar missing (make scalar)')
+        check('scalar parity', False, 'pajupilli-scalar missing (make scalar)')
         return
     worst = ''
     ok = True
@@ -513,20 +513,40 @@ def strings():
     check('fuzz 10 s (contrabass)', r.returncode == 0, r.stdout.strip())
     ns = cpu_time(['-inst', 'contrabass', '-note', '45', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
     check('real-time margin (contrabass)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The concert grand (-inst grand-piano): every octave speaks at its pitch (read a little
+    # sharp: the stiff wires' partials lie above the harmonics), no blow-up, and real time
+    # both for one note and with the pedal down (all 243 strings free).
+    cents, clar = [], []
+    for note in (24, 36, 48, 60, 72, 84, 96):
+        r = run(['-inst', 'grand-piano', '-note', str(note), '-secs', '1.5'])
+        c = re.search(r'\(([+-]\d+) cents\) clarity ([\d.-]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    # (Modulo the octave: under a bass note the blow leaves a soundboard resonance ringing for a
+    # moment, and when it lies near 2.5 times the note the tracker reads an octave low: C2 does.)
+    check('grand-piano: notes at their pitch', max(abs(((c + 600) % 1200) - 600) for c in cents) <= 15, f'cents {cents}')
+    # (C1's many partials lie well off the harmonics, the stiffer the wire the higher: it reads less clear.)
+    check('grand-piano: notes clear', clar[0] >= 0.7 and min(clar[1:]) >= 0.8, f'clarity {clar}')
+    r = run(['-inst', 'grand-piano', '-fuzz', '10', '1'])
+    check('fuzz 10 s (grand-piano)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'grand-piano', '-note', '60', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (grand-piano)', ns < 4000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    ns = cpu_time(['-inst', 'grand-piano', '-note', '60', '-secs', '4'], env={'PJ_NOCAL': '1', 'PJ_PIANO_PEDAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (grand-piano, pedal down)', ns < 10400, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
 # The ethnic and percussive families on the modal engine (src/modal.cc,
 # src/modalinst.cc): no blow-ups, NaN recovery (the key struck again), real
 # time, and the pitched ones in tune (three notes of their range).
 MODALS = ['sitar', 'banjo', 'shamisen', 'koto', 'kalimba', 'fiddle', 'tinkle-bell', 'agogo', 'steel-drums',
-          'woodblock', 'taiko', 'reverse-cymbal',
+          'woodblock', 'taiko', 'reverse-cymbal', 'vibraphone',
           # the sound effects (src/sfx.cc)
           'fret-noise', 'breath-noise', 'seashore', 'bird-tweet', 'telephone', 'helicopter', 'applause', 'gunshot']
 # (Modulo the octave: a banjo's or a shamisen's fundamental is weak, a pan's
 # octave blooms over it; the taiko's pitch is not clear enough to track.)
 MODAL_PITCHED = {'sitar': (50, 62, 74), 'banjo': (55, 64, 76), 'shamisen': (52, 62, 66), 'koto': (55, 62, 74),
                  'kalimba': (60, 72, 84), 'fiddle': (60, 69, 81), 'steel-drums': (62, 72, 84),
-                 'tinkle-bell': (55, 72, 84)}
+                 'tinkle-bell': (55, 72, 84), 'vibraphone': (55, 72, 84)}
 
 
 def struck_cents(inst, midi, harmonics=8):
@@ -576,10 +596,93 @@ def modals():
             check(f'{inst}: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
 
 
+def electric_grand():
+    """The CP-80 (src/cp80.cc: the grand's strings on a rigid bridge, read by
+    piezos, then its circuit): no blow-ups, three notes in tune, real time
+    with the pedal down."""
+    r = run(['-inst', 'electric-grand', '-fuzz', '10', '1'])
+    peak = float(re.search(r'peak ([\d.]+)', r.stdout).group(1))
+    check('fuzz 10 s (electric-grand)', r.returncode == 0 and peak < 8, r.stdout.strip())
+    out = [struck_cents('electric-grand', m, 1) for m in (48, 60, 72)]
+    bad = [c for c in out if c is None or abs(c) > 15]
+    check('electric-grand: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    ns = cpu_time(['-inst', 'electric-grand', '-note', '60', '-secs', '4'], env={'PJ_PIANO_PEDAL': '1'}) / (4 * 48000) * 1e9
+    # (About 0.45 x the grand's work, whose limit is 10400 ns: 4.7 us under a load of 27.)
+    check('real-time margin (electric-grand, pedal down)', ns < 6000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def upright():
+    """The upright piano (-inst upright-piano, src/upright.cc): the grand's checks on its own scale
+    and board: every octave at its pitch (modulo the octave, as the grand), clear, no blow-up,
+    real time."""
+    cents, clar = [], []
+    for note in (24, 36, 48, 60, 72, 84, 96):
+        r = run(['-inst', 'upright-piano', '-note', str(note), '-secs', '1.5'])
+        c = re.search(r'\(([+-]\d+) cents\) clarity ([\d.-]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    # C1 by its partials (tools/pianofit.py: a stiff string's series fitted), not the tracker:
+    # the small board passes little of its first few partials, and the tracker can read a sixth
+    # off. A short scale's bass is stretched flat: within 40 c.
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import pianofit
+    wav = os.path.join(ROOT, 'tools', '.upright-c1.wav')
+    run(['-inst', 'upright-piano', '-note', '24', '-secs', '2', '-o', wav])
+    fs, x = pianofit.load(wav)
+    os.remove(wav)
+    n = pianofit.measure_file(x, fs, 24, 0.0, 1.5)
+    cents[0] = round(1200 * math.log2(n['f0'] / 32.703))
+    check('upright-piano: notes at their pitch', abs(cents[0]) <= 40 and max(abs(((c + 600) % 1200) - 600) for c in cents[1:]) <= 15,
+          f'cents {cents} (C1 by its partials)')
+    check('upright-piano: notes clear', clar[0] >= 0.6 and min(clar[1:]) >= 0.8, f'clarity {clar}')
+    r = run(['-inst', 'upright-piano', '-fuzz', '10', '1'])
+    check('fuzz 10 s (upright-piano)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'upright-piano', '-note', '60', '-secs', '4'], env={'PJ_NOCAL': '1', 'PJ_PIANO_PEDAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (upright-piano, pedal down)', ns < 10400, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def clavinet():
+    """The Clavinet (-inst clavinet, src/clavinet.cc): in tune, no blow-up, real time, and the
+    release three semitones down (the tangent lets the whole string go: research/clavinet.md 5)."""
+    out = [struck_cents('clavinet', m, 1) for m in (40, 52, 64, 76)]
+    bad = [c for c in out if c is None or abs(c) > 15]
+    check('clavinet: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    r = run(['-inst', 'clavinet', '-fuzz', '10', '1'])
+    check('fuzz 10 s (clavinet)', r.returncode == 0, r.stdout.strip())
+    wav = os.path.join(ROOT, 'tools', '.clav-release.wav')
+    run(['-inst', 'clavinet', '-seq', 'on 52 90 wait 0.5 off 52 wait 0.3', '-o', wav])
+    import numpy as np
+    from scipy.io import wavfile
+    fs, x = wavfile.read(wav)
+    os.remove(wav)
+    x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    seg = x[int(0.505 * fs):int(0.62 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 17))
+    f = np.fft.rfftfreq(1 << 17, 1 / fs)
+    band = (f > 100) & (f < 200)
+    drop = 1200 * math.log2(164.81 / f[band][np.argmax(sp[band])])
+    check('clavinet: the release drops three semitones', abs(drop - 300) < 25, f'E3 released: {drop:.0f} c down')
+    for inst in ('clavinet-e7', 'clavinet-c'):
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    # The wah and the envelope filter: stable at the ends of their sweeps.
+    for env in ({'PJ_CLAV_WAH': '0'}, {'PJ_CLAV_WAH': '1'}, {'PJ_CLAV_ENV': '1'}):
+        r = run(['-inst', 'clavinet', '-fuzz', '5', '2'], env=env)
+        check(f'fuzz 5 s (clavinet, {list(env.items())[0][0]}={list(env.values())[0]})', r.returncode == 0, r.stdout.strip())
+    # Pressed harder: the held note a few cents up.
+    pc = []
+    for press in ('0', '10'):
+        c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', 'clavinet', '-note', '52'], env={'PJ_CLAV_PRESS': press}).stdout)
+        pc.append(int(c.group(1)) if c else -999)
+    check('clavinet: pressing bends the note up', 7 <= pc[1] - pc[0] <= 13, f'{pc[1] - pc[0]} c for 10 c pressed')
+    ns = cpu_time(['-inst', 'clavinet', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (clavinet, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

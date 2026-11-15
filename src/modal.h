@@ -44,7 +44,7 @@ namespace pajupilli {
 
 class ModalSet {
  public:
-  static constexpr int kMaxVib = 32, kModes = 64, kBody = 24, kContacts = 4;
+  static constexpr int kMaxVib = 40, kModes = 64, kBody = 24, kContacts = 4;
   explicit ModalSet(double fs);
   double fs() const { return fs_; }
 
@@ -75,6 +75,13 @@ class ModalSet {
     struct Quad { int p, i, j; float g; } quad[kQuad] = {};
     // Tension glide: every mode x sqrt(1 + glide * (amplitude / glideRef)^2).
     float glide = 0, glideRef = 1e-3f;
+    // Linear coupling between two of its modes (a vibraphone bar's
+    // fundamental and the air in its resonator under it): a shared spring,
+    // x_a'' += -g x_b and x_b'' += -g x_a (per unit modal mass), times the
+    // vibrator's coupling (setCoupling: the fan's opening).
+    static constexpr int kLin = 2;
+    int nl = 0;
+    struct Lin { int a, b; float g; } lin[kLin] = {};
   };
   void setVib(int i, const Def& d);
   const Def& def(int i) const { return vib_[i].def; }
@@ -107,6 +114,8 @@ class ModalSet {
   // A knock on the body at the bridge: a half-sine force (N) lasting dur s,
   // after delay s (a shamisen's bachi meeting the skin after the string).
   void knock(double force, double dur, double delay = 0);
+  // The linear couplings of vibrator i x s (a vibraphone's fan: 1 open, ~0 closed).
+  void setCoupling(int i, float s) { vib_[i].couple = s; }
   // A damper (a finger, the hand, a felt): every mode of i dies at `rate` 1/s (0: off).
   void damp(int i, double rate);
   // The vibrator's energy (per unit modal mass; tests).
@@ -127,6 +136,7 @@ class ModalSet {
     double ratio = 1, ratioFrom = 1, ratioTo = 1, glideT = 1, glideDur = 0, glideNow = 1;
     double dampRate = 0;
     float dampMul = 1;
+    float couple = 1;
     // Pluck.
     double pF = 0, pRise = 0, pHold = 0, pSlip = 0, pT = 1e9, pAngle = 0.6;
     // Mallet.

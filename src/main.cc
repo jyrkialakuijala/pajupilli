@@ -1,13 +1,13 @@
 // pajupilli: a physical model of a Boehm concert flute.
 //
-//   ./flute -note 69 -o a4.wav        play one note (MIDI), print its pitch
-//   ./flute -scale                    play C4..C7, print a tuning table
-//   ./flute -imp 69                   passive resonances of a fingering
-//   ./flute -slur 71 72 -dyn 0.2      slur into a note; print its pitch and level wobble
-//   ./flute -inst piccolo ...         piccolo, alto or bass flute, flute-c (default: flute, B foot);
+//   ./pajupilli -note 69 -o a4.wav        play one note (MIDI), print its pitch
+//   ./pajupilli -scale                    play C4..C7, print a tuning table
+//   ./pajupilli -imp 69                   passive resonances of a fingering
+//   ./pajupilli -slur 71 72 -dyn 0.2      slur into a note; print its pitch and level wobble
+//   ./pajupilli -inst piccolo ...         piccolo, alto or bass flute, flute-c (default: flute, B foot);
 //                                     notes are sounding MIDI pitches
-//   ./flute -h                        all options
-//   ./flute -live                     play it from the MPK mini mk3
+//   ./pajupilli -h                        all options
+//   ./pajupilli -live                     play it from the MPK mini mk3
 //       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
 #include <memory>
@@ -24,6 +24,7 @@
 
 #include "analysis.h"
 #include "calibrate.h"
+#include "midifile.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "flute.h"
@@ -333,7 +334,7 @@ int slurTest(int from, int to, double dyn, double secs, std::vector<float>* keep
 const char kUsage[] =
     "pajupilli: physical models of the Boehm flute and other woodwinds.\n"
     "\n"
-    "usage: flute [-inst NAME] MODE [options]\n"
+    "usage: pajupilli [-inst NAME] MODE [options]\n"
     "\n"
     "Instrument:\n"
     "  -inst NAME          flute (default, B foot), flute-c (C foot), piccolo,\n"
@@ -343,6 +344,7 @@ const char kUsage[] =
     "                      trumpet, muted-trumpet (Harmon), trombone (slide), tuba;\n"
     "                      sitar, banjo, shamisen, koto, kalimba, fiddle; tinkle-bell,\n"
     "                      agogo, steel-drums, woodblock, taiko, reverse-cymbal;\n"
+    "                      vibraphone;\n"
     "                      fret-noise, breath-noise, seashore, bird-tweet, telephone,\n"
     "                      helicopter, applause, gunshot (and the synth leads, pads,\n"
     "                      the double bass: -inst nosuch lists them all).\n"
@@ -371,6 +373,9 @@ const char kUsage[] =
     "                      sound, per octave band\n"
     "  -roomimp ROOM       the room at the microphones: room vs direct sound,\n"
     "                      left/right balance and correlation over time\n"
+    "  -play FILE.mid      play a MIDI file: each channel's GM program on its\n"
+    "                      instrument (or the nearest built), drums on the\n"
+    "                      percussion built; played as it is rendered (or -o)\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
@@ -406,9 +411,9 @@ const char kUsage[] =
     "PJ_TRACE (with -note: print model state per sample)\n"
     "\n"
     "Examples:\n"
-    "  flute -live -inst alto\n"
-    "  flute -note 69 -o a4.wav\n"
-    "  flute -inst piccolo -scale\n";
+    "  pajupilli -live -inst alto\n"
+    "  pajupilli -note 69 -o a4.wav\n"
+    "  pajupilli -inst piccolo -scale\n";
 
 // Scattering: a silent flute driven by 1 Pa of room noise in one octave band;
 // what it radiates (Pa at 1 m) per Pa of room pressure. A passive instrument
@@ -499,6 +504,7 @@ int main(int argc, char** argv) {
   const RoomSpec* room = findRoom("hall");
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
+  std::string playFile;  // -play: a MIDI file
   const char* dump = nullptr;  // window pressure, raw float32
   std::string seq;  // -seq: "on N V", "off N", "wait S", ...
   if (argc < 2) { std::fputs(kUsage, stderr); return 1; }
@@ -531,6 +537,7 @@ int main(int argc, char** argv) {
     else if (a == "-v") lopt.verbose = true;
     else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
     else if (a == "-polydemo") polyDemo = true;
+    else if (a == "-play") playFile = next();
     else if (a == "-ensemble") {
       ensemble = "bass,alto,flute,flute,piccolo";
       if (i + 1 < argc && argv[i + 1][0] != '-') ensemble = argv[++i];
@@ -589,6 +596,7 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
+  if (!playFile.empty()) return playMidiFile(playFile, out, room, lopt.device, lopt.verbose);
   if (cfoot && gInst == findInstrument("flute")) gInst = findInstrument("flute-c");
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;
   if (cal) { calibrate(*gInst, 440, stdout); return 0; }

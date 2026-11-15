@@ -213,6 +213,15 @@ int Ensemble::pickFree(int key, int* pitch) const {
     double c = cost(i, p, o);
     for (int g = 0; g < int(f_.size()); ++g)
       if (f_[g].held) c += crossing(i, p, g, f_[g].v->player().sounding());
+    if (keepTails_ > 0 && !mixed_) {
+      // (-play) Let released notes ring out: the voice released longest ago
+      // (never played: the longest). A wind's line keeps to its player: the
+      // voice released last, if its note was within a minor third.
+      const Instrument& in = f_[i].v->instrument();
+      const bool wind = !in.circuit() && !in.plucked() && !in.modal();
+      const double age = f_[i].lastNote < 0 ? 1e6 : now_ - f_[i].lastOff;
+      c = wind && f_[i].lastNote >= 0 && std::abs(f_[i].lastNote - p) <= 3 && age < keepTails_ ? -1e9 + age : -age;
+    }
     if (c < bestCost) { bestCost = c; best = i; *pitch = p; }
   }
   return best;
@@ -828,7 +837,17 @@ void Ensemble::block(float* left, float* right, int n) {
     std::vector<float*> at(nf);
     std::vector<float> lg(nf);
     for (int i = 0; i < nf; ++i) {
-      const float g = float(f_[i].v->instrument().gain);
+      // (The voice's output carries its gain and its level trim: both are
+      // the listener's, not the air's. Left in, a quiet instrument trimmed
+      // up (the tuba: +10 dB) put 3x its pressure into the room, and the
+      // room 3x that back on its neighbours' bells: several tubas in a
+      // studio rang up an oscillation at 5.8 kHz.)
+      // (The grand: its microphones stand 65 cm over the strings and hear
+      // little of what the open lid and the case send into the room: the
+      // room gets 1 dB more of it than of the others, PJ_PIANO_REVERB.)
+      static const float kGrand = float(std::pow(10.0, knob("PJ_PIANO_REVERB", 1.0) / 20));
+      const float send = std::strcmp(f_[i].v->instrument().name, "grand-piano") == 0 ? kGrand : 1.0f;
+      const float g = float(f_[i].v->instrument().gain * levelTrim(f_[i].v->instrument())) / send;
       for (int j = 0; j < n; ++j) srcBuf_[size_t(i) * n + j] = buf_[i][j] / (g * k);
       src[i] = &srcBuf_[size_t(i) * n];
       at[i] = f_[i].room.data();

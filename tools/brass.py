@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Transfer-matrix (frequency-domain) model of the brass instruments in
-src/brass.cc, to design their bores and check the waveguide (./flute -imp):
+src/brass.cc, to design their bores and check the waveguide (./pajupilli -imp):
 the mouthpiece (the cup a volume, the throat and backbore resolved), the bore
 from the throat to the bell, the valve loops added in the cylindrical
 section, the bell's radiation load as in src/bore.cc (Levine-Schwinger at low

@@ -68,6 +68,10 @@ class Ensemble {
   void all(void (Performer::*set)(double), double x) {
     for (Slot& s : f_) (s.v->player().*set)(x);
   }
+  // (-play) Let a released note ring out: a new note takes the voice released
+  // longest ago; a wind's the one released last if within a minor third (its
+  // line keeps to its player). Live keeps its own choice.
+  void setKeepTails(double secs) { keepTails_ = secs; }  // (how long a released note is taken to ring)
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
   }
@@ -118,6 +122,7 @@ class Ensemble {
   static constexpr double kFresh = 0.25;  // silent this long after a release: a fresh start
   std::vector<Slot> f_;
   bool mixed_ = false;
+  double keepTails_ = 0;
   bool panned_ = false;  // a stereo mix by each voice's pan (no room)
   double healAt_ = 0;    // when the tuning last healed (s)
   int lo_ = 127, hi_ = 0;

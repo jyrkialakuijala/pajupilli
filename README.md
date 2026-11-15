@@ -24,10 +24,10 @@ See `REQUIREMENTS.md` and `research/` for the physics and the numbers.
 
 ## Play
 
-    ./flute -live           # finds the MPK mini, plays through PipeWire/ALSA
-    ./flute -live -v        # also prints the MIDI events
-    ./flute -selftest       # a short arpeggio without a keyboard
-    ./flute -live -inst piccolo   # or alto, bass (default: flute)
+    ./pajupilli -live           # finds the MPK mini, plays through PipeWire/ALSA
+    ./pajupilli -live -v        # also prints the MIDI events
+    ./pajupilli -selftest       # a short arpeggio without a keyboard
+    ./pajupilli -live -inst piccolo   # or alto, bass (default: flute)
 
 Options: `-dev hw:1` (another ALSA device), `-period 64 -periods 3` (buffer),
 `-transpose 12` (keys to sounding pitch; default: the MPK's lowest C plays the
@@ -68,8 +68,8 @@ The knobs start from their defaults until you turn them.
 
 ### Polyphony (`-poly N`, default 8)
 
-    ./flute -live            # a pool of 8 flutes
-    ./flute -live -poly 1    # one flute only
+    ./pajupilli -live            # a pool of 8 flutes
+    ./pajupilli -live -poly 1    # one flute only
 
 The keys are dealt to a pool of flutes, each its own model and player (with its own
 breath wander). How many play is guessed from the playing: keys struck together (within
@@ -82,7 +82,7 @@ in use change (an instrument counts for 2 s after its last key). A new line take
 most recently; silent flutes are not computed. The mix is scaled by 1 / sqrt(flutes
 playing). Controls (breath, vibrato, knobs) go to every flute, but
 each player has its own vibrato (rate ±8 %, depth ±15 %, its own phase, drifting with the
-breath) and its own flutter tongue (23-31 Hz), so the flutes never pulse together. `./flute -polydemo -o
+breath) and its own flutter tongue (23-31 Hz), so the flutes never pulse together. `./pajupilli -polydemo -o
 poly.wav` plays a line, a held note under a melody, and chords.
 
 Flutes sounding together tune to each other (adaptive just intonation, `PJ_JI=0` turns it
@@ -101,10 +101,10 @@ roughness (Sethares, from the partials) drops by 21 %.
 
 ### Ensemble (`-ensemble`) and the room (`-room`)
 
-    ./flute -live -ensemble                  # bass, alto, two flutes, piccolo
-    ./flute -live -ensemble alto,flute,flute # any list
-    ./flute -live -room church               # dry, studio, hall (default), church
-    ./flute -ensemble -polydemo -o choir.wav # with a five-voice chorale (stereo)
+    ./pajupilli -live -ensemble                  # bass, alto, two flutes, piccolo
+    ./pajupilli -live -ensemble alto,flute,flute # any list
+    ./pajupilli -live -room church               # dry, studio, hall (default), church
+    ./pajupilli -ensemble -polydemo -o choir.wav # with a five-voice chorale (stereo)
 
 A flute choir instead of a pool of one instrument: the keys are at sounding pitch over the
 whole ensemble (C3 to B7; keys beyond it fold in by octaves). Each instrument plays only its own
@@ -128,11 +128,11 @@ mirrored (about 11 dB between the channels); the reverberant field is a
 from diffuse-field theory (in the hall at the listener about as loud as the direct sound).
 Each player feeds it through diffusers along its own random direction and each listener takes
 its own: after 50 ms the room is even left and right and uncorrelated, wherever the player
-sits (`./flute -roomimp hall` shows it). Every instrument hears the room's sound and the others' direct
+sits (`./pajupilli -roomimp hall` shows it). Every instrument hears the room's sound and the others' direct
 sound in its bore: the pressure acts on the embouchure, the open holes and the foot, in series
 with each opening's radiation load, so an instrument takes in only as much as it would
 radiate. The silent flutes of the pool are computed too, and ring in sympathy. No energy is
-made in the loop: a silent flute gives back 0.1-1 % of the room's sound (`./flute -scatter`
+made in the loop: a silent flute gives back 0.1-1 % of the room's sound (`./pajupilli -scatter`
 measures it), and the walls and the air take the rest as heat at the room's RT60. `-room dry`
 is the old behaviour (no room, silent flutes not computed).
 
@@ -156,7 +156,7 @@ Each is the concert flute resized: tube lengths by the pitch ratio, bores to the
 instruments' (piccolo ~10.5 mm, alto 26 mm, bass 35 mm), embouchure, lips and jet by about
 the square root. Same Boehm fingerings; the piccolo has a D foot. Each runs at its own rate so
 the bore keeps its 96 points, resampled to 48 kHz. Offline commands take `-inst` too, with
-sounding MIDI notes (`./flute -inst bass -note 48`).
+sounding MIDI notes (`./pajupilli -inst bass -note 48`).
 
 ### Other woodwinds
 
@@ -176,7 +176,7 @@ sounding MIDI notes (`./flute -inst bass -note 48`).
 | `duduk` | in A: a large soft double reed on a cylindrical bore | A3–C#5 | 48 kHz |
 | `shawm` | treble in D: a wide cone, a reed behind a pirouette | D4–A5 | 48 kHz |
 
-`./flute -inst NAME -cal` lists, note by note, how the player tunes and which notes do not
+`./pajupilli -inst NAME -cal` lists, note by note, how the player tunes and which notes do not
 sound in their register (see Status). They play live, in `-poly` pools and in ensembles
 (`-ensemble bassoon,clarinet,oboe,flute`).
 
@@ -200,6 +200,12 @@ or half-holes, a hole), key clicks, the radiation and the room. New:
   (C6, C#6) the player rolls the lips out, taking less reed, as oboists do for the sharp
   third register: less lip on the blades, half the damping at C#6. Bitten harder instead,
   C#6 held its register only at the top of the bite, 19 c sharp; rolled out, it plays in tune.
+  The bassoonist starts a note as a skilled player does: as the tongue leaves the reed, the
+  air column is already ringing at the note (a few cycles of flow at its pitch into the
+  mouthpiece, scaled with the breath; `ReedParams::prime`, `PJ_PRIME`). Over 144 random
+  tongued notes: none silent (5 before), the rise to full level 20 ms (30), 14 ending over
+  20 c off (27). Bb3–Eb4 (on the speaker vents, built flat) still settle slowly: they need
+  their fingerings refitted.
 - **A duct** (recorder, ocarina): the windway and window fixed, the breath alone sets the pitch,
   so louder is sharper; the calibration learns each note's breath. **End-blown** (shakuhachi,
   pan flute): the flute's lips on the open top, the coverage bending the pitch.
@@ -333,6 +339,149 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
 - **By ear:** the stopping finger trembles by a few cents, and the player evens weak and booming
   notes with the bow (`tools/bowlevels.py`).
 
+### Concert grand
+
+`-inst grand-piano` (GM 1), A0 to C8: a physical model of a concert grand, with no samples
+(research/piano.md):
+
+- **Strings:** 243 strings on 88 keys (one, two or three per key). Each string is held as its
+  bending shapes up to 10 kHz in the bass and 20 kHz in the treble, in two directions of swing,
+  with the stiff wire's sharp partials; the piano is tuned as a tuner does, octave by octave
+  on those partials (stretched: about 6 cents flat at the bottom, 23 sharp at the top).
+- **Hammers:** a felt-covered mass thrown at the strings; the felt hardens as it is pressed,
+  so a harder key is brighter as well as louder. The felt is soft at its surface (as fitted
+  to recordings for gentle blows) and hardens steeply underneath, so a loud note blazes
+  rather than swells. Key velocity is the hammer's speed.
+  On the felt lies a loose nap: the softest keys never press through it and give a long,
+  gentle push, the fundamental with little else (flute-like); between about velocity 20 and
+  50 the nap is pressed flat within the blow and the tone opens quickly, then more gradually.
+- **Bridge and soundboard:** every string stands on the bridge and exchanges motion with the
+  soundboard each sample: a ribbed, tapered spruce plate computed by `tools/pianoboard.py`
+  (256 resonances, 96 broad ones above them). The damped strings resting on the bridge load
+  the board; a lifted damper takes its key's load away. A string's sideways swing is tuned
+  a little apart from its up-and-down swing and holds the bridge less: a note falls quickly,
+  then slowly, the two drifting against each other.
+- **Dampers and pedal:** releasing a key lets its damper down (the top 18 keys have none).
+  The sustain pedal lifts all dampers: every string rings along with what is played. A key
+  struck again before its sound is gone meets its own waves: repeated notes differ.
+- **Fitted to recordings:** string stiffness, tuning stretch, string loss, unison spread,
+  felt hardness and the bridge's stiffness are fitted to notes found in two solo piano
+  recordings (`tools/pianofit.py`, research/piano.md section 11): numbers only, no samples.
+- **Sound:** a crossed pair of figure-of-eight microphones over the strings, turned 60° to either side,, one turned to
+  the bass side (left), one to the treble side (right), hears each part of the board after
+  its own distance and by its angle: each partial sits where the board moves with it.
+- **Knobs:** brightness (K2) and hardness voice the hammers' felt, softer or harder.
+- **Cost:** about 9 % of a core for a single note, 32 % with the pedal down.
+
+### Upright piano
+
+`-inst upright-piano`, A0 to C8: the same strings, hammers and dampers on a 121 cm upright's
+scale and board (Yamaha U1 class; research/piano_variants.md section 3):
+
+- **Scale:** the bass shorter: wound strings 1.19 m at A0 to 0.98 m at B2, plain strings from
+  C3 at 1.03 m reaching the grand's lengths at C5. The grand's wire on shorter strings is
+  stiffer, so the tenor's partials run sharp sooner and the bass is stretched wider (C1 about
+  21 c flat); the step from wound to plain at B2/C3 is heard as in a real upright.
+- **Board:** a rectangle of 1.30 m² (the grand's 2 m²) standing upright, grain along the
+  diagonal long bridge, the bass bridge low on the bass side (`tools/uprightboard.py`: the
+  grand's board tool on this outline, radiating fully from 500 Hz as the grand's). Its bridge
+  gives more than the grand's: the treble dies sooner (C6 about 42 dB/s against 27).
+- **Sound:** a crossed pair of microphones behind the board (the back open), 60 cm off it, of
+  the grand's pattern (between figure-of-eight and cardioid).
+- **Not yet:** fitted to recordings (the wound strings' stiffness is an estimate); the wall
+  behind the board; the soft pedal moving the hammer rail.
+- **Cost:** about as the grand's with the pedal down.
+
+### Electric grand (Yamaha CP-80)
+
+`-inst electric-grand` (GM 3), A0 to C8: the CP-80 on the grand's machinery (`src/cp80.*`,
+research/cp80.md), a different piano as data (`PianoDesign`):
+
+- **Strings:** 154 on a short scale (single wound strings A0–F#2, two a key above), about 0.68 m
+  through the bass and tenor: stiff, the partials sharp (B ~ 2e-3 at A0: the clank); unisons
+  0.4–2 cents apart (a stiff bridge does not pull them together: they beat). Tuned as a small
+  piano is, the bass octaves between 2 : 1 and 4 : 2.
+- **No soundboard:** the bridge on a heavy plate over urethane strips (Yamaha's patent: a spring
+  and a dashpot: `supportR` 4000 kg/s above a 150 Hz corner): the fundamentals ring long (50 s at
+  A0), the treble about as on a grand. Read by a piezo per key: the strings' force on the bridge, the 88 in parallel on one bus
+  (the top six through a 0.022 uF mixing capacitor, a few dB down).
+- **The circuit** (from its 1978 overall circuit diagram): the input's 3.4 Hz high-pass; the
+  tone controls, flat at the centre detent as on the panel, at the corners the diagram's parts
+  give (bass a shelf at 100 Hz, middle a peak or dip at 340 Hz, treble a shelf at 8.7 kHz,
+  +-10-12 dB; the network's wiring through the brilliance switch is not legible on the scan, so
+  the gains are assumed): treble on K2; the brilliance switch (high, as default: flat; medium,
+  low: -4, -9 dB above 1.5 kHz); the tremolo (K4 depth, K5 speed): a Wien-bridge oscillator
+  (0.69–12.9 Hz) switching an LED on for about half of each cycle, the LED a light-dependent
+  resistor shunting the signal, the other channel from the inverted sine: an auto-pan that flips
+  rather than swings, as recorded (0.92 Hz, each channel dipping 8.5 dB, nearly square).
+- **Fitted to recordings** (about 120 notes from six recordings of CP-80s, `tools/pianofit.py`):
+  the low bass far darker than a grand's (A0–D2 nearly all below 1 kHz: a softer bass hammer),
+  the wound strings' upper partials dying twice as fast as a grand's (wire loss x 3); the tremolo
+  above. Still estimates: string gauges, the treble hammers; the recordings' 2–4 kHz in the
+  middle and upper registers sits about 5 dB over the model, which no hammer or strike point
+  reaches (perhaps the recordings' EQ, perhaps a resonance of the pickup's mount).
+- **Cost:** about 0.5 % of a core for a note; with the pedal down about 0.45 of the grand's work.
+
+### Clavinet (Hohner D6, E7, C)
+
+`-inst clavinet` (the D6, GM 8), `clavinet-e7`, `clavinet-c`, F1 to E6: the 60 strings of a
+Hohner Clavinet, its pickups, its electronics and the pedals it was played through
+(research/clavinet.md):
+
+- **The tangent:** a key's rubber tip strikes its string against an anvil and holds it there.
+  The string's end moves 1 mm in the time the key's speed takes (0.7–3 ms) and stays; each
+  speaking mode is driven by that end's motion. The low partials come out the same at any
+  velocity (a sawtooth); above about 1/(π·τ) a faster key is brighter: the Clavinet's dynamics
+  are mostly its brightness.
+- **The knock:** the tip landing on the anvil strikes the frame (five resonances, 180 Hz to
+  1.15 kHz); the frame moves the sounding strings' ends, and the knock is heard through them,
+  about 10 dB under a loud high note's start.
+- **Two directions of swing:** below E4, on most keys, the string also swings sideways, tuned
+  a little apart and coupled to the up-and-down swing at the rubber tip. The two trade their
+  energy: the note beats, 0.5 to 2 times a second, up to about 15 dB deep (the pickups hear
+  the sideways swing 25 dB down).
+- **Pressing a held key** harder stretches its string: up to 10 cents up, from the breath
+  (pad pressure, joystick up; in a MIDI file, channel pressure).
+- **The release:** the tip lets the whole string go (1.19 × the speaking length: three
+  semitones lower). The vibration and the released bend, a pluck at the anvil, ring on it while
+  the yarn damps them (the highs in about 30 ms, the dropped fundamental in about 0.2 s): the
+  release "thunk" with its short downward drop.
+- **Strings:** lengths estimated (0.82 m at F1 to 0.18 m at E6; only E3's 0.678 m is
+  published); stiffness as measured on recordings of a D6 from E2 to D#4 (about 5e-5, half the
+  published figure there) and as published in the bass and at the top; held notes ring 20 s at
+  100 Hz, 8 s at 1 kHz.
+- **Pickups:** the bridge pickup 4 cm from the tailpiece (bright, the bass fundamentals weak)
+  and the centre one 18.5 to 6.5 cm (warm, its comb notches every 3–5 partials), each reading
+  its strings' velocity, with a little of the magnet's nonlinearity. The air knob (K3) is the
+  selector: centre, both in phase (the default), bridge, both out of phase (thin).
+- **Tone switches:** the D6's four elements in series from the tone node to ground, each
+  shorted until pressed (`tools/clavtone.py`: all 15 settings as exact filters). Their
+  combinations make notches a simple cascade of filters would not. The brightness knob (K2) walks
+  them: Soft, Medium, Medium+Treble (the default), Treble (the 1.6 kHz twang),
+  Medium+Treble+Brilliant, Treble+Brilliant, Brilliant. The settings keep their levels, as on
+  the instrument (up to 20 dB apart).
+- **Electronics:**
+  - the D6: the 1:15 transformer, stage 1's roll-off from 5 kHz, the tone switches, stage 2's
+    soft clip (a loud chord colours, a single note hardly);
+  - the E7: the same network fed from its lower source (12 k against 51 k): the switches shape
+    the sound less (drier), stage 2 driven less hard;
+  - the C: no transformer and no tone switches: two germanium stages, an uneven clip, a
+    roll-off near 14 kHz.
+- **Pedals:** a wah on the joystick across (centred: out; heel 450 Hz to toe 1.6 kHz, Q 5; in a
+  MIDI file, pitch bend), and an envelope filter on K4 above its usual (the Mu-Tron's "wow":
+  the band-pass opens with the attack and closes as the note dies, 300 Hz to 2.5 kHz).
+- **Knobs:** hardness: the touch (key speed). For tests: `PJ_CLAV_TONE` (bits 1 Soft, 2 Medium,
+  4 Treble, 8 Brilliant), `PJ_CLAV_PICKUP` (0–3), `PJ_CLAV_MUTE` (the mute slider),
+  `PJ_CLAV_WAH` (0–1), `PJ_CLAV_ENV` (0–1), `PJ_CLAV_PRESS` (cents), `PJ_CLAV_KNOCK`,
+  `PJ_CLAV_SIDE` (the share of bass keys that beat).
+- **Fitted so far** (four recordings, 21 notes, `tools/pianofit.py`): the stiffness from E2 to
+  D#4; the recorded D#3 is nearest the model's default setting (both pickups, Medium+Treble:
+  8.6 dB rms over its first 16 partials), though its comb's first gap lies two partials lower.
+- **Not yet:** the scale's lengths and pickup distances (the comb), the decays (the recordings'
+  notes are short or effected), the yarn, the knock's resonances and the E7's level at its tone
+  node are estimates; the tension's own pitch glide on a hard strike.
+- **Cost:** about 1 % of a core for a note, about 6 % for busy playing.
+
 ### Ethnic and percussive (modes)
 
 The GM ethnic (105–112) and percussive (113–120) families, each researched first
@@ -381,6 +530,26 @@ One voice is one instrument, its player giving the keys to strings, tines, note 
   held down so the hardest hit peaks near full scale. `make test`: no blow-ups, NaN recovery,
   real time (the sitar ~0.6 µs per sample, the rest 0.04–0.35), and the pitched ones in tune
   (within ~7 c on three notes).
+
+### Vibraphone
+
+`-inst vibraphone` (GM 12), F3 to F6: a Musser M55 on the modal engine (research/vibraphone.md).
+
+- **Bars:** 37 aluminium bars, each its bending modes (tuned 1 : 4 : 10 in the low register by the
+  arch underneath; only the fundamental tuned from G#5 up), a torsion and a lateral mode. Alone, a
+  low bar rings about 25 s.
+- **Resonators:** under each bar a closed tube tuned 5 cents below it, its air a mode of its own,
+  coupled to the bar's fundamental by a spring (the engine's linear coupling). Open, the tube takes
+  most of the fundamental's energy and radiates it: louder, and a low note rings about 4.5 s
+  instead of 23.
+- **Fan:** discs on a shaft over the tubes' mouths open and close the coupling twice a turn: the
+  tremolo is the tube coupling coming and going, not a volume knob (a low tube cannot empty
+  quickly: at fast speeds the low notes pulse less). K4 switches the motor on and sets the depth
+  (off: the discs left open), K5 its speed (0.7–5 Hz).
+- **Mallets and damper:** a yarn mallet (22 g) on a stiffening contact; the hardness knob from soft
+  (3 ms on the bar) to hard (0.7 ms). A released key is damped by the felt bar in ~0.3 s unless the
+  pedal is down.
+- **Cost:** about 1 % of a core with every bar ringing.
 
 ### Sound effects
 
@@ -460,14 +629,35 @@ Lead-saw's circuit:
   - overlapping keys slur, a softer overlapped key glides, and a harder one retriggers the
     envelopes.
 
+## MIDI files
+
+    ./pajupilli -play song.mid               # play it (rendered on a thread, heard a second behind)
+    ./pajupilli -play song.mid -o song.wav   # or write it
+    ./pajupilli -play song.mid -room church  # in another room
+
+Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
+on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
+CP-80, organs to the calliope, guitars to the koto and banjo, cello to the contrabass, string
+sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
+built (bass drum: taiko; snare: synth drum; toms, bongos, congas: melodic tom; cowbell,
+agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel
+is a pool of its instrument as big as the most notes sounding at once, counting 1.5 s of tail
+after each release (`PJ_PLAY_TAIL`; at most 32 voices, `PJ_PLAY_VOICES`; a piano: one voice). A
+new note takes the voice released longest ago, so tails ring out; a wind's line keeps to its
+player (the voice released last, if its note was within a minor third);
+the sustain pedal, volume and expression are followed. A song heavier than real time pauses
+once, long enough to play on to the end without another stop; a file is scaled to
+its peak, a stream passes a soft knee over 0.9. Schubert's piano (8 min) renders at about
+3× real time.
+
 ## Offline
 
-    ./flute -note 69 -o a4.wav   # one note, prints its pitch
-    ./flute -demo -o demo.wav    # a scale and a phrase
-    ./flute -cal                 # what the player learns at startup (cached in ~/.cache/pajupilli)
-    ./flute -imp 69              # passive resonances of a fingering (PJ_IMPHOLES: any fingering)
-    ./flute -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
-    ./flute -ramp 60             # register map: the breath swept x0.25 .. x3 and back
+    ./pajupilli -note 69 -o a4.wav   # one note, prints its pitch
+    ./pajupilli -demo -o demo.wav    # a scale and a phrase
+    ./pajupilli -cal                 # what the player learns at startup (cached in ~/.cache/pajupilli)
+    ./pajupilli -imp 69              # passive resonances of a fingering (PJ_IMPHOLES: any fingering)
+    ./pajupilli -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
+    ./pajupilli -ramp 60             # register map: the breath swept x0.25 .. x3 and back
     tools/tmm.py -inst alto 69   # the transfer-matrix reference
     tools/fitgrid.py             # the waveguide against it, every instrument and fingering
     make test                    # ~30 s of checks
@@ -481,7 +671,7 @@ slow drift of breath support, jet aim and lips, and attacks that vary), `PJ_AIR`
 Air knob's start value), `PJ_EDGE` (edge hiss level).
 
 Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
-`src/player.cc`), e.g. `PJ_BREATH=0.03 ./flute -live`.
+`src/player.cc`), e.g. `PJ_BREATH=0.03 ./pajupilli -live`.
 
 ## Status
 
@@ -533,7 +723,7 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   correction is kept for the next time. A note held on the key for 0.3 s prints
   `trill-c5-d5: held, lips +x c`. Held trill notes end within 3 cents (piccolo top: 7).
 - Not yet: the look-ahead expressive mode, other trills, harmonics, multiphonics,
-- Other woodwinds (`./flute -inst NAME -cal` per note; `make test` checks the shares):
+- Other woodwinds (`./pajupilli -inst NAME -cal` per note; `make test` checks the shares):
 
   | Instrument | Notes that sound in tune (calibrated, within ~10 c) | Off or silent |
   |---|---|---|

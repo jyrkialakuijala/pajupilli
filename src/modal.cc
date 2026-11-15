@@ -425,6 +425,13 @@ float ModalSet::sample() {
       const Def::Quad& q = d.quad[t];
       f0[q.p] -= dt * q.g * v.x[0][q.i] * v.x[0][q.j];
     }
+    // Linear couplings (a bar and its resonator).
+    for (int t = 0; t < d.nl; ++t) {
+      const Def::Lin& q = d.lin[t];
+      const float g = dt * q.g * v.couple;
+      f0[q.a] -= g * v.x[0][q.b];
+      f0[q.b] -= g * v.x[0][q.a];
+    }
     // Step every mode: the impulse, the damper, the free motion over a sample.
     const float dm = v.dampMul;
     float o = 0, s = 0;

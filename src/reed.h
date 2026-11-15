@@ -16,6 +16,9 @@
 // sample (trapezoidal, the flow's square root in closed form).
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+
 #include "flute.h"  // Embouchure
 #include "tube.h"
 
@@ -26,6 +29,14 @@ class Reed : public Tube {
   explicit Reed(const Instrument& inst);
   void setEmbouchure(const Embouchure& e) { target_ = e; }
   const Embouchure& embouchure() const { return target_; }
+  // A few cycles of flow at hz into the mouthpiece (peak m^3/s), from now:
+  // the player's start (ReedParams::prime).
+  void prime(double peak, double hz, double cycles) {
+    primeAmp_ = peak;
+    primeW_ = 2 * M_PI * hz / fs_;
+    primeLen_ = std::max(1, int(cycles * fs_ / hz));
+    primeAt_ = 0;
+  }
 
   double testResponse() const override { return bore_.s.p()[ec_]; }
   void resetAir() override;
@@ -54,6 +65,8 @@ class Reed : public Tube {
   double aFlow_ = 0;  // sqrt(2 / rho) / sqrt(1 / (w h)^2 + psi / sd^2), without h's part
   // Mouth.
   double pm_ = 0, u_ = 0;
+  double primeAmp_ = 0, primeW_ = 0;
+  int primeLen_ = 0, primeAt_ = 0;
   double glotLp_ = 0, noiseLp_ = 0, noiseHp_ = 0, glotA_, noiseA_, noiseHpA_;
   double kNoise_, kSweep_, kLipH_, kGlotNoise_, kFr_ = 1, kQr_ = 1;
   double psi_ = 0;  // the double reed's duct loss (the design's, or PJ_REEDPSI)

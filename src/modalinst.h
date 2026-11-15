@@ -20,6 +20,8 @@ class ModalModel : public Tube {
  public:
   enum Type { kSitar, kBanjo, kShamisen, kKoto, kKalimba, kFiddle, kTinkle, kAgogo, kSteelpan, kWoodblock, kTaiko,
               kRevCymbal,
+              // GM 12 (the chromatic percussion).
+              kVibraphone,
               // The sound effects (GM 121-128: sfx.h).
               kFretNoise, kBreathNoise, kSeashore, kBirdTweet, kTelephone, kHelicopter, kApplause, kGunshot };
   explicit ModalModel(const Instrument& inst);
@@ -72,6 +74,10 @@ class ModalModel : public Tube {
     float step(float* bridgeForce);
   };
   Bowed bowed[4];
+  // The vibraphone: bar i (MIDI 53 + i) is vibrator i; its fundamental is
+  // mode 0, the air in its resonator mode kVibAir, coupled by a spring the
+  // fan's discs open and close.
+  static constexpr int kVibLo = 53, kVibBars = 37, kVibAir = 6;
 
  private:
   void controlStep() override {}
@@ -106,6 +112,7 @@ class ModalPlayer : public Performer {
   bool hold_ = false;
   bool held_[128] = {};
   double bend_ = 0, vibPh_ = 0, clock_ = 0;
+  double fanPh_ = 0;  // the vibraphone's fan shaft (rad)
   int bowKey_ = -1;   // the fiddle: the key under the bow
   double bowDir_ = 1, bowClock_ = 0, bowTarget_ = 0;
   uint32_t rng_ = 4711;

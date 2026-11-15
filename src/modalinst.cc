@@ -123,6 +123,8 @@ extern const Instrument kModals[] = {
     {"woodblock", 0, 48, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "block"},
     {"taiko", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "taiko"},
     {"reverse-cymbal", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "cymbal"},
+    // GM 12: the vibraphone (a Musser M55, F3-F6).
+    {"vibraphone", 0, 53, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "vibraphone"},
     // GM 121-128: the sound effects (src/sfx.cc).
     {"fret-noise", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "sfx"},
     {"breath-noise", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "sfx"},
@@ -137,11 +139,11 @@ extern const int kNumModals = int(sizeof kModals / sizeof kModals[0]);
 
 ModalModel::ModalModel(const Instrument& inst) : Tube(inst), set_(inst.fs) {
   static const char* names[] = {"sitar", "banjo", "shamisen", "koto", "kalimba", "fiddle", "tinkle-bell",
-                                "agogo", "steel-drums", "woodblock", "taiko", "reverse-cymbal", "fret-noise",
+                                "agogo", "steel-drums", "woodblock", "taiko", "reverse-cymbal", "vibraphone", "fret-noise",
                                 "breath-noise", "seashore", "bird-tweet", "telephone", "helicopter", "applause",
                                 "gunshot"};
   type_ = kSitar;
-  for (int i = 0; i < 20; ++i)
+  for (int i = 0; i < int(sizeof names / sizeof names[0]); ++i)
     if (std::strcmp(inst.name, names[i]) == 0) type_ = Type(i);
   build();
 }
@@ -327,8 +329,8 @@ const float kTaikoAmp[] = {1, 0.6f, 0.35f, 0.4f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f
 // -2.5, agogo -7.5, pan -1.4, woodblock -15, reverse cymbal -17.7 dB. The
 // sound effects measured over a 3 s held key (a helicopter spins up, a wave
 // takes seconds); applause and the gunshot (all peak) held down likewise.
-static const double kModalLevel[20] = {23.6, 2.3, -1.2, 32.3, 22.9, -15.2, 34.2, 12.0, 21.0, 10.4, 1.7, 18.6,
-                                       49.4, 34.9, 1.6, -1.5, 7.6, 19.3, 21.8, 11.0};
+static const double kModalLevel[21] = {23.6, 2.3, -1.2, 32.3, 22.9, -15.2, 34.2, 12.0, 21.0, 10.4, 1.7, 18.6,
+                                       -10.5, 49.4, 34.9, 1.6, -1.5, 7.6, 19.3, 21.8, 11.0};
 
 static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
 
@@ -536,6 +538,72 @@ void ModalModel::build1() {
       }
       // The box: its air at ~400 Hz (a 30 mm hole), Q ~20; the board above.
       body({400, 900, 1500}, {0.11f, 0.06f, 0.04f}, {0.5f, 0.8f, 0.8f}, {1.5f, 0.6f, 0.4f}, {0.3f, -0.3f, 0.3f});
+      gain = 1.0;
+      break;
+    }
+    case kVibraphone: {
+      // research/vibraphone.md: a Musser M55, 37 bars F3-F6 of 2024
+      // aluminium, 12.7 mm thick, 381 -> 175 mm long, arched underneath to
+      // tune the overtones; a closed tube under each, tuned to the bar.
+      // Each bar one vibrator (y only: the mallet strikes down), its modes:
+      //   0-3 bending: 1 : 4 : 10 : ~18 low; the third tuned flatter (9.6)
+      //       from D#4, only the fundamental tuned from G#5 (the arch does
+      //       less on a short bar: towards the flat bar's 2.76 : 5.40 : 8.93);
+      //   4   the first torsion (struck off the centre line): ~7 x at F3,
+      //       ~2.7 x at F6; 5 the first lateral, ~12 x .. 4.7 x (barely struck);
+      //   6   the air in the tube, 5 c under the bar (a closed quarter-wave
+      //       tube: only its fundamental is near any of the bar's modes; Q
+      //       ~89 at F3 .. ~12 at F6), coupled to bending 1 by a spring
+      //       k = 2 w kappa, the low bars near critical coupling: the tube
+      //       takes ~80 % of the fundamental's energy and radiates it (alone
+      //       25 s at F3, with the tube open ~3.5 s).
+      // The bars alone ring T60 ~ 25 s x (175 / f)^0.75.
+      for (int i = 0; i < kVibBars; ++i) {
+        const int midi = kVibLo + i;
+        const double f = hz(midi), u = i / double(kVibBars - 1);  // 0 at F3, 1 at F6
+        auto lerp = [](double a, double b, double t) { return a + (b - a) * std::clamp(t, 0.0, 1.0); };
+        auto logl = [](double a, double b, double t) { return a * std::pow(b / a, std::clamp(t, 0.0, 1.0)); };
+        double r[6];
+        r[0] = 1;
+        r[1] = midi <= 79 ? 4.0 : lerp(4.0, 3.1, (midi - 79) / 10.0);
+        r[2] = midi <= 62 ? 10.0 : midi <= 67 ? 9.6 : lerp(9.6, 6.2, (midi - 67) / 22.0);
+        r[3] = lerp(18.0, 10.0, u);
+        r[4] = logl(7.0, 2.7, u);
+        r[5] = logl(12.0, 4.7, u);
+        // Struck between the centre and the edge: bending 2 (a node at the
+        // centre) and the torsion come in part.
+        static const float exc[6] = {1.0f, 0.55f, 0.5f, 0.3f, 0.3f, 0.05f};
+        // Each bar a dipole: its low modes radiate little (the tube does
+        // that); higher, more.
+        static const float rad[6] = {0.12f, 0.45f, 0.5f, 0.4f, 0.15f, 0.08f};
+        ModalSet::Def d;
+        d.one = true;
+        d.n = 7;
+        d.modalMass = float(0.12 * std::pow(175 / f, 0.6));  // kg (a 0.5 kg bar at F3)
+        for (int k = 0; k < 6; ++k) {
+          const double fk = f * r[k];
+          d.freq[k] = float(fk);
+          d.t60[k] = float(25 * std::pow(175 / fk, 0.75));
+          d.exc[k] = exc[k];
+          d.rad[k] = rad[k];
+          d.side[k] = float(0.3 * rad[k] * (k % 2 ? 1 : -1));
+        }
+        const double fa = f * std::exp2(-5 / 1200.0), Q = 89 * std::pow(f / 175, -0.963);
+        d.freq[kVibAir] = float(fa);
+        d.t60[kVibAir] = float(6.91 / (M_PI * fa / Q));
+        d.exc[kVibAir] = 0;
+        static const double kAirRad = knob("PJ_VIBAIR", 6);  // the tube's mouth: a monopole
+        d.rad[kVibAir] = float(kAirRad);
+        d.side[kVibAir] = float(kAirRad * 0.4 * (2 * u - 1));  // low bars left, high right (the player's view)
+        for (int k = 0; k < 6; ++k) d.side[k] += float(rad[k] * 0.4 * (2 * u - 1));
+        d.nl = 1;
+        d.lin[0] = {0, kVibAir, float(7e3 * std::pow(f / 175, 1.739))};
+        S.setVib(i, d);
+        Str st;
+        st.vib = i;
+        st.f0 = f;
+        strings.push_back(st);
+      }
       gain = 1.0;
       break;
     }
@@ -869,6 +937,16 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       s_.strike(vib, mallet, speed, K, alpha);
       break;
     }
+    case ModalModel::kVibraphone: {
+      // research/vibraphone.md: a yarn mallet (~22 g; the wound head stiffens
+      // as it is pressed, alpha 2.5): K 2.6e10 a medium one (1.5 ms on the
+      // bar), the hardness knob from soft (2.3e9, 3 ms) to hard (~3e11, 0.7 ms).
+      vib = midi - ModalModel::kVibLo;
+      if (vib < 0 || vib >= ModalModel::kVibBars) return;
+      s_.damp(vib, 0);
+      s_.strike(vib, 0.022, 0.3 + 2.2 * amp, 2.6e10 * std::pow(hardness_, 3.5), 2.5);
+      break;
+    }
     case ModalModel::kSteelpan: {
       vib = midi - 60;
       if (vib < 0 || vib >= 31) return;
@@ -926,6 +1004,9 @@ void ModalPlayer::noteOff(int midi) {
     case ModalModel::kSteelpan:
       s_.damp(vib, 3);
       break;
+    case ModalModel::kVibraphone:
+      s_.damp(vib, 25);  // the damper bar (pedal up): ~0.3 s
+      break;
     default:
       break;  // the rest ring on
   }
@@ -963,6 +1044,20 @@ void ModalPlayer::render(float* out, int n) {
           s_.retune(v, base * std::exp2(cents / 1200));
         }
       }
+    }
+    // The vibraphone's fan: discs on a shaft over the tubes' mouths, open
+    // twice a turn (the tremolo at 0.7-5 Hz: K5); open, the tube couples
+    // to its bar fully, closed ~15 %. K4: the motor on and how deep (off:
+    // the discs left open).
+    if (m_.type() == ModalModel::kVibraphone) {
+      // (Tests: PJ_FAN the depth, PJ_FANHZ the tremolo's rate, in place of the knobs.)
+      static const double kFan = knob("PJ_FAN", -1), kFanHz = knob("PJ_FANHZ", -1), kFanPh = knob("PJ_FANPH", 0);
+      const double depth = kFan >= 0 ? kFan : std::clamp(vibDepth_ / 0.15, 0.0, 1.0);
+      const double rate = kFanHz > 0 ? kFanHz : 0.7 + 4.3 * std::clamp((vibRate_ - 4) / 3, 0.0, 1.0);
+      if (depth > 0) fanPh_ = std::fmod(fanPh_ + M_PI * rate * bdt, 2 * M_PI);
+      const double open = 0.15 + 0.85 * std::fabs(std::cos(fanPh_ + kFanPh));
+      const float s = float(1 - depth * (1 - open));
+      for (int v = 0; v < ModalModel::kVibBars; ++v) s_.setCoupling(v, s);
     }
     m_.process(out + i, m);
   }

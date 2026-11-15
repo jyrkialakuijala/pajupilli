@@ -10,22 +10,22 @@ LDLIBS = -lasound -lm -pthread
 SRCS = $(wildcard src/*.cc)
 HDRS = $(wildcard src/*.h)
 
-flute: $(SRCS) $(HDRS)
+pajupilli: $(SRCS) $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(SRCS) $(LDLIBS)
 
 scalar: $(SRCS) $(HDRS)
-	$(CXX) $(SCALARFLAGS) -o flute-scalar $(SRCS) $(LDLIBS)
+	$(CXX) $(SCALARFLAGS) -o pajupilli-scalar $(SRCS) $(LDLIBS)
 
 # Show that the bore loops use zmm registers.
 asm: $(SRCS) $(HDRS)
 	$(CXX) $(CXXFLAGS) -S -o - src/bore.cc | grep -c zmm
 
 clean:
-	rm -f flute flute-scalar
+	rm -f pajupilli pajupilli-scalar
 
 # Fast checks (PLAN.md step 1): vectorisation, stability, NaN recovery,
 # tuning and registers, scalar parity, real-time margin.
-test: flute scalar
+test: pajupilli scalar
 	python3 -I tools/test.py
 
 .PHONY: scalar asm clean test

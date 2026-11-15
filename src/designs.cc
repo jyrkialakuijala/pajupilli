@@ -245,7 +245,7 @@ const NoteInfo kBassoonNotes[] = {
     {"oxxxxoxooxoxoxooxoxoo", 2},  // 62 D4 (-19 c passive)
     {"oxxxooxooxoxoxooxoxoo", 2},  // 63 D#4 (-8 c passive)
 };
-const Design kBassoonDesign = {kBassoonBore, 5, kBassoonHoles, 21, kBassoonNotes, 7.47, 2625.5, false, nullptr, 0, {0.013, 0.0006, 1e+07, 1100, 0.35, 6e-05, 0, 1.3e-05, 2500, 3800, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kBassoonDesign = {kBassoonBore, 5, kBassoonHoles, 21, kBassoonNotes, 7.47, 2625.5, false, nullptr, 0, {0.013, 0.0006, 1e+07, 1100, 0.35, 6e-05, 0, 1.3e-05, 2500, 3800, 0, 1, 0, 1, 3e-4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Duduk in A, A3..C#5
 // A cylindrical bore and a large soft double reed; diatonic finger holes,

@@ -43,6 +43,7 @@ class ReedPlayer : public Performer {
   double lungHeld_ = 0;  // the breath while the note was blown (for the release)
   double graceLeft_ = 0;
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;
+  bool primePending_ = false;  // the start's ring of the air column, at the tongue's release
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   Vibrato vib_;  // its own vibrato (performer.h)
   double flutterPhase_ = 0, flutterRate_ = 27;

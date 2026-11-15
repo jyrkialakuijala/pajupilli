@@ -19,6 +19,9 @@
 #include <vector>
 
 #include "bassinst.h"
+#include "pianoinst.h"
+#include "clavinet.h"
+#include "cp80.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "player.h"
@@ -130,7 +133,7 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked()), bowed_(inst.plucked() && bowedBass(inst)) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked() && !grandPiano(inst) && !electricGrand(inst) && !clavinet(inst)), bowed_(inst.plucked() && bowedBass(inst)) {
     singing_ = std::strcmp(inst.name, "pad-choir") == 0;
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();

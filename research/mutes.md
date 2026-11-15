@@ -371,7 +371,7 @@ Order of work:
 4. Cup and plunger last.
 
 ### What to validate
-- **Impedance:** `./flute -imp` with the mute against this table and against [F10]'s curves (Appendix C there).
+- **Impedance:** `./pajupilli -imp` with the mute against this table and against [F10]'s curves (Appendix C there).
   - Parasite frequency.
   - Peak shifts < 1 kHz.
   - Peak heights above 1 kHz, which should go up for the Harmon.

@@ -456,7 +456,7 @@ def fit_end_only(spec, verbose):
 
 def main():
     args = sys.argv[1:]
-    if args and args[0] == '-grid':  # the waveguide (./flute -imp) against this TMM, per note
+    if args and args[0] == '-grid':  # the waveguide (./pajupilli -imp) against this TMM, per note
         import subprocess
         from concurrent.futures import ThreadPoolExecutor
         spec = INSTRUMENTS[args[1]]
@@ -476,7 +476,7 @@ def main():
             t = target(spec, m)
             ref = model.resonance(pat, n, t, m + spec['transpose'])
             e = dict(env, PJ_IMPHOLES=pat)
-            out = subprocess.run([os.path.join(ROOT, 'flute'), '-inst', spec['name'], '-imp', str(m + spec['transpose'])],
+            out = subprocess.run([os.path.join(ROOT, 'pajupilli'), '-inst', spec['name'], '-imp', str(m + spec['transpose'])],
                                  capture_output=True, text=True, env=e).stdout
             got = [float(v) for v in out.split(':', 1)[1].split('(')[0].split()] if ':' in out else []
             g = min(got, key=lambda v: abs(math.log(v / ref))) if got and ref else float('nan')

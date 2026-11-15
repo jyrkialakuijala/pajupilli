@@ -138,7 +138,7 @@ drive is now high-passed at 100 Hz (`PJ_XIHP`, 0 = old behaviour).
 - Default dynamics: F#5…D6 had been stuck in the pumping state at 1/10 of the level; all sound now.
 - F#5 now uses the middle-finger fingering (a standard alternate): the ring-finger F# holds its
   second register only in a sliver of breath × coverage in this model.
-- New: `./flute -slur A B -dyn d` and a `slur stability` check in `make test`.
+- New: `./pajupilli -slur A B -dyn d` and a `slur stability` check in `make test`.
 - Still failing (step 3, register selection): soft G5 (dyn ≤ 0.3) and loud F5 (dyn 0.8) jump to
   the 3rd/6th resonance; B5→C6 keeps a 4–5 cent, 35–50 % wobble. The soft G5 and F5 cases were
   quiet pumping notes before; they are now wrong-register notes, which is more audible.

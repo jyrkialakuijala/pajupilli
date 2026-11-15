@@ -24,7 +24,7 @@ from scipy.io import wavfile
 from scipy.signal import lfilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FLUTE = os.path.join(ROOT, 'flute')
+FLUTE = os.path.join(ROOT, 'pajupilli')
 
 
 def k_weight(x, fs):

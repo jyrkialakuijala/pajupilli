@@ -208,7 +208,13 @@ float Reed::sample() {
   const double wh = width * h_;
   const double A = wh > 0 ? std::sqrt(2 / kRho) / std::sqrt(1 / (wh * wh) + psi_ / (rp_.sd * rp_.sd + 1e-30)) : 0;
   // (Tests: a small flow impulse, 1e-8 m^3/s per unit: the holes stay linear.)
-  const double R = pm_ - pOld - beta * (jIn + ur + 1e-8 * testDp_);
+  double q = 1e-8 * testDp_;
+  if (primeAt_ < primeLen_) {  // the start's few cycles (Hann-shaped)
+    const double w = std::sin(M_PI * primeAt_ / primeLen_);
+    q -= primeAmp_ * w * w * std::sin(primeW_ * primeAt_);
+    ++primeAt_;
+  }
+  const double R = pm_ - pOld - beta * (jIn + ur + q);
   const double bA = beta * A;
   const double s = 0.5 * (-bA + std::sqrt(bA * bA + 4 * std::fabs(R)));
   const double D = R >= 0 ? s * s : -s * s;
