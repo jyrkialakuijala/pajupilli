@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 
 #include "levels_data.h"
+#include "velgain_data.h"
 #include "instrument.h"
 
 #include <cmath>
@@ -90,6 +92,48 @@ double levelTrim(const Instrument& inst) {
   for (const LevelTrim& t : kLevelTrims)
     if (std::strcmp(t.name, inst.name) == 0) return std::pow(10.0, t.db / 20);
   return 1;
+}
+
+// The sample players' curve (TiMidity++ with FluidR3, its median over every
+// GM program and drum: 33 log10(v / 127) dB, v^(5/3) in amplitude) less this
+// instrument's own (its physics: the hammer, the breath), both from velocity
+// 90; measured by tools/velcurve.py -emit. PJ_NOVELGAIN: none.
+namespace {
+const VelGain* velGainOf(const Instrument& inst) {
+  static const bool off = std::getenv("PJ_NOVELGAIN") != nullptr;
+  if (off) return nullptr;
+  for (const VelGain& t : kVelGains)
+    if (std::strcmp(t.name, inst.name) == 0) return &t;
+  return nullptr;
+}
+double tableDb(const VelGain& t, double v) {
+  v = std::clamp(v, double(kVelGainVels[0]), 127.0);
+  int i = 0;
+  while (i + 2 < kVelGainN && kVelGainVels[i + 1] < v) ++i;
+  const double a = (v - kVelGainVels[i]) / double(kVelGainVels[i + 1] - kVelGainVels[i]);
+  return t.db[i] + a * (t.db[i + 1] - t.db[i]);
+}
+double gmDb(double v) { return 33.3 * std::log10(v / 90); }
+}  // namespace
+
+double velocityGainDb(const Instrument& inst, int velocity) {
+  const VelGain* t = velGainOf(inst);
+  return t ? std::min(6.0, tableDb(*t, velocity)) : 0;
+}
+
+bool velocityAsGain(const Instrument& inst) {
+  return !inst.oneVoice() || std::strcmp(inst.name, "fiddle") == 0 || std::strcmp(inst.name, "contrabass") == 0;
+}
+
+// The instrument's own loudness at velocity u is the GM curve's less the
+// table's gain: the softest u whose loudness reaches the GM curve at v.
+int velocityRemap(const Instrument& inst, int velocity) {
+  const VelGain* t = velGainOf(inst);
+  if (!t) return velocity;
+  const double want = gmDb(velocity);
+  for (int u = 1; u < 127; ++u)
+    if (gmDb(u) - tableDb(*t, u) >= want) return u;
+  return 127;
 }
 
 const Instrument* findInstrument(const std::string& name) {

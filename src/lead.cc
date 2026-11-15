@@ -1839,7 +1839,12 @@ void LeadPlayer::render(float* out, int n) {
       // (the knob's reading moved by up to +-0.2 around a mezzo key).
       c.res = resonance(air_ + 0.4 * (velAmt_ - 0.5)) * P.resScale;
     }
-    c.level = amp_.v * (0.4 + 0.6 * dyn) * (0.6 + 0.4 * velAmt_);
+    // (The drum synths (GM 118, 119; the MIDI player's toms and snares): the
+    // key's speed sets the level as a struck drum's does, ~velocity^1.6, the
+    // General MIDI curve's ~30 dB from 16 to 127 (tools/velcurve.py); the
+    // other leads keep a synth's gentle velocity, +-20 %.)
+    const bool drum = std::strcmp(lead_.instrument().family, "tom") == 0 || std::strcmp(lead_.instrument().family, "drum") == 0;
+    c.level = amp_.v * (0.4 + 0.6 * dyn) * (drum ? std::pow(std::max(velAmt_, 0.01), 1.6) : 0.6 + 0.4 * velAmt_);
     {
       // Singers: the brightness knob is the vowel, u (0.3) o a (rest, 1.0) e i
       // (2.5); PJ_VOWEL (0..4) fixes it; the air knob is their breath.

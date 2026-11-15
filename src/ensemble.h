@@ -72,6 +72,10 @@ class Ensemble {
   // longest ago; a wind's the one released last if within a minor third (its
   // line keeps to its player). Live keeps its own choice.
   void setKeepTails(double secs) { keepTails_ = secs; }  // (how long a released note is taken to ring)
+  // (-play) Velocity is loudness, as a General MIDI player's: each note's
+  // voice is turned up or down on its instrument's curve (velocityGainDb), as
+  // the listener's gain (the room's air is not). Live keeps the physics alone.
+  void setVelocityGain(bool on) { velGain_ = on; }
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
   }
@@ -101,6 +105,7 @@ class Ensemble {
     double noteAt = -1e9;
     double cents = 0;        // its offset from equal temperament
     double gl = 1, gr = 1;   // its pan (no room): gains left and right
+    double vg = 1, vgTo = 1, vgTau = 0.005;  // velocity's gain: now, its goal, how fast (s)
     std::vector<float> room; // the room's pressure here, next block
   };
   void init(const std::vector<Member>& members, const RoomSpec* room);
@@ -123,6 +128,7 @@ class Ensemble {
   std::vector<Slot> f_;
   bool mixed_ = false;
   double keepTails_ = 0;
+  bool velGain_ = false;
   bool panned_ = false;  // a stereo mix by each voice's pan (no room)
   double healAt_ = 0;    // when the tuning last healed (s)
   int lo_ = 127, hi_ = 0;

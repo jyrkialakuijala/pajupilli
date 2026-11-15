@@ -207,6 +207,27 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   std::string err;
   if (!readSong(path, &song, &err)) { std::fprintf(stderr, "-play: %s\n", err.c_str()); return 1; }
   if (song.ev.empty()) { std::fprintf(stderr, "-play: no events in %s\n", path.c_str()); return 1; }
+  // A file played hot throughout (every note near 127: a sequencer's default,
+  // a keyboard with a hard curve) has no loudness to spare: its velocities
+  // are scaled together until the median is 96 (PJ_PLAY_VELMEDIAN), keeping
+  // their ratios (a constant few dB down on the GM curve, and softer strokes).
+  // A file with real dynamics (a median of 40 .. 80) is played as it is.
+  {
+    static const double kMedian = std::getenv("PJ_PLAY_VELMEDIAN") ? std::atof(std::getenv("PJ_PLAY_VELMEDIAN")) : 96;
+    std::vector<int> v;
+    for (const Event& e : song.ev)
+      if ((e.status & 0xf0) == 0x90 && e.b > 0) v.push_back(e.b);
+    if (!v.empty()) {
+      std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
+      const int med = v[v.size() / 2];
+      if (med > kMedian) {
+        const double k = kMedian / med;
+        for (Event& e : song.ev)
+          if ((e.status & 0xf0) == 0x90 && e.b > 0) e.b = uint8_t(std::clamp(int(std::lround(e.b * k)), 1, 127));
+        std::fprintf(stderr, "velocities: median %d, scaled by %.2f (%.1f dB)\n", med, k, 33.3 * std::log10(k));
+      }
+    }
+  }
   // First pass: which parts there are, and how many notes each holds at once.
   std::map<int, Part> parts;  // key: channel * 128 + program (channel 9: 9 * 128 + drum instrument index)
   std::vector<std::string> drumNames;
@@ -277,6 +298,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     const int poly = std::min(p.maxPoly, kMaxVoices);
     p.ens.reset(new Ensemble(*p.inst, *cals[p.inst], poly, verbose, room));
     p.ens->setKeepTails(kTail);
+    p.ens->setVelocityGain(true);
     if (p.inst->oneVoice())
       std::fprintf(stderr, "  %s %2d: %s (%d at once, one voice)\n", id / 128 == 9 ? "drums  " : "channel", id / 128 + 1,
                    p.inst->name, p.maxHeld);

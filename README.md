@@ -645,7 +645,18 @@ is a pool of its instrument as big as the most notes sounding at once, counting 
 after each release (`PJ_PLAY_TAIL`; at most 32 voices, `PJ_PLAY_VOICES`; a piano: one voice). A
 new note takes the voice released longest ago, so tails ring out; a wind's line keeps to its
 player (the voice released last, if its note was within a minor third);
-the sustain pedal, volume and expression are followed. A song heavier than real time pauses
+the sustain pedal, volume and expression are followed. Struck and plucked instruments (the
+modal percussion, the drum synths) take a key's velocity as the stroke's speed, ~velocity^1.6
+(^1.2 for hard bars and the taiko, ^1 for bells): about 30 dB from velocity 16 to 127, as a
+General MIDI player's curve (`tools/velcurve.py`). The others' loudness comes mostly from the
+breath (live: the dynamics knob and the pad), so a file's velocity also sets each note's level:
+the median curve of TiMidity++ with FluidR3, 33 log10(v/127) dB, less what the instrument's
+physics already gives, measured per instrument (`tools/velcurve.py -emit`,
+`src/velgain_data.h`; 0 dB at velocity 90, at most +6 dB; `PJ_NOVELGAIN` turns it off). A
+wind or a synth gets it as its voice's gain (a slur moves there in 60 ms); one voice that
+sounds every key (the CP-80, the plucks) gets the stroke that sounds that loud instead. A
+file played hot throughout (its median velocity over 96: a sequencer's default) is scaled
+down together until the median is 96 (`PJ_PLAY_VELMEDIAN`). A song heavier than real time pauses
 once, long enough to play on to the end without another stop; a file is scaled to
 its peak, a stream passes a soft knee over 0.9. Schubert's piano (8 min) renders at about
 3× real time.
@@ -658,6 +669,9 @@ its peak, a stream passes a soft knee over 0.9. Schubert's piano (8 min) renders
     ./pajupilli -imp 69              # passive resonances of a fingering (PJ_IMPHOLES: any fingering)
     ./pajupilli -slur 71 72 -dyn 0.2 # slur into a note; pitch and level wobble
     ./pajupilli -ramp 60             # register map: the breath swept x0.25 .. x3 and back
+    tools/velcurve.py drums          # velocity curves (A-weighted) of every GM drum key, against TiMidity++
+    tools/velcurve.py programs       # ... of every GM program
+    tools/velcurve.py -emit          # the -play velocity gains (src/velgain_data.h)
     tools/tmm.py -inst alto 69   # the transfer-matrix reference
     tools/fitgrid.py             # the waveguide against it, every instrument and fingering
     make test                    # ~30 s of checks

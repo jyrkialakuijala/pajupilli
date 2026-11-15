@@ -257,6 +257,15 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   // never played): it starts as a fresh instrument would, its keys and lips
   // already at this note, nothing carried over from where it stood.
   const bool silent = s.held == 0 && !s.v->player().busy() && now_ - s.lastOff > kFresh;
+  // (A one-voice instrument sounds all its keys in one voice: a gain would
+  // move the notes still ringing; its stroke is chosen instead.)
+  if (velGain_ && velocityAsGain(s.v->instrument())) {
+    s.vgTo = std::pow(10.0, velocityGainDb(s.v->instrument(), velocity) / 20);
+    s.vgTau = s.held ? 0.06 : 0.005;  // a slur moves there as the breath does; an attack at once
+    if (silent) s.vg = s.vgTo;
+  } else if (velGain_) {
+    velocity = velocityRemap(s.v->instrument(), velocity);
+  }
   ++s.held;
   s.lastNote = pitch;
   s.active = true;
@@ -828,6 +837,8 @@ void Ensemble::block(float* left, float* right, int n) {
     }
   }
   for (int i : go) playing += f_[i].v->player().busy();
+  if (velGain_)
+    for (Slot& s : f_) s.vg += (1 - std::exp(-n / 48000.0 / s.vgTau)) * (s.vgTo - s.vg);
   if (room_) {
     // To pressure at 1 m (Pa) for the room; the listener's microphones keep
     // each instrument's balance (its gain).
@@ -848,7 +859,10 @@ void Ensemble::block(float* left, float* right, int n) {
       static const float kGrand = float(std::pow(10.0, knob("PJ_PIANO_REVERB", 1.0) / 20));
       const float send = std::strcmp(f_[i].v->instrument().name, "grand-piano") == 0 ? kGrand : 1.0f;
       const float g = float(f_[i].v->instrument().gain * levelTrim(f_[i].v->instrument())) / send;
-      for (int j = 0; j < n; ++j) srcBuf_[size_t(i) * n + j] = buf_[i][j] / (g * k);
+      // (Velocity's gain is the player's: the room hears it too, early and
+      // late. It is at most +6 dB, velocityGainDb.)
+      const float gs = float(f_[i].vg) / (g * k);
+      for (int j = 0; j < n; ++j) srcBuf_[size_t(i) * n + j] = buf_[i][j] * gs;
       src[i] = &srcBuf_[size_t(i) * n];
       at[i] = f_[i].room.data();
       lg[i] = g;
@@ -870,25 +884,29 @@ void Ensemble::block(float* left, float* right, int n) {
     for (int j = 0; j < n; ++j) { left[j] *= k; right[j] *= k; }
   } else if (panned_) {
     for (int i = 0; i < nf; ++i) {
-      const float gl = float(f_[i].gl), gr = float(f_[i].gr);
+      const float gl = float(f_[i].gl * f_[i].vg), gr = float(f_[i].gr * f_[i].vg);
       for (int j = 0; j < n; ++j) {
         left[j] += gl * buf_[i][j];
         right[j] += gr * buf_[i][j];
       }
     }
   } else {
-    for (int i = 0; i < nf; ++i)
-      for (int j = 0; j < n; ++j) left[j] += buf_[i][j];
+    for (int i = 0; i < nf; ++i) {
+      const float g = float(f_[i].vg);
+      for (int j = 0; j < n; ++j) left[j] += g * buf_[i][j];
+    }
     std::copy(left, left + n, right);
   }
   // An instrument that sounds differently to its two sides (the double bass):
   // its direct sound's difference, to the left and from the right.
   for (int i : go)
-    if (const float* sd = f_[i].v->side(n))
+    if (const float* sd = f_[i].v->side(n)) {
+      const float g = float(f_[i].vg);
       for (int j = 0; j < n; ++j) {
-        left[j] += sd[j];
-        right[j] -= sd[j];
+        left[j] += g * sd[j];
+        right[j] -= g * sd[j];
       }
+    }
   // Several flutes add up; keep the sum near one flute's level (1 / sqrt(n)).
   const double target = 1 / std::sqrt(std::max(1, playing));
   // Down at once when voices join (~40 ms: no clipping), back up slowly when

@@ -329,8 +329,8 @@ const float kTaikoAmp[] = {1, 0.6f, 0.35f, 0.4f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f
 // -2.5, agogo -7.5, pan -1.4, woodblock -15, reverse cymbal -17.7 dB. The
 // sound effects measured over a 3 s held key (a helicopter spins up, a wave
 // takes seconds); applause and the gunshot (all peak) held down likewise.
-static const double kModalLevel[21] = {23.6, 2.3, -1.2, 32.3, 22.9, -15.2, 34.2, 12.0, 21.0, 10.4, 1.7, 18.6,
-                                       -10.5, 49.4, 34.9, 1.6, -1.5, 7.6, 19.3, 21.8, 11.0};
+static const double kModalLevel[21] = {20.4, 9.5, 3.3, 33.8, 24.4, -15.8, 37.2, 20.6, 23.7, 28.8, 1.7, 35.7,
+                                       -11.1, 49.4, 34.9, -16.0, 1.4, 8.5, 28.8, 21.8, 22.7};
 
 static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
 
@@ -762,7 +762,17 @@ void ModalPlayer::noteOn(int midi, int velocity) {
   held_[midi] = true;
   const double v = std::clamp(velocity / 127.0, 0.02, 1.0);
   const double dyn = std::clamp(0.4 + 0.6 * dyn_ + breathCtl_, 0.2, 1.6);
-  const double amp = std::min(1.0, v * v * dyn);  // (a struck or plucked thing: the hardest key is the hardest hit)
+  // A struck or plucked thing: the hardest key the hardest hit, the stroke's
+  // speed (or the pluck's force) ~ velocity^1.6 from nothing. The A-weighted
+  // level then spans ~30 dB from velocity 16 to 127, as a General MIDI player
+  // does (tools/velcurve.py: the faster stroke's shorter contact is also
+  // brighter, so ^2 gave 36-48 dB; with a floor, as before, a pianissimo key
+  // was still struck at a fifth of full speed: 4-16 dB).
+  // (Struck hard bars, bells and the taiko's head: a softer stroke stays on
+  // them longer, its strike darker, A-weighted the quieter: 47-55 dB at ^1.6;
+  // their stroke's speed ~ velocity^1.2, the bells' ~ velocity.)
+  const bool stiff = t == ModalModel::kVibraphone || t == ModalModel::kTinkle || t == ModalModel::kTaiko;
+  const double amp = std::min(1.0, std::pow(v, t == ModalModel::kTinkle ? 1.0 : stiff ? 1.2 : 1.6) * dyn);
   if (m_.sfx) {
     // (A hard key while the hall applauds: someone shouts "bravo"; the
     // applause goes on.)
@@ -825,12 +835,12 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       // share of the shorter string, made with it).
       m_.stopString(si, hz(midi));
       {
-        const double F = (t == ModalModel::kSitar ? 6 : t == ModalModel::kShamisen ? 5 : 3) * (0.25 + amp);
+        const double F = (t == ModalModel::kSitar ? 6 : t == ModalModel::kShamisen ? 5 : 3) * 1.25 * amp;
         const double rise = t == ModalModel::kBanjo ? 0.002 : 0.0015, slip = 0.0002;
         s_.pluck(vib, F, rise, 0.001, slip, 0.5 + 0.3 * urand());
         // The shamisen's bachi meets the skin a moment after the string (its
         // snap: ~20-50 % of the attack).
-        if (t == ModalModel::kShamisen) s_.knock(-(1 + 5 * amp), 0.0008, 0.001);
+        if (t == ModalModel::kShamisen) s_.knock(-6 * amp, 0.0008, 0.001);
         if (t == ModalModel::kSitar && velocity > 90) {  // the chikari, struck after a loud stroke
           for (int c = 3; c < 5; ++c) s_.pluck(m_.strings[c].vib, 1.5 * amp, 0.0015, 0.001, 0.0002, 0.7);
         }
@@ -863,7 +873,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       } else {
         s_.retune(vib, ratio);
       }
-      s_.pluck(vib, 5 * (0.25 + amp), 0.002, 0.001, 0.0003, 0.6);
+      s_.pluck(vib, 6.25 * amp, 0.002, 0.001, 0.0003, 0.6);
       break;
     }
     case ModalModel::kKalimba: {
@@ -878,7 +888,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       static const float part[3] = {0.25f, 0.13f, 0.08f};
       supportCoupling(d, part);
       s_.setVib(vib, d);
-      s_.pluck(vib, 2.5 * (0.25 + amp), 0.02, 0.002, 0.00015, 1.4);  // a slow press, the nail's quick release
+      s_.pluck(vib, 3.125 * amp, 0.02, 0.002, 0.00015, 1.4);  // a slow press, the nail's quick release
       break;
     }
     case ModalModel::kTinkle:
@@ -892,7 +902,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       // stopped dead, the sound would click.)
       if (s_.energy(vib) < 1e-6) s_.silence(vib);
       ModalSet::Def d;
-      double mallet = 0.02, K = 1e8, alpha = 1.5, speed = 0.5 + 2.5 * amp, mass = 0.01;
+      double mallet = 0.02, K = 1e8, alpha = 1.5, speed = 3.0 * amp, mass = 0.01;
       if (t == ModalModel::kTinkle && midi < 72) {
         // A church bell (below C5), struck by a soft felt hammer (felt
         // stiffens as it is pressed, F ~ c^2.5; a few ms on the bell: the
@@ -931,7 +941,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
         struckDef(d, {9, kTaikoRatio, kTaikoT60, kTaikoAmp, 0.0f, 100, 0.002f}, hz(midi), mass, rng_);
         d.glide = 0.12f;
         d.glideRef = 3e-3f;
-        mallet = 0.17; K = 3e6; speed = 1.5 + 6 * amp;
+        mallet = 0.17; K = 3e6; speed = 7.5 * amp;
       }
       s_.setVib(vib, d);
       s_.strike(vib, mallet, speed, K, alpha);
@@ -944,7 +954,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       vib = midi - ModalModel::kVibLo;
       if (vib < 0 || vib >= ModalModel::kVibBars) return;
       s_.damp(vib, 0);
-      s_.strike(vib, 0.022, 0.3 + 2.2 * amp, 2.6e10 * std::pow(hardness_, 3.5), 2.5);
+      s_.strike(vib, 0.022, 2.5 * amp, 2.6e10 * std::pow(hardness_, 3.5), 2.5);
       break;
     }
     case ModalModel::kSteelpan: {
@@ -952,7 +962,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       if (vib < 0 || vib >= 31) return;
       s_.damp(vib, 0);
       // A rubber-tipped stick (~30 g, Hertz ~5e6: 1-2 ms on the note).
-      s_.strike(vib, 0.03, 0.4 + 2.2 * amp, 5e6, 1.5);
+      s_.strike(vib, 0.03, 2.6 * amp, 5e6, 1.5);
       break;
     }
     case ModalModel::kRevCymbal: {

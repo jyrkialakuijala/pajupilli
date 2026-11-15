@@ -193,6 +193,15 @@ struct Instrument {
 // By name; nullptr if unknown.
 const Instrument* findInstrument(const std::string& name);
 double levelTrim(const Instrument& inst);  // the factor that brings it to the common loudness
+// (-play) A MIDI file's velocity as loudness: the gain (dB, 0 at velocity 90,
+// where the levels are trimmed) that puts this instrument's own response to
+// velocity on General MIDI's curve (tools/velcurve.py).
+double velocityGainDb(const Instrument& inst, int velocity);
+// Whether that is a gain on the voice (a voice a note: winds, synths; a
+// one-line bowed string) or, for one voice sounding every key (a piano's,
+// a pluck's), a velocity remapped to the stroke that sounds that loud.
+bool velocityAsGain(const Instrument& inst);
+int velocityRemap(const Instrument& inst, int velocity);
 const Instrument& concertFlute();
 // All names, comma-separated (for messages).
 std::string instrumentNames();
