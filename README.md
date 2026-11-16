@@ -371,6 +371,10 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
   the bass side (left), one to the treble side (right), hears each part of the board after
   its own distance and by its angle: each partial sits where the board moves with it.
 - **Knobs:** brightness (K2) and hardness voice the hammers' felt, softer or harder.
+- **The top two and a half octaves** (from F#5, fully from C6): the second partial dies away ~35 %
+  faster (1.31-1.47x measured at C6-G7), so the tone settles onto the fundamental. Its own loss is
+  x1.6 (`PJ_PIANO_TOPH2`), the board's share unchanged. `PJ_PIANO_TOPHI` does the same for the
+  partials above it (1: off).
 - **Cost:** about 9 % of a core for a single note, 32 % with the pedal down.
 
 ### Upright piano
@@ -627,34 +631,47 @@ classical guitar with nylon strings. E2–B5; notes outside are moved in by octa
   or harmonics. The ring was lengthened by ear (`PJ_GUITAR_RING`; `PJ_GUITAR_RING23` for the first
   and second overtones, `PJ_GUITAR_RING45` for the third and fourth, lengthened less). 0.9 % of a core.
 
-### Church organ (first rank)
+### Church organ (first ranks)
 
-`-inst gedackt-8`: the church organ's first rank (`src/organ.cc`, `src/organpipe.h`,
-`research/church_organ.md`), a Gedackt 8', stopped wooden pipes, C2-C7 (8' C at 65.4 Hz). Each key
-its own pipe: an air jet crossing the mouth (its travel a quarter period, deflected by the mouth's
-flow, a tanh of the deflection entering the pipe, its turbulence) driving the stopped column's odd
-modes (1, 3, 5 ... x the pitch, the upper ones a little flat; their Q from ~20 in the bass to ~35),
-whose flow deflects the jet in turn: a self-sustained loop, in float32 at 48 kHz. Each pipe is
-voiced for its pitch and calibrated when the rank is built (~0.1 s) so it speaks in tune (all 61
-within 2 cents). The pallet opens over 5 ms and the foot's wind follows; 8' C speaks in ~130 ms, middle
-C in ~75, the top in ~20; the tone a stopped pipe's (the twelfth ~-18 dB, the octave ~-55). Below C5 the
-pipes get more wind (their jets' drive ~ (523 Hz / f)^0.95, `PJ_GEDACKT_AIR`: a voicer's wider bass
-mouths; the mouth radiates its flow's rate of change, ~6 dB an octave weaker for the same flow), so the
-bass is as full as C5 (8' C was 20 dB under it) and richer (the twelfth ~-13 dB at 8' C, 20 harmonics
-within 40 dB of the fundamental). Voiced against a recorded Bourdon 8' (GrandOrgue's demo sample set,
-GPL-2+/CC-BY-SA, measured in the scratchpad only): the jet's own flow radiates at the mouth low-passed at 2x
-the pitch (4 poles: its asymmetry gives the even harmonics, ~-35..-60 dB; unfiltered, its square-ish edge
-made a buzz of upper harmonics at -30 dB), so the 5th harmonic is ~-35, the 7th ~-50, the 9th ~-60; above
-C5 the mouths are narrower (`PJ_GEDACKT_TREBLE`), the treble no louder than C5 (it had grown 6 dB an
-octave: shrill); a steady breath (~-80 dB between the harmonics) and each note's puff (the wind rushing
-through the opening pallet, the jet turbulent until the tone locks: ~25 dB over the breath, fading over
-~200 ms in the bass, ~40 ms at the top; `PJ_GEDACKT_PUFF`). The noises come from `src/rng.h`
-(xoshiro256**, seeded through splitmix64: each pipe its own stream, the jet's and the radiated noise two
-independent halves of one output). The C and
-C# sides of the chest alternate left and right, the big pipes outside. No velocity (a pallet opens
-the same however the key is struck), no sustain pedal. Steady wind for now; the blower, the
-reservoirs and the wind's sag, the other ranks, the couplers, each pipe's place in the church and the
-church's acoustics follow the research's plan. ~3 % of a core in random playing.
+The church organ's first two ranks (`src/organ.cc`, `src/organpipe.h`, `src/organbox.h`,
+`research/church_organ.md`), C2-C7, each key its own pipe: an air jet crossing the mouth (its travel a
+quarter period, deflected by the flow there and by the field around the mouth, a tanh of the
+deflection entering the pipe, its turbulence) driving the column's modes, whose flow deflects the jet
+in turn: a self-sustained loop, float32 at 48 kHz.
+
+- `-inst gedackt-8`: the Schwellwerk's Gedackt 8', stopped wood (odd modes: the twelfth ~-18 dB, the
+  octave ~-55), voiced against a recorded Bourdon 8' (GrandOrgue's demo sample set, measured in the
+  scratchpad only). More wind below C5 (`PJ_GEDACKT_AIR`: a wider bass mouth; the mouth radiates its
+  flow's rate of change, ~6 dB an octave weaker for the same flow), narrower mouths above
+  (`PJ_GEDACKT_TREBLE`): an even level. The jet's own flow radiates low-passed (4 poles at 2x the
+  pitch: its asymmetry gives the even harmonics without a buzz). A breath (a hiss around 1-5 kHz) and
+  each note's puff (the wind rushing through the opening pallet, the jet turbulent until the tone
+  locks: ~25 dB over the breath, ~200 ms in the bass, ~40 at the top; `PJ_GEDACKT_PUFF`).
+- `-inst rohrgedackt-8`: the Positiv's Rohrgedackt 8', a metal chimney flute: the chimney half-opens
+  the stopper (even modes: the octave ~-50 dB in the bass .. -30 at the top) and lifts the 4th-6th
+  (the 5th ~-20 dB): brighter, "liquid".
+- `-inst gedackt-rohrgedackt`: both drawn, the manuals coupled: every key sounds both, from the boxes
+  and from the rail; the swell box's air ~0.6 C warmer than the church's (`PJ_SWELL_WARM`), so its
+  Gedackt stands ~2 c sharp and the two flutes beat slowly.
+
+**The divided chest, the enclosures:** every division stands on a divided chest, the C side (C, D,
+E, F#, G#, A#) on the left, the C# side on the right, the biggest pipes at the outer ends: chords
+spread across the gallery (an even interval stays on one side, an odd one crosses: every triad spans
+both). The Gedackt stands in **two swell boxes** high on the gallery (~2.6 x 2.4 x 1.6 m, ~5 m apart;
+its bass octave offset along each box's back wall); the Rohrgedackt in the **Rückpositiv**'s open
+case at the gallery rail (its halves C left, C# right; nearer: ~6 ms ahead of the boxes). Each
+enclosure is a small room (four delay lines: the round trips across it, an oblique one; Jot damping):
+each pipe's mouth drives its modes as their shapes are at the mouth, hears the field there (by
+reciprocity, ~ 1 / its pitch: the jet moved by the acoustic velocity) and its chest neighbours (a whole
+tone and two away), and is calibrated in tune where it stands (all within the designed +-0.5 c and
+the box's warmth). Out through the opening: each pipe's direct sound (delayed by its distance to the
+front) and the box's field. **The swell pedal** (the dynamics, `-dyn`, the knob; the breath
+controller) opens both boxes' shutters: 0.5 (the default) ~3/4 open, 2/3 and up fully; closed, ~14 dB
+quieter and dark (600 Hz .. 16 kHz), the box ringing longer (0.6 s against 0.3), its walls leaking
+the bass. No velocity (a pallet opens the same however the key is struck), no sustain pedal. Steady
+wind for now; the blower and the wind's sag, the other ranks, the church's acoustics follow the
+research's plan. ~8 % of a core for both ranks in random playing. The noises come from `src/rng.h`
+(xoshiro256**, seeded through splitmix64).
 
 ### Accordion and bandoneón (free reeds)
 
@@ -690,6 +707,89 @@ reeds run at 96 kHz (their puffs are sharp), then a half-band filter takes them 
   four-note musette chord (14 reeds).
 
     ./pajupilli -inst accordion -seq "on 48 80 on 64 80 on 67 80 wait 1.5 off 48 off 64 off 67 on 43 80 on 62 80 on 65 80 on 71 80 wait 1.5 off 43 off 62 off 65 off 71"
+
+### Chromatic harmonica
+
+`-inst harmonica` (GM 23; `src/harmonica.cc`, `research/harmonica.md`): a 16-hole C chromatic,
+C3-D7 (MIDI 48-98, the top hole's slide draw D7). It has solo tuning, 64 free reeds (the
+accordion's engine, `src/freereed.h`) in 0.35 cm³ chambers on 1.05 mm plates, and A = 440. Notes
+outside the range are moved by octaves. Each reed is tuned in place when the instrument is built
+(~0.15 s).
+
+- **One player, one breath:**
+  - The lungs' signed pressure feeds the vocal tract, a Helmholtz mode set by the throat's
+    inertance and the mouth's 40 cm³.
+  - The mouth feeds every hole the tongue leaves open, in parallel (tongue blocking).
+  - The chambers sound into the cupped hands, a second Helmholtz cavity of 75 cm³ whose opening
+    radiates.
+  - So a chord takes more air and each of its reeds a little less pressure, and a bend moves every
+    note of a chord.
+- **Blow or draw, never both:** only the reeds of the breath's direction are ever driven, whatever
+  the MIDI file asks (`PJ_HARP_CHECK=1` counts violations). Notes are placed as follows:
+  - **A single line:** each note goes where it keeps the breath, then the slide, then the mouth's
+    place. C and F exist both ways, and the lungs' fill nudges the choice: drawing when they run
+    empty, blowing when full.
+  - **A chord:** it takes the breath whose notes have the higher average velocity, plus a bonus of
+    6 per note (a near-tie goes to the side with more notes) and the lungs' leaning. The slide
+    position is the one most of those notes want, and the holes must fit four under the lips. The
+    other notes do not sound.
+- **Transitions:**
+  - A breath turned round dies away, pauses and comes back: a ~65 ms gap in a slow line, a few ms
+    in a quick one.
+  - A hole change in one breath leaves no gap.
+  - **The slide** travels (~20 ms in, ~20 out on its spring), and both rows are partly open in the
+    middle: the old note fades as the new one comes in, ~3 dB down on the way in.
+  - **Attacks:** a breath attack from silence takes 20-70 ms; a firm key or a quick line is tongued
+    (the pressure built behind the tongue). Many slower notes are scooped into from 0.5-1.8
+    semitones below; quick notes are not.
+- **Pitch bend:** down, the player tunes the tract just above the bent pitch and listens, moving it
+  until the lead note sits there (to -2 semitones, as the files ask, though a real valved reed
+  manages about one). Up, a softer breath: +3 c.
+- **The hands:**
+  - cupped while playing (a 12 mm opening, a resonance near 1.1 kHz, as in the recordings);
+  - opened after a phrase or a rest, and on some long notes, brighter and projected (+3.5 dB
+    forward);
+  - closed again at the next note.
+  - The opening and the habit of fluttering them on long notes depend on how much the other parts
+    of a MIDI file play in C3-D7 at the time: more drama over a sparse accompaniment.
+  - **CC1:** the hand tremolo (6.5 Hz, wandering ~12 %), ~6.6 dB in level and ~200 Hz in centroid,
+    as in the recording.
+  - `PJ_HARP_HANDS=0` turns the automatic hand moves off.
+- 2 % of a core for a four-note chord.
+
+    ./pajupilli -inst harmonica -seq "on 67 70 wait 0.4 on 69 80 off 67 wait 0.4 on 71 85 off 69 wait 0.4 on 72 90 off 71 wait 1.2 off 72 wait 0.6"
+
+### Reed organ (pressure harmonium)
+
+`-inst reed-organ` (GM 21; `src/harmonium.cc`, `research/reed_organ.md`): a Kunstharmonium of the
+Mustel / Schiedmayer kind, C2-C7, A = 440. The reeds are blown by the wind, not sucked.
+
+- **The wind:** the feet tread two feeders in turn, each stroke's changeover a few % dip.
+  - With Expression (the default) the reservoir is shut off, so the feet's pressure is the reeds'
+    pressure and the dynamics. It runs from ~300 Pa at velocity 0 to ~2.2 kPa at 127, and channel
+    pressure or CC2 adds to it. A harder chord gets a quicker push (15-60 ms).
+  - A heavy chord takes more air than the feeders give, and the pressure sags a little.
+  - `PJ_HARM_EXPR=0` gives the reservoir's steady ~800 Pa: the organ-like, even tone.
+- **The reeds:** brass tongues (`src/freereed.h`, `sampleDown`). Each sits over its cell *downstream*:
+  the chest's wind passes through the reed into the cell, and out through the key's pallet. The
+  pallet's felt damps the cell's resonance (Q ~2, ~6 at the top).
+  - They are voiced close and stiff, so the pitch moves only a few cents from soft to loud.
+  - The bass and top tongues are softer, so every key speaks at the softest wind.
+  - Each is tuned in its cell when the instrument is built (~0.9 s).
+- **Stops** (`PJ_HARM_REG`), both halves of the keyboard (split at E4/F4):
+  - `default`: 1 Cor anglais / Flûte 8' (front, broad, dark) with 4 Basson / Hautbois 8' (back,
+    narrow, under the closed forte lids), and the Percussion on;
+  - `flute`: 1 alone;
+  - `celeste`: 1 with the treble's Voix céleste, 1.5 beats a second at A4;
+  - `grandjeu`: 1, 2 Bourdon / Clarinette 16', 3 Clairon / Fifre 4', and 4.
+- **Percussion** (`PJ_HARM_PERC=0` turns it off): a hammer starts the row-1 tongues at ~20 % of
+  their swing, harder for a harder key. C3 speaks in ~75 ms instead of ~125.
+- **Sound:** the front rows go through the case's cloth (two poles at 2.5 kHz). The back rows go
+  under the lids (two poles at 1.4 kHz, -6 dB). The bass is a little left and the treble right.
+- **The sustain pedal** holds the keys down. There is no pitch bend (fixed reeds).
+- 5.7 % of a core for Grand Jeu with an eight-note chord (32 reeds).
+
+    ./pajupilli -inst reed-organ -seq "on 48 70 on 64 70 on 67 70 on 72 70 wait 2 off 48 off 64 off 67 off 72 wait 0.5"
 
 ### Harpsichord
 
@@ -1055,7 +1155,7 @@ GM2's 86/87 (XG's 13/14) and 84.
 
 Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
 on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
-CP-80, organs to the calliope (the reed organ and the harmonica to the square lead), guitars to the koto and banjo, cello to the contrabass, string
+CP-80, organs to the calliope, guitars to the koto and banjo, cello to the contrabass, string
 sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
 built (bass drum: the jazz kick; snare and side stick: the brushed snare; hi-hats: the hi-hat; toms, bongos, congas: melodic tom; cowbell,
 agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel

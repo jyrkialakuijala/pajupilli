@@ -5,10 +5,14 @@
 #include <cstring>
 
 #include "knob.h"
+#include "rng.h"
 
 namespace pajupilli {
 
-bool organRank(const Instrument& inst) { return std::strcmp(inst.name, "gedackt-8") == 0; }
+bool organRank(const Instrument& inst) {
+  return std::strcmp(inst.name, "gedackt-8") == 0 || std::strcmp(inst.name, "rohrgedackt-8") == 0 ||
+         std::strcmp(inst.name, "gedackt-rohrgedackt") == 0;
+}
 
 namespace {
 
@@ -61,29 +65,28 @@ PipeVoicing gedackt(double hz) {
   return v;
 }
 
-// The pipe's speaking pitch after a short run (its steady part): the zero
-// crossings' rate of its sound low-passed to the fundamental (two one-poles
-// at 1.5 x its pitch: a low pipe's waveform, with its noise, can wander
-// across zero twice a period; the fundamental alone crosses once).
-double speakingHz(FluePipe p, double fs) {
+// The pipe's speaking pitch after a short run (its steady part), sounding
+// alone in its place: its enclosure's field acting on its jet as it will
+// when played (a tuner tunes a pipe where it stands). The zero crossings'
+// rate of its sound low-passed to the fundamental (two one-poles at 1.5 x its
+// pitch: a low pipe's waveform, with its noise, can wander across zero twice
+// a period; the fundamental alone crosses once).
+double speakingHz(FluePipe p, Enclosure e, int src, float hear, double fs) {
   p.reset();
+  e.reset();
   p.open();
   const int warm = int(0.5 * fs), len = int(0.4 * fs);
   const float a = float(1 - std::exp(-2 * M_PI * 1.5 * p.hz() * p.ratio() / fs));
-  float l1 = 0, l2 = 0;
-  for (int n = 0; n < warm; ++n) {
-    const float y = p.sample(1.0f);
-    l1 += a * (y - l1);
-    l2 += a * (l1 - l2);
-  }
-  float prev = l2;
+  float l1 = 0, l2 = 0, prev = 0;
   double first = -1, last = 0;
   int count = 0;
-  for (int n = 1; n < len; ++n) {
-    const float y = p.sample(1.0f);
+  for (int n = 0; n < warm + len; ++n) {
+    const float y = p.sample(1.0f, hear * e.heard(src));
+    e.add(src, y);
+    e.step(0);
     l1 += a * (y - l1);
     l2 += a * (l1 - l2);
-    if (prev < 0 && l2 >= 0) {
+    if (n > warm && prev < 0 && l2 >= 0) {
       const double t = n - 1 + prev / (prev - l2);
       if (first < 0) first = t;
       last = t;
@@ -94,62 +97,184 @@ double speakingHz(FluePipe p, double fs) {
   return count > 2 ? (count - 1) * fs / (last - first) : 0;
 }
 
+// Rohrgedackt 8': the Positiv's chimney flute, metal, a smaller scale than
+// the Gedackt: the chimney half-opens it (the even harmonics ~-50 dB in the
+// bass .. -30 at the top) and lifts the 4th-6th (the "liquid" tone),
+// brighter, a little less breath.
+PipeVoicing rohrgedackt(double hz) {
+  PipeVoicing v = gedackt(hz);
+  v.evenLevel = knob("PJ_ROHR_EVEN", 2.5);
+  v.chimneyK = knob("PJ_ROHR_CHIMNEYK", 5.0);
+  v.chimneyBoost = knob("PJ_ROHR_BOOST", 2.5);
+  v.chimneyWidth = 1.3;
+  v.rollK = knob("PJ_ROHR_ROLL", 5.0);
+  v.breath *= 0.7;
+  v.puff *= 0.8;
+  return v;
+}
+
 }  // namespace
+
+// The divisions' enclosures: 0, 1 the swell boxes (C side left, C# right),
+// 2, 3 the Rückpositiv case's halves (C left, C# right).
+enum { kSwellC = 0, kSwellCis = 1, kPosC = 2, kPosCis = 3 };
+
+// How strongly a pipe's jet hears the field at its mouth (its enclosure's,
+// its neighbours').
+const float kHear = float(knob("PJ_ORGAN_COUPLE", 1.0));
 
 OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
   const double fs = inst.fs;
+  enc_.resize(4);
+  Enclosure::Params sw;
+  sw.dims = {knob("PJ_SWELL_W", 2.6), 2.4, 1.6};
+  sw.t60Low = knob("PJ_SWELL_T60", 0.6);
+  sw.t60High = 0.12;
+  sw.openT60 = 0.3;
+  sw.field = knob("PJ_SWELL_FIELD", 0.5);
+  sw.outDelay = 0.006;  // (behind and above the Positiv: ~2 m farther)
+  const double spread = knob("PJ_SWELL_PAN", 0.7);
+  sw.pan = -spread;
+  enc_[kSwellC].setup(fs, sw);
+  sw.pan = spread;
+  enc_[kSwellCis].setup(fs, sw);
+  Enclosure::Params pos;
+  pos.dims = {1.1, 1.4, 0.7};
+  pos.t60Low = 0.15;
+  pos.t60High = 0.05;
+  pos.shutters = false;
+  pos.leak = 0;
+  pos.field = 0.3;
+  pos.pan = -0.3;
+  enc_[kPosC].setup(fs, pos);
+  pos.pan = 0.3;
+  enc_[kPosCis].setup(fs, pos);
+  const bool sw8 = std::strcmp(inst.name, "rohrgedackt-8") != 0;
+  const bool pos8 = std::strcmp(inst.name, "gedackt-8") != 0;
+  if (sw8) addRank(0);
+  if (pos8) addRank(1);
+  setSwell(0.75);
+}
+
+// One rank: its pipes voiced, tuned (each a little off, as a tuner leaves
+// them: +-0.5 c; the swell box's air a little warmer than the church's, its
+// pipes sharper), calibrated, placed on its division's divided chest.
+void OrganModel::addRank(int rank) {
+  const double fs = fs_;
+  Rng rng(0x5EED0000u + rank);
+  const double warm = rank == 0 ? knob("PJ_SWELL_WARM", 0.6) : 0.0;  // degrees C over the church
+  const double warmCents = 1200 * std::log2(std::sqrt((293.15 + warm) / 293.15));
+  const int first = int(pipes_.size());
   for (int m = kLo; m <= kHi; ++m) {
-    const double hz = 440 * std::exp2((m - 69) / 12.0);
-    FluePipe p;
-    p.setup(fs, hz, gedackt(hz), unsigned(m * 7919));
-    // Voiced in tune: the jet pulls the pitch a little; turn the modes back
-    // (twice: the second pass measures the corrected pipe).
-    for (int it = 0; it < 2; ++it) {
-      const double got = speakingHz(p, fs);
-      if (got > 0) p.tune(p.ratio() * hz / got);
+    const double cents = warmCents + 0.5 * rng.uniform();
+    const double hz = 440 * std::exp2((m - 69) / 12.0 + cents / 1200);
+    Pipe pp;
+    pp.p.setup(fs, hz, rank == 0 ? gedackt(hz) : rohrgedackt(hz), unsigned(m * 7919 + rank * 104729));
+    // Its place: the C side (C, D, E, F#, G#, A#) in the left enclosure, the
+    // C# side in the right; the biggest at the outer ends.
+    const int i = m - kLo, side = i % 2, j = i / 2;  // j: 0 the biggest of its side
+    const double outer = side == 0 ? -1 : 1;
+    Vec3 at;
+    if (rank == 0) {
+      const double w = 2.6, h = 2.4, d = 1.6;
+      if (m < 48) {  // the offset bass octave: along the back wall, lower
+        at = {outer * (w / 2 - 0.25 - j * 0.33), -h / 2 + 0.3, -d / 2 + 0.2};
+      } else {
+        const int jj = j - 6;
+        at = {outer * (w / 2 - 0.3 - jj * (w - 0.6) / 24), -h / 2 + 0.55, 0.1};
+      }
+      pp.enc = side == 0 ? kSwellC : kSwellCis;
+    } else {
+      at = {outer * (0.45 - j * 0.9 / 30), -0.35, 0.0};
+      pp.enc = side == 0 ? kPosC : kPosCis;
     }
-    p.reset();
-    pipes_.push_back(p);
-    // C side (C, D, E, F#, G#, A#) left, C# side right; the biggest at the
-    // ends, the smallest in the middle of each side.
-    const int i = m - kLo;
-    const double out = 1 - i / double(kHi - kLo);
-    pan_.push_back(float((i % 2 == 0 ? -1 : 1) * (0.25 + 0.65 * out)));
+    pp.src = enc_[pp.enc].addSource(at);
+    // The field moves its jet by the acoustic velocity across the mouth, ~ the
+    // pressure / its frequency: the treble's jets hear the box less.
+    pp.hear = float(kHear * std::pow(262 / hz, knob("PJ_ORGAN_HEAREXP", 1.0)));
+    // Voiced in tune where it stands: the jet and its box pull the pitch a
+    // little; turn the modes back (twice: the second pass measures the
+    // corrected pipe).
+    for (int it = 0; it < 2; ++it) {
+      const double got = speakingHz(pp.p, enc_[pp.enc], pp.src, pp.hear, fs);
+      if (got > 0) pp.p.tune(pp.p.ratio() * hz / got);
+    }
+    pp.p.reset();
+    pipes_.push_back(pp);
+    byKey_[m].push_back(int(pipes_.size()) - 1);
+  }
+  // The near field: each pipe hears its chest neighbours (a whole tone and
+  // two away, on its side) directly, ~1 / distance (a few cm to ~0.3 m).
+  static const double kNear = knob("PJ_ORGAN_NEAR", 1.0);
+  const int n = int(pipes_.size()) - first;
+  for (int a = 0; a < n; ++a) {
+    int c = 0;
+    for (int dj : {-4, -2, 2, 4}) {
+      const int b = a + dj;
+      if (b < 0 || b >= n) continue;
+      const double dist = 0.08 * std::abs(dj) / 2 + 0.03;
+      pipes_[first + a].near[c] = first + b;
+      pipes_[first + a].nearG[c] = float(kNear * 0.03 / dist);
+      ++c;
+    }
   }
 }
 
 void OrganModel::open(int midi) {
-  if (midi < kLo || midi > kHi) return;
-  pipes_[midi - kLo].open();
+  if (midi < 0 || midi > 127) return;
+  for (int i : byKey_[midi]) pipes_[i].p.open();
 }
 
 void OrganModel::close(int midi) {
-  if (midi < kLo || midi > kHi) return;
-  pipes_[midi - kLo].close();
+  if (midi < 0 || midi > 127) return;
+  for (int i : byKey_[midi]) pipes_[i].p.close();
+}
+
+void OrganModel::setSwell(double s) {
+  for (int e : {kSwellC, kSwellCis}) enc_[e].setOpening(s);
 }
 
 bool OrganModel::asleep() const {
-  for (const FluePipe& p : pipes_)
-    if (p.awake()) return false;
+  for (const Pipe& p : pipes_)
+    if (p.p.awake()) return false;
+  for (const Enclosure& e : enc_)
+    if (!e.quiet()) return false;
   return true;
 }
 
 void OrganModel::resetAir() {
   Tube::resetAir();
-  for (FluePipe& p : pipes_) p.reset();
+  for (Pipe& p : pipes_) {
+    p.p.reset();
+    p.y = 0;
+  }
+  for (Enclosure& e : enc_) e.reset();
 }
 
 float OrganModel::sample() {
   static const float g = float(knob("PJ_ORGAN_OUT", 0.05));
-  float y = 0, s = 0;
-  for (size_t i = 0; i < pipes_.size(); ++i) {
-    if (!pipes_[i].awake()) continue;
-    const float v = pipes_[i].sample(1.0f);
-    y += v;
-    s += pan_[i] * v;
+  if (roomPos_ < roomN_) pRoom_ = room_[roomPos_++];
+  // Every sounding pipe: the field at its mouth (its enclosure's, its
+  // neighbours' last samples), its sample, into its enclosure.
+  for (Pipe& pp : pipes_) {
+    if (!pp.p.awake()) {
+      pp.y = 0;
+      continue;
+    }
+    float heard = enc_[pp.enc].heard(pp.src);
+    for (int c = 0; c < 4 && pp.near[c] >= 0; ++c) heard += pp.nearG[c] * pipes_[pp.near[c]].y;
+    pp.y = pp.p.sample(1.0f, pp.hear * heard);
+    enc_[pp.enc].add(pp.src, pp.y);
   }
-  last_ = g * y;
-  side_.push_back(g * float(outScale()) * 0.5f * s);
+  float l = 0, r = 0;
+  for (Enclosure& e : enc_) {
+    const float y = e.step(pRoom_ / float(outScale()));
+    l += y * float(1 - e.pan());
+    r += y * float(1 + e.pan());
+  }
+  const float mid = 0.5f * (l + r), sd = 0.5f * (l - r);
+  last_ = g * mid;
+  side_.push_back(g * float(outScale()) * sd);
   return finish(last_);
 }
 
@@ -167,18 +292,17 @@ void OrganPlayer::noteOn(int midi, int velocity) {
   articulate(midi, velocity, false);
   note_ = midi;
   blowing_ = true;
-  down_[midi & 127] = true;
   m_.open(midi);
 }
 
-void OrganPlayer::noteOff(int midi) {
-  down_[midi & 127] = false;
-  m_.close(midi);
-}
+void OrganPlayer::noteOff(int midi) { m_.close(midi); }
 
 void OrganPlayer::setHold(bool) {}  // (an organ has no sustain pedal)
 
 void OrganPlayer::render(float* out, int n) {
+  // The swell pedal: the dynamics (a knob) and the breath (a controller) open
+  // the boxes' shutters (0.5, the default, ~3/4 open; 2/3 and up fully).
+  m_.setSwell(std::clamp(1.5 * (dyn_ + breathCtl_), 0.03, 1.0));
   constexpr int kBlock = 16;
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);

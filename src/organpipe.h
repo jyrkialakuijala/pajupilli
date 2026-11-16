@@ -54,6 +54,12 @@ struct PipeVoicing {
   double breath = 0;        // the jet's turbulence radiated (a soft hiss above ~1 kHz), ~ its speed
   double puff = 0;          // the onset's puff: the wind rushing through the opening pallet and the jet
   double puffTime = 0.06;   // turbulent until the tone locks (its level, its decay in s)
+  // A chimney (Rohrflöte, Rohrgedackt): the stopper's tube half-opens the
+  // top, so the even modes speak too (weakly: evenLevel x their weight), and
+  // its own resonance lifts the harmonics around chimneyK (by chimneyBoost x,
+  // over +-chimneyWidth harmonics).
+  double evenLevel = 0;
+  double chimneyK = 5, chimneyBoost = 0, chimneyWidth = 1.5;
   double rollK = 0;         // and ~ exp(-((k - 1) / rollK)^2) on top (0: none): the upper harmonics'
                             // steep fall (a real Bourdon: the 5th ~-40, the 7th ~-60, the 9th ~-70 dB)
   double valve = 0.005;     // the pallet's opening (s)
@@ -69,7 +75,7 @@ class FluePipe {
     hz_ = hz;
     rng_.reseed(seed);
     k_.clear();
-    for (int k = 1; int(k_.size()) < v.maxModes; k += v.stopped ? 2 : 1) {
+    for (int k = 1; int(k_.size()) < v.maxModes; k += v.stopped && v.evenLevel <= 0 ? 2 : 1) {
       const double f = hz * k * (1 + v.stretch * (k - 1));
       if (f > 0.4 * fs) break;
       k_.push_back(k);
@@ -101,7 +107,10 @@ class FluePipe {
       c_[i] = float(r * std::cos(w));
       s_[i] = float(r * std::sin(w));
       const double roll = v_.rollK > 0 ? std::exp(-((k - 1) / v_.rollK) * ((k - 1) / v_.rollK)) : 1.0;
-      in_[i] = float((1 - r) * std::pow(double(k), -v_.modeTilt) * roll);  // (each mode's resonance gain ~ its weight)
+      const double even = v_.stopped && k % 2 == 0 ? v_.evenLevel : 1.0;
+      const double cz = (k - v_.chimneyK) / v_.chimneyWidth;
+      const double chimney = 1 + v_.chimneyBoost * std::exp(-cz * cz);
+      in_[i] = float((1 - r) * std::pow(double(k), -v_.modeTilt) * roll * even * chimney);  // (each mode's resonance gain ~ its weight)
     }
     tau_ = v_.tauFrac * fs_ / (hz_ * ratio);
     puffDecay_ = float(std::exp(-1 / (v_.puffTime * fs_)));
@@ -157,7 +166,12 @@ class FluePipe {
     jl2_ += jetA_ * (jl1_ - jl2_);
     jl3_ += jetA_ * (jl2_ - jl3_);
     jl4_ += jetA_ * (jl3_ - jl4_);
-    const float b = float(v_.breath) * v * (hiss - prevHiss_);  // (differenced: above ~1 kHz)
+    // (differenced, then low-passed twice at ~4 kHz: a hiss around 1-5 kHz,
+    // not a fizz rising to the Nyquist: the recorded Bourdon has its energy
+    // above 8 kHz ~60 dB down)
+    bl1_ += 0.41f * ((hiss - prevHiss_) - bl1_);
+    bl2_ += 0.41f * (bl1_ - bl2_);
+    const float b = float(v_.breath) * v * bl2_;
     prevHiss_ = hiss;
     // The puff: the same turbulence, broader (low-passed at ~3 kHz, not
     // differenced), fading as the tone takes over.
@@ -179,7 +193,7 @@ class FluePipe {
     std::fill(re_.begin(), re_.end(), 0.0f);
     std::fill(im_.begin(), im_.end(), 0.0f);
     std::fill(hist_.begin(), hist_.end(), 0.0f);
-    valvePos_ = foot_ = prev_ = prevD_ = jl1_ = jl2_ = jl3_ = jl4_ = prevHiss_ = puffLp_ = puffEnv_ = 0;
+    valvePos_ = foot_ = prev_ = prevD_ = jl1_ = jl2_ = jl3_ = jl4_ = prevHiss_ = puffLp_ = puffEnv_ = bl1_ = bl2_ = 0;
   }
   double hz() const { return hz_; }
 
@@ -189,7 +203,7 @@ class FluePipe {
   std::vector<int> k_;
   std::vector<float> re_, im_, c_, s_, in_, hist_;
   int mask_ = 0, w_ = 0, quiet_ = 0;
-  float valvePos_ = 0, foot_ = 0, prev_ = 0, prevD_ = 0, jl1_ = 0, jl2_ = 0, jl3_ = 0, jl4_ = 0, prevHiss_ = 0, jetA_ = 1, puffLp_ = 0, puffEnv_ = 0, puffDecay_ = 0;
+  float valvePos_ = 0, foot_ = 0, prev_ = 0, prevD_ = 0, jl1_ = 0, jl2_ = 0, jl3_ = 0, jl4_ = 0, prevHiss_ = 0, jetA_ = 1, puffLp_ = 0, puffEnv_ = 0, puffDecay_ = 0, bl1_ = 0, bl2_ = 0;
   bool on_ = false, awake_ = false;
   Rng rng_;
 };

@@ -809,3 +809,28 @@ accordion's reeds, with a half-band filter to 48 kHz.
   hand in a horn bell: https://courses.physics.illinois.edu/phys406/sp2017/Student_Projects/Spring09/Adam_Watts/A_Watts_Phys498POM_Spring09_Final_Report.pdf
 - **[US5739446]** H. T. Bahnson, harmonica patent (slide thickness note via search).
   https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/5739446
+
+## 13. Built (2026-11-16)
+
+`src/harmonica.cc`, `src/harmonica.h`: §10's plan, with the user's answers to §11.
+- **Answers:** A = 440 (as the other GM instruments). No second room send: the hands change only the
+  level, the brightness and a forward projection. Upward bend: a few cents from a softer breath.
+  Tongue blocking, the user's own technique. A near-tie goes to the side with more notes, and the
+  lungs' fill leans the breath. No diatonic for now. All hand moves are automatic, scaled by the
+  other parts' activity in C3-D7 in a MIDI file.
+- **Changes from §10 found while fitting:**
+  - The tract at rest is set low and broad (500 Hz, Q 1.2), and the cupped hands lossy (Q 3). At Q 3
+    and Q 5 the reed nearest the resonance choked: C5 under the tract, E5 under a 6 mm hand opening.
+  - A fixed bend tuning (f_t = 1.04 x the bent pitch, open loop) overshot by 1-2 semitones. The
+    player now bends by ear: the lead reed's pitch moves the tract's tuning (a 30 ms loop), so bends
+    land within a few cents down to -2 st at C4-G5.
+  - The breath reversal's pause and the scoops scale with the time between notes. The recordings'
+    60-120 ms gaps belong to a slow line; at 60 ms a note, blow/draw alternation must speak on
+    every note, and does.
+  - The slide's rows overlap over the whole travel (both open half-way): -3 dB into G#4.
+  - The cupped opening is 12 mm (f_h ~1.1 kHz), not 6. A tighter cup made the top octave 10-15 dB
+    quieter.
+- **Not yet:** the partner reed's leakage on the unvalved top holes; slaps and tongue-block
+  splits; the diatonic; throat vibrato habits (CC-driven vibrato only through the player's
+  vibrato setting); fitting the spectrum in detail to `harmonica2.wav`.
+

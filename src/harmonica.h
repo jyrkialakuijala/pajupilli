@@ -23,6 +23,7 @@
 //     the breath softer.
 #pragma once
 
+#include <cmath>
 #include <vector>
 
 #include "freereed.h"
@@ -43,13 +44,23 @@ class HarmonicaModel : public Tube {
   static int noteOf(int h, int row, int dir);
 
   // The player's controls.
-  void setBreath(double pa) { breathP_ = pa; }    // the lungs' target (Pa, signed: + blow)
+  void setBreath(double pa) {  // the lungs' target (Pa, signed: + blow)
+    breathP_ = pa;
+    // From silence the breath starts the way it is wanted (nothing to turn round).
+    if (std::fabs(pL_) < 20 && pa != 0) { dir_ = pa > 0 ? 0 : 1; holdGap_ = 0; }
+  }
   void setBreathTau(double s) { breathTau_ = s; } // how fast the breath gets there
+  // A breath turned round: how fast it dies (s) and how long the chest pauses (s).
+  void setReversal(double decay, double pause) { revDecay_ = decay; revPause_ = pause; }
   void setSlide(bool in) { slideIn_ = in; }
   void setLips(int h, double open, double tau);   // a hole uncovered (1) or blocked (0)
   void setTract(double hz, double q) { tractHz_ = hz; tractQ_ = q; }
   void setHands(double a, double tau) { handTarget_ = a; handTau_ = tau; }  // the opening's radius (m)
   void setTremolo(double depth, double hz) { tremDepth_ = depth; tremHz_ = hz; }
+  // The player's ear on the lead note: the reed (hole, row, dir) whose pitch it follows, and the
+  // pitch it hears (Hz; 0: not sounding).
+  void setEar(int h, int row, int dir) { earReed_ = (h * 2 + row) * 2 + dir; }
+  double heardHz() const { return earAge_ < 3 * earPeriod_ ? fs2_ / earPeriod_ : 0; }
   int breathDir() const { return dir_; }          // the breath's direction now (0 blow, 1 draw)
   double breath() const { return pL_; }
   double lungFill() const { return lung_; }       // 0 empty .. 1 full
@@ -73,7 +84,7 @@ class HarmonicaModel : public Tube {
   std::vector<int> active_;
   double fs2_, dt_;
   // The breath and the tract.
-  double breathP_ = 0, breathTau_ = 0.03, pL_ = 0, holdGap_ = 0;
+  double breathP_ = 0, breathTau_ = 0.03, pL_ = 0, holdGap_ = 0, revDecay_ = 0.012, revPause_ = 0.03;
   int dir_ = 0, wantDir_ = 0;
   double tractHz_ = 500, tractQ_ = 3, ut_ = 0, pm_ = 0, ct_;
   double lung_ = 0.5;
@@ -85,6 +96,8 @@ class HarmonicaModel : public Tube {
   double handA_ = 0.01, handTarget_ = 0.01, handTau_ = 0.1, ph_ = 0, uo_ = 0, ch_;
   double tremDepth_ = 0, tremHz_ = 6.5, tremPh_ = 0, tremWander_ = 0;
   double prevUo_ = 0, prevUm_ = 0;
+  int earReed_ = -1;
+  double earMean_ = 0, earPrev_ = 0, earPeriod_ = 1e9, earAge_ = 1e9;
   uint32_t rng_ = 99991;
   long violations_ = 0;
   bool check_ = false;
@@ -113,9 +126,10 @@ class HarmonicaPlayer : public Performer {
   std::vector<std::pair<int, Place>> sounding_;  // the notes that sound, and where
   int dir_ = 0, row_ = 0, hole_ = 4;
   int vel_ = 80;
-  bool breathing_ = false;
-  double offAt_ = -1e9, onAt_ = -1e9, noteOnAt_ = 0;
+  bool breathing_ = false, tongued_ = false;
+  double offAt_ = -1e9, onAt_ = -1e9, noteOnAt_ = -1e9;
   double scoop_ = 0;           // the attack's bend (semitones, decaying)
+  double tractCorr_ = 0.04;    // the tract's tuning above the bent pitch (log), set by ear
   double handOpenAt_ = -1;     // when the hands open on this note (s after its start; -1: not)
   bool handsOpen_ = false, endBreath_ = false;
   double busy_ = 0;            // the other parts in the harmonica's register (-play)

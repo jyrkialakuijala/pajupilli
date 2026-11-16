@@ -109,7 +109,9 @@ constexpr LevelTrim kLevelTrims[] = {
     {"perc-extras", 10.1f},  // (12 dB under the common level, by hand: small sounds, and their clicks peak high)
     {"stick-snare", -1.0f},  // (by hand: 2 dB under the common level, so an accent (velocity 127) peaks near 1.2)
     {"vibraphone-25r", -0.8f},  // (the vibraphone with Balter 25R mallets: brighter and louder at velocity 90)
-    {"gedackt-8", 3.0f},  // (the organ's Gedackt 8': measured -31.2 LUFS at three notes, voiced to a recorded Bourdon)
+    {"gedackt-8", 8.3f},  // (the organ's ranks, measured: -36.5 LUFS in its swell boxes 3/4 open,
+    {"rohrgedackt-8", 2.7f},  //  -30.9 at the Positiv's rail, -29.9 both: one trim each, so a
+    {"gedackt-rohrgedackt", 1.7f},  //  rank alone sounds at the common level; together their own balance)
     {"hand-clap", 0.0f},     // (by hand, by the peak: ~0.6 at velocity 100; ~10 dB under the common loudness, as short sounds are)
     {"claves", 1.0f},        // (by hand: a peak ~0.8 at velocity 100)
     {"wood-blocks", 0.0f},   // (by hand, by the peak: ~0.8 at velocity 100; ~9 dB under the common loudness)
@@ -117,5 +119,7 @@ constexpr LevelTrim kLevelTrims[] = {
     {"bell-tree", -4.5f},
     {"accordion", -3.7f},  // (measured -24.5 LUFS at three notes, the median -28.2)
     {"bandoneon", -5.7f},  // (measured -22.5 LUFS)
+    {"harmonica", 2.2f},  // (measured -30.4 LUFS with the hands cupped)
+    {"reed-organ", 9.3f},  // (measured -37.5 LUFS, stops 1 + 4)
 };
 }  // namespace pajupilli

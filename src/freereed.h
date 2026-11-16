@@ -102,7 +102,47 @@ class FreeReed {
   void setDuct(double s) { ductNow_ = b_.duct * s; }
   double ratio() const { return ratio_; }
   double hz() const { return b_.hz * ratio_; }
-  void reset() { z_ = v_ = p1_ = u_ = uPrev_ = 0; }
+  void reset() { z_ = v_ = p1_ = u_ = uPrev_ = up_ = upPrev_ = 0; }
+  // The harmonium's arrangement (research/reed_organ.md §4.4, §8.2): the wind chest's pressure
+  // on the tongue, the reed's cell *downstream* of it, the cell emptying into the room through the
+  // key's pallet (its open area, m^2; 0: shut) with that opening's air (ductLen, m) and its
+  // Bernoulli loss. Uses the reed's own `cell` volume. Returns d(pallet flow)/dt (m^3/s^2).
+  // palletQ: the cell's resonance damped by the pallet's felt and leather (its Q; 0: undamped).
+  float sampleDown(double chest, double palletArea, double ductLen = 5e-3, double palletQ = 2) {
+    const double y = b_.set - z_;
+    const double e = b_.clear;
+    const double d = 0.5 * (y + std::sqrt(y * y + e * e)) + 0.5 * (-b_.plate - y + std::sqrt((b_.plate + y) * (b_.plate + y) + e * e));
+    const double area = perim_ * std::sqrt(d * d + e * e);
+    // The jet through the gap, against the cell's pressure (implicit, as sample()).
+    const double a = sr_ * v_, cc = kRho / (2 * area * area);
+    const double drive = chest - p1_;
+    const double bb = u_ - a + dt_ * drive / ductNow_, dd = dt_ * cc / ductNow_;
+    const double x = std::copysign((std::sqrt(1 + 4 * dd * std::fabs(bb)) - 1) / (2 * dd), bb);
+    u_ = x + a;
+    const double p2 = cc * x * std::fabs(x);
+    const double f = mu_ * p2;
+    const double z = a11_ * z_ + a12_ * v_ + b1_ * f;
+    v_ = a21_ * z_ + a22_ * v_ + b2_ * f;
+    z_ = z;
+    // The pallet: the cell's air out through the key's opening (implicit in its own loss).
+    if (palletArea > 1e-9) {
+      const double mp = kRho * ductLen / palletArea, cp = kRho / (2 * palletArea * palletArea);
+      const double rl = palletQ > 0 ? std::sqrt(mp * k_) / palletQ : 0;  // the felt's loss (Z0 / Q)
+      const double den = 1 + dt_ * rl / mp;
+      const double bp = (up_ + dt_ * p1_ / mp) / den, dp = dt_ * cp / mp / den;
+      up_ = std::copysign((std::sqrt(1 + 4 * dp * std::fabs(bp)) - 1) / (2 * dp), bp);
+    } else {
+      up_ = 0;
+    }
+    // The cell between them.
+    p1_ += k_ * dt_ * (u_ - up_);
+    const double out = (up_ - upPrev_) * fs_;
+    upPrev_ = up_;
+    return float(out);
+  }
+  // A hammer on the tongue (the harmonium's Percussion): its tip set moving (m/s, into the slot).
+  void kick(double v) { v_ += v; }
+  double palletFlow() const { return up_; }
   // How far the tongue swings (m), roughly: for tests.
   double tip() const { return z_; }
   double cellPressure() const { return p1_; }
@@ -144,7 +184,7 @@ class FreeReed {
   double fs_ = 48000, dt_ = 1 / 48000.0, ratio_ = 1;
   double sr_ = 0, perim_ = 0, k_ = 0, mu_ = 0, ductNow_ = 960, w_ = 1;
   double a11_ = 1, a12_ = 0, a21_ = 0, a22_ = 1, b1_ = 0, b2_ = 0;
-  double z_ = 0, v_ = 0, p1_ = 0, u_ = 0, uPrev_ = 0;
+  double z_ = 0, v_ = 0, p1_ = 0, u_ = 0, uPrev_ = 0, up_ = 0, upPrev_ = 0;
 };
 
 // Two samples in, one out: a Kaiser-windowed sinc cut at 21 kHz (the reeds' 96 kHz to 48 kHz).

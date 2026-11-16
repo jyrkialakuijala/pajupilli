@@ -280,7 +280,17 @@ void Piano::build() {
       const double f = n * f0 * std::sqrt(1 + s.B * n * n);
       if (f > 0.47 * fs_) continue;  // (left at rest: all its numbers 0)
       const double w = 2 * M_PI * f, wdt = w / fs_;
-      const double sigma = s.loss + b2 * f + b3 * f * f + (supportFc > 0 ? support / (1 + (supportFc / f) * (supportFc / f)) : support);
+      double sigma = s.loss + b2 * f + b3 * f * f + (supportFc > 0 ? support / (1 + (supportFc / f) * (supportFc / f)) : support);
+      // The top two and a half octaves (from F#5, fully from C6): the second partial dies away
+      // faster (its own loss x PJ_PIANO_TOPH2, 1.6: with the board's share ~35 % faster overall),
+      // so the tone settles onto the fundamental; the partials above it
+      // optionally too (x PJ_PIANO_TOPHI).
+      {
+        static const double kTopH2 = knob("PJ_PIANO_TOPH2", 1.6), kTopHi = knob("PJ_PIANO_TOPHI", 1.0);
+        const double top = std::clamp((st.key + 21 - 78) / 6.0, 0.0, 1.0);  // (key 0 is A0, MIDI 21)
+        if (n == 2) sigma *= 1 + (kTopH2 - 1) * top;
+        else if (n > 2) sigma *= 1 + (kTopHi - 1) * top;
+      }
       const double g = std::exp(-sigma / fs_);
       cs_[m] = float(g * std::cos(wdt));
       sn_[m] = float(g * std::sin(wdt));

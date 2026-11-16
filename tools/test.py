@@ -1169,43 +1169,63 @@ def bagpipe_drones():
 
 
 def organ():
-    """The church organ's first rank (-inst gedackt-8, src/organ.cc, src/organpipe.h): each pipe a jet
-    driving the stopped column's odd modes, calibrated in tune; it speaks in time (8' C ~150 ms, middle C
-    ~90), its tone a stopped pipe's (the twelfth over the octave), stable, real time."""
+    """The church organ's first ranks (src/organ.cc, src/organpipe.h, src/organbox.h): each pipe a jet
+    driving its column's modes, calibrated in tune where it stands (its enclosure's field acting on it);
+    the Schwellwerk's Gedackt 8' in two swell boxes (C side left, C# right), the Positiv's Rohrgedackt 8'
+    (a chimney flute) at the rail, both together; they speak in time, with their tones (a stopped pipe's
+    twelfth; the chimney's even harmonics and lifted 5th), stable, real time."""
     import numpy as np
     from scipy.io import wavfile
-    cents = []
-    for m in (36, 48, 60, 72, 84, 96):
-        c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', 'gedackt-8', '-note', str(m), '-secs', '1']).stdout)
-        cents.append(int(c.group(1)) if c else 999)
-    check('organ: the Gedackt\'s pipes speak in tune', all(abs(c) <= 3 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
-    def render(m):
+    for inst in ('gedackt-8', 'rohrgedackt-8', 'gedackt-rohrgedackt'):
+        cents = []
+        for m in (36, 48, 60, 72, 84, 96):
+            c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', inst, '-note', str(m), '-secs', '1']).stdout)
+            cents.append(int(c.group(1)) if c else 999)
+        # (the swell box's air ~0.6 C warmer than the church: its Gedackt ~+2 c; each pipe +-0.5 c)
+        check(f'organ: {inst} speaks in tune', all(abs(c) <= 5 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
+    def render(inst, m):
         wav = os.path.join(ROOT, 'tools', '.organ.wav')
-        run(['-inst', 'gedackt-8', '-seq', f'on {m} 80 wait 1.2 off {m} wait 0.3', '-o', wav])
+        run(['-inst', inst, '-seq', f'on {m} 80 wait 1.2 off {m} wait 0.3', '-o', wav])
         fs, x = wavfile.read(wav)
         os.remove(wav)
         return fs, x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
-    speech, twelfth, octave = [], [], []
-    for m in (36, 60):
-        fs, x = render(m)
-        env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
-        st = env[int(0.8 * fs):int(1.1 * fs)].mean()
-        speech.append(np.where(env > 0.708 * st)[0][0] / fs * 1e3)
+    def harmonics(fs, x, m):
         seg = x[int(0.7 * fs):int(1.1 * fs)]
         sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 18))
         f = np.fft.rfftfreq(1 << 18, 1 / fs)
         f0 = 440 * 2 ** ((m - 69) / 12)
-        h = lambda k: sp[(f > k * f0 * 0.98) & (f < k * f0 * 1.02)].max()
-        twelfth.append(20 * math.log10(h(3) / h(1)))
-        octave.append(20 * math.log10(h(2) / h(1)))
+        h = [sp[(f > k * f0 * 0.98) & (f < k * f0 * 1.02)].max() for k in range(1, 7)]
+        return [20 * math.log10(v / h[0]) for v in h]
+    speech, ged, rohr = [], [], []
+    for m in (36, 60):
+        fs, x = render('gedackt-8', m)
+        env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
+        st = env[int(0.8 * fs):int(1.1 * fs)].mean()
+        speech.append(np.where(env > 0.708 * st)[0][0] / fs * 1e3)
+        ged.append(harmonics(fs, x, m))
+        rohr.append(harmonics(*render('rohrgedackt-8', m), m))
     check('organ: it speaks in time (8\' C, middle C)', speech[0] < 300 and speech[1] < 150, f'{speech[0]:.0f} ms, {speech[1]:.0f} ms')
-    check('organ: a stopped pipe\'s tone (the twelfth over the octave)', all(t > o + 15 for t, o in zip(twelfth, octave)),
-          'twelfth ' + ', '.join(f'{t:+.0f}' for t in twelfth) + ' dB, octave ' + ', '.join(f'{o:+.0f}' for o in octave) + ' dB')
-    r = run(['-inst', 'gedackt-8', '-fuzz', '10', '1'])
-    check('fuzz 10 s (gedackt-8)', r.returncode == 0, r.stdout.strip())
-    ns = cpu_time(['-inst', 'gedackt-8', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
-    check('real-time margin (gedackt-8, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
-
+    check('organ: the Gedackt a stopped pipe (the twelfth over the octave)', all(h[2] > h[1] + 15 for h in ged),
+          'twelfth ' + ', '.join(f'{h[2]:+.0f}' for h in ged) + ' dB, octave ' + ', '.join(f'{h[1]:+.0f}' for h in ged) + ' dB')
+    check('organ: the Rohrgedackt\'s chimney (more octave and 5th than the Gedackt)',
+          all(r[1] > g[1] + 5 and r[4] > g[4] + 5 for r, g in zip(rohr, ged)),
+          'octave ' + ', '.join(f'{r[1]:+.0f}/{g[1]:+.0f}' for r, g in zip(rohr, ged)) + ', 5th ' +
+          ', '.join(f'{r[4]:+.0f}/{g[4]:+.0f}' for r, g in zip(rohr, ged)) + ' dB (Rohr/Gedackt)')
+    # The swell: the box closed (dynamics 0) quieter and darker than open (1).
+    lv = []
+    for d in ('0', '1'):
+        wav = os.path.join(ROOT, 'tools', '.organ.wav')
+        run(['-inst', 'gedackt-8', '-dyn', d, '-seq', 'on 72 80 wait 1.2 off 72 wait 0.3', '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        lv.append(10 * math.log10(np.mean(x[int(0.7 * fs):int(1.1 * fs)] ** 2) + 1e-20))
+    check('organ: the swell box closes (quieter)', lv[0] < lv[1] - 6, f'closed {lv[0] - lv[1]:+.1f} dB')
+    for inst in ('gedackt-8', 'gedackt-rohrgedackt'):
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'gedackt-rohrgedackt', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (gedackt-rohrgedackt, random playing)', ns < 5000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 def accordions():
     """The accordion and the bandoneón (-inst accordion, bandoneon; src/accordion.cc, src/freereed.h;
@@ -1293,6 +1313,196 @@ def accordions():
     ns = (cpu_time(['-inst', 'accordion', '-seq', seq, '-o', wav]) - base) / (10 * 48000) * 1e9
     os.remove(wav)
     check('real-time margin (accordion: a bass and a four-note musette chord, 14 reeds)', ns < 2500,
+          f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def harmonica():
+    """The chromatic harmonica (-inst harmonica; src/harmonica.cc; research/harmonica.md §10): 16 holes
+    C3..D7 in tune; one breath direction at a time (never blow and draw reeds driven together); chords
+    choose their breath by velocity and number; bends follow the pitch bend by ear; the slide
+    cross-fades; a breath reversal leaves a gap, a hole change none; quick lines speak; the hands
+    open brighter; CC1's hand tremolo; stable, real time."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    still = {'PJ_HARP_HANDS': '0'}  # (the player's own hand moves off: measurable)
+    wav = os.path.join(ROOT, 'tools', '.harmonica.wav')
+    def load():
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        return fs, x.mean(1) if x.ndim > 1 else x
+    def render(seq, env=None):
+        e = dict(still)
+        e.update(env or {})
+        r = run(['-inst', 'harmonica', '-seq', seq, '-o', wav], env=e)
+        return (*load(), r.stderr)
+    def peak_hz(x, fs, f0, t0, t1, lo=0.85, hi=1.06):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 20))
+        f = np.fft.rfftfreq(1 << 20, 1 / fs)
+        m = (f > f0 * lo) & (f < f0 * hi)
+        return f[m][sp[m].argmax()]
+    cents = []
+    for m in (48, 60, 72, 84, 98):
+        fs, x, _ = render(f'on {m} 80 wait 1.2 off {m}')
+        f0 = 440 * 2 ** ((m - 69) / 12)
+        cents.append(1200 * math.log2(peak_hz(x, fs, f0, 0.5, 1.15, 0.97, 1.03) / f0))
+    check('harmonica: in tune over C3..D7 (C3 C4 C5 C6 D7)', all(abs(c) <= 15 for c in cents), ' '.join(f'{c:+.0f} c' for c in cents))
+    def levels(x, fs, notes, t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 18))
+        f = np.fft.rfftfreq(1 << 18, 1 / fs)
+        ref = sp.max()
+        return [20 * math.log10(sp[(f > 440 * 2 ** ((m - 69) / 12) * 0.99) & (f < 440 * 2 ** ((m - 69) / 12) * 1.01)].max() / ref) for m in notes]
+    fs, x, err = render('on 60 100 on 62 40 wait 1.5 off 60 off 62', {'PJ_HARP_CHECK': '1'})
+    c_, d_ = levels(x, fs, (60, 62), 0.5, 1.2)
+    fs, x, _ = render('on 60 60 on 64 60 on 67 60 on 62 70 wait 1.5 off 60 off 64 off 67 off 62')
+    ce, de, ee, ge = levels(x, fs, (60, 62, 64, 67), 0.5, 1.2)
+    fs, x, _ = render('on 62 80 on 65 80 on 69 80 on 71 80 wait 1.5 off 62 off 65 off 69 off 71')
+    draw = levels(x, fs, (62, 65, 69, 71), 0.5, 1.2)
+    check('harmonica: chords take one breath (C4 v100 + D4 v40: blow; C E G v60 + D v70: blow, more notes; D F A B: draw)',
+          c_ > -30 and d_ < -60 and min(ce, ee, ge) > -30 and de < -60 and min(draw) > -30,
+          f'C {c_:.0f} D {d_:.0f} dB; C E G {ce:.0f} {ee:.0f} {ge:.0f}, D {de:.0f} dB; D F A B ' + ' '.join(f'{l:.0f}' for l in draw))
+    r = run(['-inst', 'harmonica', '-fuzz', '10', '3'], env={'PJ_HARP_CHECK': '1'})
+    viol = re.search(r'(\d+) samples with blow and draw', r.stderr)
+    check('harmonica: never blow and draw reeds driven at once (fuzz 10 s, chords and reversals)',
+          r.returncode == 0 and viol and viol.group(1) == '0', (viol.group(0) if viol else 'no count') + '; ' + r.stdout.strip())
+    # Bends: a MIDI file, G4 bent -0.5 and -2 semitones.
+    def vlq(n):
+        b = [n & 127]
+        n >>= 7
+        while n:
+            b.insert(0, (n & 127) | 128)
+            n >>= 7
+        return bytes(b)
+    def midi(events, path):
+        trk = b''.join(vlq(dt) + bytes(e) for dt, e in events) + b'\x00\xff\x2f\x00'
+        with open(path, 'wb') as fh:
+            fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+    mid = os.path.join(ROOT, 'tools', '.harmonica.mid')
+    midi([(0, [0xC0, 22]), (0, [0x90, 67, 80]), (960, [0xE0, 0, 0x30]), (960, [0xE0, 0, 0x00]), (960, [0xE0, 0, 0x40]),
+          (960, [0xE0, 0, 0x60]), (960, [0x80, 67, 0])], mid)
+    run(['-play', mid, '-o', wav], env=still)
+    fs, x = load()
+    f0 = 392.0
+    b = [1200 * math.log2(peak_hz(x, fs, f0, t + 0.4, t + 0.95) / f0) for t in (1, 2, 3, 4)]
+    up = b[3] - b[2]
+    check('harmonica: bends follow the pitch bend by ear (-50 c, -200 c), up only a few cents (a softer breath)',
+          abs(b[0] + 50) < 15 and abs(b[1] + 200) < 25 and 0 <= up < 15,
+          f'{b[0]:+.0f} c, {b[1]:+.0f} c; up a semitone: {up:+.0f} c')
+    # Transitions: the slide into G#4 (both rows partly open), a breath reversal G4 -> A4, a hole
+    # change in one breath E4 -> G4.
+    def dip(seq):
+        fs, x, _ = render(seq)
+        env = np.sqrt(np.convolve(x ** 2, np.ones(96) / 96, 'same'))
+        st = np.median(env[int(0.4 * fs):int(0.75 * fs)])
+        w = env[int(0.7 * fs):int(1.0 * fs)]
+        return 20 * math.log10(w.min() / st), (w < st * 10 ** -0.5).sum() / fs * 1e3
+    sd, _ = dip('on 67 80 wait 0.8 on 68 80 off 67 wait 0.8 off 68')
+    rd, rms_ = dip('on 67 80 wait 0.8 on 69 80 off 67 wait 0.8 off 69')
+    hd, hms = dip('on 64 80 wait 0.8 on 67 80 off 64 wait 0.8 off 67')
+    check('harmonica: the slide cross-fades, a breath reversal leaves a gap, a hole change none',
+          sd > -6 and 40 < rms_ < 130 and hms < 20, f'slide {sd:.1f} dB; reversal {rd:.0f} dB, {rms_:.0f} ms under -10 dB; hole change {hd:.1f} dB, {hms:.0f} ms')
+    seq = ''.join(f'on {a} 80 wait 0.06 off {a} on {b_} 80 wait 0.06 off {b_} ' for a, b_ in [(67, 69)] * 6)
+    fs, x, _ = render(seq + 'wait 0.2')
+    lv = [20 * math.log10(np.sqrt(np.mean(x[int((i * 0.06 + 0.02) * fs):int((i * 0.06 + 0.06) * fs)] ** 2)) + 1e-9) for i in range(12)]
+    check('harmonica: a quick blow/draw line speaks on every note (G4 A4 at 60 ms)', max(lv) - min(lv) < 10, ' '.join(f'{l:.0f}' for l in lv))
+    # The hands: open, brighter.
+    def cent(env):
+        fs, x, _ = render('on 67 80 wait 1.5 off 67', env)
+        seg = x[int(0.6 * fs):int(1.4 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+        f = np.fft.rfftfreq(len(seg), 1 / fs)
+        return (sp * f).sum() / sp.sum(), 10 * math.log10(np.mean(seg ** 2))
+    (cc, lc), (co, lo) = cent({}), cent({'PJ_HARP_CUPPED': '0.035', 'PJ_HARP_OPEN': '0.05'})
+    check('harmonica: the hands opened, brighter', co > 1.2 * cc, f'centroid {cc:.0f} -> {co:.0f} Hz, level {lc:.1f} -> {lo:.1f} dB')
+    # CC1: the hand tremolo, ~6.5 Hz, level and brightness.
+    midi([(0, [0xC0, 22]), (0, [0xB0, 1, 80]), (0, [0x90, 67, 80]), (2880, [0x80, 67, 0])], mid)
+    run(['-play', mid, '-o', wav], env=still)
+    os.remove(mid)
+    fs, x = load()
+    seg = x[int(0.8 * fs):int(2.8 * fs)]
+    hop = 240
+    lev = np.array([10 * math.log10(np.mean(seg[i:i + 960] ** 2) + 1e-12) for i in range(0, len(seg) - 960, hop)])
+    L = lev - lev.mean()
+    sp = np.abs(np.fft.rfft(L * np.hanning(len(L)), 4096))
+    ff = np.fft.rfftfreq(4096, hop / fs)
+    m = (ff > 2) & (ff < 12)
+    rate, pp = ff[m][sp[m].argmax()], np.percentile(lev, 95) - np.percentile(lev, 5)
+    check('harmonica: CC1 flutters the hands (~6.5 Hz, the level)', 5.5 < rate < 7.5 and pp > 3, f'{rate:.2f} Hz, {pp:.1f} dB p-p')
+    seq = 'on 60 80 on 64 80 on 67 80 on 72 80 wait 10 off 60 off 64 off 67 off 72'
+    base = cpu_time(['-inst', 'harmonica', '-seq', 'wait 0.01', '-o', wav], env=still)
+    ns = (cpu_time(['-inst', 'harmonica', '-seq', seq, '-o', wav], env=still) - base) / (10 * 48000) * 1e9
+    os.remove(wav)
+    check('real-time margin (harmonica: a four-note chord)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def reed_organ():
+    """The reed organ (-inst reed-organ; src/harmonium.cc; research/reed_organ.md §8): a pressure
+    harmonium, its reeds in cells downstream, the cells out through the pallets; in tune; every key
+    speaks at the softest wind; with Expression the feet's pressure is the dynamics (the tone
+    brightening as it grows), without it the reservoir's steady wind; the Percussion hammer starts
+    the bass quicker; the Voix céleste beats; stable, real time with Grand Jeu."""
+    import numpy as np
+    from scipy.io import wavfile
+    wav = os.path.join(ROOT, 'tools', '.reedorgan.wav')
+    def render(seq, env=None):
+        run(['-inst', 'reed-organ', '-seq', seq, '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        return fs, x.mean(1) if x.ndim > 1 else x
+    cents = []
+    for m in (36, 48, 60, 72, 84, 96):
+        c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', 'reed-organ', '-note', str(m), '-secs', '1.5']).stdout)
+        cents.append(int(c.group(1)) if c else 999)
+    check('reed-organ: in tune (C2 .. C7)', all(abs(c) <= 10 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
+    soft = []
+    for m in (36, 60, 96):
+        fs, x = render(f'on {m} 1 wait 1.5 off {m}', {'PJ_HARM_PERC': '0'})
+        soft.append(10 * math.log10(np.mean(x[int(0.8 * fs):int(1.4 * fs)] ** 2) + 1e-15))
+    check('reed-organ: the softest key speaks (C2, C4, C7)', all(l > -75 for l in soft), ' '.join(f'{l:.0f} dB' for l in soft))
+    def level(v, env):
+        fs, x = render(f'on 60 {v} wait 1.5 off 60', env)
+        seg = x[int(0.8 * fs):int(1.4 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+        f = np.fft.rfftfreq(len(seg), 1 / fs)
+        return 10 * math.log10(np.mean(seg ** 2)), (sp * f).sum() / sp.sum()
+    (l1, c1), (l2, c2) = level(30, {'PJ_HARM_PERC': '0'}), level(127, {'PJ_HARM_PERC': '0'})
+    (r1, _), (r2, _) = level(30, {'PJ_HARM_PERC': '0', 'PJ_HARM_EXPR': '0'}), level(127, {'PJ_HARM_PERC': '0', 'PJ_HARM_EXPR': '0'})
+    check('reed-organ: Expression: the feet are the dynamics, brighter louder; the reservoir steady',
+          l2 - l1 > 12 and c2 > 1.2 * c1 and abs(r2 - r1) < 1.5,
+          f'v30 -> v127: {l2 - l1:+.1f} dB, centroid {c1:.0f} -> {c2:.0f} Hz; reservoir {r2 - r1:+.1f} dB')
+    def onset(env):
+        fs, x = render('on 48 80 wait 1.5 off 48', env)
+        e = np.sqrt(np.convolve(x ** 2, np.ones(240) / 240, 'same'))
+        st = e[int(1.0 * fs):int(1.4 * fs)].mean()
+        return np.where(e > 0.7 * st)[0][0] / fs * 1e3
+    plain, hammer = onset({'PJ_HARM_PERC': '0'}), onset({})
+    check('reed-organ: the Percussion hammer starts C3 quicker', hammer < 0.85 * plain, f'{plain:.0f} ms -> {hammer:.0f} ms')
+    fs, x = render('on 69 80 wait 4 off 69', {'PJ_HARM_REG': 'celeste', 'PJ_HARM_PERC': '0'})
+    seg = x[int(0.5 * fs):int(3.9 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 21))
+    f = np.fft.rfftfreq(1 << 21, 1 / fs)
+    m = (f > 436) & (f < 446)
+    pk = [f[m][i] for i in np.argsort(sp[m])[::-1] if True][:1]
+    peaks = []
+    mm = np.where(m)[0]
+    for i in mm[1:-1]:
+        if sp[i] > sp[i - 1] and sp[i] >= sp[i + 1] and sp[i] > 0.2 * sp[m].max():
+            peaks.append(f[i])
+    beat = (max(peaks) - min(peaks)) if len(peaks) >= 2 else 0
+    check('reed-organ: the Voix céleste beats ~1.5 a second at A4', 1.0 < beat < 2.2, f'{beat:.2f} Hz ({len(peaks)} peaks)')
+    r = run(['-inst', 'reed-organ', '-fuzz', '10', '1'])
+    check('fuzz 10 s (reed-organ)', r.returncode == 0, r.stdout.strip())
+    seq = 'on 48 100 on 55 100 on 60 100 on 64 100 on 67 100 on 72 100 on 76 100 on 79 100 wait 10 ' + \
+          'off 48 off 55 off 60 off 64 off 67 off 72 off 76 off 79'
+    env = {'PJ_HARM_REG': 'grandjeu'}
+    base = cpu_time(['-inst', 'reed-organ', '-seq', 'wait 0.01', '-o', wav], env=env)
+    ns = (cpu_time(['-inst', 'reed-organ', '-seq', seq, '-o', wav], env=env) - base) / (10 * 48000) * 1e9
+    os.remove(wav)
+    check('real-time margin (reed-organ: Grand Jeu, an eight-note chord, 32 reeds)', ns < 2500,
           f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
@@ -1587,7 +1797,7 @@ def clap_claves_surdo():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, accordions):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, accordions, harmonica, reed_organ):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

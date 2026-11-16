@@ -158,10 +158,10 @@ float HarmonicaModel::step() {
   // (~35-60 ms), then the other way (the recordings' 60-120 ms dip, §7).
   const int want = breathP_ > 0 ? 0 : breathP_ < 0 ? 1 : dir_;
   if (want != dir_) {
-    pL_ += (0 - pL_) * (dt / 0.012);
+    pL_ += (0 - pL_) * std::min(1.0, dt / revDecay_);
     if (std::fabs(pL_) < 5) {
       holdGap_ += dt;
-      if (holdGap_ > 0.045) {
+      if (holdGap_ > revPause_) {
         dir_ = want;
         holdGap_ = 0;
       }
@@ -173,10 +173,14 @@ float HarmonicaModel::step() {
   const double wt = 2 * M_PI * tractHz_;
   const double mt = 1 / (wt * wt * ct_), rt = std::sqrt(mt / ct_) / tractQ_;
   ut_ = (ut_ + dt / mt * (pL_ - pm_)) / (1 + dt * rt / mt);
-  // The slide (in ~20 ms, back on its spring in ~15) and the lips.
-  slide_ = std::clamp(slide_ + (slideIn_ ? dt / 0.020 : -dt / 0.015), 0.0, 1.0);
+  // The slide (in ~20 ms, back on its spring in ~20) and the lips.
+  slide_ = std::clamp(slide_ + (slideIn_ ? dt / 0.020 : -dt / 0.020), 0.0, 1.0);
   const double xs = smooth01(slide_);
-  const double row[2] = {std::clamp((0.8 - xs) / 0.6, 0.0, 1.0), std::clamp((xs - 0.2) / 0.6, 0.0, 1.0)};
+  // Each row's opening along the travel; both partly open over the middle (the recordings' 1.5-6
+  // dB dip, both pitches sounding at once).
+  static const double kOverlap = knob("PJ_HARP_SLIDEOVERLAP", 1.0);
+  const double row[2] = {std::clamp((0.5 + 0.5 * kOverlap - xs) / kOverlap, 0.0, 1.0),
+                         std::clamp((xs - 0.5 + 0.5 * kOverlap) / kOverlap, 0.0, 1.0)};
   for (int h = 0; h < kHoles; ++h) lip_[h] += (lipTarget_[h] - lip_[h]) * std::min(1.0, dt / std::max(lipTau_[h], 1e-3));
   // The reeds of the breath's direction, driven by the mouth against the hands.
   double g = 0, k = 0;
@@ -196,11 +200,25 @@ float HarmonicaModel::step() {
     k += s * e.r.cellPressure() / r;
   }
   if (blow && draw) ++violations_;
+  // The ear: the lead reed's swing, its period from upward crossings.
+  if (earReed_ >= 0) {
+    const double z = reeds_[earReed_].r.tip();
+    earMean_ += (z - earMean_) * 0.002;
+    const double y = z - earMean_;
+    earAge_ += 1;
+    if (earPrev_ < 0 && y >= 0) {
+      const double frac = earPrev_ / (earPrev_ - y);
+      const double since = earAge_ - 1 + frac;
+      if (since > 8 && since < 2000) earPeriod_ = since;
+      earAge_ = 1 - frac;
+    }
+    earPrev_ = y;
+  }
   // The mouth and the hands (implicit in the holes' conductance: a chord's many open holes).
   pm_ = (pm_ + dt / ct_ * (ut_ + g * ph_ + k)) / (1 + dt * g / ct_);
   const double a = std::clamp(handA_ * (1 + tremDepth_ * std::sin(tremPh_)), 0.003, 0.045);
   const double mo = kRho * 1.7 / (M_PI * a);                 // the opening's air (a flanged hole)
-  static const double kHandQ = knob("PJ_HARP_HANDQ", 5);
+  static const double kHandQ = knob("PJ_HARP_HANDQ", 3);
   const double ro = std::sqrt(mo / ch_) / kHandQ;  // radiation and the soft hands' losses
   uo_ = (uo_ + dt / mo * ph_) / (1 + dt * ro / mo);
   ph_ = (ph_ + dt / ch_ * (g * pm_ - k - uo_)) / (1 + dt * g / ch_);
@@ -212,8 +230,11 @@ float HarmonicaModel::step() {
   tremPh_ += 2 * M_PI * tremHz_ * (1 + 3 * tremWander_) * dt;
   if (tremPh_ > 2 * M_PI) tremPh_ -= 2 * M_PI;
   handA_ += (handTarget_ - handA_) * std::min(1.0, dt / std::max(handTau_, 1e-3));
-  // Radiated at 1 m: the hands' opening, and a little straight through the fingers.
-  const double out = kRho / (4 * M_PI) * ((uo_ - prevUo_) + 0.1 * (um - prevUm_)) * fs2_;
+  // Radiated at 1 m: the hands' opening, and a little straight through the fingers. Open, the
+  // harmonica faces the listener (its covers' backs forward): projected, ~+3.5 dB.
+  static const double kCup = knob("PJ_HARP_CUPPED", 0.012), kOpenA = knob("PJ_HARP_OPEN", 0.035);
+  const double proj = 1 + 0.5 * std::clamp((a - kCup) / std::max(kOpenA - kCup, 1e-3), 0.0, 1.0);
+  const double out = proj * kRho / (4 * M_PI) * ((uo_ - prevUo_) + 0.1 * (um - prevUm_)) * fs2_;
   prevUo_ = uo_;
   prevUm_ = um;
   return float(out);
@@ -324,10 +345,11 @@ void HarmonicaPlayer::decide(bool attack) {
   dir_ = sounding_[0].second.dir;
   row_ = sounding_[0].second.row;
   hole_ = sounding_[0].second.hole;
+  m_.setEar(sounding_.back().second.hole, sounding_.back().second.row, sounding_.back().second.dir);
   // The mouth: the notes' holes open, the tongue on the rest.
   bool open[HarmonicaModel::kHoles] = {};
   for (auto& s : sounding_) open[s.second.hole] = true;
-  const bool tongued = attack && vel_ > 90;
+  const bool tongued = attack && tongued_;
   for (int h = 0; h < HarmonicaModel::kHoles; ++h) m_.setLips(h, open[h] ? 1 : 0, tongued ? 0.002 : attack ? 0.004 : 0.006);
   m_.setSlide(row_ == 1);
   applyBreath();
@@ -350,6 +372,10 @@ void HarmonicaPlayer::applyBreath() {
 void HarmonicaPlayer::noteOn(int midi, int velocity) {
   articulate(midi, velocity, !held_.empty());
   const bool attack = !breathing_;
+  // How fast the notes come: a quick passage turns the breath quickly (the recordings' 60-120 ms
+  // gaps are a slow line's) and has no time to scoop.
+  const double ioi = now_ - noteOnAt_;
+  m_.setReversal(std::clamp(0.08 * ioi, 0.003, 0.012), std::clamp(0.25 * ioi, 0.005, 0.03));
   held_.erase(std::remove_if(held_.begin(), held_.end(), [&](const Held& h) { return h.midi == midi; }), held_.end());
   held_.push_back({midi, velocity, now_});
   note_ = midi;
@@ -359,14 +385,16 @@ void HarmonicaPlayer::noteOn(int midi, int velocity) {
   endBreath_ = false;
   // The tongue: a hard key builds the breath behind it and lets go; a soft one is a breath attack.
   const double v = velocity / 127.0;
-  m_.setBreathTau(attack ? (velocity > 90 ? 0.008 : 0.07 - 0.05 * v) : 0.02);
+  tongued_ = velocity > 70 || ioi < 0.4;
+  m_.setBreathTau(attack ? (tongued_ ? 0.008 : 0.07 - 0.05 * v) : std::clamp(0.15 * ioi, 0.004, 0.02));
   decide(attack);
   breathing_ = true;
   // A scoop into the note (the tract starting low): the recordings' most notes, 50-185 c.
-  scoop_ = urand() < (attack ? 0.6 : 0.35) ? -(0.5 + 1.3 * urand()) : 0;
+  scoop_ = urand() < (attack ? 0.6 : 0.35) * smooth01((ioi - 0.15) / 0.3) ? -(0.5 + 1.3 * urand()) : 0;
   // The hands close round it; on a long note they may open part-way through. More drama when
   // the others leave the register free.
-  const double drama = 1 / (1 + 2 * busy_);
+  static const double kAuto = knob("PJ_HARP_HANDS", 1);  // the player's own hand moves (0: none)
+  const double drama = kAuto / (1 + 2 * busy_);
   m_.setHands(knob("PJ_HARP_CUPPED", 0.012), 0.05);
   handsOpen_ = false;
   handOpenAt_ = urand() < 0.45 * drama ? 0.5 + 0.4 * urand() : -1;
@@ -400,8 +428,9 @@ void HarmonicaPlayer::noteOff(int midi) {
     m_.setBreath(0);
   }
   // The phrase's end, or a rest: the hands open ("doo-wah"), more with less around.
-  const double drama = 1 / (1 + 2 * busy_);
-  handOpenAt_ = urand() < 0.35 + 0.65 * drama ? (now_ - noteOnAt_) + 0.15 * urand() : -1;
+  static const double kAuto = knob("PJ_HARP_HANDS", 1);
+  const double drama = kAuto / (1 + 2 * busy_);
+  handOpenAt_ = kAuto > 0 && urand() < 0.35 + 0.65 * drama ? (now_ - noteOnAt_) + 0.15 * urand() : -1;
 }
 
 void HarmonicaPlayer::render(float* out, int n) {
@@ -420,8 +449,17 @@ void HarmonicaPlayer::render(float* out, int n) {
       for (auto& s : sounding_) lead = s.first;
       const double down = std::min(2 * roll_, 0.0) + scoop_;
       const double fN = 440 * std::exp2((std::clamp(lead, 48, 98) - 69) / 12.0);
-      const double w = smooth01(-down / 0.2);
-      const double fT = std::exp(std::log(restHz()) * (1 - w) + std::log(fN * std::exp2(down / 12) * 1.04) * w);
+      // Bending, the player tunes the tract above the wanted pitch and listens: too low, the
+      // tongue moves the resonance up (the reed pulled less), too high, down (~30 ms).
+      const double want = fN * std::exp2(down / 12);
+      if (down < -0.02) {
+        const double heard = m_.heardHz();
+        if (heard > 0) tractCorr_ = std::clamp(tractCorr_ - std::log(heard / want) * dt / 0.03, -0.1, 0.6);
+      } else {
+        tractCorr_ = 0.04;
+      }
+      const double w = smooth01(-down / 0.1);
+      const double fT = std::exp(std::log(restHz()) * (1 - w) + (std::log(want) + tractCorr_) * w);
       m_.setTract(fT, restQ() + (10 - restQ()) * std::min(1.0, -down));
     } else if (endBreath_ && now_ - offAt_ > 0.08) {
       m_.setBreathTau(0.05);
@@ -440,6 +478,10 @@ void HarmonicaPlayer::render(float* out, int n) {
     const double held = now_ - noteOnAt_;
     const double habit = !held_.empty() && held > 0.35 ? habitTrem_ * smooth01((held - 0.35) / 0.4) : 0;
     m_.setTremolo(std::max(flutter_, habit), 6.5);
+    static const bool kDebug = std::getenv("PJ_HARP_DEBUG") != nullptr;
+    if (kDebug && int(now_ * 1000) % 10 == 0)
+      std::fprintf(stderr, "%.3f hole %d row %d held %zu snd %zu dir %d pL %.0f bdir %d scoop %.2f corr %.2f heard %.0f lung %.2f\n", now_, hole_, row_, held_.size(),
+                   sounding_.size(), dir_, m_.breath(), m_.breathDir(), scoop_, tractCorr_, m_.heardHz(), m_.lungFill());
     m_.process(out + i, m);
   }
   if (held_.empty() && !endBreath_) blowing_ = !m_.asleep();

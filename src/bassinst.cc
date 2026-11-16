@@ -120,12 +120,16 @@ extern const Instrument kPlucked[] = {
     {"stick-snare", 0, 36, 44, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     // The church organ's first rank (src/organ.cc; research/church_organ.md): Gedackt 8', C2..C7.
     {"gedackt-8", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"rohrgedackt-8", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"gedackt-rohrgedackt", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
     // The free reeds with a bellows (src/accordion.cc; research/free_reeds.md): the accordion's musette
     // and bass (General MIDI 22), the bandoneón (24, the tango accordion).
     {"accordion", 0, 24, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "accordion"},
     {"bandoneon", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bandoneon"},
     // The chromatic harmonica (src/harmonica.cc; research/harmonica.md): 16 holes, C3..D7 (General MIDI 23).
     {"harmonica", 0, 48, 98, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "harmonica"},
+    // The reed organ (src/harmonium.cc; research/reed_organ.md): a pressure harmonium, C2..C7 (General MIDI 21).
+    {"reed-organ", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "reed organ"},
 };
 extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 

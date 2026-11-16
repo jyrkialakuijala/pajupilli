@@ -1,22 +1,35 @@
-// The church organ (research/church_organ.md), its first rank: Gedackt 8'
-// (-inst gedackt-8), a stopped wooden flute, C2..C7 (MIDI 36..96; 8' C at
-// 65.4 Hz). Each key its own pipe (src/organpipe.h: the jet and the stopped
-// column's odd modes), voiced for its pitch and calibrated when built so it
-// speaks in tune. The chest: C side and C# side, the pipes alternating left
-// and right by semitone, the big ones outside. Steady wind for now (the
-// blower, reservoirs and the wind's sag: §4a, later). The keys have no
-// velocity: an organ's pallet opens the same however the key is struck.
+// The church organ (research/church_organ.md), its first ranks, each key its
+// own pipe (src/organpipe.h: the jet and the column's modes), voiced for its
+// pitch and calibrated when built, at its place in its division
+// (src/organbox.h), every division on a divided chest: the C side on the
+// left, the C# side on the right.
+//
+//   -inst gedackt-8       Schwellwerk Gedackt 8': stopped wood, in two swell
+//                         boxes high on the gallery, ~5 m apart (the C side's
+//                         box left, the C#'s right), the bass octave offset
+//                         along each box's back wall; the swell pedal (the
+//                         dynamics knob, the breath) opens both boxes' shutters.
+//   -inst rohrgedackt-8   Positiv Rohrgedackt 8': metal with chimneys, in the
+//                         Rückpositiv's open case at the gallery rail (its two
+//                         halves C left, C# right), nearer the church.
+//   -inst gedackt-rohrgedackt  both drawn, the manuals coupled: each key sounds
+//                         both, from the boxes and from the rail; the swell box
+//                         a little warmer, so the two flutes beat gently.
+// Steady wind for now (the blower and the wind's sag: §4a, later). The keys
+// have no velocity (a pallet opens the same however the key is struck).
 #pragma once
 
+#include <memory>
 #include <vector>
 
+#include "organbox.h"
 #include "organpipe.h"
 #include "performer.h"
 #include "tube.h"
 
 namespace pajupilli {
 
-bool organRank(const Instrument& inst);  // -inst gedackt-8
+bool organRank(const Instrument& inst);
 
 class OrganModel : public Tube {
  public:
@@ -24,19 +37,29 @@ class OrganModel : public Tube {
   static constexpr int kLo = 36, kHi = 96;
   void open(int midi);
   void close(int midi);
+  void setSwell(double s);  // 0 closed .. 1 open
   bool asleep() const;
   double testResponse() const override { return last_; }
   const float* takeSide(int n) override;
   void resetAir() override;
 
  private:
+  struct Pipe {
+    FluePipe p;
+    int enc = 0, src = 0;
+    int near[4] = {-1, -1, -1, -1};  // the neighbours on its chest (a whole tone, two, away)
+    float nearG[4] = {};
+    float y = 0;     // its last sample
+    float hear = 1;  // how strongly its jet hears the field at its mouth
+  };
   void controlStep() override {}
   float sample() override;
-  std::vector<FluePipe> pipes_;
-  std::vector<float> pan_;  // each pipe's place across the chest, -1 .. 1
+  void addRank(int rank);
+  std::vector<Pipe> pipes_;
+  std::vector<int> byKey_[128];
+  std::vector<Enclosure> enc_;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
-  float sideNow_ = 0;
 };
 
 class OrganPlayer : public Performer {
@@ -50,7 +73,6 @@ class OrganPlayer : public Performer {
 
  private:
   OrganModel& m_;
-  bool down_[128] = {};
 };
 
 }  // namespace pajupilli
