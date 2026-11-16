@@ -77,7 +77,7 @@ class ModalModel : public Tube {
   // The vibraphone: bar i (MIDI 53 + i) is vibrator i; its fundamental is
   // mode 0, the air in its resonator mode kVibAir, coupled by a spring the
   // fan's discs open and close.
-  static constexpr int kVibLo = 53, kVibBars = 37, kVibAir = 6;
+  static constexpr int kVibLo = 53, kVibBars = 37, kVibAir = 6, kVibHigh = 8;
 
  private:
   void controlStep() override {}

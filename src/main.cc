@@ -845,7 +845,9 @@ int main(int argc, char** argv) {
       if (w == "on") {
         int m = 0, vel = 0;
         is >> m >> vel;
-        if (!inRange(m, "-seq")) return 1;
+        // (Below the melody's range an instrument may have drones: those keys are its too.)
+        const bool drone = gInst->droneLo >= 0 && m >= gInst->droneLo + gInst->transpose && m < lo;
+        if (!drone && !inRange(m, "-seq")) return 1;
         pl.noteOn(m, vel);
         std::printf("%6.3f s  on  %-4s v%-3d %s\n", t, noteName(m), vel, pl.articulation());
       } else if (w == "off") {

@@ -65,6 +65,10 @@ constexpr LevelTrim kLevelTrims[] = {
     {"tubular-bells", -4.0f},
     {"music-box", 23.0f},
     {"dulcimer", 16.0f},
+    {"nylon-guitar", 23.0f},
+    {"harpsichord", 24.0f},
+    {"harpsichord-8", 26.0f},
+    {"harpsichord-full", 20.0f},
     {"jazz-kick", -4.3f},
     {"jazz-kick-20", -5.4f},
     {"maracas", -2.9f},
@@ -104,10 +108,14 @@ constexpr LevelTrim kLevelTrims[] = {
     {"fx-crystal", -4.9f},
     {"perc-extras", 10.1f},  // (12 dB under the common level, by hand: small sounds, and their clicks peak high)
     {"stick-snare", -1.0f},  // (by hand: 2 dB under the common level, so an accent (velocity 127) peaks near 1.2)
+    {"vibraphone-25r", -0.8f},  // (the vibraphone with Balter 25R mallets: brighter and louder at velocity 90)
+    {"gedackt-8", 3.0f},  // (the organ's Gedackt 8': measured -31.2 LUFS at three notes, voiced to a recorded Bourdon)
     {"hand-clap", 0.0f},     // (by hand, by the peak: ~0.6 at velocity 100; ~10 dB under the common loudness, as short sounds are)
     {"claves", 1.0f},        // (by hand: a peak ~0.8 at velocity 100)
     {"wood-blocks", 0.0f},   // (by hand, by the peak: ~0.8 at velocity 100; ~9 dB under the common loudness)
     {"surdo", -0.2f},
     {"bell-tree", -4.5f},
+    {"accordion", -3.7f},  // (measured -24.5 LUFS at three notes, the median -28.2)
+    {"bandoneon", -5.7f},  // (measured -22.5 LUFS)
 };
 }  // namespace pajupilli

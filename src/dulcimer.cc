@@ -20,6 +20,9 @@ PianoDesign dulcimerDesign() {
   des.name = "dulcimer";
   static const double kE = 2.02e11, kRho = 7850;
   const double hard = knob("PJ_DULCIMER_HARD", 6.0), near = knob("PJ_DULCIMER_STRIKE", 0.14);
+  // x the grand's string losses, at the bottom and at the top key.
+  const double ring = knob("PJ_DULCIMER_LOSS", 4.8), ring2 = knob("PJ_DULCIMER_LOSS2", 2.2);
+  const double ringTop = knob("PJ_DULCIMER_LOSSTOP", 1.6), ring2Top = knob("PJ_DULCIMER_LOSS2TOP", 1.0);
   for (int key = 1; key <= 88; ++key) {
     PianoKey& s = des.key[key - 1];
     const int midi = key + 20;
@@ -46,6 +49,11 @@ PianoDesign dulcimerDesign() {
     s.nap = 0;
     s.napK = 0;
     s.hasDamper = false;
+    // The strings lose their sound far sooner than a grand's: short, thin
+    // wire on small bridges over a light board. (By ear: about 2.5 s to
+    // -30 dB at the bottom, under a second at the top.)
+    s.loss *= ring * (1 + (ringTop / ring - 1) * (key - 1) / 87.0);
+    s.b2 *= ring2 + (ring2Top - ring2) * (key - 1) / 87.0;
   }
   tuneByPartials(&des);
   // The courses are never quite in tune with themselves: the shimmer.

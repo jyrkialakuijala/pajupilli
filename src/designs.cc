@@ -942,7 +942,7 @@ extern const Instrument kDesigned[] = {
     {"duduk", 0, 57, 73, 1, 1, 1, 48000, 0, false, false, 0, 0.3, Kind::kDoubleReed, &kDudukDesign, "duduk"},
     {"shawm", 0, 62, 74, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kShawmDesign, "shawm"},
     {"shehnai", 0, 60, 79, 1, 1, 1, 48000, 0, false, false, 0, 0.25, Kind::kDoubleReed, &kShehnaiDesign, "shehnai"},
-    {"bagpipe", 0, 67, 81, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kBagpipeDesign, "bagpipe"},
+    {"bagpipe", 0, 67, 81, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kBagpipeDesign, "bagpipe", 33},  // (drones down to A1)
     {"recorder", 0, 65, 88, 1, 1, 1, 48000, 0, false, false, 0, 1, Kind::kDuct, &kRecorderDesign, "recorder"},
     {"whistle", 0, 74, 93, 1, 1, 0.8, 96000, 0, false, false, 0, 0.8, Kind::kDuct, &kWhistleDesign, "whistle"},
     {"shakuhachi", 0, 62, 85, 1, 1, 1.3, 48000, 0, false, false, 0, 1, Kind::kEndBlown, &kShakuhachiDesign, "shakuhachi"},

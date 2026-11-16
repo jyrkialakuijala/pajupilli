@@ -177,6 +177,10 @@ int Ensemble::holding() const {
 int Ensemble::fold(int f, int key, int* octaves) const {
   const Slot& s = f_[f];
   if (octaves) *octaves = 0;
+  // A drone (below the melody's range, down to the instrument's drones):
+  // played where it is, its pipe tuned to it.
+  const int dl = s.v->instrument().droneLo;
+  if (dl >= 0 && key >= dl + s.v->instrument().transpose && key < s.lo) return key;
   // An ensemble never moves a note by an octave: only instruments that reach it.
   if (mixed_) return key >= s.lo && key <= s.hi ? key : -1;
   int p = key, o = 0;

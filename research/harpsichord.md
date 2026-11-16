@@ -1,6 +1,7 @@
 # A large harpsichord with 16', 8', 8', 4' and a pedal instrument: research and plan
 
-Status: 2026-11-15, research only; nothing is built. SI units. Pitches by MIDI-style names (C4 =
+Status: 2026-11-16: the first stage is built (section 9: the four choirs, the plectrum, the
+registers; `-inst harpsichord`). What follows was the research before it (2026-11-15). SI units. Pitches by MIDI-style names (C4 =
 middle C); A4 = 415 Hz unless stated.
 
 This file adds the registers, the 16' choir, the pedal instrument and the way onto the grand's
@@ -294,3 +295,42 @@ Besides those of `research/harpsichord_clavinet.md` §7:
 - The Cambridge Companion to the Harpsichord, "History and construction of the harpsichord"
   (registers, stops; through search summaries).
   https://www.cambridge.org/core/books/cambridge-companion-to-the-harpsichord/history-and-construction-of-the-harpsichord/3A52A2F5D80CF9382932EF6E1024EA02
+
+## 9. As built (2026-11-16): the first stage
+
+`src/harpsichord.h/.cc` on `src/piano.*`; `-inst harpsichord` (8' + 8', General MIDI 7),
+`harpsichord-8` (the back 8' alone), `harpsichord-full` (16' 8' 8' 4'); `PJ_HPSI_STOPS=16,8,4`
+(any list) chooses the registers otherwise. A4 = 440 Hz (`PJ_HPSI_A4`), keys F1–F6, others folded
+in by octaves.
+
+- **In `Piano` (the grand stays bit-identical, checked):** `PianoDesign::kMaxKeys` 88 → 256; a
+  key's own top frequency; the plectrum as a second exciter (`PianoKey::pluckK`, `pluckLimit`,
+  `pluckSide`): a spring of 1200 N/m on a jack rising at the key's speed (0.15–0.5 m/s), solved
+  against the string's give, that lets go when its force passes the limit (1.2 N treble to 2.5 N
+  bass; × 0.7 for the 4', × 1.4 for the 16'); the string leaves upward and a third as much
+  sideways.
+- **The design:** 4 × 61 strings, each a key: the scales of §3 (Taskin's 8' and 4' shortened to
+  c'' = 340 mm, the 16' table, its lowest octave and a half overspun); plucking points an eighth
+  to a third (the front 8' 15 mm further, the 16' a tenth to a quarter); the two directions
+  14 cents apart; a cloth damper per string; modes to 12 kHz (16': 8 kHz).
+- **The player:** the registers as above; the rows staggered by 0.6 mm of key travel (back 8',
+  4', front 8', 16'); the sustain pedal as a register pedal (§5.2's first reading): down, it adds
+  the 4' and the 16' from the next pluck on.
+- **Measured on it:** the sound starts 3–11 ms after the key (27 ms for the full bass: the jack's
+  way to the let-go); decay 5 dB/s at C2, 8 at C4, 15 at C6; a released note falls 28–97 dB in
+  0.3 s; in tune within 2 cents; all four choirs under dense random playing 36 % of a core (the
+  plan's 5–15 % was for ordinary playing; not yet measured on music).
+- **Tuning (the user: "use just tuning on harpsichord"):** fixed five-limit just intonation on
+  the song's tonic: 1, 16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3, 9/5, 15/8, every octave
+  alike, the tonic at its equal-tempered pitch. In `-play` the tonic is the file's key signature
+  (meta event 59), or, for a file with none or only the empty C major, the key whose
+  Krumhansl profile fits the notes' durations best; alone, C. `PJ_HPSI_TONIC`, `PJ_HPSI_TUNING=equal`.
+  Measured on C: E −13, G +2, A −15, B −11 cents against equal temperament. A piece that leaves
+  its key meets the scale's wolf intervals (D–A is 40/27, 22 cents narrow), as on such an
+  instrument; a historical temperament (Vallotti, Werckmeister) would be the remedy if wanted.
+- **Not built (the plan's steps 2–6):** the soundboard is the grand's, each string on the bridge
+  point of the piano key of its pitch and its share doubled (a harpsichord's board is far
+  lighter): this is the largest known fault, and with it the 16' has no board of its own. No
+  lengths behind the bridge, no air in the case, no buff or lute stops, no jack's tick on the way
+  back, no key knock, no pads for the registers in `-live`, no pedal instrument. Nothing is
+  fitted to a recording.

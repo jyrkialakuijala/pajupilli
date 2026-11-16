@@ -180,6 +180,10 @@ struct Instrument {
   Kind kind = Kind::kFlute;
   const Design* design = nullptr;
   const char* family = "flute";  // the ensemble's label ("flute 2", "sax 1")
+  // Below lo, down to droneLo: drones, not the melody (a bagpipe's drones,
+  // tuned each to its one pitch under the chanter's range); -1: none (a
+  // note below lo is folded up by octaves).
+  int droneLo = -1;
   bool reed() const { return kind == Kind::kReed || kind == Kind::kDoubleReed; }
   bool lip() const { return kind == Kind::kLip; }
   bool circuit() const { return kind == Kind::kCircuit; }

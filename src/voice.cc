@@ -10,6 +10,11 @@
 #include "bassinst.h"
 #include "modalinst.h"
 #include "barsinst.h"
+#include "guitarinst.h"
+#include "organ.h"
+#include "accordion.h"
+#include "harmonica.h"
+#include "harpsichord.h"
 #include "hihatinst.h"
 #include "kick.h"
 #include "percextras.h"
@@ -111,12 +116,16 @@ std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.reed()) return std::unique_ptr<Tube>(new Reed(inst));
   if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));
   if (inst.circuit()) return std::unique_ptr<Tube>(new Lead(inst));
-  if (inst.plucked() && grandPiano(inst)) return std::unique_ptr<Tube>(new PianoModel(inst));
+  if (inst.plucked() && (grandPiano(inst) || harpsichord(inst))) return std::unique_ptr<Tube>(new PianoModel(inst));
   if (inst.plucked() && electricGrand(inst)) return std::unique_ptr<Tube>(new Cp80Model(inst));
   if (inst.plucked() && clavinet(inst)) return std::unique_ptr<Tube>(new ClavinetModel(inst));
   if (inst.plucked() && brushSnare(inst)) return std::unique_ptr<Tube>(new SnareModel(inst));
   if (inst.plucked() && stickSnare(inst)) return std::unique_ptr<Tube>(new StickSnareModel(inst));
   if (inst.plucked() && hiHat(inst)) return std::unique_ptr<Tube>(new HiHatModel(inst));
+  if (inst.plucked() && guitarInstrument(inst)) return std::unique_ptr<Tube>(new GuitarModel(inst));
+  if (inst.plucked() && organRank(inst)) return std::unique_ptr<Tube>(new OrganModel(inst));
+  if (inst.plucked() && accordionInstrument(inst)) return std::unique_ptr<Tube>(new AccordionModel(inst));
+  if (inst.plucked() && harmonicaInstrument(inst)) return std::unique_ptr<Tube>(new HarmonicaModel(inst));
   if (inst.plucked() && barInstrument(inst)) return std::unique_ptr<Tube>(new BarsModel(inst));
   if (inst.plucked() && jazzKick(inst)) return std::unique_ptr<Tube>(new KickModel(inst));
   if (inst.plucked() && shakerInstrument(inst)) return std::unique_ptr<Tube>(new ShakerModel(inst));
@@ -139,6 +148,8 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
   if (t.instrument().reed()) return std::unique_ptr<Performer>(new ReedPlayer(static_cast<Reed&>(t)));
   if (t.instrument().lip()) return std::unique_ptr<Performer>(new HornPlayer(static_cast<Horn&>(t)));
   if (t.instrument().circuit()) return std::unique_ptr<Performer>(new LeadPlayer(static_cast<Lead&>(t)));
+  if (t.instrument().plucked() && harpsichord(t.instrument()))
+    return std::unique_ptr<Performer>(new HarpsichordPlayer(static_cast<PianoModel&>(t)));
   if (t.instrument().plucked() && grandPiano(t.instrument()))
     return std::unique_ptr<Performer>(new PianoPlayer(static_cast<PianoModel&>(t)));
   if (t.instrument().plucked() && electricGrand(t.instrument()))
@@ -147,6 +158,14 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
     return std::unique_ptr<Performer>(new ClavinetPlayer(static_cast<ClavinetModel&>(t)));
   if (t.instrument().plucked() && barInstrument(t.instrument()))
     return std::unique_ptr<Performer>(new BarsPlayer(static_cast<BarsModel&>(t)));
+  if (t.instrument().plucked() && guitarInstrument(t.instrument()))
+    return std::unique_ptr<Performer>(new GuitarPlayer(static_cast<GuitarModel&>(t)));
+  if (t.instrument().plucked() && organRank(t.instrument()))
+    return std::unique_ptr<Performer>(new OrganPlayer(static_cast<OrganModel&>(t)));
+  if (t.instrument().plucked() && accordionInstrument(t.instrument()))
+    return std::unique_ptr<Performer>(new AccordionPlayer(static_cast<AccordionModel&>(t)));
+  if (t.instrument().plucked() && harmonicaInstrument(t.instrument()))
+    return std::unique_ptr<Performer>(new HarmonicaPlayer(static_cast<HarmonicaModel&>(t)));
   if (t.instrument().plucked() && hiHat(t.instrument()))
     return std::unique_ptr<Performer>(new HiHatPlayer(static_cast<HiHatModel&>(t)));
   if (t.instrument().plucked() && jazzKick(t.instrument()))

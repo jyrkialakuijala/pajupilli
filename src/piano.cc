@@ -194,7 +194,7 @@ void Piano::build() {
   str_.clear();
   for (int k = 0; k < kKeys; ++k) {
     const PianoKey& s = sc[k];
-    const double fmax = lerp(top, topTreble, (k + 1 - 40) / 12.0);
+    const double fmax = s.top > 0 ? std::min(0.45 * fs_, s.top) : lerp(top, topTreble, (k + 1 - 40) / 12.0);
     const double f0 = s.f1 / std::sqrt(1 + s.B);
     int n = 0;
     while (n < 176 && (n + 1) * f0 * std::sqrt(1 + s.B * (n + 1) * (n + 1)) < fmax) ++n;
@@ -209,6 +209,9 @@ void Piano::build() {
     key_[k].p = float(s.p);
     key_[k].nap = float(s.nap);
     key_[k].napK = float(s.napK);
+    key_[k].pluckK = float(s.pluckK);
+    key_[k].pluckLimit = float(s.pluckLimit);
+    key_[k].pluckSide = float(s.pluckSide);
     key_[k].hasDamper = s.hasDamper;
     key_[k].damperDown = key_[k].hasDamper;
     key_[k].engage = key_[k].hasDamper ? 1 : 0;
@@ -432,7 +435,7 @@ void Piano::strike(int key, double speed) {
     s.active = true;
     s.dPrev = 0;
   }
-  k.eta = lowest - 1e-4f;
+  k.eta = k.pluckK > 0 ? lowest : lowest - 1e-4f;  // (a plectrum starts touching its string)
   k.vh = float(speed);
   k.hammerOn = true;
   wake();
@@ -456,7 +459,41 @@ void Piano::damper(int key, bool down) {
 // string at the end of the sample depends on the force during it (the string
 // gives way, the hammer is slowed): solved for, not stepped (a hard blow on a
 // stiff felt would otherwise overshoot).
+// The plectrum: a spring between the rising jack and the string. It bends
+// (the string hardly moving: this takes some milliseconds and is not heard)
+// until its force passes the limit; then the string is off its tip.
+void Piano::pluck(Key& k) {
+  const float reach = k.eta + dt_ * k.vh;  // the jack a sample on
+  float total = 0;
+  bool gone = false;
+  for (int j = 0; j < k.ns; ++j) {
+    const Str& s = str_[k.s0 + j];
+    float* x = x_[0] + s.off;
+    float* v0 = v_[0] + s.off;
+    float* v1 = v_[1] + s.off;
+    const float *hc = hc_ + s.off, *hs = hs_ + s.off, *hk = hk_ + s.off;
+    float y = 0;
+    for (int i = 0; i < s.n; ++i) y += hc[i] * x[i] + hs[i] * v0[i];
+    const float f = reach > y ? k.pluckK * (reach - y) / (1 + k.pluckK * s.comply) : 0;
+    if (f >= k.pluckLimit * voicing_) { gone = true; continue; }
+    if (f <= 0) continue;
+    const float f1 = f * k.pluckSide;
+    for (int i = 0; i < s.n; ++i) {
+      v0[i] += hk[i] * f;
+      v1[i] += hk[i] * f1;
+    }
+    total += f;
+  }
+  k.eta = reach;
+  k.force = total;
+  if (gone) {
+    k.hammerOn = false;
+    k.force = 0;
+  }
+}
+
 void Piano::hammer(Key& k) {
+  if (k.pluckK > 0) { pluck(k); return; }
   static const float kHyst = float(knob("PJ_PIANO_HYST", 0.25));  // s/m: more force pressing than releasing
   const float K = k.K * voicing_, p = k.p;
   const float hm = dt_ * dt_ / k.mh;

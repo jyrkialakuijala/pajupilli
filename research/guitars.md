@@ -1,6 +1,7 @@
 # Guitars (GM 25–32) and electric basses (GM 34–38) as physical models — research and plan
 
-Status: 2026-11-16. Research only; nothing is built. SI units.
+Status: 2026-11-16. The classical guitar (GM 25) is built (section 13); the rest is research.
+SI units.
 
 Marks:
 - **[paper]**: read in the source (or its abstract), listed at the end.
@@ -597,3 +598,99 @@ silent), the material to fit against.
   guitar", PhD thesis, Cardiff, 1997.
 - **Body model:** [memory] O. Christensen, B. B. Vistisen, "Simple model for low-frequency guitar
   function", JASA 68, 1980. https://typeset.io/pdf/simple-model-for-low-frequency-guitar-function-plccqpv99x.pdf
+
+## 13. As built (2026-11-16): the classical guitar
+
+`src/guitar.h/.cc` (the model), `src/guitarinst.h/.cc` (the instrument and the guitarist);
+`-inst nylon-guitar`, GM 25 in `-play`. Not on `src/bass.*` as §0 proposed, but a new, smaller
+class with the same parts, so the bass stays as it is.
+
+- **Strings:** §1.1's classical table; 48 modes in each of two directions; amplitude decay
+  loss0 + loss1 k^1.2 with loss0 1.1–2.0 /s and loss1 0.10–0.36 [est, to be fitted]; along the top
+  a string is 0.15 % sharp of towards it [est].
+- **Bridge and body:** the strings' pull on the bridge drives 28 body resonances (100, 200, 236,
+  290, 400 Hz, then 23 from 455 Hz to 3.2 kHz), each a mass under the bridge (0.3 kg for the top's
+  first, mobility peak about 0.06 m/(s N)) with its own share of the sound and its own mix of the
+  two string directions [est]. The bridge's acceleration drives every string's modes.
+- **Pluck:** a force at the plucking point (12 cm from the bridge by default) rising over 5 ms
+  while the finger damps the string, then falling in two stages: off the flesh (9 mm wide, about
+  2 ms) and off the nail (1.5 mm, 0.5 ms).
+- **The guitarist:** §7.2 as a greedy choice per note (free string, near the hand, low, open
+  preferred, strings in the notes' order); §7.3's pinch: 3–9 ms between strings, the thumb first;
+  note-off damps (45 /s), the pedal lets ring.
+- **Measured on it:** in tune within 1 cent; a released note 23 dB down after 0.6 s; after an A4
+  the open strings carry 34 dB more at 440 Hz than after a B-flat (they ring along); first decay
+  about 12 dB/s on the low E, 25–45 dB/s on the trebles (fastest near the top's resonance), then
+  slower; 0.7 % of a core in random playing.
+- **By the user's ear, the same day:**
+  - *Vibrato:* a held note with nothing else happening gets a left-hand vibrato, the string pushed
+    up along the fret (pitch rises and returns, never flat), about 14 cents × the string's
+    suitability (B and G 1, high E 0.6, D 0.7, A 0.15, low E none) × the place on the neck (full
+    from the 7th fret, little under the 5th), 4.5–5.8 Hz. It enters 0.6 s after the note if nothing
+    was played since 150 ms after its start; 0.45 s when the recent gaps between strokes are short,
+    0.9 s and slower when long. A note that comes alone after a pause is fingered for it (B or G
+    string, frets 5–10, never open) and always gets it. In `-play` other parts' note-ons within
+    two octaves count as "something played", with certainty within an octave and linearly less to
+    two octaves (`SongClock::lastOn`).
+  - *Mending the tuning:* under the same calm, notes are pulled up (never down, never open
+    strings) by chord: the chord's pitch classes are those held on the guitar plus those other
+    parts began within 2 s. A minor chord is a root r with r+3 present and r+4 absent, where r is
+    not the major third (r−4 present) or the fifth (r−7 and r−3 present) of a major chord
+    sounding. In it: the minor third +13 cents, the minor seventh +17, the major seventh +11,
+    the major thirteenth +18 (the user's numbers). In a major chord (r and r+4): the ninth +4. Measured: D minor 7's
+    seventh +18 and third +11; the major seventh of a minor chord +10 to +13; C major 9's ninth
+    +4; the seventh of D7 +1 and the fifth of C major +3 (left alone).
+  - *The same note repeated:* each stroke differs by the velocity change and the spacing (rest
+    stroke nearer the bridge on a rise of more than 8; nearer the fingerboard on more flesh on a
+    fall; otherwise alternating nail share and a wandering plucking point, scaled by the gap),
+    with the depth compensated so even repeats stay within about 3 dB.
+  - *Strumming (the user's design):* a detector: the third and later of strings sounded within
+    60 ms of each other in one direction, or 5–6 notes at once, or a chord of 3 or more within
+    1.5 s of the last strum. A strummed string gets a passing hand, not a planted finger (rise
+    1.2 ms, little damping), 17 cm from the bridge, the force along the top in the hand's
+    direction; velocity sets the depth only; the hand's speed across the strings is constant
+    (1.4 m/s, 10.5 mm string spacing: 7.5 ms a string). Down: nail share 0.85–0.95, the first
+    strings 25 % deeper. Up: nail 0.4–0.55, 25 % shallower, less again on the strings reached
+    last. Measured: six strings at once take 52 ms from the first string to the loudest moment at
+    velocities 45, 80 and 115 alike, at −13, −8 and −4 dB; up strokes 3–8 dB under down strokes; a
+    strum's spectral centre about 300–350 Hz against a three-note pinch's 233 Hz.
+  - *Picking's colour by velocity (the user):* flesh alone when soft (nail share 0 up to velocity
+    40), rising smoothly to 0.8 (0.5 for the thumb) by velocity 105; above 107 the nail's knock
+    (a 0.6 ms force pulse against the pull, through the nail's narrow contact). Measured on E4,
+    share of the first 100 ms between 0.8 and 2 kHz: −42 dB at velocity 30, −21 at 70, −18 at 127;
+    between 2 and 5 kHz: −59, −43, −36.
+  - *Strums are soft (the user):* broad flesh-and-nail contact (11 mm and 3 mm going down, 16 and
+    6 mm coming up), slower release, nail share 0.4–0.5 down and 0.15–0.25 up whatever the
+    velocity, and never the knock: a nail's rounded back flexes where its hollow side and edge
+    are stiff. Measured, a strummed chord at velocity 60 and at 127: 0.8–2 kHz share −33 dB both,
+    2–5 kHz −61 dB both, only the level differs (−16 and −9 dB).
+  - *Strum direction (the user, with seven common patterns as D / U / rest charts):* the hand
+    is a pendulum: its swing is the shortest gap between recent strums (learned from gaps of one
+    swing), a strum n swings after the last goes the other way for odd n and the same way for
+    even n; after 1.6 s without one: down; 5 % of strums go against it. With the song clock, a
+    strum within 0.12 beat of a beat is down with probability 0.85, of the bar's first beat 0.97.
+    With the clock, the last bar's pattern (its strums' ways by sixteenth; "clear" if it had three
+    or more) pulls: where this bar's reading differs from it at the same place, the last bar's
+    way is taken with probability 0.3. Checked on eight bars of one pattern with 30 % of strums
+    made to go against the swing: 28 of 42 strums agree with the bar before without the pull, 34
+    with it, 42 at 0.8; as set (5 % against the swing) all 42.
+    Checked without the clock: eighths give D U D U D U D U; "D - D U - - D -" and
+    "D - D U - U D U" come out exactly.
+  - *One stroke, one depth (the user):* a strum's depth comes from the chord's mean velocity,
+    compressed (0.3 + 0.5 × the mean, in velocity's 0–1), the same for every string but for a
+    little more on the bass strings going down (up to 15 %), a little more on the middle strings
+    coming up (12 %) and less on the highest (× 0.82). Measured: all notes at velocity 20, 50, 80,
+    110, 127 give −19.6, −17.3, −15.3, −13.6, −12.7 dB (7 dB in all); six unequal velocities
+    sound exactly as their mean.
+  - *What a stroke takes from a ringing string (the user):* picking stops it (the finger plants);
+    a down strum hardly touches it; an up strum's pad eats some. Measured, a nearly silent strum
+    over a loud ringing chord: down −0.4 dB, up −4.8 dB.
+  - *The nail's two sides (the user):* picking, the string lies in the nail's hollow side, held
+    sharply at two places about 3 mm apart; strumming, it meets the rounded back. Modelled as two
+    narrow contacts 3 mm apart for the picked nail; within the 48 modes this changes the highest
+    partials by under 1 dB.
+  - *Ring:* the strings' losses × 0.8, the 2nd and 3rd partials' × 0.55 again, the 4th and 5th's
+    × 0.78 (asked for next: "slightly longer, but not as much"): those partials now
+    lose about half as many dB per second (E5: 32 → 17 and 34 → 15).
+- **Not built:** the fit to the separated recordings of §11.2; fret buzz; tension modulation;
+  slides, hammer-ons, bends, harmonics; the whole-file fingering (Viterbi); live controls.

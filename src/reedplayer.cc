@@ -47,6 +47,21 @@ void ReedPlayer::setHold(bool h) {
 }
 
 void ReedPlayer::noteOn(int midi, int velocity) {
+  // A bagpipe's low keys: its drones, each pipe tuned to its key (and
+  // sounding as long as it is held, from the bag).
+  if (bag_ && inst_.droneLo >= 0 && midi < inst_.lo + inst_.transpose && midi >= inst_.droneLo + inst_.transpose) {
+    Drone* d = nullptr;
+    for (Drone& x : drones_)
+      if (x.midi == midi) d = &x;
+    for (Drone& x : drones_)
+      if (!d && !x.pipe.sounding()) d = &x;
+    if (!d) { d = &drones_[droneNext_]; droneNext_ = (droneNext_ + 1) % 4; }
+    d->midi = midi;
+    d->pipe.start(fs_, 440.0 * std::exp2((midi - 69) / 12.0) * (1 + 0.0015 * urand()), unsigned(midi * 7 + droneNext_));
+    blowing_ = true;
+    (void)velocity;
+    return;
+  }
   if (!info(midi)) return;
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
@@ -87,6 +102,8 @@ void ReedPlayer::noteOn(int midi, int velocity) {
 
 void ReedPlayer::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
+  for (Drone& d : drones_)
+    if (d.midi == midi) { d.pipe.stop(); d.midi = -1; return; }
   held_[midi] = 0;
   int w = 0;
   for (int r = 0; r < stackTop_; ++r)
@@ -228,6 +245,21 @@ void ReedPlayer::render(float* out, int n) {
     e.air = air_;
     reed_.setEmbouchure(e);
     reed_.process(out + i, m);
+    // The drones, from the same bag (their level against the chanter's:
+    // PJ_DRONE_GAIN).
+    if (bag_) {
+      static const float kDroneGain = float(knob("PJ_DRONE_GAIN", 0.1));
+      static const float kBag = float(knob("PJ_DRONE_BAG", 0.85));
+      bool any = false;
+      for (Drone& d : drones_)
+        if (d.pipe.sounding()) {
+          any = true;
+          for (int j = 0; j < m; ++j) out[i + j] += kDroneGain * d.pipe.sample(kBag);
+        }
+      if (any && note_ < 0) blowing_ = true;
+      else if (!any && droneOn_ && note_ < 0) blowing_ = false;  // (the last drone gone quiet)
+      droneOn_ = any;
+    }
     // (An error over 120 cents is another regime, not a matter for the lips:
     // chasing the attack's flat start pushed the duduk's A4 into G4.)
     if (ear_ && note_ >= 0 && earClock_ > kEarStart_) listen(out + i, m, earCorr_, earCents_, earClock_, 150, 0.05, 0, kEarRange_);

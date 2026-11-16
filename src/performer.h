@@ -53,6 +53,9 @@ class Performer {
   // Its own breath wander, and its own vibrato and flutter: rate, phase and
   // depth differ from player to player, so an ensemble never pulses together.
   virtual void seed(unsigned s) = 0;
+  // (-play) How much the other parts are playing in this instrument's register just now (0:
+  // nothing, ~1: a full texture). A soloist plays with more drama over less (the harmonica's hands).
+  virtual void setAccompaniment(double /*busy*/) {}
 
   void setDynamics(double d) { dyn_ = d; }      // 0 pp .. 1 ff (breath, lip opening)
   void setBreath(double b) { breathCtl_ = b; }   // added to dynamics (joystick, pad pressure)

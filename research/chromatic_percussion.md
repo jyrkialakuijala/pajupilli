@@ -92,6 +92,12 @@ piece where it is.
 - Hammers: 2–3.5 g of wood faced with leather: the grand's felt stiffness × 6, no soft layer
   **[est]**. No dampers: every note rings into the next. Unisons 0.8–1.2 cents apart: the shimmer
   **[est]**.
+- String losses: the grand's × 4.8 at the bottom falling to × 1.6 at the top, their rise with
+  frequency × 2.2 falling to × 1, set by ear in two steps (the first form kept the grand's and
+  rang 5.5 s to −30 dB at G4; the user then asked for about a second more than a shorter
+  setting). Measured now, to −30 dB: about 5 s in the lowest octave, 2–3 s in the middle,
+  1.1–1.6 s at the top, uneven from note to note (the decay has two stages and the threshold
+  falls in one or the other) **[est]**.
 - **The soundboard is still the grand's.** A dulcimer's small trapezoid of spruce and its two
   bridges are not modelled; this is the largest known fault.
 

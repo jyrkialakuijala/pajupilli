@@ -47,6 +47,13 @@ struct PianoKey {
   // long, gentle push, the fundamental and little else; a little harder
   // and it is flat within the blow, and the felt under it shapes the rest.
   double nap = 0, napK = 0;
+  // Not a hammer but a plectrum (pluckK > 0): a springy tongue (N/m) on a
+  // jack that rises at the key's speed, catches the string from below and
+  // bends until its force passes pluckLimit (N), where the string slips off
+  // its tip and flies: that let-go is the sound. The string leaves upward
+  // and, by the plectrum's slope, sideways (pluckSide of the upward force).
+  double pluckK = 0, pluckLimit = 0, pluckSide = 0;
+  double top = 0;                  // this key's modes up to here (Hz; 0: the design's rule by key number)
   double loss = 0, b2 = 0, b3 = 0; // the wire's own loss: loss + b2 f + b3 f^2 (1/s)
   bool hasDamper = true;
   double damper = 0, damperLen = 0, damperRate = 0;  // its place (share), felt length (m), rate (1/s)
@@ -56,7 +63,7 @@ struct PianoKey {
 // strings and hammers (research/piano_design.md): another scale, another or
 // no soundboard, microphones or a pickup.
 struct PianoDesign {
-  static constexpr int kMaxKeys = 88;
+  static constexpr int kMaxKeys = 256;  // (a harpsichord's four choirs: each string its own key)
   const char* name = "grand-piano";
   int keys = 88, lowMidi = 21;
   PianoKey key[kMaxKeys];
@@ -108,6 +115,8 @@ struct PianoDesign {
 PianoDesign grandDesign();
 // The hammered dulcimer (src/dulcimer.cc): its own scale, hammers and unisons.
 PianoDesign dulcimerDesign();
+// A large harpsichord (src/harpsichord.cc): four choirs, each string a key, plucked.
+PianoDesign harpsichordDesign();
 // A tuner's work on a design's keys (their B set): equal temperament on keys
 // [lo, hi] (numbered from 1, A4 = key 49 = 440 Hz), then octave by octave, a
 // partial of the lower note against one of the upper: 2 with 1 going up,
@@ -160,6 +169,7 @@ class Piano {
     double f1, B, len;
     float mh, K, p;       // the hammer: mass (kg), felt stiffness (N/m^p), exponent
     float nap = 0, napK = 0;  // the felt's nap: thickness (m), stiffness (N/m a string)
+    float pluckK = 0, pluckLimit = 0, pluckSide = 0;  // a plectrum in the hammer's place
     float eta = 0, vh = 0, force = 0;  // its place (m, from the strings' rest) and speed
     bool hammerOn = false;
     bool hasDamper = true, damperDown = true;
@@ -169,6 +179,7 @@ class Piano {
   };
   void build();
   void hammer(Key& k);
+  void pluck(Key& k);
   void wake();
   void boardNow();
   void census();

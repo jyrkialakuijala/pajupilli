@@ -15,6 +15,7 @@
 
 #include <cstdint>
 
+#include "drone.h"
 #include "performer.h"
 #include "reed.h"
 
@@ -40,6 +41,11 @@ class ReedPlayer : public Performer {
   double lung_ = 0, lungAttack_ = 0.008, sinceOff_ = 1e9, sinceOn_ = 0;
   // A bagpipe: the bag's steady pressure, no lips, no tongue; notes split by grace notes.
   bool bag_ = false;
+  // Its drones: a pipe for each low key held (below the chanter), tuned to it.
+  struct Drone { int midi = -1; DronePipe pipe; };
+  Drone drones_[4];
+  int droneNext_ = 0;
+  bool droneOn_ = false;
   double lungHeld_ = 0;  // the breath while the note was blown (for the release)
   double graceLeft_ = 0;
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;

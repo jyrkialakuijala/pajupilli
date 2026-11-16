@@ -493,6 +493,12 @@ The GM ethnic (105–112) and percussive (113–120) families, each researched f
 `reverse-cymbal` (the bagpipe and shehnai are woodwinds; the melodic tom and synth drum are circuits).
 One voice is one instrument, its player giving the keys to strings, tines, note areas or bells.
 
+The bagpipe (a woodwind, GM 110) has its drones too: a key below the chanter (G4-A5) down to A1 is a
+drone, a cylindrical pipe sounded by a single beating cane reed from the same bag, its tuning slide
+set to that key (`src/drone.h`: a quarter-wave waveguide, the reed as a pressure-controlled
+reflection, so the odd harmonics: the 3rd -10 dB, the 5th -15, the even ones -60), sounding while the
+key is held; a pair (A2, A3) sits ~6 dB under the chanter (`PJ_DRONE_GAIN`).
+
 - **The engine**: each vibrator is its lowest modes, each a damped oscillator stepped exactly
   (its free motion over a sample a matrix of four numbers), in two directions a hair apart. Strings
   push a bridge (tension × slope); the body's modes at the bridge move, and their acceleration
@@ -548,10 +554,172 @@ One voice is one instrument, its player giving the keys to strings, tines, note 
   tremolo is the tube coupling coming and going, not a volume knob (a low tube cannot empty
   quickly: at fast speeds the low notes pulse less). K4 switches the motor on and sets the depth
   (off: the discs left open), K5 its speed (0.7–5 Hz).
-- **Mallets and damper:** a yarn mallet (22 g) on a stiffening contact; the hardness knob from soft
-  (3 ms on the bar) to hard (0.7 ms). A released key is damped by the felt bar in ~0.3 s unless the
-  pedal is down.
+- **Mallets and damper:** yarn mallets (22 g) on a stiffening contact, as Mike Balter's Pro Vibe
+  series (`PJ_VIB_MALLET`): 24 (red, soft), 23 (blue, the default), 22 (green), 21 (yellow, hard),
+  25 (silver "jazz", very hard: firm from the first touch; `-inst vibraphone-25r`); all but the
+  softest made hard enough for the "blium", a bright start that turns at once into the tone. Each
+  mallet hardens gradually with the velocity (a soft stroke on the yarn alone, a hard one through
+  to the core: 0.75x at the softest, 1.35x at 127, `PJ_VIB_VELHARD`); the stroke's speed ~
+  velocity^1.2 keeps ~30 dB from 16 to 127 (the default; 24 dB with the #25). The bar hangs on cords
+  at its fundamental's nodes, which damp its overtones (x0.2 of a free bar's ring, `PJ_VIB_SUPPORT`):
+  the highs fall ~22 dB against the note in the first 0.3 s while the tube carries the fundamental
+  on; and its dense high modes (~6-16 kHz, 0.1-0.2 s) add the hardest strokes' sparkle. A released
+  key is damped by the felt bar in ~0.3 s unless the pedal is down.
 - **Cost:** about 1 % of a core with every bar ringing.
+
+### Classical guitar
+
+`-inst nylon-guitar` (GM 25; `research/guitars.md`, `src/guitar.cc`): the first of the guitars, the
+classical guitar with nylon strings. E2–B5; notes outside are moved in by octaves.
+
+- **Strings:** six, each swinging in two directions (towards the top plate and along it), fretted
+  by shortening. All six end on one bridge: the strings not played ring along with what is.
+- **Body:** the air in the box breathing through the soundhole (near 100 Hz), the top's first
+  resonance (near 200), the back's, and some twenty more up to 3 kHz, each a mass under the bridge.
+  Towards the top the bridge gives readily (loud, soon over); along it, little (quiet, ringing on):
+  a note's two-stage decay, set by how the string is plucked.
+- **Pluck:** a finger takes the string, pulls it aside and lets it go, first off the flesh (wide,
+  slow: round), then off the nail's edge (narrow, quick: bright). Picking is the guitar's own
+  voice, and velocity is its colour as much as its loudness: soft, the flesh alone (dark, round,
+  intimate); from the middle up a little nail and then more (crisp, woody); at the hardest the
+  nail knocks on the string as it takes it (the clack: more upper middle, never metallic).
+- **The guitarist:** chooses a string and a fret for every note (near the left hand, low on the
+  neck, open where it can be, a chord's notes on different strings); notes that come together are
+  one gesture, the thumb on the bass (a rest stroke) and the fingers after it a few milliseconds
+  apart. Velocity is how deep the pull and how much nail; the brightness knob moves the hand along
+  the string. A key let go damps its string; the sustain pedal lets everything ring.
+- **Vibrato:** when nothing else is happening, the left hand warms a held note: the finger pushes
+  the string up along its fret and lets it back, about five times a second, so the pitch rises
+  some cents and returns. It comes in after 0.6 s of the note with nothing new played (0.45 s when
+  the music has been busy; 0.9 s and slower when it has been slow). Mostly on the B and G strings
+  from the fifth fret up, never on an open string; a note that comes alone after a pause is taken
+  where vibrato is easy and always gets it. In a MIDI file the guitarist listens to the band as
+  well: another part's note near his own (within an octave and a half or so) counts as something
+  happening. `PJ_GUITAR_VIBRATO` (0: none).
+- **Mending the tuning:** with nothing else to do he pulls notes up towards their pure places
+  (a finger can only raise a note, and not on an open string). In a minor chord, known by its
+  root and minor third sounding on the guitar or in what the band has just played: the minor
+  third 13 cents, the minor seventh 17, the major seventh 11, the major thirteenth 18. In a major
+  chord: the ninth 4.
+  The thirds, fifths and sevenths of major and dominant chords stay as fretted. `PJ_GUITAR_PULL`.
+- **Strumming:** three or more strings sounded within 60 ms one after another across the guitar
+  (or five or six at once) put the right hand into strumming, and it stays there while such
+  chords keep coming. The strings are then caught by a hand passing over them above the soundhole,
+  not taken first, so what they still sounded rings into the new stroke. The hand crosses the
+  strings at a nearly constant speed however loud the chord is meant (`PJ_GUITAR_STRUMSPEED`,
+  1.4 m/s: 7.5 ms from string to string); velocity is how deep the nails reach. Down is the backs
+  of the fingers, the bass strings fullest; up is the fingertip's pad, rounder and darker still.
+  Flesh and nail together are broad and soft on the string: a strum is warm, thick and velvety,
+  and never has the hard nail's sound or its knock however loud (a nail is curved: picking meets
+  its stiff hollow side and edge, strumming its rounded back, which flexes). A down stroke hardly
+  disturbs what the strings still sound; an up stroke's pad lies on them a moment and takes some
+  of it. Chords that come all at once have no direction of their own: the hand swings down and up
+  like a pendulum whether it touches the strings or not (a chord one swing after the last goes
+  the other way, two swings after the same way again), and with the song's beat known a chord on
+  a beat is most often down, on the bar's first beat nearly always; where the last bar's pattern
+  was clear there is a small pull towards playing this bar the same way (`PJ_GUITAR_STRUMBAR`).
+  It prints `down` or `up` for every strum it finds.
+- **The same note again:** never plucked the same way twice. A note louder than the last is a
+  rest stroke nearer the bridge, a softer one is taken nearer the fingerboard on more flesh, even
+  ones alternate fingers and wander along the string (further when slow, hardly in a fast run),
+  equally loud unless the velocities say otherwise.
+- A first form from the literature's numbers: not yet fitted to recordings, no fret buzz, slides
+  or harmonics. The ring was lengthened by ear (`PJ_GUITAR_RING`; `PJ_GUITAR_RING23` for the first
+  and second overtones, `PJ_GUITAR_RING45` for the third and fourth, lengthened less). 0.9 % of a core.
+
+### Church organ (first rank)
+
+`-inst gedackt-8`: the church organ's first rank (`src/organ.cc`, `src/organpipe.h`,
+`research/church_organ.md`), a Gedackt 8', stopped wooden pipes, C2-C7 (8' C at 65.4 Hz). Each key
+its own pipe: an air jet crossing the mouth (its travel a quarter period, deflected by the mouth's
+flow, a tanh of the deflection entering the pipe, its turbulence) driving the stopped column's odd
+modes (1, 3, 5 ... x the pitch, the upper ones a little flat; their Q from ~20 in the bass to ~35),
+whose flow deflects the jet in turn: a self-sustained loop, in float32 at 48 kHz. Each pipe is
+voiced for its pitch and calibrated when the rank is built (~0.1 s) so it speaks in tune (all 61
+within 2 cents). The pallet opens over 5 ms and the foot's wind follows; 8' C speaks in ~130 ms, middle
+C in ~75, the top in ~20; the tone a stopped pipe's (the twelfth ~-18 dB, the octave ~-55). Below C5 the
+pipes get more wind (their jets' drive ~ (523 Hz / f)^0.95, `PJ_GEDACKT_AIR`: a voicer's wider bass
+mouths; the mouth radiates its flow's rate of change, ~6 dB an octave weaker for the same flow), so the
+bass is as full as C5 (8' C was 20 dB under it) and richer (the twelfth ~-13 dB at 8' C, 20 harmonics
+within 40 dB of the fundamental). Voiced against a recorded Bourdon 8' (GrandOrgue's demo sample set,
+GPL-2+/CC-BY-SA, measured in the scratchpad only): the jet's own flow radiates at the mouth low-passed at 2x
+the pitch (4 poles: its asymmetry gives the even harmonics, ~-35..-60 dB; unfiltered, its square-ish edge
+made a buzz of upper harmonics at -30 dB), so the 5th harmonic is ~-35, the 7th ~-50, the 9th ~-60; above
+C5 the mouths are narrower (`PJ_GEDACKT_TREBLE`), the treble no louder than C5 (it had grown 6 dB an
+octave: shrill); a steady breath (~-80 dB between the harmonics) and each note's puff (the wind rushing
+through the opening pallet, the jet turbulent until the tone locks: ~25 dB over the breath, fading over
+~200 ms in the bass, ~40 ms at the top; `PJ_GEDACKT_PUFF`). The noises come from `src/rng.h`
+(xoshiro256**, seeded through splitmix64: each pipe its own stream, the jet's and the radiated noise two
+independent halves of one output). The C and
+C# sides of the chest alternate left and right, the big pipes outside. No velocity (a pallet opens
+the same however the key is struck), no sustain pedal. Steady wind for now; the blower, the
+reservoirs and the wind's sag, the other ranks, the couplers, each pipe's place in the church and the
+church's acoustics follow the research's plan. ~3 % of a core in random playing.
+
+### Accordion and bandoneón (free reeds)
+
+`-inst accordion` (GM 22) and `-inst bandoneon` (GM 24, the tango accordion): free reeds and a
+bellows (`src/accordion.cc`, `src/freereed.h`, `research/free_reeds.md`). Each reed is the minimal
+model of Millot & Baumann: a steel tongue's first mode, swinging through its slot (a 45 µm
+clearance, a plate ~1-2.5 mm thick, the tip set ~4 % of its length out at rest); the jet through
+the gap (Bernoulli, solved implicitly each sample) and the tongue's own sweeping; the air in the
+feeding duct, whose inertia makes it speak; the reed's cell, filled through the key's pallet. The
+gap opens on both sides of the plate, so there are two puffs a cycle and a nearly square tone. The tongues are
+sized by pitch (13 x 2.1 mm at A4, 39 mm long at C1, 6 mm at the top). They start from ~50-100 Pa in
+the middle (~200 at the extremes) and swing ~15-25 % of their length. The pitch sinks a little as
+they are blown harder. Each reed is tuned in at 600 Pa when the instrument is built (~0.4 s). The
+reeds run at 96 kHz (their puffs are sharp), then a half-band filter takes them to 48 kHz.
+
+- **Accordion:** the treble is a French-style musette, three 8' sets. The middle one sits in the
+  cassotto (two poles at 1.4 kHz, `PJ_ACC_CASS`), and the outer two are tuned 3.5 beats a second
+  flat and sharp at A4 (`PJ_ACC_BEAT`; 0: one set). The tuning is in beats, so the low notes are wider in
+  cents, up to 25. Below C3 the bass plays 16' + 8', both in the cassotto.
+- **Bandoneón:** two reeds an octave apart on each note (8' + 4'), no cassotto or musette, thicker
+  plates, a brighter grille and a harder arm (tango's marcato).
+- **Push and pull:** each set has two reeds per plate, one per bellows direction, each tuned a little apart
+  (within ~1 c). Every key draws on one bellows. Its pressure follows the arm, ~220 Pa at velocity 0
+  to ~2.2 kPa at 127 (channel pressure adds to it); a harder key pushes it up faster (8-45 ms) and opens
+  the pallet faster (2-6 ms). A chord takes more air and sags it a little (`PJ_ACC_SAG`). The bellows
+  turn every 2.5-5 s of playing, between notes if they can, under held notes if they must. The
+  pressure passes through zero and the pull reeds take over after a ~30 ms gap. The pull side
+  sounds a little duller (into the bellows).
+- **Pitch bend** works as on the instrument (EMS21): the bellows are pushed harder against a pallet
+  half shut, so the duct's air grows heavier. The pitch goes down only: ~-13, -29 and -46 c at a
+  quarter, half and full bend, a little quieter. A MIDI bend of 2 semitones is not reached.
+- The bass box sounds from the left and the treble from the right. 2.5 % of a core for a bass and a
+  four-note musette chord (14 reeds).
+
+    ./pajupilli -inst accordion -seq "on 48 80 on 64 80 on 67 80 wait 1.5 off 48 off 64 off 67 on 43 80 on 62 80 on 65 80 on 71 80 wait 1.5 off 43 off 62 off 65 off 71"
+
+### Harpsichord
+
+`-inst harpsichord` (GM 7; `research/harpsichord.md`, `src/harpsichord.cc`): a large North German
+double of the Hass kind on the grand's string engine: 61 keys F1–F6 and four choirs of strings,
+two at pitch (8'), one an octave up (4'), one an octave down (16'). Each string is plucked by a
+plectrum on a jack: the jack rises at the key's speed, the plectrum bends under the string and
+lets go at a fixed force, so how hard a key is struck hardly changes the sound, as on the
+instrument. Each string has its cloth damper.
+
+    ./pajupilli -live -inst harpsichord        # 8' + 8'
+    ./pajupilli -live -inst harpsichord-8      # one 8'
+    ./pajupilli -live -inst harpsichord-full   # 16' 8' 8' 4'
+    PJ_HPSI_STOPS=16,8,4 ./pajupilli -live -inst harpsichord   # any registers
+
+- **Registers:** a register on, its row of jacks plucks; off, its strings keep their dampers and
+  only ring along through the bridge. The rows pluck one after another, not together.
+- **The pedal** (CC 64) is a register pedal, as revival instruments had: down, it adds the 4' and
+  the 16' from the next pluck on.
+- **Tuning:** just intonation, fixed before playing as a harpsichord's is: every interval from
+  the key's tonic a ratio of small numbers (1, 16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3,
+  9/5, 15/8), every octave alike. In `-play` the tonic is the file's key signature or, without
+  one, the key its notes fit best (printed at the start); alone it is C. `PJ_HPSI_TONIC=0..11`
+  chooses it, `PJ_HPSI_TUNING=equal` gives equal temperament.
+- **Tone:** the rows pluck at different places (the back 8' an eighth of the string from the nut
+  in the bass to a third in the treble, the front 8' a little further on, the 16' nearer the nut);
+  a string's two directions are tuned 0.8 % apart by the bridge pin: the slow beat in the sound.
+- A first stage: the soundboard is still the grand's, and the lengths behind the bridge, the air
+  in the case, the buff and lute stops and the pedal instrument of the plan are not built. All
+  four choirs under dense random playing: about 36 % of a core (the grand with its pedal down: 29 %).
 
 ### Chromatic percussion
 
@@ -887,7 +1055,7 @@ GM2's 86/87 (XG's 13/14) and 84.
 
 Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
 on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
-CP-80, organs to the calliope, guitars to the koto and banjo, cello to the contrabass, string
+CP-80, organs to the calliope (the reed organ and the harmonica to the square lead), guitars to the koto and banjo, cello to the contrabass, string
 sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
 built (bass drum: the jazz kick; snare and side stick: the brushed snare; hi-hats: the hi-hat; toms, bongos, congas: melodic tom; cowbell,
 agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel

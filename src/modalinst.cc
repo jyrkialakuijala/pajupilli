@@ -125,6 +125,8 @@ extern const Instrument kModals[] = {
     {"reverse-cymbal", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "cymbal"},
     // GM 12: the vibraphone (a Musser M55, F3-F6).
     {"vibraphone", 0, 53, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "vibraphone"},
+    // (The same vibraphone played with Mike Balter's 25R "jazz" mallets (rattan): very hard.)
+    {"vibraphone-25r", 0, 53, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "vibraphone"},
     // GM 121-128: the sound effects (src/sfx.cc).
     {"fret-noise", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "sfx"},
     {"breath-noise", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "sfx"},
@@ -145,6 +147,7 @@ ModalModel::ModalModel(const Instrument& inst) : Tube(inst), set_(inst.fs) {
   type_ = kSitar;
   for (int i = 0; i < int(sizeof names / sizeof names[0]); ++i)
     if (std::strcmp(inst.name, names[i]) == 0) type_ = Type(i);
+  if (std::strncmp(inst.name, "vibraphone", 10) == 0) type_ = kVibraphone;  // (and its mallet variants)
   build();
 }
 
@@ -338,7 +341,7 @@ const float kTaikoAmp[] = {1, 0.6f, 0.35f, 0.4f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f
 // sound effects measured over a 3 s held key (a helicopter spins up, a wave
 // takes seconds); applause and the gunshot (all peak) held down likewise.
 static const double kModalLevel[21] = {20.4, 9.5, 3.3, 33.8, 24.4, -15.8, 37.2, 30.8, 23.7, 28.8, 1.7, 35.7,
-                                       -11.1, 49.4, 34.9, -16.0, 1.4, 8.5, 28.8, 21.8, 22.7};
+                                       -11.9, 49.4, 34.9, -16.0, 1.4, 8.5, 28.8, 21.8, 22.7};
 
 static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
 
@@ -586,12 +589,19 @@ void ModalModel::build1() {
         static const float rad[6] = {0.12f, 0.45f, 0.5f, 0.4f, 0.15f, 0.08f};
         ModalSet::Def d;
         d.one = true;
-        d.n = 7;
+        d.n = 7 + kVibHigh;
         d.modalMass = float(0.12 * std::pow(175 / f, 0.6));  // kg (a 0.5 kg bar at F3)
+        // On the instrument the bar hangs on cords through holes at its
+        // fundamental's nodes: the overtones' nodes lie elsewhere, so the cords
+        // and their felts damp them (a free bar's overtones ring 6-10 s,
+        // research 2.1; mounted, they fade while the tube carries the
+        // fundamental on): their T60 x PJ_VIB_SUPPORT (0.2, a design value).
+        // The bright start of a hard stroke that turns into the tone: "blium".
+        static const double kSupport = knob("PJ_VIB_SUPPORT", 0.2);
         for (int k = 0; k < 6; ++k) {
           const double fk = f * r[k];
           d.freq[k] = float(fk);
-          d.t60[k] = float(25 * std::pow(175 / fk, 0.75));
+          d.t60[k] = float(25 * std::pow(175 / fk, 0.75) * (k == 0 ? 1.0 : kSupport));
           d.exc[k] = exc[k];
           d.rad[k] = rad[k];
           d.side[k] = float(0.3 * rad[k] * (k % 2 ? 1 : -1));
@@ -604,6 +614,22 @@ void ModalModel::build1() {
         d.rad[kVibAir] = float(kAirRad);
         d.side[kVibAir] = float(kAirRad * 0.4 * (2 * u - 1));  // low bars left, high right (the player's view)
         for (int k = 0; k < 6; ++k) d.side[k] += float(rad[k] * 0.4 * (2 * u - 1));
+        // The bar's dense high modes (bending beyond the fourth, torsion's
+        // overtones), ~6-16 kHz: only a hard mallet's short contact reaches
+        // them, and they die in a fraction of a second (radiation and the
+        // metal's losses grow fast up there): the bright "bl" of a hard stroke
+        // that turns at once into the ringing tone. Their decay is a design
+        // value (no measurement found): PJ_VIB_HIGHT60 at 8 kHz, ~f^-0.5.
+        static const double kHiT60 = knob("PJ_VIB_HIGHT60", 0.15), kHiExc = knob("PJ_VIB_HIGHEXC", 0.35);
+        for (int k = 0; k < kVibHigh; ++k) {
+          const double fk = std::min(17000.0, f * r[3] * std::pow(1.32, k + 1) * (1 + 0.03 * std::sin(7.3 * (k + 1) + i)));
+          const int m = 7 + k;
+          d.freq[m] = float(fk);
+          d.t60[m] = float(kHiT60 * std::sqrt(8000 / fk));
+          d.exc[m] = float(kHiExc * (k % 2 ? 0.7 : 1.0) / (1 + 0.15 * k));
+          d.rad[m] = 0.5f;
+          d.side[m] = float(0.5 * 0.4 * (2 * u - 1) * (k % 2 ? 1 : -1));
+        }
         d.nl = 1;
         d.lin[0] = {0, kVibAir, float(7e3 * std::pow(f / 175, 1.739))};
         S.setVib(i, d);
@@ -780,7 +806,11 @@ void ModalPlayer::noteOn(int midi, int velocity) {
   // them longer, its strike darker, A-weighted the quieter: 47-55 dB at ^1.6;
   // their stroke's speed ~ velocity^1.2, the bells' ~ velocity.)
   const bool stiff = t == ModalModel::kVibraphone || t == ModalModel::kTinkle || t == ModalModel::kTaiko;
-  const double amp = std::min(1.0, std::pow(v, t == ModalModel::kTinkle ? 1.0 : stiff ? 1.2 : 1.6) * dyn);
+  // (The vibraphone's mallet also hardens with the velocity, brighter and
+  // louder on top: its speed ~ velocity^1.2 keeps the ~30 dB.)
+  static const double kVibExp = knob("PJ_VIB_VELEXP", 1.2);
+  const double ex = t == ModalModel::kTinkle ? 1.0 : t == ModalModel::kVibraphone ? kVibExp : stiff ? 1.2 : 1.6;
+  const double amp = std::min(1.0, std::pow(v, ex) * dyn);
   if (m_.sfx) {
     // (A hard key while the hall applauds: someone shouts "bravo"; the
     // applause goes on.)
@@ -964,10 +994,33 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       // research/vibraphone.md: a yarn mallet (~22 g; the wound head stiffens
       // as it is pressed, alpha 2.5): K 2.6e10 a medium one (1.5 ms on the
       // bar), the hardness knob from soft (2.3e9, 3 ms) to hard (~3e11, 0.7 ms).
+      // The mallet's material follows the velocity: a soft stroke lands on the
+      // yarn alone (softer, longer on the bar, darker), a hard one goes
+      // through it to the firm core (harder, shorter, brighter): x0.75 of the
+      // hardness at the softest, ~x1.05 at velocity 90, x1.35 at 127
+      // (PJ_VIB_VELHARD: how much; 0 = one mallet for all).
       vib = midi - ModalModel::kVibLo;
       if (vib < 0 || vib >= ModalModel::kVibBars) return;
       s_.damp(vib, 0);
-      s_.strike(vib, 0.022, 2.5 * amp, 2.6e10 * std::pow(hardness_, 3.5), 2.5);
+      {
+        // The mallets: Mike Balter's Pro Vibe series, PJ_VIB_MALLET 21 (yellow
+        // cord, hard), 22 (green, medium hard), 23 (blue, medium: the default),
+        // 24 (red, soft), 25 (silver, "jazz": very hard, its thin
+        // cord over the core firm from the first touch, alpha 2.0; the
+        // instrument vibraphone-25r). Hardness factors on K^(1/3.5).
+        static const int kMallet = int(knob("PJ_VIB_MALLET", 23));
+        const int mallet = std::strcmp(m_.instrument().name, "vibraphone-25r") == 0 ? 25 : kMallet;
+        // (All but the softest made harder, so a stroke's bright transient
+        // changes quickly into the tone: the "blium".)
+        const double base = mallet == 21 ? 2.0 : mallet == 22 ? 1.7 : mallet == 24 ? 0.6 : mallet == 25 ? 2.3 : 1.4;
+        const double alpha = mallet == 25 ? 2.0 : 2.5;
+        static const double kVel = knob("PJ_VIB_VELHARD", 1.0);
+        const double w = std::clamp(velocity, 1, 127) / 127.0;
+        const double h = hardness_ * base * (1 + kVel * (-0.25 + 0.6 * w * w));
+        // (alpha 2.0 against 2.5: K rescaled to the same force at 0.2 mm.)
+        const double K = 2.6e10 * std::pow(h, 3.5) * std::pow(2e-4, 2.5 - alpha);
+        s_.strike(vib, 0.022, 2.5 * amp, K, alpha);
+      }
       break;
     }
     case ModalModel::kSteelpan: {

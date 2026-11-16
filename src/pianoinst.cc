@@ -22,6 +22,7 @@ bool grandPiano(const Instrument& inst) { return std::strcmp(inst.name, "grand-p
 
 static PianoDesign designFor(const Instrument& inst) {
   if (dulcimer(inst)) return dulcimerDesign();
+  if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
   return upright(inst) && uprightDesign ? uprightDesign() : grandDesign();
 }
 

@@ -691,6 +691,75 @@ def celesta():
     check('real-time margin (marimba, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def harpsichord():
+    """The harpsichord (src/harpsichord.cc, on the piano's engine): in tune, the 4' an octave up
+    and the 16' an octave down, the damper stops a note, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    out = [struck_cents('harpsichord-8', m, 4) for m in (36, 48, 60, 72, 84)]
+    bad = [c for c in out if c is None or abs(c) > 8]
+    check('harpsichord: the 8\' in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    # Tuned just on C (alone): the third 14 cents under equal temperament's, the fifth 2 over.
+    third, fifth = struck_cents('harpsichord-8', 64, 4), struck_cents('harpsichord-8', 67, 4)
+    check('harpsichord: just intonation on C', third is not None and fifth is not None and abs(third + 14) <= 3 and abs(fifth - 2) <= 3,
+          f'E4 {third:+d} c, G4 {fifth:+d} c against equal temperament')
+    def strongest(stops, lo, hi):
+        wav = os.path.join(ROOT, 'tools', '.hpsi.wav')
+        run(['-inst', 'harpsichord-8', '-seq', 'on 60 80 wait 1.0 off 60 wait 0.6', '-o', wav], env={'PJ_HPSI_STOPS': stops})
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        sp = np.abs(np.fft.rfft(x[int(0.05 * fs):int(0.9 * fs)] * np.hanning(int(0.9 * fs) - int(0.05 * fs)), 1 << 17))
+        fr = np.fft.rfftfreq(1 << 17, 1 / fs)
+        band = (fr > lo) & (fr < hi)
+        late = 10 * math.log10(np.mean(x[int(1.3 * fs):int(1.5 * fs)] ** 2) + 1e-20) - 10 * math.log10(np.mean(x[int(0.7 * fs):int(0.9 * fs)] ** 2) + 1e-20)
+        return fr[band][np.argmax(sp[band])], late
+    f4, _ = strongest('4', 100, 700)
+    f16, _ = strongest('16', 100, 700)
+    f8, late = strongest('8', 100, 700)
+    check('harpsichord: the registers\' pitches at middle C', abs(f8 - 261.6) < 3 and abs(f4 - 523.3) < 5 and abs(f16 - 130.8) < 2,
+          f"8' {f8:.1f} Hz, 4' {f4:.1f} Hz, 16' {f16:.1f} Hz")
+    check('harpsichord: the damper stops a note', late < -20, f'{late:.0f} dB 0.4 s after the key is let go')
+    for inst in ('harpsichord', 'harpsichord-full'):
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'harpsichord-full', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (harpsichord, all four choirs, random playing)', ns < 16000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def guitars():
+    """The classical guitar (-inst nylon-guitar, src/guitar.cc): in tune on open and fretted
+    strings, a released note is damped, the strings not played ring along, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    out = [struck_cents('nylon-guitar', m, 4) for m in (40, 45, 50, 55, 59, 64, 69, 76, 83)]
+    bad = [c for c in out if c is None or abs(c) > 8]
+    check('nylon-guitar: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    def level(seq, t0, t1, lo=0, hi=1e9):
+        wav = os.path.join(ROOT, 'tools', '.guitar.wav')
+        run(['-inst', 'nylon-guitar', '-seq', seq, '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+        fr = np.fft.rfftfreq(len(seg), 1 / fs)
+        return 10 * math.log10(sp[(fr >= lo) & (fr < hi)].sum() + 1e-20)
+    # (B-flat 3: a note the open strings do not ring along with.)
+    held = level('on 58 80 wait 1.2 off 58', 0.9, 1.1)
+    let = level('on 58 80 wait 0.3 off 58 wait 0.9', 0.9, 1.1)
+    check('nylon-guitar: a released note is damped', held - let > 20, f'{held - let:.0f} dB under the held note 0.6 s after the key is let go')
+    # A4 on the first string, let go: the open A string (two octaves under) rings on at 440 Hz and
+    # its other partials, though it was never plucked.
+    symp = level('on 69 100 wait 0.5 off 69 wait 1.0', 1.1, 1.4, 425, 455)
+    floor = level('on 70 100 wait 0.5 off 70 wait 1.0', 1.1, 1.4, 425, 455)
+    check('nylon-guitar: the open strings ring along', symp - floor > 6, f'{symp - floor:.0f} dB more at 440 Hz after an A than after a B-flat')
+    r = run(['-inst', 'nylon-guitar', '-fuzz', '10', '1'])
+    check('fuzz 10 s (nylon-guitar)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'nylon-guitar', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (nylon-guitar, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 def clavinet():
     """The Clavinet (-inst clavinet, src/clavinet.cc): in tune, no blow-up, real time, and the
     release three semitones down (the tangent lets the whole string go: research/clavinet.md 5)."""
@@ -1059,6 +1128,174 @@ def hand_drums():
     check('real-time margin (hand drums, random playing)', ns < 2500, f'{ns:.0f} ns/sample at most ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def bagpipe_drones():
+    """The bagpipe's drones (src/drone.h): a key below the chanter (MIDI 67..81) is a drone pipe tuned
+    to it, from the bag, while held (through -play: a General MIDI file, program 110)."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    def var(n):
+        out = [n & 0x7f]
+        n >>= 7
+        while n:
+            out.insert(0, (n & 0x7f) | 0x80)
+            n >>= 7
+        return bytes(out)
+    ev = [(0, b'\xff\x51\x03' + (500000).to_bytes(3, 'big')), (0, bytes([0xc0, 109]))]
+    ev += [(0.2, bytes([0x90, 45, 90])), (0.2, bytes([0x90, 57, 90])), (3.2, bytes([0x80, 45, 0])), (3.2, bytes([0x80, 57, 0]))]
+    ev.append((4.0, b'\xff\x2f\x00'))
+    body, last = b'', 0
+    for t, d in ev:
+        tk = int(round(t / 0.5 * 480))
+        body += var(tk - last) + d
+        last = tk
+    mid, wav = os.path.join(ROOT, 'tools', '.drone.mid'), os.path.join(ROOT, 'tools', '.drone.wav')
+    open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(body)) + body)
+    run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_PLAY_TAIL': '0.3'})
+    fs, x = wavfile.read(wav)
+    os.remove(mid)
+    os.remove(wav)
+    x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    seg = x[int(0.8 * fs):int(2.8 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 18))
+    f = np.fft.rfftfreq(1 << 18, 1 / fs)
+    cents = []
+    for want in (110.0, 220.0):
+        m = (f > want * 0.95) & (f < want * 1.05)
+        cents.append(1200 * math.log2(f[m][sp[m].argmax()] / want))
+    after = np.sqrt(np.mean(x[int(3.5 * fs):int(3.9 * fs)] ** 2)) / (np.sqrt(np.mean(seg ** 2)) + 1e-12)
+    check('bagpipe: keys below the chanter are drones in tune (A2, A3)', all(abs(c) < 10 for c in cents) and np.abs(seg).max() > 0,
+          f'{cents[0]:+.1f} c, {cents[1]:+.1f} c; after the keys are up {20 * math.log10(after + 1e-12):.0f} dB')
+
+
+def organ():
+    """The church organ's first rank (-inst gedackt-8, src/organ.cc, src/organpipe.h): each pipe a jet
+    driving the stopped column's odd modes, calibrated in tune; it speaks in time (8' C ~150 ms, middle C
+    ~90), its tone a stopped pipe's (the twelfth over the octave), stable, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    cents = []
+    for m in (36, 48, 60, 72, 84, 96):
+        c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', 'gedackt-8', '-note', str(m), '-secs', '1']).stdout)
+        cents.append(int(c.group(1)) if c else 999)
+    check('organ: the Gedackt\'s pipes speak in tune', all(abs(c) <= 3 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
+    def render(m):
+        wav = os.path.join(ROOT, 'tools', '.organ.wav')
+        run(['-inst', 'gedackt-8', '-seq', f'on {m} 80 wait 1.2 off {m} wait 0.3', '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    speech, twelfth, octave = [], [], []
+    for m in (36, 60):
+        fs, x = render(m)
+        env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
+        st = env[int(0.8 * fs):int(1.1 * fs)].mean()
+        speech.append(np.where(env > 0.708 * st)[0][0] / fs * 1e3)
+        seg = x[int(0.7 * fs):int(1.1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 18))
+        f = np.fft.rfftfreq(1 << 18, 1 / fs)
+        f0 = 440 * 2 ** ((m - 69) / 12)
+        h = lambda k: sp[(f > k * f0 * 0.98) & (f < k * f0 * 1.02)].max()
+        twelfth.append(20 * math.log10(h(3) / h(1)))
+        octave.append(20 * math.log10(h(2) / h(1)))
+    check('organ: it speaks in time (8\' C, middle C)', speech[0] < 300 and speech[1] < 150, f'{speech[0]:.0f} ms, {speech[1]:.0f} ms')
+    check('organ: a stopped pipe\'s tone (the twelfth over the octave)', all(t > o + 15 for t, o in zip(twelfth, octave)),
+          'twelfth ' + ', '.join(f'{t:+.0f}' for t in twelfth) + ' dB, octave ' + ', '.join(f'{o:+.0f}' for o in octave) + ' dB')
+    r = run(['-inst', 'gedackt-8', '-fuzz', '10', '1'])
+    check('fuzz 10 s (gedackt-8)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'gedackt-8', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (gedackt-8, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def accordions():
+    """The accordion and the bandoneón (-inst accordion, bandoneon; src/accordion.cc, src/freereed.h;
+    research/free_reeds.md): free reeds (the minimal model of Millot & Baumann) tuned in at
+    mezzo-forte; the accordion's musette beating, the bandoneón's octave pair; a reed's quick start
+    and a pallet's quick stop; the bellows turned under a long chord (a short gap); pitch bend
+    pulls the pitch down, as a choked pallet does; stable, real time."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    cents = []
+    for inst, notes in (('accordion', (36, 60, 84)), ('bandoneon', (48, 69, 90))):
+        for m in notes:
+            c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', inst, '-note', str(m), '-secs', '1.5']).stdout)
+            cents.append(int(c.group(1)) if c else 999)
+    check('accordions: the reeds speak in tune (accordion C2 C4 C6, bandoneon C3 A4 F#6)',
+          all(abs(c) <= 8 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
+    def render(inst, seq, name='.accordion.wav'):
+        wav = os.path.join(ROOT, 'tools', name)
+        run(['-inst', inst, '-seq', seq, '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    # The musette: three reeds at A4, the outer two ~3.5 beats a second from the middle one.
+    fs, x = render('accordion', 'on 69 90 wait 2.5 off 69 wait 0.3')
+    seg = x[int(0.5 * fs):int(2.4 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 20))
+    f = np.fft.rfftfreq(1 << 20, 1 / fs)
+    peak = lambda hz: sp[(f > hz - 1) & (f < hz + 1)].max()
+    mid = peak(440)
+    outer = [20 * math.log10(peak(440 + d) / mid) for d in (-3.5, 3.5)]
+    dip = 20 * math.log10(sp[(f > 437.8) & (f < 438.2)].max() / mid)
+    check('accordion: the musette (reeds 3.5 Hz either side of A4)', all(o > -12 for o in outer) and dip < min(outer) - 6,
+          ', '.join(f'{o:+.0f} dB' for o in outer) + f'; between {dip:+.0f} dB')
+    # The start and the stop.
+    for inst in ('accordion', 'bandoneon'):
+        fs, x = render(inst, 'on 69 90 wait 1.5 off 69 wait 0.5')
+        env = np.sqrt(np.convolve(x ** 2, np.ones(240) / 240, 'same'))
+        st = env[int(1.0 * fs):int(1.4 * fs)].mean()
+        on = np.where(env > 0.7 * st)[0][0] / fs * 1e3
+        off = np.where(env[int(1.5 * fs):] < 0.01 * st)[0]
+        off = off[0] / fs * 1e3 if len(off) else 999
+        check(f'{inst}: A4 speaks and stops in time', on < 90 and off < 120, f'{on:.0f} ms to speak, {off:.0f} ms to -40 dB')
+    # The bellows: turned within ~8.5 s of a held chord, a gap of 10-80 ms.
+    fs, x = render('accordion', 'on 48 80 on 60 80 on 64 80 on 67 80 wait 9 off 48 off 60 off 64 off 67 wait 0.3')
+    env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
+    body = env[int(0.5 * fs):int(9 * fs)]
+    low = (body < 0.3 * np.median(body)).sum() / fs * 1e3
+    check('accordion: the bellows turned under a long chord', 10 < low < 80, f'{low:.0f} ms under -10 dB')
+    # Pitch bend: the bandoneón's A4, bend -0.5 (a choked pallet, more bellows) a little flat, quieter.
+    def vlq(n):
+        b = [n & 127]
+        n >>= 7
+        while n:
+            b.insert(0, (n & 127) | 128)
+            n >>= 7
+        return bytes(b)
+    trk = b''.join([vlq(0) + bytes([0xC0, 23]), vlq(0) + bytes([0x90, 69, 90]), vlq(1440) + bytes([0xE0, 0, 0x20]),
+                    vlq(1440) + bytes([0x80, 69, 0])]) + b'\x00\xff\x2f\x00'
+    mid_path = os.path.join(ROOT, 'tools', '.bend.mid')
+    with open(mid_path, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+    wav = os.path.join(ROOT, 'tools', '.bend.wav')
+    run(['-play', mid_path, '-o', wav])
+    os.remove(mid_path)
+    fs, x = wavfile.read(wav)
+    os.remove(wav)
+    x = x.astype(float).mean(1)
+    def pitch(t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 19))
+        f = np.fft.rfftfreq(1 << 19, 1 / fs)
+        m = (f > 400) & (f < 460)
+        return f[m][sp[m].argmax()], np.sqrt(np.mean(seg ** 2))
+    (f0, l0), (f1, l1) = pitch(0.6, 1.4), pitch(2.1, 2.9)
+    bend, drop = 1200 * math.log2(f1 / f0), 20 * math.log10(l1 / l0)
+    check('bandoneon: pitch bend pulls the reeds down (EMS21: 10-35 c)', -60 < bend < -8 and drop < 0,
+          f'{bend:+.0f} c, {drop:+.1f} dB')
+    for inst in ('accordion', 'bandoneon'):
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    seq = 'on 36 80 on 60 80 on 64 80 on 67 80 on 72 80 wait 10 off 36 off 60 off 64 off 67 off 72'
+    wav = os.path.join(ROOT, 'tools', '.accordion.wav')
+    base = cpu_time(['-inst', 'accordion', '-seq', 'wait 0.01', '-o', wav])
+    ns = (cpu_time(['-inst', 'accordion', '-seq', seq, '-o', wav]) - base) / (10 * 48000) * 1e9
+    os.remove(wav)
+    check('real-time margin (accordion: a bass and a four-note musette chord, 14 reeds)', ns < 2500,
+          f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 def scrapers():
     """The guiro, cuica, vibraslap and pea whistle (src/scrapers.cc; research/scrapers_friction.md):
     the guiro's clicks at the stroke's speed over the notch spacing, the cuica speaking (stick-slip)
@@ -1350,7 +1587,7 @@ def clap_claves_surdo():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, accordions):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

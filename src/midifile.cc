@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -41,6 +42,8 @@ struct Event {
 struct Song {
   std::vector<Event> ev;
   std::string title;
+  int tonic = -1;      // the key's tonic, a pitch class (-1: not known)
+  bool minor = false, keySigned = false;
   bool gs = false;  // a Roland GS or General MIDI 2 file (else the drum keys below 35 are Yamaha XG's)
   // The tempo map: from `t` seconds on (at `beat` quarter notes), a quarter lasts `len` s.
   struct Tempo { double t, beat, len; };
@@ -93,6 +96,12 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
         const uint8_t type = d[p++];
         const uint32_t n = var();
         if (type == 0x51 && n == 3 && p + 3 <= end) tempo.push_back({tick, be(&d[p], 3) * 1e-6 / div});
+        if (type == 0x59 && n == 2 && p + 2 <= end && song->tonic < 0) {  // the key signature: sharps (flats: negative), minor
+          const int sf = int8_t(d[p]);
+          song->minor = d[p + 1] == 1;
+          song->tonic = ((sf * 7 + (song->minor ? 9 : 0)) % 12 + 12) % 12;
+          song->keySigned = true;
+        }
         if (type == 0x03 && song->title.empty() && tr <= 1) song->title.assign(d.begin() + p, d.begin() + std::min(end, p + n));
         p += n;
         continue;
@@ -150,10 +159,11 @@ const char* const kGm[128][3] = {
     {"celesta", "vibraphone", "tinkle-bell"}, {"glockenspiel", "vibraphone", "tinkle-bell"},
     {"music-box", "kalimba", "vibraphone"}, {"vibraphone"}, {"marimba", "vibraphone"}, {"xylophone", "vibraphone"},
     {"tubular-bells", "tinkle-bell", "vibraphone"}, {"dulcimer", "koto"},
-    // Organs, accordions, harmonica: the calliope's pipes, a reedy square.
+    // Organs, accordions, harmonica: the calliope's pipes, a reedy square; the accordion and the
+    // bandoneón (the tango accordion) are their own.
     {"drawbar-organ", "lead-calliope"}, {"percussive-organ", "lead-calliope"}, {"rock-organ", "lead-calliope"},
     {"church-organ", "lead-calliope"}, {"reed-organ", "lead-square"}, {"accordion", "lead-square"},
-    {"harmonica", "lead-square"}, {"tango-accordion", "lead-square"},
+    {"harmonica", "lead-square"}, {"bandoneon", "accordion", "lead-square"},
     // Guitars.
     {"nylon-guitar", "koto"}, {"steel-guitar", "banjo", "koto"}, {"jazz-guitar", "koto"}, {"clean-guitar", "koto"},
     {"muted-guitar", "shamisen", "koto"}, {"overdriven-guitar", "lead-charang", "lead-saw"},
@@ -245,6 +255,42 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     drumNames.push_back(nm);
     return int(drumNames.size() - 1);
   };
+  // The song's key, for what is tuned to it. The file's key signature says
+  // it; a file without one (or with the empty C major that many carry
+  // whatever their key): the key whose scale fits the notes best, each
+  // pitch class by how long it sounds (Krumhansl's profiles).
+  {
+    double hist[12] = {};
+    std::map<int, double> onAt;
+    for (const Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (ch == 9) continue;
+      if (kind == 0x90 && e.b > 0) onAt[ch * 128 + e.a] = e.t;
+      else if (kind == 0x80 || kind == 0x90) {
+        auto it = onAt.find(ch * 128 + e.a);
+        if (it != onAt.end()) { hist[e.a % 12] += std::min(e.t - it->second, 2.0); onAt.erase(it); }
+      }
+    }
+    static const double maj[12] = {6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88};
+    static const double min[12] = {6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17};
+    double best = -1e9, total = 0;
+    int bt = 0;
+    bool bm = false;
+    for (double h : hist) total += h;
+    for (int t = 0; t < 12 && total > 0; ++t)
+      for (int m = 0; m < 2; ++m) {
+        double sxy = 0, sx = 0, sy = 0, sxx = 0, syy = 0;
+        for (int i = 0; i < 12; ++i) {
+          const double x = hist[(t + i) % 12], y = m ? min[i] : maj[i];
+          sxy += x * y; sx += x; sy += y; sxx += x * x; syy += y * y;
+        }
+        const double r = (12 * sxy - sx * sy) / std::sqrt(std::max((12 * sxx - sx * sx) * (12 * syy - sy * sy), 1e-30));
+        if (r > best) { best = r; bt = t; bm = m; }
+      }
+    if (!song.keySigned || (song.tonic == 0 && !song.minor)) { song.tonic = bt; song.minor = bm; }
+    SongClock::get().tonic = song.tonic;
+    SongClock::get().minor = song.minor;
+  }
   // Which snare the drummer plays. The usual file: sticks. A file whose band
   // has a piano and an upright bass (General MIDI programs 1 .. 4, and 33 or
   // the fretless 36, with notes on them) is a jazz group: the brushed snare. A file that selects a
@@ -343,6 +389,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   if (!song.title.empty()) std::fprintf(stderr, "%s\n", song.title.c_str());
   std::fprintf(stderr, "%.1f s, %zu parts%s:\n", song.ev.back().t, parts.size(),
                jazzBand ? " (a piano and an upright bass: the snare with brushes)" : "");
+  for (auto& [id, p] : parts)
+    if (std::strncmp(p.inst->name, "harpsichord", 11) == 0 && !std::getenv("PJ_HPSI_TUNING")) {
+      static const char* const kNames[12] = {"C", "C#", "D", "E-flat", "E", "F", "F#", "G", "A-flat", "A", "B-flat", "B"};
+      std::fprintf(stderr, "  (the harpsichord tuned just, on %s%s: %s)\n", kNames[song.tonic], song.minor ? " minor" : "",
+                   song.keySigned ? "the file's key signature" : "the key its notes fit best");
+      break;
+    }
   std::map<const Instrument*, std::unique_ptr<Calibration>> cals;
   for (auto& [id, p] : parts) {
     if (!cals.count(p.inst)) {
@@ -409,6 +462,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         while (tk + 1 < song.tempo.size() && song.tempo[tk + 1].t <= now) ++tk;
         SongClock& c = SongClock::get();
         c.valid = !song.tempo.empty();
+        c.now = now;
         if (c.valid) {
           c.beatLen = song.tempo[tk].len;
           c.beat = song.tempo[tk].beat + (now - song.tempo[tk].t) / song.tempo[tk].len;
@@ -423,6 +477,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         const int ch = e.status & 15, kind = e.status & 0xf0;
         if (kind == 0x90 && e.b > 0) {
           lastOn = e.t;
+          if (ch != 9) SongClock::get().lastOn[e.a & 127] = e.t;
           if (ch != 9) { ++heldNote[ch * 128 + e.a]; ++heldAll; }
         } else if ((kind == 0x80 || kind == 0x90) && ch != 9) {
           auto h = heldNote.find(ch * 128 + e.a);
@@ -449,7 +504,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
               if (id / 128 == ch) p.ens->setHold(e.b >= 64);
           if (e.a == 7) chVol[ch] = e.b / 127.0;
           if (e.a == 11) chExpr[ch] = e.b / 127.0;
-            if (e.a == 123 || e.a == 120)  // all notes off
+          if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo
+            for (auto& [id, p] : parts)
+              if (id / 128 == ch && std::strcmp(p.inst->name, "harmonica") == 0) p.ens->all(&Performer::setFlutter, e.b / 127.0);
+          if (e.a == 123 || e.a == 120)  // all notes off
             for (auto& [k, id] : noteOwner)
               if (k / 128 == ch) parts[id].ens->noteOff(heldKey[k]);
         } else if (kind == 0xd0) {  // channel pressure: the breath (a Clavinet: its keys pressed harder)
@@ -461,6 +519,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (id / 128 == ch) p.ens->all(&Performer::setLipRoll, b);
         }
       }
+      // A harmonica hears how much the others play in its register (C3..D7): its hands' drama.
+      for (auto& [id, p] : parts)
+        if (std::strcmp(p.inst->name, "harmonica") == 0) {
+          double busy = 0;
+          for (const auto& [k, c] : heldNote)
+            if (c > 0 && k / 128 != id / 128 && k % 128 >= 48 && k % 128 <= 98) busy += 0.25 * c;
+          p.ens->all(&Performer::setAccompaniment, busy);
+        }
       std::fill(l.begin(), l.end(), 0.0f);
       std::fill(r.begin(), r.end(), 0.0f);
       // The parts side by side on the pool's threads (the circuits as one

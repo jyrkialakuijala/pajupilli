@@ -12,6 +12,17 @@ struct SongClock {
   // drums, none begun for two beats, none to come within the next beat), or
   // the song over.
   bool pause = false;
+  // The song's key: its tonic as a pitch class (0 = C .. 11 = B; -1: not
+  // known), from the file's key signature or, without one, from which notes
+  // it uses most. For what is tuned to a key before playing (a harpsichord).
+  int tonic = -1;
+  bool minor = false;
+  // What the band is playing, for players who listen: the song's time now
+  // (s), and when each pitch (MIDI key, any part but the drums) was last
+  // begun (s; far in the past: never).
+  double now = 0;
+  double lastOn[128];
+  SongClock() { for (double& t : lastOn) t = -1e9; }
   static SongClock& get() {
     static SongClock c;
     return c;
