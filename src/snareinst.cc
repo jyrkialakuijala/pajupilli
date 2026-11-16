@@ -55,6 +55,9 @@ SnarePlayer::SnarePlayer(SnareModel& m) : Performer(m), m_(m) {
     for (int i = 0; i < kWarp; ++i) warpT_[i] /= t;
   }
   sweeps_ = knob("PJ_SNARE_TAPSWEEP", 1) > 0;
+  meat_ = knob("PJ_SNARE_MEAT", 1.0);            // the quarter-note strokes this much harder while brushing (dB)
+  flatShare_ = knob("PJ_SNARE_FLAT", 0.22);      // the share of them that land flatter: a fuller slap
+  flatHard_ = knob("PJ_SNARE_FLATHARD", 0.8);    // ... the hand that much slower for those (landing flat is louder by itself)
   tapSwoosh_ = knob("PJ_SNARE_TAPSWOOSH", 0.7);  // how much of a sweep a quarter-note stroke is while brushing (0: a plain tap-sweep)  // a tap is drawn on across the head
   loop_ = knob("PJ_SNARE_LOOP", 1) > 0;  // the left hand circles of its own accord between brush strokes
 }
@@ -159,7 +162,23 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   const double dir = th + (ur() < 0.7 ? 1 : -1) * (1.3 + 0.5 * ur());  // across, mostly towards the drummer's left
   rhDx_ = std::cos(dir); rhDy_ = std::sin(dir);
   rhT_ = 0;
-  b.strike(v * (1 - 0.15 * sw), (2.5 + 1.5 * ur() + 1.2 * sw) * 1e-3, (0.6 + 1.0 * vel + 0.3 * sw) * 1e-3, rhDur_);
+  // The quarter-note strokes of the brushing have some meat on them: a
+  // little harder than written (meat_, dB). And now and then (never twice
+  // running) one lands flatter: the fan nearly level with the head, so its
+  // wire ends arrive together, nearer the middle of the head, a touch harder
+  // still and let further in: a fuller slap with more of the drum in it.
+  double hard = 1, spread = (2.5 + 1.5 * ur() + 1.2 * sw) * 1e-3, follow = (0.6 + 1.0 * vel + 0.3 * sw) * 1e-3;
+  if (brushing_) hard = 1 + (std::pow(10.0, meat_ / 20) - 1) * room;
+  const bool flat = brushing_ && room > 0.5 && !lastFlat_ && ur() < flatShare_;
+  lastFlat_ = flat;
+  if (flat) {
+    hard *= flatHard_;
+    spread = (0.7 + 0.6 * ur()) * 1e-3;
+    follow += 0.5e-3;
+    rhX_ *= 0.65; rhY_ *= 0.65;
+    b.jump(rhX_, rhY_, rhAng_);
+  }
+  b.strike(v * (1 - 0.15 * sw) * hard, spread, follow, rhDur_);
 }
 
 void SnarePlayer::noteOff(int midi) {

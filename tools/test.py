@@ -641,6 +641,56 @@ def upright():
     check('real-time margin (upright-piano, pedal down)', ns < 10400, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def celesta():
+    """The chromatic percussion. The celesta (-inst celesta, src/bars.cc): in tune, the damper
+    stops a note, no blow-up, real time; then the others."""
+    out = [struck_cents('celesta', m, 1) for m in (48, 60, 72, 84, 96)]
+    bad = [c for c in out if c is None or abs(c) > 8]
+    check('celesta: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    import numpy as np
+    from scipy.io import wavfile
+    def level(seq, t0, t1):
+        wav = os.path.join(ROOT, 'tools', '.celesta.wav')
+        run(['-inst', 'celesta', '-seq', seq, '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        return 10 * math.log10(np.mean(x[int(t0 * fs):int(t1 * fs)] ** 2) + 1e-20)
+    held = level('on 72 80 wait 1.2 off 72', 0.9, 1.1)
+    let = level('on 72 80 wait 0.3 off 72 wait 0.9', 0.9, 1.1)
+    check('celesta: the damper stops a note', held - let > 25, f'{held - let:.0f} dB under the held note 0.6 s after the key is let go')
+    r = run(['-inst', 'celesta', '-fuzz', '10', '1'])
+    check('fuzz 10 s (celesta)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'celesta', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (celesta, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The rest of the chromatic percussion (src/bars.cc, src/dulcimer.cc): in tune (the
+    # tubular bells have no mode at the pitch heard: their fourth is an octave over it), no
+    # blow-up, real time.
+    for inst, notes in (('glockenspiel', (79, 91, 103)), ('marimba', (36, 60, 84)), ('xylophone', (65, 89)),
+                        ('music-box', (60, 84)), ('dulcimer', (55, 67, 79))):
+        out = [struck_cents(inst, m, 1) for m in notes]
+        bad = [c for c in out if c is None or abs(c) > 10]
+        check(f'{inst}: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    out = [struck_cents('tubular-bells', m + 12, 1) for m in (60, 72)]
+    for i, m in enumerate((60, 72)):  # (played a key and listened for an octave up)
+        wav = os.path.join(ROOT, 'tools', '.bells.wav')
+        run(['-inst', 'tubular-bells', '-seq', f'on {m} 80 wait 1.0', '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        sp = np.abs(np.fft.rfft(x[int(0.05 * fs):int(0.9 * fs)] * np.hanning(int(0.9 * fs) - int(0.05 * fs)), 1 << 18))
+        fr = np.fft.rfftfreq(1 << 18, 1 / fs)
+        f4 = 2 * 440 * 2 ** ((m - 69) / 12)
+        band = (fr > f4 * 0.97) & (fr < f4 * 1.03)
+        out[i] = round(1200 * math.log2(fr[band][np.argmax(sp[band])] / f4))
+    check('tubular-bells: the fourth mode an octave over the note', all(abs(c) <= 5 for c in out), ' '.join(f'{c:+d} c' for c in out))
+    for inst in ('glockenspiel', 'marimba', 'xylophone', 'tubular-bells', 'music-box', 'dulcimer'):
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'marimba', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (marimba, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 def clavinet():
     """The Clavinet (-inst clavinet, src/clavinet.cc): in tune, no blow-up, real time, and the
     release three semitones down (the tangent lets the whole string go: research/clavinet.md 5)."""
@@ -1300,7 +1350,7 @@ def clap_claves_surdo():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

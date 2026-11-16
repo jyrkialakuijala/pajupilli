@@ -57,8 +57,10 @@ class PianoPlayer : public Performer {
   static double hammerSpeed(int velocity, double dynamics);  // m/s
 
  private:
+  int fold(int midi) const;
   PianoModel& m_;
   bool down_[Piano::kKeys] = {};
+  int lo_ = 0, hi_ = 127;
 };
 
 }  // namespace pajupilli

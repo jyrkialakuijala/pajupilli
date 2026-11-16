@@ -16,9 +16,12 @@ PianoDesign uprightDesign() __attribute__((weak));
 
 static bool upright(const Instrument& inst) { return std::strcmp(inst.name, "upright-piano") == 0; }
 
-bool grandPiano(const Instrument& inst) { return std::strcmp(inst.name, "grand-piano") == 0 || upright(inst); }
+static bool dulcimer(const Instrument& inst) { return std::strcmp(inst.name, "dulcimer") == 0; }
+
+bool grandPiano(const Instrument& inst) { return std::strcmp(inst.name, "grand-piano") == 0 || upright(inst) || dulcimer(inst); }
 
 static PianoDesign designFor(const Instrument& inst) {
+  if (dulcimer(inst)) return dulcimerDesign();
   return upright(inst) && uprightDesign ? uprightDesign() : grandDesign();
 }
 
@@ -42,6 +45,13 @@ float PianoModel::sample() {
 PianoPlayer::PianoPlayer(PianoModel& m) : Performer(m), m_(m) {
   // (PJ_PIANO_PEDAL: the sustain pedal held from the start: every string free, the most work.)
   if (knob("PJ_PIANO_PEDAL", 0) > 0) setHold(true);
+  if (dulcimer(m.instrument())) { lo_ = 43; hi_ = 93; }  // G2 .. A6
+}
+
+int PianoPlayer::fold(int midi) const {  // (an instrument of a smaller compass: by octaves into it)
+  while (midi < lo_) midi += 12;
+  while (midi > hi_) midi -= 12;
+  return midi;
 }
 
 double PianoPlayer::hammerSpeed(int velocity, double dynamics) {
@@ -50,6 +60,7 @@ double PianoPlayer::hammerSpeed(int velocity, double dynamics) {
 }
 
 void PianoPlayer::noteOn(int midi, int velocity) {
+  midi = fold(midi);
   const int key = midi - kLowest;
   if (key < 0 || key >= Piano::kKeys) return;
   articulate(midi, velocity, false);
@@ -61,6 +72,7 @@ void PianoPlayer::noteOn(int midi, int velocity) {
 }
 
 void PianoPlayer::noteOff(int midi) {
+  midi = fold(midi);
   const int key = midi - kLowest;
   if (key < 0 || key >= Piano::kKeys) return;
   down_[key] = false;

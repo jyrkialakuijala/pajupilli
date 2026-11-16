@@ -553,6 +553,51 @@ One voice is one instrument, its player giving the keys to strings, tines, note 
   pedal is down.
 - **Cost:** about 1 % of a core with every bar ringing.
 
+### Chromatic percussion
+
+General MIDI 9–16 on one struck-bar engine (`src/bars.cc`; `research/chromatic_percussion.md`), with
+the vibraphone above and the dulcimer on the piano's strings. Notes outside an instrument's compass
+are folded in by octaves. A mallet meets its bar where the bar is, so a repeated note may add to
+the ring or take from it, and no two strokes land in quite the same place.
+
+| `-inst` | GM | Compass (sounding) | What sounds |
+|---|---|---|---|
+| `celesta` | 9 | C3–F8 | steel plates on felt, a tuned box under each, felt hammers, dampers and pedal (below) |
+| `glockenspiel` | 10 | G5–C8 | thick steel bars, bare, hard mallets: 1 : 2.76 : 5.40 : 8.93, all ringing on |
+| `music-box` | 11 | C4–C8 | a comb's teeth (1 : 6.27 : 17.5), plucked by pins, heard through the box |
+| `vibraphone` | 12 | F3–F6 | (above) |
+| `marimba` | 13 | C2–C7 | rosewood bars tuned 1 : 4 : 10, a tube under each, yarn mallets |
+| `xylophone` | 14 | F4–C8 | rosewood bars tuned 1 : 3 : 6, hard mallets, short notes |
+| `tubular-bells` | 15 | C4–F5 | brass tubes struck on the end: the note heard is an octave under the fourth mode |
+| `dulcimer` | 16 | G2–A6 | courses of steel strings, light leather-faced hammers, no dampers (`src/dulcimer.cc`) |
+
+The celesta is fitted to a recording. The other six are first forms from general acoustics, not
+yet checked against the literature or recordings; the dulcimer still sounds through the grand's
+soundboard.
+
+#### Celesta
+
+`-inst celesta` (GM 9; `research/celesta.md`): a 5½-octave instrument, C3–F8 at
+sounding pitch, every key its own plate, box, hammer and damper.
+
+    ./pajupilli -live -inst celesta        # the sustain pedal lifts all dampers
+
+- **Plates:** flat strips of spring steel resting on felt at the two points where their lowest
+  mode does not move, tuned by their length for that mode alone. Their overtones are a free
+  strip's, none of them harmonic (2.73, 5.35, 8.84, 13.3 times the fundamental), and the twisting
+  modes, which lie close over the fundamental in the short top plates. The felt takes every mode
+  that moves on it within tenths of a second and spares the first.
+- **Boxes:** a wooden resonator under each plate, its air tuned to the plate. The air is what is
+  heard, and by sounding it takes the fundamental's energy: the box sets how long a note rings
+  (about 11 s at middle C, 1 s at C8).
+- **Hammers:** felt on a small head, soft and heavy in the bass, hard and light at the top, each a
+  millimetre or two off its plate's middle. **Dampers:** felt on the plate's far end.
+- **The sound:** nearly a pure tone, with a metallic edge at the attack (the 5.35 partial, about
+  33 dB under) and the knock of the action in the case's wood under it. Those three, and the ring
+  times, are fitted to a recording.
+- About 0.6 % of a core. `PJ_CEL_PLATE` (the metallic edge), `PJ_CEL_KNOCK`, `PJ_CEL_RING`,
+  `PJ_CEL_HARD` (the felt), `PJ_CEL_A4`.
+
 ### Sound effects
 
 GM 121–128 as physical systems too (`src/sfx.*`, on the modal instrument's frame):

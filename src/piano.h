@@ -106,6 +106,8 @@ struct PianoDesign {
 
 // The concert grand (research/piano.md), with the PJ_PIANO_* knobs.
 PianoDesign grandDesign();
+// The hammered dulcimer (src/dulcimer.cc): its own scale, hammers and unisons.
+PianoDesign dulcimerDesign();
 // A tuner's work on a design's keys (their B set): equal temperament on keys
 // [lo, hi] (numbered from 1, A4 = key 49 = 440 Hz), then octave by octave, a
 // partial of the lower note against one of the upper: 2 with 1 going up,

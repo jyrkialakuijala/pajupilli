@@ -54,6 +54,17 @@ extern const Instrument kPlucked[] = {
     {"brush-snare", 0, 36, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     // The hi-hat (src/hihat.cc): General MIDI's drum keys 42, 44, 46.
     {"hi-hat", 0, 36, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The chromatic percussion (src/bars.cc), at sounding pitch: the celesta C3 .. F8, the
+    // glockenspiel G5 .. C8, the marimba C2 .. C7, the xylophone F4 .. C8, tubular bells C4 .. F5,
+    // the music box C4 .. C8.
+    {"celesta", 0, 48, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "celesta"},
+    {"glockenspiel", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "glockenspiel"},
+    {"marimba", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "marimba"},
+    {"xylophone", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "xylophone"},
+    {"tubular-bells", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bells"},
+    {"music-box", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "music box"},
+    // The hammered dulcimer (src/dulcimer.cc, on the piano's strings): G2 .. A6.
+    {"dulcimer", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "dulcimer"},
     // The jazz bass drum, 18" (and 20") (src/kick.cc): General MIDI's drum keys 35, 36.
     {"jazz-kick", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"jazz-kick-20", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},

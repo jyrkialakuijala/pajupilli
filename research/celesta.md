@@ -1,6 +1,7 @@
 # The celesta: research and model plan
 
-Status: 2026-11-15. Research only, nothing built. GM program 9 "Celesta". The plan is to model
+Status: 2026-11-16. Built as `-inst celesta` (`celestaDesign()` in `src/bars.cc`, section 12); what follows was the
+research before it (2026-11-15). GM program 9 "Celesta". The plan is to model
 it as the grand was modelled (`research/piano.md`): a felt hammer on a vibrator, a resonator,
 dampers and a pedal, and two microphones, all physical, no samples.
 
@@ -539,3 +540,35 @@ oversampling during contact.
 
 Not obtained: the text of Mustel's patent; any measured plate dimensions of a Schiedmayer;
 hammer masses; measured decay times or spectra of any celesta.
+
+## 12. As built (2026-11-16)
+
+`celestaDesign()` in `src/bars.cc` (on the struck-bar engine shared with the rest of the chromatic
+percussion), `src/barsinst.h/.cc` (the instrument and its player),
+`-inst celesta`, GM program 9 in `-play`; 66 keys C3–F8 at sounding pitch (notes outside are folded
+in by octaves), A4 = 440 Hz (`PJ_CEL_A4`).
+
+- **Per key:** five bending modes of the free strip and its first two twisting modes; one air mode
+  of the box, coupled to the plate by κ set from the wanted ring time (§4.3); a felt hammer (mass
+  and stiffness by register, p = 2.5, a little hysteresis) solved implicitly against the plate's
+  give; a damper on every mode, ramped; the pedal lifts all. No offline tool: the strip's modes are
+  the closed-form ones, the twisting ones from the strip's torsion (they land on §3.4's ratios:
+  4.86 at C4, 1.92 at C7, 1.36 at C8).
+- **Checks (`tools/test.py` celesta()):** in tune within 3 cents; the damper stops a note; 10 s of
+  random playing stable; 0.6 % of a core.
+- **Fitted to one recording** (a short phrase supplied by the user; only numbers kept). Measured
+  there, on notes at 664 and 996 Hz, in the first 80 ms and relative to the fundamental: a partial
+  at **5.33–5.35 ×, −33 to −36 dB** (the third bending mode: the celesta's metallic edge, gone
+  within tenths of a second); 2.72–2.73 × at −44 to −53 dB; a **knock** below the note (near 70,
+  150 and 370–570 Hz) at about −35 dB; the fundamental falling 5–8 dB/s (a ring of 8–11 s). The
+  recording is 14 cents sharp of A 440 (about 443.5 Hz, as §2 says orchestras tune them).
+  - The model's 2nd to 4th bending modes are set 1 % under the plain strip's (2.73, 5.35, 8.84).
+  - The plates' own radiation of their overtones is 11 × the bare strip's (the frame and case give
+    it more to work against): the 5.35 partial comes out at −32 to −33 dB.
+  - The ring table (§7) is doubled in the middle: 12, 11, 9, 6, 3, 1 s at C3 .. C8.
+  - A case knock was added: four short cabinet resonances (72, 150, 370, 560 Hz) driven by the
+    hammers' force, at −33 to −37 dB.
+- **Not done:** end weights in the bass (plain strips at their full length); the top octave's
+  shared boxes; the Mustel voice; the case's colouring of the sound beyond the knock; the offline
+  plate tool with holes. Levels across the compass (the boxes' tilt of 0.5 halvings an octave) are
+  an estimate.

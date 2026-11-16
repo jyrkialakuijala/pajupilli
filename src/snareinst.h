@@ -69,7 +69,9 @@ class SnareModel : public Tube {
 // (PJ_SNARE_LOOP=0: nothing unasked. PJ_SNARE_TAPSWEEP=0: taps lift at once.
 // PJ_SNARE_PULL: how much faster the hand is at the pull, 0: even.
 // PJ_SNARE_TAPSWOOSH: how much of a sweep a quarter-note stroke is, 0 .. 2.
-// PJ_SNARE_VARY: how much one round differs from the next, 0: all alike.)
+// PJ_SNARE_VARY: how much one round differs from the next, 0: all alike.
+// PJ_SNARE_MEAT: the quarter-note strokes harder by this, dB. PJ_SNARE_FLAT:
+// the share of them that land flatter, a fuller slap.)
 // Velocity: the stroke's speed; the swirl's weight on the head. Each tap
 // lands a little elsewhere; the brightness knob moves the right hand between
 // the middle (dark, fat) and the edge (ringing).
@@ -109,7 +111,8 @@ class SnarePlayer : public Performer {
   Round aim_[2], now_[2];
   double vary_ = 1.0, lastPhase_ = 0, zone_ = 1;
   int turn_ = 0, zoneHold_ = 2;
-  double tapSwoosh_ = 0.7, held_ = 0.42;
+  double tapSwoosh_ = 0.7, held_ = 0.42, meat_ = 1.0, flatShare_ = 0.22, flatHard_ = 0.8;
+  bool lastFlat_ = false;
   double rhT_ = -1, rhDur_ = 0, rhV0_ = 0, rhX_ = 0, rhY_ = 0, rhDx_ = 0, rhDy_ = 0, rhAng_ = 1.2, phaseR_ = 3.1;
 };
 
