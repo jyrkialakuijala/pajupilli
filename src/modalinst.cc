@@ -288,12 +288,18 @@ const float kChurchRatio[] = {0.5f, 1, 1.2f, 1.5f, 2, 2.5f, 2.67f, 3.0f, 4.0f};
 const float kChurchT60[] = {2.5f, 2.0f, 1.8f, 0.6f, 1.2f, 0.5f, 0.5f, 0.6f, 0.4f};
 const float kChurchAmp[] = {0.6f, 0.8f, 0.9f, 0.25f, 1, 0.25f, 0.2f, 0.45f, 0.35f};
 
-// An agogo bell: a thin conical iron shell, its modes after Rayleigh's ring
-// law (1 : 2.83 : 5.42 : 8.77 : 12.9), Q ~600; the oval mouth splits each
-// pair widely (2-8 %: a roughness more than a beat).
-const float kAgogoRatio[] = {1, 2.83f, 5.42f, 8.77f, 12.9f};
-const float kAgogoT60[] = {1.6f, 0.6f, 0.32f, 0.2f, 0.14f};
-const float kAgogoAmp[] = {1, 0.6f, 0.4f, 0.25f, 0.15f};
+// An agogo bell: a thin conical iron shell. Its partials as measured on a
+// recorded pair (FluidR3's General MIDI agogos, 1000 and 1499 Hz: the same
+// ratios on both; research/triangle_cowbell.md 3): 2.0, 2.25, 2.55 (weak),
+// 3.73 and 5.12 the strongest (-20, -15 dB), 6.46, 7.45, 7.94; their T60s
+// 0.3 - 0.8 s whatever the pitch (the samples' own, a little longer). The amp
+// is each mode's shape at the stroke and its radiation alike: the sound
+// ~ amp^2 f, so amp = sqrt(10^(dB/20) / ratio), then each fitted on the
+// model's own stroke (the stick's contact takes the upper ones down). The
+// oval mouth splits each pair (3 %: a roughness more than a beat).
+const float kAgogoRatio[] = {1, 2.0f, 2.25f, 2.55f, 3.73f, 5.12f, 6.46f, 7.45f, 7.94f};
+const float kAgogoT60[] = {0.7f, 0.35f, 0.31f, 0.5f, 0.65f, 0.6f, 0.45f, 0.5f, 0.4f};
+const float kAgogoAmp[] = {1, 0.37f, 0.36f, 0.166f, 0.184f, 0.24f, 0.13f, 0.116f, 0.194f};
 
 // A wood (temple) block: the lip and the cavity under it (a bass-reflex pair,
 // 1 : 1.15, Yuasa's mokugyo), the lip's partials (3.65, 5.34, 7.91: the
@@ -326,10 +332,12 @@ const float kTaikoAmp[] = {1, 0.6f, 0.35f, 0.4f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f
 // struck and the brightly plucked are then held down so the hardest hit
 // peaks near full scale (a woodblock's click at the median loudness peaked
 // at 5.6, a crash's at 7.7): sitar -2.3, banjo -10.6, shamisen -4.9, bell
-// -2.5, agogo -7.5, pan -1.4, woodblock -15, reverse cymbal -17.7 dB. The
+// -2.5, agogo -7.5, pan -1.4, woodblock -15, reverse cymbal -17.7 dB. (The agogo: its bell made
+// heavier and its partials as recorded, 2026-11-16: +10.2 dB, held down so
+// velocity 127 peaks near full scale.) The
 // sound effects measured over a 3 s held key (a helicopter spins up, a wave
 // takes seconds); applause and the gunshot (all peak) held down likewise.
-static const double kModalLevel[21] = {20.4, 9.5, 3.3, 33.8, 24.4, -15.8, 37.2, 20.6, 23.7, 28.8, 1.7, 35.7,
+static const double kModalLevel[21] = {20.4, 9.5, 3.3, 33.8, 24.4, -15.8, 37.2, 30.8, 23.7, 28.8, 1.7, 35.7,
                                        -11.1, 49.4, 34.9, -16.0, 1.4, 8.5, 28.8, 21.8, 22.7};
 
 static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
@@ -918,9 +926,14 @@ void ModalPlayer::noteOn(int midi, int velocity) {
         struckDef(d, {10, kBellRatio, kBellT60, kBellAmp, 1.0f, 1000, 0.001f}, hz(midi), mass, rng_);
         mallet = 0.01; K = 5e9;  // the clapper: contact ~0.1 ms
       } else if (t == ModalModel::kAgogo) {
-        mass = 0.02;
-        struckDef(d, {5, kAgogoRatio, kAgogoT60, kAgogoAmp, 1.0f, 800, 0.03f}, hz(midi), mass, rng_);
-        mallet = 0.02; K = 3e9;  // a stick: ~0.12 ms
+        // (The bell's modal mass against the stick's tip: a tip as heavy as
+        // the bell rode its fundamental for half a cycle, the partials gone;
+        // the many modes of a real shell make its point stiff, the contact
+        // short.)
+        static const double bellMass = knob("PJ_AGOGO_MASS", 0.08), tip = knob("PJ_AGOGO_TIP", 0.006);
+        mass = bellMass;
+        struckDef(d, {9, kAgogoRatio, kAgogoT60, kAgogoAmp, 0.0f, 800, 0.03f}, hz(midi), mass, rng_);
+        mallet = tip; K = 3e9;  // a stick's tip: ~0.05 ms
       } else if (t == ModalModel::kWoodblock) {
         mass = 0.03;
         struckDef(d, {5, kBlockRatio, kBlockT60, kBlockAmp, 1.0f, 800, 0}, hz(midi), mass, rng_);

@@ -9,7 +9,22 @@
 #include "hornplayer.h"
 #include "bassinst.h"
 #include "modalinst.h"
+#include "hihatinst.h"
+#include "kick.h"
+#include "percextras.h"
+#include "clap.h"
+#include "woodperc.h"
+#include "surdo.h"
+#include "belltree.h"
+#include "shaker.h"
+#include "scrapers.h"
+#include "cymbal.h"
+#include "tom.h"
+#include "metalperc.h"
+#include "handdrum.h"
 #include "pianoinst.h"
+#include "snareinst.h"
+#include "sticksnare.h"
 #include "clavinet.h"
 #include "cp80.h"
 #include "lead.h"
@@ -98,6 +113,21 @@ std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.plucked() && grandPiano(inst)) return std::unique_ptr<Tube>(new PianoModel(inst));
   if (inst.plucked() && electricGrand(inst)) return std::unique_ptr<Tube>(new Cp80Model(inst));
   if (inst.plucked() && clavinet(inst)) return std::unique_ptr<Tube>(new ClavinetModel(inst));
+  if (inst.plucked() && brushSnare(inst)) return std::unique_ptr<Tube>(new SnareModel(inst));
+  if (inst.plucked() && stickSnare(inst)) return std::unique_ptr<Tube>(new StickSnareModel(inst));
+  if (inst.plucked() && hiHat(inst)) return std::unique_ptr<Tube>(new HiHatModel(inst));
+  if (inst.plucked() && jazzKick(inst)) return std::unique_ptr<Tube>(new KickModel(inst));
+  if (inst.plucked() && shakerInstrument(inst)) return std::unique_ptr<Tube>(new ShakerModel(inst));
+  if (inst.plucked() && cymbal(inst)) return std::unique_ptr<Tube>(new CymbalModel(inst));
+  if (inst.plucked() && jazzTom(inst)) return std::unique_ptr<Tube>(new TomModel(inst));
+  if (inst.plucked() && metalPerc(inst)) return std::unique_ptr<Tube>(new MetalPercModel(inst));
+  if (inst.plucked() && scraper(inst)) return std::unique_ptr<Tube>(new ScraperModel(inst));
+  if (inst.plucked() && handDrum(inst)) return std::unique_ptr<Tube>(new HandDrumModel(inst));
+  if (inst.plucked() && percExtras(inst)) return std::unique_ptr<Tube>(new PercExtrasModel(inst));
+  if (inst.plucked() && handClap(inst)) return std::unique_ptr<Tube>(new ClapModel(inst));
+  if (inst.plucked() && woodPerc(inst)) return std::unique_ptr<Tube>(new WoodPercModel(inst));
+  if (inst.plucked() && surdo(inst)) return std::unique_ptr<Tube>(new SurdoModel(inst));
+  if (inst.plucked() && bellTree(inst)) return std::unique_ptr<Tube>(new BellTreeModel(inst));
   if (inst.plucked()) return std::unique_ptr<Tube>(new BassModel(inst));
   if (inst.modal()) return std::unique_ptr<Tube>(new ModalModel(inst));
   return std::unique_ptr<Tube>(new Flute(inst));
@@ -113,6 +143,36 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
     return std::unique_ptr<Performer>(new Cp80Player(static_cast<Cp80Model&>(t)));
   if (t.instrument().plucked() && clavinet(t.instrument()))
     return std::unique_ptr<Performer>(new ClavinetPlayer(static_cast<ClavinetModel&>(t)));
+  if (t.instrument().plucked() && hiHat(t.instrument()))
+    return std::unique_ptr<Performer>(new HiHatPlayer(static_cast<HiHatModel&>(t)));
+  if (t.instrument().plucked() && jazzKick(t.instrument()))
+    return std::unique_ptr<Performer>(new KickPlayer(static_cast<KickModel&>(t)));
+  if (t.instrument().plucked() && shakerInstrument(t.instrument()))
+    return std::unique_ptr<Performer>(new ShakerPlayer(static_cast<ShakerModel&>(t)));
+  if (t.instrument().plucked() && cymbal(t.instrument()))
+    return std::unique_ptr<Performer>(new CymbalPlayer(static_cast<CymbalModel&>(t)));
+  if (t.instrument().plucked() && jazzTom(t.instrument()))
+    return std::unique_ptr<Performer>(new TomPlayer(static_cast<TomModel&>(t)));
+  if (t.instrument().plucked() && metalPerc(t.instrument()))
+    return std::unique_ptr<Performer>(new MetalPercPlayer(static_cast<MetalPercModel&>(t)));
+  if (t.instrument().plucked() && brushSnare(t.instrument()))
+    return std::unique_ptr<Performer>(new SnarePlayer(static_cast<SnareModel&>(t)));
+  if (t.instrument().plucked() && stickSnare(t.instrument()))
+    return std::unique_ptr<Performer>(new StickSnarePlayer(static_cast<StickSnareModel&>(t)));
+  if (t.instrument().plucked() && scraper(t.instrument()))
+    return std::unique_ptr<Performer>(new ScraperPlayer(static_cast<ScraperModel&>(t)));
+  if (t.instrument().plucked() && handDrum(t.instrument()))
+    return std::unique_ptr<Performer>(new HandDrumPlayer(static_cast<HandDrumModel&>(t)));
+  if (t.instrument().plucked() && percExtras(t.instrument()))
+    return std::unique_ptr<Performer>(new PercExtrasPlayer(static_cast<PercExtrasModel&>(t)));
+  if (t.instrument().plucked() && handClap(t.instrument()))
+    return std::unique_ptr<Performer>(new ClapPlayer(static_cast<ClapModel&>(t)));
+  if (t.instrument().plucked() && woodPerc(t.instrument()))
+    return std::unique_ptr<Performer>(new WoodPercPlayer(static_cast<WoodPercModel&>(t)));
+  if (t.instrument().plucked() && surdo(t.instrument()))
+    return std::unique_ptr<Performer>(new SurdoPlayer(static_cast<SurdoModel&>(t)));
+  if (t.instrument().plucked() && bellTree(t.instrument()))
+    return std::unique_ptr<Performer>(new BellTreePlayer(static_cast<BellTreeModel&>(t)));
   if (t.instrument().plucked()) {
     BassModel& b = static_cast<BassModel&>(t);
     return std::unique_ptr<Performer>(bowedBass(t.instrument()) ? new BowPlayer(b) : new BassPlayer(b));

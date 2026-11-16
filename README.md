@@ -445,7 +445,9 @@ Hohner Clavinet, its pickups, its electronics and the pedals it was played throu
 - **The release:** the tip lets the whole string go (1.19 × the speaking length: three
   semitones lower). The vibration and the released bend, a pluck at the anvil, ring on it while
   the yarn damps them (the highs in about 30 ms, the dropped fundamental in about 0.2 s): the
-  release "thunk" with its short downward drop.
+  release "thunk" with its short downward drop. A key struck again while that rings clamps the
+  swinging string: what swings on the speaking length goes on under the new stroke (the old note
+  decays as it would, not cut off), and only the part beyond the anvil dies in the yarn.
 - **Strings:** lengths estimated (0.82 m at F1 to 0.18 m at E6; only E3's 0.678 m is
   published); stiffness as measured on recordings of a D6 from E2 to D#4 (about 5e-5, half the
   published figure there) and as published in the bass and at the top; held notes ring 20 s at
@@ -635,11 +637,214 @@ Lead-saw's circuit:
     ./pajupilli -play song.mid -o song.wav   # or write it
     ./pajupilli -play song.mid -room church  # in another room
 
+The drum kit, live (`src/drumkit.h`): the same drum keys from the keyboard.
+
+    ./pajupilli -live -inst drums                    # the kit on the keys and the pads
+    ./pajupilli -live -inst grand-piano -pads drums  # the piano on the keys, the kit on the pads
+
+The MPK's pads send General MIDI's drum keys on channel 10 as they come (bank A 36..43: bass
+drum, side stick, snare, clap, snare 2, low tom, closed hi-hat, tom; bank B 44..51: pedal
+hi-hat, tom, open hi-hat, tom, tom, crash, tom, ride); with `-pads drums` they play the kit
+instead of the breath and the flutter. With `-inst drums` the keys are drum keys too, the
+MPK's lowest C (48) the bass drum (36; `-transpose N` moves them, the octave buttons reach the
+rest). Velocity is the stroke. At the start it lists which key plays what, and which are
+silent: the cymbals and hi-hats are not built yet (`research/cymbal_plan.md`), so until then
+five of the sixteen pads make no sound. About 12 % of a core, busy.
+
+The jazz bass drum (`-inst jazz-kick`, `jazz-kick-20`; `src/kick.cc`, `research/kick.md`): the
+bebop kick, 18" × 14" (or 20"), both heads on, no port, tuned up to a note (70 Hz; the 20": 60
+Hz), a felt beater. The two heads share the shell's air (the note is their in-phase pair), a
+hard stroke stretches them (a bomb starts most of a semitone sharp; a feathered one not at
+all), and the beater is thrown from where the head is now, so a stroke into a ringing drum adds
+to it or takes from it by its phase; it springs off and stays off (one key, one stroke). Keys
+35 (lower on the head, more ring) and 36; velocity is the beater's speed (feathered quarters at
+20–70, about 30 dB from 16 to 127). The hold (CC 64; `PJ_KICK_BURY=1`: always) buries the
+beater: a short, higher, dead thud.
+
+    ./pajupilli -inst jazz-kick -seq "on 36 44 wait 0.5 on 36 40 wait 0.5 on 36 105 wait 1"
+
+The cymbals (`-inst ride-cymbal`, `ride-cymbal-2`, `crash-cymbal`, `crash-cymbal-2`,
+`splash-cymbal`, `china-cymbal`; `src/cymbal.cc`, `research/cymbals_built.md`): a 22" thin jazz
+ride, a 20" drier ride, 16" and 18" thin crashes, a 10" splash, an 18" china. Each is a free
+bronze plate as its modes (to 16 kHz: ~1600 on the 22"), living through the whole song, so ride
+strokes pile up into the wash and each stroke meets the plate where it is; the cup rings as its
+own few modes when struck inside its rim; the cymbal rocks on its stand. A stick (the tip on the
+bow, the shoulder on the edge) or a brush (the hand, grip, fan and wire ends of `src/brush.cc`)
+strikes it; a hand on the edge chokes it. Keys are General MIDI's: 51 and 59 the bow (the place
+drifting over the bow by phrases and wandering a little every stroke), 53 the bell, 49/57/55/52
+a crash; the same key 24 higher is the stroke with a brush (`PJ_CYM_BRUSH=1`: all). On the ride
+a brush stroke goes continuously from the slowed tip (light: a few wire ends, off at once,
+bright) to the thrown fan (leaned on), by velocity and, in a song, by the beat: 1 and 3 leaned
+on, 2 and 4 light (the bar learnt from the ride's own pattern: 2 and 4 are where its skip notes lead). The breath (channel pressure) grabs the edge (`PJ_CYM_NOTEOFF=1`: a note-off
+does). Linear only: a hard crash is bright at once but does not bloom (no nonlinear cascade
+yet). About 5–7 % of a core each, busy.
+
+    ./pajupilli -inst ride-cymbal -seq "on 51 80 wait 0.3 on 51 90 wait 0.2 on 51 60 wait 0.1 on 51 80 wait 2"
+
+The shakers and jingles (`-inst maracas`, `shaker`, `cabasa`, `tambourine`, `jingle-bell`;
+`src/shaker.cc`, `research/shakers.md`), for General MIDI's 70, 69, 54 and GM2's 82, 83: many
+small hard things thrown by the hand, each collision a click ringing the body's few broad
+resonances (PhISEM's resonances, but the things themselves simulated, cheaply). In a maraca 60
+seeds fly on when the hand stops and hit the far wall together (the chick, at the key's time),
+then rattle off each other and settle in ~0.1 s; two maracas take the strokes in turn. The
+shaker's tube alternates push and pull. The tambourine's six pairs of jingles slam against their
+slots and each other, each disc ringing its own modes (3-8 kHz), over the frame's knock; the
+jingle bell's balls ring their bells. Every stroke finds the jingles otherwise arranged: the
+frame held at its own tilt and rocking on the blow (one side's pairs thrown harder), the kick
+reaching the pairs over a few ms, each disc tilted on its pin (its bounce and free travel its
+own), and every collision striking a disc's rim somewhere else (its modes mixed by their shapes
+there). The cabasa is a scraper: the bead chains over the ribbed
+cylinder, dense clicks at the ridge rate, as long as its key is held. Velocity chooses how it
+is played: the softest turned on one way (the chains keep sliding, no reversal; to 45), then
+twisted back and forth (each reversal throws the chains over; to 80), then shaken in the air
+(the chains thrown, a short scrape, in a 1-2-3-4: 1 strongest, 3 a little under it, 2 under 3,
+4 the weakest, from the song's beat or, live, by counting; to 105), and the hardest struck
+against the other hand (the palm's thump on the handle and cylinder, every chain thrown, the
+beads sliding); `PJ_CABASA_TURN`, `_TWIST`, `_SHAKE` move the borders. One object a song, so a
+stroke meets what is still moving; no two strokes alike; velocity is the hand's speed, about
+30 dB from 16 to 127. The maracas are played in their ways by velocity: the softest from the
+chest (the seeds start to slide as the hand moves off, a small rising woosh, then the slap; in
+a song the player gets these notes 0.12 s early, `PJ_MARACA_LEAD`, and the slap falls on the
+note; live it is a soft slap), the plain slap, two slaps in one movement (out and back, the
+second weaker, a sixteenth later; 100-110), and a flick (the wrist snapped: the seeds thrown in
+a tight bunch, a firmer slap; 111 up); a key held past 3/4 of a beat (0.4 s live) turns the
+maraca in loops, the seeds rolling round the wall, until it is let go (`PJ_MARACA_CHEST`,
+`_SLAP`, `_DOUBLE` move the borders). The maracas and shaker sit 5-6 dB under the common level (a chick's peak
+is ~30 dB over its loudness). Under 0.5 % of a core each.
+
+    ./pajupilli -inst maracas -seq "on 70 100 wait 0.23 on 70 55 wait 0.23 on 70 75 wait 0.23 on 70 55 wait 1"
+
+The snare with sticks (`-inst stick-snare`; `src/sticksnare.cc`, `research/stick_snare.md`): the
+brushed snare's drum (its two heads on their air, the wires on the snare head, its microphones)
+played with a pair of sticks. A stick is a 9 g tip on a stiff contact, thrown from just over the
+head where it is now and found against the head's give each sample (3.8-4 ms on the head; the
+wires answer, a short buzz under a ghost note, a longer rattle under an accent); the stick's own
+three bending modes and the contact's click above the head's modes. Keys: 38 a stroke (between
+the middle and a third out), 40 halfway out, 42 near the edge, 37 the cross-stick (the snare's
+own), 39/41 the open rim shot (a heavier stroke near the rim, the shaft striking the hoop at once:
+its nine ring modes and the stick's, each at its own phase; about 6 dB over a stroke and
+brighter), 36 the buzz roll for as long as the key is held (the hands in turn, 6-9 strokes a
+second each, each pressed in and bouncing 3-5 times, sooner and weaker: 65-90 impacts a second).
+Velocity ~^1.75 gives about 31 dB from 16 to 127; it sits 2 dB under the common level (an accent
+peaks near 1.5). About 7 % of a core (the drum's wires the most of it).
+
+    ./pajupilli -inst stick-snare -seq "on 38 30 wait 0.25 on 38 100 wait 0.25 on 39 110 wait 0.4 on 36 80 wait 1.2 off 36 wait 0.5"
+
+The small sounds below the drum map's 35 (`-inst perc-extras`; `src/percextras.cc`,
+`research/gm2_extras.md`), by GS/GM2's keys: 26 finger snap, 27 High Q, 28 slap (the whip's two
+boards), 29/30 scratch push and pull, 31 sticks, 32 square click, 33/34 the metronome's click and
+bell; and Yamaha XG's own on free keys: 20 click noise, 21 castanets, 23/24 sequencer clicks. The
+struck ones are physical: two hickory sticks' free-free bending modes (330, 910, 1780, 2950 Hz),
+damped by the hands, under the click's own crack; the whip's air burst and boards; the finger's
+blow on the palm and the cupped hand's air; the castanets' shells and the air between them. The
+electronic ones and the turntable's scratch (the record read at a swept speed) are simple
+synthesis. Velocity gives about 30 dB from 16 to 127; they sit 12 dB under the common level (small
+sounds). The user's files with these keys are Yamaha XG sequences, where 25-28 are brushes, 31 a
+snare, 33 a bass drum and 34 an open rim shot (research/gm2_extras.md §1, §6).
+
+    ./pajupilli -inst perc-extras -seq "on 31 70 wait 0.5 on 31 70 wait 0.5 on 33 60 wait 0.5 on 34 60 wait 1"
+
+The jazz toms (`-inst tom-10`, `tom-12`, `tom-13`, `tom-14`, `tom-16`, `tom-16-low`; `src/tom.cc`,
+`research/toms.md`): one two-headed drum for each of General MIDI's six tom keys (50, 48, 47, 45,
+43, 41), tuned high and open, both heads at the same lug pitch, on 196, 165, 147, 110, 92.5 and
+73.4 Hz (the tension is solved for when the drum is made, so the note stays put as the heads'
+other settings change). The air in the shell couples the heads (the note is their in-phase
+pair, about half the batter's (1,1)); a hard stick stroke stretches them (the 14" starts about
+half a semitone sharp at velocity 127, the low 16" more), a feathered or brushed one keeps its
+pitch. A stick is thrown from where the head is now and its contact solved as the head gives
+under it; it rebounds and is gone. Keys 24 up (65–74) play the brush: the pull-out stroke, the
+hand turning up as the wires land, off the head in about 4 ms, the drum ringing on; below
+velocity 24 (`PJ_TOM_DRAGVEL`) the brush is set down and drawn a few cm instead, a short hiss
+with the drum's pitch in it. About 30 dB from velocity 16 to 127; brushes 6–13 dB under sticks.
+About 1.6 % of a core per ringing drum.
+
+    ./pajupilli -inst tom-14 -seq "on 45 60 wait 0.6 on 45 127 wait 1 on 69 90 wait 1 on 69 12 wait 1"
+
+The hand drums (`-inst conga`, `bongo`, `timbale`; `src/handdrum.cc`, `research/hand_drums.md`):
+each a pair, General MIDI's 62 (mute hi conga), 63 (open hi conga), 64 (low conga), 60, 61
+(bongos), 65, 66 (timbales). One head over an open-bottomed shell: rawhide on the congas (C4 and
+G3) and bongos (C5, G4), thin plastic on the timbales (E4, B3), each tuned on its (0,1) mode as
+the air loads it. The conga's 76 cm barrel is a pipe closed by the head: its quarter waves (near
+100, 310 and 520 Hz) are driven by the volume the head sweeps and press back on it, and its
+open foot radiates (the "bass" under the open tone); the tension is solved so that the note
+stays on pitch with the pipe pulling at it. The hand is a soft, heavy, lossy mallet (fingers
+across the rim, flesh on bone), thrown from where the head is now and solved against the
+head's give; the open tone bounces off, the closed tone (62) stays pressed 0.2 s and damps the
+head where it lies (16 dB shorter at 0.1 s). No two strokes are played the same: the hand
+lands a little elsewhere, more open (flat, wide, softer) or more closed (cupped fingers,
+narrower, harder); on open tones the fingertips sometimes stay a moment at the edge (a touch
+of damping), and now and then the hand drops further in, heavier, and is lifted at once, a
+rebound off the head for a bigger, rounder sound (more often on accents); a closed tone presses
+harder or longer. The timbales are struck with a stick near the
+edge, and their steel shells ring a little through the rim. About 30 dB from velocity 16 to
+127; 1.5 % of a core.
+
+    ./pajupilli -inst conga -seq "on 62 70 wait 0.33 on 62 50 wait 0.17 on 63 95 wait 0.17 on 62 70 wait 0.33 on 64 100 wait 0.17 on 64 90 wait 1"
+
+The triangle and the cowbell (`-inst triangle`, `cowbell`; `src/metalperc.cc`,
+`research/triangle_cowbell.md`): General MIDI's 80 (mute triangle), 81 (open) and 56. The
+triangle is a 10 mm steel rod, 0.57 m (an 8" triangle), its bending modes as the straight free
+bar's (Rossing): one family in its plane, one across it that the corners stiffen (8-18 % higher,
+as on a recorded triangle), and the rod's longitudinal modes; struck by a steel beater (a contact of
+tens of us) on the bottom side, a little elsewhere each time. The low modes barely radiate: the
+shimmer from 1 to 15 kHz, T60 about 3 s. A key 80 (or the hold) is the hand clasping it (T60
+0.35 s), and it chokes a ringing triangle; 81 lets go. The cowbell: the partials and decays of a
+recorded one (472 Hz with its rough neighbours, the walls at 2-3.7 kHz), a hickory shaft on the
+mouth's edge. (The agogo's partials, `-inst agogo`, now as a recorded pair's too: 3.73 and 5.12 x
+the strongest.) Velocity^1.65: about 30 dB from 16 to 127; 0.2 % of a core each.
+
+    ./pajupilli -inst triangle -seq "on 80 70 wait 0.12 on 80 60 wait 0.12 on 81 95 wait 0.25 on 80 70 wait 0.12 on 81 90 wait 1.5"
+
+The scraped, rubbed, rattled and blown ones (`-inst guiro`, `cuica`, `vibraslap`, `pea-whistle`;
+`src/scrapers.cc`, `research/scrapers_friction.md`): General MIDI's 73/74 (short, long guiro),
+78/79 (mute, open cuica), 58 (vibraslap), 71/72 (short, long whistle). The guiro's stick tip
+(2 g, held by a damping hand) is dragged over 20 cm of notches, 5 mm apart at the wide bottom
+to 3 mm at the narrow top: it climbs each and drops onto the next, a click train at the
+stroke's speed over the spacing, into the gourd's cavity (330 Hz) and shell, and into each
+notch's own ring (the wall under it: ~0.9 kHz at the bottom to ~2.4 kHz at the top, each a
+little apart), so a stroke glides in pitch. Strokes alternate up and down, in pairs over the
+lower notches, then the upper ones (low-low, high-high); soft ones (to 50, `PJ_GUIRO_JOIN`)
+are joined (the stick stays on, the next goes on from where it is), harder ones separate: the
+stick comes back down out of the air and lands with its own blow (0.1-0.6 m/s) before it
+scrapes. A light press skims the ridge tops. The cuica's stick, tied to the head's centre, is rubbed by a damp cloth: stick-slip
+against the head's modes there (goat skin, the stick's mass on it; the grip grows with the
+cloth's speed, as a bow's force must), the thumb gliding the open note up about five semitones,
+the mute an octave up and damped. The vibraslap's wire swings the box (22 Hz, dying in about a
+second and a half) and its six loose pins rattle against the walls (trimmed 6 dB under the
+common level: its rattle is all peaks). The pea whistle is a self-sustained cavity (3.3 kHz)
+the jet drives and its turbulence seeds, the pea trilling it at 25-40 Hz. 23-30 dB from
+velocity 16 to 127; under 0.5 % of a core.
+
+    ./pajupilli -inst guiro -seq "on 74 100 wait 0.32 on 73 90 wait 0.16 on 73 90 wait 0.16 on 74 100 wait 0.5"
+
+The hand clap, claves, wood blocks, surdo and bell tree (`-inst hand-clap`, `claves`,
+`wood-blocks`, `surdo`, `bell-tree`; `src/clap.cc`, `woodperc.cc`, `surdo.cc`, `belltree.cc`,
+`research/clap_claves_surdo.md`): General MIDI's 39 (in the Jazz and Standard kits), 75, 76/77,
+GM2's 86/87 (XG's 13/14) and 84.
+- The clap: the air cupped between the palms rings as a Helmholtz resonator as the hands close
+  (0.75 kHz cupped to 2.2 kHz flat; the soft tissue damps it within a few cycles), each clap the
+  fingers' and then the palms' contact, with the escaping air's hiss and the palms' thud; four
+  people at once spread over 20 ms, every stroke drawn afresh.
+- The claves: two rosewood bars, free-free: the held one at 2.45 kHz, the cupped hand under it
+  helping its first mode out; the striker 6 % lower and short.
+- The wood blocks: their partials as measured on recorded ones (746, 502 Hz). They are struck
+  with a stick's tip on top over the cavity, within ±10 % of the block's width and length of the
+  same place, each mode by its shape there: the main one alike every time, its neighbours a few
+  dB different stroke to stroke.
+- The surdo: a 22" × 55 cm samba drum, built as the toms are, at 62 Hz, struck with a felt
+  mallet; the mute (86) is the other hand flat on the head.
+- The bell tree: sixteen brass bells from 11 down to 4 kHz, the beater drawn down the stack, a
+  harder key a quicker sweep.
+
+26-32 dB from velocity 16 to 127; under 3 % of a core.
+
+    ./pajupilli -inst wood-blocks -seq "on 76 90 wait 0.25 on 76 70 wait 0.25 on 77 90 wait 0.25 on 76 80 wait 0.5"
+
 Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
 on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
 CP-80, organs to the calliope, guitars to the koto and banjo, cello to the contrabass, string
 sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
-built (bass drum: taiko; snare: synth drum; toms, bongos, congas: melodic tom; cowbell,
+built (bass drum: the jazz kick; snare and side stick: the brushed snare; hi-hats: the hi-hat; toms, bongos, congas: melodic tom; cowbell,
 agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel
 is a pool of its instrument as big as the most notes sounding at once, counting 1.5 s of tail
 after each release (`PJ_PLAY_TAIL`; at most 32 voices, `PJ_PLAY_VOICES`; a piano: one voice). A
@@ -656,10 +861,15 @@ physics already gives, measured per instrument (`tools/velcurve.py -emit`,
 wind or a synth gets it as its voice's gain (a slur moves there in 60 ms); one voice that
 sounds every key (the CP-80, the plucks) gets the stroke that sounds that loud instead. A
 file played hot throughout (its median velocity over 96: a sequencer's default) is scaled
-down together until the median is 96 (`PJ_PLAY_VELMEDIAN`). A song heavier than real time pauses
-once, long enough to play on to the end without another stop; a file is scaled to
+down together until the median is 96 (`PJ_PLAY_VELMEDIAN`). Playing starts once 10 s are rendered
+(`PJ_PLAY_LEAD`, s), and should the rendering fall behind (a song heavier than real time), it
+waits for 10 s again, never longer; a file is scaled to
 its peak, a stream passes a soft knee over 0.9. Schubert's piano (8 min) renders at about
-3× real time.
+3× real time. The parts render side by side on up to 16 threads (`PJ_PLAY_THREADS`; the synth
+circuits together, as they share a board) and mix in their usual order, so the result is the
+same as on one thread, bit for bit: *Good Bait* (a trio with the brushed kit, 6 min) renders in
+124 s instead of 278 s. The heaviest part (most often the piano's pool of voices) still sets
+the pace.
 
 ## Offline
 

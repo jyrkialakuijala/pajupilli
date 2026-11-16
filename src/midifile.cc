@@ -17,9 +17,12 @@
 
 #include "analysis.h"
 #include "calibrate.h"
+#include "drumkit.h"
 #include "ensemble.h"
 #include "instrument.h"
+#include "parallel.h"
 #include "performer.h"
+#include "songclock.h"
 
 namespace pajupilli {
 
@@ -38,6 +41,10 @@ struct Event {
 struct Song {
   std::vector<Event> ev;
   std::string title;
+  bool gs = false;  // a Roland GS or General MIDI 2 file (else the drum keys below 35 are Yamaha XG's)
+  // The tempo map: from `t` seconds on (at `beat` quarter notes), a quarter lasts `len` s.
+  struct Tempo { double t, beat, len; };
+  std::vector<Tempo> tempo;
 };
 
 uint32_t be(const uint8_t* p, int n) {
@@ -90,7 +97,17 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
         p += n;
         continue;
       }
-      if (s == 0xf0 || s == 0xf7) { p += var(); continue; }
+      if (s == 0xf0 || s == 0xf7) {
+        const uint32_t n = var();
+        // A Roland GS reset or a General MIDI 2 system-on: the drum keys below 35 are theirs.
+        static const uint8_t kGs[] = {0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41}, kGm2[] = {0x7e, 0x7f, 0x09, 0x03};
+        if (s == 0xf0 && p + n <= end) {
+          if (n >= sizeof kGs && d[p] == 0x41 && std::equal(kGs + 2, kGs + 9, d.begin() + p + 2)) song->gs = true;  // (any device number)
+          if (n >= sizeof kGm2 && d[p] == 0x7e && d[p + 2] == 0x09 && d[p + 3] == 0x03) song->gs = true;
+        }
+        p += n;
+        continue;
+      }
       if (s < 0x80) break;  // corrupt
       run = s;
       const int kind = s & 0xf0;
@@ -103,6 +120,13 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
   std::stable_sort(tempo.begin(), tempo.end(), [](auto& x, auto& y) { return x.first < y.first; });
   if (tempo.empty() || tempo[0].first > 0) tempo.insert(tempo.begin(), {0, 0.5 / div});
   std::sort(raw.begin(), raw.end(), [](const Raw& x, const Raw& y) { return x.tick != y.tick ? x.tick < y.tick : x.order < y.order; });
+  {
+    double t = 0;
+    for (size_t i = 0; i < tempo.size(); ++i) {
+      if (i > 0) t += (tempo[i].first - tempo[i - 1].first) * tempo[i - 1].second;
+      song->tempo.push_back({t, double(tempo[i].first) / div, tempo[i].second * div});
+    }
+  }
   size_t k = 0;
   double t0 = 0;  // seconds at tempo[k].first
   for (const Raw& r : raw) {
@@ -174,22 +198,6 @@ const Instrument* forProgram(int prog) {
   return nullptr;
 }
 
-// Channel 10: a drum key (35..81) to an instrument built and the key it plays there (-1: none).
-struct Drum { const char* inst; int key; };
-Drum drumFor(int k) {
-  switch (k) {
-    case 35: case 36: return {"taiko", 36};                                   // bass drum
-    case 37: case 75: case 76: case 77: return {"woodblock", k == 77 ? 67 : 72};  // rim, claves, wood blocks
-    case 38: case 40: case 39: return {"synth-drum", 50};                     // snare, clap
-    case 41: case 43: case 45: case 47: case 48: case 50:                     // toms, low to high
-      return {"melodic-tom", 43 + (k - 41)};
-    case 56: case 67: case 68: return {"agogo", k == 68 ? 72 : 77};           // cowbell, agogos
-    case 60: case 61: case 62: case 63: case 64: case 65: case 66:            // bongos, congas, timbales
-      return {"melodic-tom", 52 + (k - 60) * 2};
-    default: return {nullptr, -1};                                           // cymbals, hi-hats, shakers: not built
-  }
-}
-
 // One player of the song: a channel's instrument (or a drum's), as a pool.
 struct Part {
   const Instrument* inst;
@@ -237,6 +245,52 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     drumNames.push_back(nm);
     return int(drumNames.size() - 1);
   };
+  // Which snare the drummer plays. The usual file: sticks. A file whose band
+  // has a piano and an upright bass (General MIDI programs 1 .. 4, and 33 or
+  // the fretless 36, with notes on them) is a jazz group: the brushed snare. A file that selects a
+  // Brush kit gets the brushes whatever its band.
+  bool jazzBand = false;
+  {
+    int pr[16] = {};
+    bool piano = false, upright = false;
+    for (const Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pr[ch] = e.a;
+      else if (kind == 0x90 && e.b > 0 && ch != 9) {
+        piano |= pr[ch] <= 3;
+        upright |= pr[ch] == 32 || pr[ch] == 35;  // (acoustic; fretless too: what a sequenced upright is often set to)
+      }
+    }
+    jazzBand = piano && upright;
+  }
+  auto kitOf = [&](int program) {
+    if (brushKitWanted() || kitFor(program) == Kit::kBrush) return Kit::kBrush;
+    return jazzBand ? Kit::kJazz : Kit::kStandard;
+  };
+  // An instrument may want its note early: what its player does before the
+  // sound falls on the beat (a maraca's seeds sliding before the slap) takes
+  // time. Its notes' events are moved that much earlier (noteLead), and the
+  // player lands the note that much after it is told.
+  {
+    int pr[16] = {};
+    bool moved = false;
+    for (Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pr[ch] = e.a;
+      if (kind != 0x90 && kind != 0x80) continue;
+      const Instrument* in = nullptr;
+      if (ch == 9) {
+        const Drum dr = drumFor(e.a, kitOf(pr[ch]), song.gs);
+        in = dr.inst ? findInstrument(dr.inst) : nullptr;
+      } else {
+        in = forProgram(pr[ch]);
+      }
+      const double lead = in ? noteLead(*in) : 0;
+      if (lead > 0) { e.t = std::max(0.0, e.t - lead); moved = true; }
+    }
+    if (moved) std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
+    noteLeadsApplied() = true;
+  }
   int prog[16] = {};
   std::map<int, int> sounding;  // part -> notes down now
   std::map<int, int> noteOwner;  // channel * 128 + key -> part
@@ -247,7 +301,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   int skipped = 0, unbuilt = 0;
   auto partOf = [&](int ch, int key, int* playKey) -> int {
     if (ch == 9) {
-      const Drum dr = drumFor(key);
+      const Drum dr = drumFor(key, kitOf(prog[ch]), song.gs);
       if (!dr.inst || !findInstrument(dr.inst)) return -1;
       *playKey = dr.key;
       return 9 * 128 + drumIndex(dr.inst);
@@ -287,7 +341,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     if (parts.count(id)) parts[id].maxPoly = most;
   }
   if (!song.title.empty()) std::fprintf(stderr, "%s\n", song.title.c_str());
-  std::fprintf(stderr, "%.1f s, %zu parts:\n", song.ev.back().t, parts.size());
+  std::fprintf(stderr, "%.1f s, %zu parts%s:\n", song.ev.back().t, parts.size(),
+               jazzBand ? " (a piano and an upright bass: the snare with brushes)" : "");
   std::map<const Instrument*, std::unique_ptr<Calibration>> cals;
   for (auto& [id, p] : parts) {
     if (!cals.count(p.inst)) {
@@ -306,7 +361,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       std::fprintf(stderr, "  %s %2d: %s (%d held at once; %d voices for their tails)\n", id / 128 == 9 ? "drums  " : "channel",
                    id / 128 + 1, p.inst->name, p.maxHeld, poly);
   }
-  if (skipped) std::fprintf(stderr, "  (%d drum notes on cymbals, hi-hats and others not built: silent)\n", skipped);
+  if (skipped) std::fprintf(stderr, "  (%d drum notes on keys with nothing built: silent)\n", skipped);
   if (unbuilt) std::fprintf(stderr, "  (%d notes on programs with nothing near built: silent)\n", unbuilt);
   // Second pass: play.
   std::fill(prog, prog + 16, 0);
@@ -318,19 +373,61 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   const double end = song.ev.back().t + 3.0;  // and the rooms' tails
   const size_t frames = (size_t(end * kRate) / kBlock + 1) * kBlock;
   // The song is rendered on its own thread into this buffer; the player (or
-  // the file) takes what is ready: playing starts once a second is ahead, and
-  // waits should the rendering fall behind.
+  // the file) takes what is ready: playing starts once 10 s are ahead, and
+  // waits for 10 s again should the rendering fall behind.
   std::vector<float> all(2 * frames, 0.0f);
   std::atomic<size_t> ready{0};
   const bool streaming = outWav == nullptr;
+  // Rendering on several threads (PJ_PLAY_THREADS, default 16): one job a
+  // part, the heaviest first (the most voices); the synth circuits all in one
+  // job, in their order (one board couples them, sample by sample).
+  const int threads = std::max(1, std::getenv("PJ_PLAY_THREADS") ? std::atoi(std::getenv("PJ_PLAY_THREADS"))
+                                                                   : std::min(16, int(std::thread::hardware_concurrency())));
+  std::vector<std::vector<Part*>> jobs;
+  {
+    std::vector<Part*> circuits, others;
+    for (auto& [id, p] : parts) {
+      p.l.resize(kBlock);
+      p.r.resize(kBlock);
+      (p.inst->circuit() ? circuits : others).push_back(&p);
+    }
+    std::stable_sort(others.begin(), others.end(), [](Part* a, Part* b) { return a->ens->size() > b->ens->size(); });
+    if (!circuits.empty()) jobs.push_back(circuits);
+    for (Part* p : others) jobs.push_back({p});
+  }
+  WorkPool pool(std::min(threads, int(jobs.size())));
+  if (verbose) std::fprintf(stderr, "  rendering on %d threads (%zu jobs)\n", pool.threads(), jobs.size());
   auto renderSong = [&]() {
     std::vector<float> l(kBlock), r(kBlock);
-    size_t next = 0;
+    size_t next = 0, tk = 0, ahead = 0;
+    int heldAll = 0;
+    double lastOn = -1e9;
+    std::map<int, int> heldNote;  // channel * 128 + key -> times down (not the drums)
     for (size_t n = 0; n < frames; n += kBlock) {
       const double now = (n + kBlock) / double(kRate);
+      {  // the beat, for those who keep time with it
+        while (tk + 1 < song.tempo.size() && song.tempo[tk + 1].t <= now) ++tk;
+        SongClock& c = SongClock::get();
+        c.valid = !song.tempo.empty();
+        if (c.valid) {
+          c.beatLen = song.tempo[tk].len;
+          c.beat = song.tempo[tk].beat + (now - song.tempo[tk].t) / song.tempo[tk].len;
+        }
+        // The band's silences: what sounds now, what was last begun, what comes next.
+        while (ahead < song.ev.size() && (song.ev[ahead].t < now || (song.ev[ahead].status & 0xf0) != 0x90 || song.ev[ahead].b == 0)) ++ahead;
+        const double toNext = ahead < song.ev.size() ? song.ev[ahead].t - now : 1e9;
+        c.pause = heldAll <= 0 && now - lastOn > 2 * c.beatLen && toNext > c.beatLen;
+      }
       for (; next < song.ev.size() && song.ev[next].t < now; ++next) {
         const Event& e = song.ev[next];
         const int ch = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0x90 && e.b > 0) {
+          lastOn = e.t;
+          if (ch != 9) { ++heldNote[ch * 128 + e.a]; ++heldAll; }
+        } else if ((kind == 0x80 || kind == 0x90) && ch != 9) {
+          auto h = heldNote.find(ch * 128 + e.a);
+          if (h != heldNote.end() && h->second > 0) { --h->second; --heldAll; }
+        }
         if (kind == 0xc0) prog[ch] = e.a;
         else if (kind == 0x90 && e.b > 0) {
           int pk;
@@ -366,10 +463,12 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
       std::fill(l.begin(), l.end(), 0.0f);
       std::fill(r.begin(), r.end(), 0.0f);
+      // The parts side by side on the pool's threads (the circuits as one
+      // job: they share a board); then mixed in their order, as on one thread.
+      pool.run(int(jobs.size()), [&](int i) {
+        for (Part* p : jobs[i]) p->ens->render(p->l.data(), p->r.data(), kBlock);
+      });
       for (auto& [id, p] : parts) {
-        p.l.resize(kBlock);
-        p.r.resize(kBlock);
-        p.ens->render(p.l.data(), p.r.data(), kBlock);
         // Volume and expression: as a mixing desk's fader, on the square law
         // (100 the usual: unity).
         const int ch = id / 128;
@@ -409,24 +508,24 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       renderer.join();
       return 1;
     }
-    const size_t lead = kRate;  // a second ahead before playing, and after a wait
+    // Playing starts once 10 s are ready (PJ_PLAY_LEAD, s; or the whole song,
+    // if shorter), and should the rendering fall behind, it waits for 10 s
+    // again: never longer.
+    static const double kLead = std::getenv("PJ_PLAY_LEAD") ? std::atof(std::getenv("PJ_PLAY_LEAD")) : 10.0;
+    const size_t lead = size_t(std::max(0.1, kLead) * kRate);
     int waits = 0;
     for (size_t i = 0; i < frames;) {
       size_t have = ready.load(std::memory_order_acquire);
       if (have <= i) {
-        // The rendering is behind (or not yet a second ahead at the start):
-        // wait until, at the speed it has kept so far, it will stay ahead to
-        // the end (a song heavier than real time: one long wait, not many).
         ++waits;
-        size_t need = i + lead;
+        const size_t need = std::min(frames, i + lead);
         if (i > 0) {
           const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
           const double speed = have / std::max(secs, 1e-3) / kRate;  // x real time
-          if (speed < 1) need += size_t((frames - i) * (1 - speed));
           std::fprintf(stderr, "\r  (rendering at %.2f x real time: waiting %.0f s)\n", speed,
-                       (std::min(frames, need) - have) / std::max(speed, 0.05) / kRate);
+                       (need - have) / std::max(speed, 0.05) / kRate);
         }
-        while ((have = ready.load(std::memory_order_acquire)) < std::min(frames, need))
+        while ((have = ready.load(std::memory_order_acquire)) < need)
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         if (i == 0) std::fprintf(stderr, "playing...\n");
       }

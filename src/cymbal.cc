@@ -1,0 +1,579 @@
+#include "cymbal.h"
+
+#include <algorithm>
+#include <cmath>
+#include <complex>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+
+#include "knob.h"
+#include "songclock.h"
+
+namespace pajupilli {
+
+namespace {
+constexpr double kPi = 3.14159265358979323846;
+constexpr double kRho = 1.2, kC = 343.0;
+const char* const kNames[6] = {"ride-cymbal", "ride-cymbal-2", "crash-cymbal", "crash-cymbal-2", "splash-cymbal",
+                               "china-cymbal"};
+int whichOf(const Instrument& inst) {
+  for (int i = 0; i < 6; ++i)
+    if (std::strcmp(inst.name, kNames[i]) == 0) return i;
+  return -1;
+}
+// A dome of height H over radius R, as one sphere: R^2 / (2 H).
+double sphere(double R, double H) { return R * R / (2 * H); }
+}  // namespace
+
+bool cymbal(const Instrument& inst) { return whichOf(inst) >= 0; }
+
+CymbalSpec cymbalSpec(int which) {
+  CymbalSpec s;
+  PlateSpec& p = s.plate;
+  p.top = knob("PJ_CYM_TOP", 16000);
+  p.rho = 8600;
+  // The brush on bronze: many light wire ends, each bouncing on its own
+  // (the fan's friction holds the fan as a whole, not every end to the
+  // handle: a scatter of small landings, not one blow), on a hard surface
+  // with lathing grooves.
+  s.brush.tips = int(knob("PJ_CYM_BRUSHTIPS", 48));
+  s.brush.tipMass = knob("PJ_CYM_TIPMASS", 2.5e-5);
+  s.brush.contact = knob("PJ_CYM_BRUSHK", 1.2e4);
+  s.brush.together = knob("PJ_CYM_TOGETHER", 0.1);
+  s.brush.tipLoss = knob("PJ_CYM_TIPLOSS", 0.15);
+  // The fan's own friction (the wires rubbing): the snare's 2 carries the
+  // handle's whole momentum into the first few ends that stop, and a long
+  // follow-through lands as one blow; on bronze 0.4, and the ends keep
+  // landing one by one as the hand lets the fan through (pajupilli-78,
+  // measured on the hi-hat: 2 -> 6 landings 5.3 N; 0.25 -> 13 over 29 ms).
+  s.brush.fanLoss = knob("PJ_CYM_FANLOSS", 0.4);
+  s.brush.rough = 3e-6;
+  s.brush.grain = 0.3e-3;
+  // Losses (1/s) lossA w^0.6 + lossB: a ride's band T60s (FluidR3's recorded
+  // ride: 3.9 s at 1-2 kHz, 2.6 s at 4 kHz, 1.65 s at 8 kHz, 1.06 s at
+  // 12.5 kHz), a little longer in the lows (the user: free cymbals die
+  // slowly); a crash on its stand ~3 s at 1 kHz, under 1 s above 10 kHz
+  // (research/jazz_drums.md 3.3).
+  switch (which) {
+    default:
+    case 0:  // 22" thin jazz ride: hammered, a small bell, the bow 3 cm high
+      p.radius = 0.2794; p.thickness = 1.15e-3; p.domeRadius = sphere(p.radius, 0.030);
+      p.lossA = 0.0055; p.lossB = 0.5; p.split = 0.012; p.seed = 21;
+      s.ride = true; s.bowAt = 0.62; s.bellR = 0.065;
+      {  // (to FluidR3's ride: 500 Hz 5.6 -> 3.8 s, 2 kHz 2.5 -> 3.9 s, ...)
+        const double f[7] = {250, 500, 1000, 2000, 4000, 8000, 12500};
+        const double m[7] = {1.47, 1.47, 1.15, 0.64, 0.88, 1.0, 1.2};
+        s.nFix = 7;
+        std::copy(f, f + 7, s.fixF);
+        std::copy(m, m + 7, s.fixMul);
+      }
+      break;
+    case 1: {  // 20" medium ride, drier: heavier, more damped in the highs, a bigger bell
+      p.radius = 0.254; p.thickness = 1.4e-3; p.domeRadius = sphere(p.radius, 0.028);
+      p.lossA = 0.0075; p.lossB = 0.7; p.split = 0.008; p.seed = 22;
+      s.ride = true; s.bowAt = 0.6; s.bellR = 0.075;
+      const double f[6] = {950, 1460, 2010, 2560, 3240, 3990};
+      std::copy(f, f + 6, s.bellF);
+      break;
+    }
+    case 2: {  // 16" thin crash
+      p.radius = 0.2032; p.thickness = 0.9e-3; p.domeRadius = sphere(p.radius, 0.025);
+      p.lossA = 0.008; p.lossB = 0.7; p.split = 0.010; p.seed = 23;
+      s.ride = false; s.bellR = 0.05; s.bellGain = 0.5;
+      const double f[6] = {1150, 1760, 2420, 3090, 3900, 4810};
+      std::copy(f, f + 6, s.bellF);
+      break;
+    }
+    case 3: {  // 18" thin crash
+      p.radius = 0.2286; p.thickness = 0.95e-3; p.domeRadius = sphere(p.radius, 0.026);
+      p.lossA = 0.008; p.lossB = 0.65; p.split = 0.010; p.seed = 24;
+      s.ride = false; s.bellR = 0.055; s.bellGain = 0.5;
+      const double f[6] = {1000, 1530, 2110, 2690, 3400, 4190};
+      std::copy(f, f + 6, s.bellF);
+      break;
+    }
+    case 4: {  // 10" splash: thin, small, short
+      p.radius = 0.127; p.thickness = 0.6e-3; p.domeRadius = sphere(p.radius, 0.015);
+      p.lossA = 0.011; p.lossB = 1.8; p.split = 0.010; p.seed = 25;
+      s.ride = false; s.bellR = 0.035; s.bellGain = 0.4;
+      const double f[6] = {1800, 2750, 3790, 4840, 6100, 7500};
+      const double t[6] = {1.5, 1.3, 1.1, 1.0, 0.9, 0.8};
+      std::copy(f, f + 6, s.bellF);
+      std::copy(t, t + 6, s.bellT60);
+      s.micZ = 0.4;
+      break;
+    }
+    case 5: {  // 18" china: thin, unlathed, heavily hammered, a flatter bow and a
+               // cylindrical bell; trashy: wide-split pairs, more loss up high
+      p.radius = 0.2286; p.thickness = 0.85e-3; p.domeRadius = sphere(p.radius, 0.018);
+      p.lossA = 0.012; p.lossB = 0.9; p.split = 0.04; p.seed = 26;
+      s.ride = false; s.bellR = 0.06; s.bellGain = 0.6;
+      const double f[6] = {700, 980, 1370, 1690, 2210, 2730};
+      const double t[6] = {2.5, 2.2, 2.0, 1.8, 1.5, 1.2};
+      std::copy(f, f + 6, s.bellF);
+      std::copy(t, t + 6, s.bellT60);
+      break;
+    }
+  }
+  // (The cup as a piston over the mode sum: set so a bell stroke is a few dB
+  // over a bow stroke of the same velocity.)
+  s.bellGain *= 0.015;
+  // (One sphere's dome lifts every stretching mode just above one pitch, and
+  // on an edge stroke their round members drown the rest. A cymbal is most
+  // curved at the bell and nearly flat at the edge: the curvature tapers,
+  // PJ_CYM_TAPER, and each mode is lifted by the curvature where it moves.
+  // At the real dome height that still piles them up (the crash's 400-800 Hz
+  // octave all but 0.2 dB of its energy), so these take a quarter of it,
+  // PJ_CYM_DOME, until the plate has its true profile.)
+  if (!s.ride) {
+    p.domeTaper = knob("PJ_CYM_TAPER", 1.4);
+    const double h = p.radius * p.radius / (2 * p.domeRadius) * knob("PJ_CYM_DOME", 0.25);
+    p.domeRadius = sphere(p.radius, h);
+    p.felt *= knob("PJ_CYM_FELT", 1);
+  } else {
+    p.domeTaper = knob("PJ_CYM_RIDETAPER", 0);
+  }
+  p.lossA *= knob("PJ_CYM_LOSSA", 1);
+  p.lossB *= knob("PJ_CYM_LOSSB", 1);
+  s.wood = knob("PJ_CYM_WOOD", s.wood);
+  s.bellGain *= knob("PJ_CYM_BELL", 1);
+  s.choke = knob("PJ_CYM_CHOKE", s.choke);
+  s.gain = knob("PJ_CYM_GAIN", 1);
+  return s;
+}
+
+Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
+    : s_(spec), fs_(fs), dt_(1 / fs), plate_(fs, spec.plate) {
+  // Each mode's loss times a correction by pitch (log-interpolated), fitted
+  // to the band decays (the ride's to FluidR3's recorded ride).
+  if (s_.nFix > 0) {
+    static const double kFix = knob("PJ_CYM_FIX", 1);
+    for (int k = 0; k < plate_.modes(); ++k) {
+      const double lf = std::log(plate_.frequency(k));
+      double c = s_.fixMul[0];
+      if (lf >= std::log(s_.fixF[s_.nFix - 1])) c = s_.fixMul[s_.nFix - 1];
+      else
+        for (int i = 0; i + 1 < s_.nFix; ++i)
+          if (lf >= std::log(s_.fixF[i]) && lf < std::log(s_.fixF[i + 1])) {
+            const double a = (lf - std::log(s_.fixF[i])) / (std::log(s_.fixF[i + 1]) - std::log(s_.fixF[i]));
+            c = std::exp((1 - a) * std::log(s_.fixMul[i]) + a * std::log(s_.fixMul[i + 1]));
+          }
+      plate_.setLoss(k, plate_.loss(k) * std::pow(c, kFix));
+    }
+    plate_.retune();
+  }
+  // The wire ends feel the modes below ~7 kHz (above, the plate's own; most
+  // of the cost).
+  BrushSpec bs = spec.brush;
+  if (bs.modes == 0) {
+    int n = 0;
+    while (n < plate_.modes() && plate_.frequency(n) < knob("PJ_CYM_BRUSHTOP", 7000)) ++n;
+    bs.modes = n;
+  }
+  // (Brushed, the cymbal is heard at its own level, as a kit's brushed
+  // sounds are set against its sticks: the brush's pushes reach the plate
+  // PJ_CYM_BRUSHDB louder than the brush feels them. The level is in the
+  // stroke, so nothing already ringing changes.) 13 dB: with the fan's
+  // friction low (fanLoss 0.4) more of its ends land, and 20 dB left the
+  // brush only 4-5 dB under a stick; 13 puts it ~11 dB under.)
+  brushGain_ = float(std::pow(10.0, knob("PJ_CYM_BRUSHDB", 13) / 20));
+  feel_.reset(new Feel(plate_));
+  brush_.reset(new Brush(fs, *feel_, bs, seed));
+  if (const char* tr = std::getenv("PJ_CYM_TRACE")) trace_ = std::fopen(tr, "wb");
+  sPhi_.assign((plate_.modes() + 15) / 16 * 16, 0.0f);
+  // The bell's own modes, and the stick's (40 cm hickory, free-free, the hand
+  // damping them in ~40 ms).
+  for (int k = 0; k < s_.bellN; ++k) {
+    const double w = 2 * kPi * s_.bellF[k], d = std::exp(-6.91 / s_.bellT60[k] * dt_);
+    bPr_[k] = float(d * std::cos(w * dt_));
+    bPi_[k] = float(d * std::sin(w * dt_));
+    bW_[k] = float(w);
+  }
+  const double wf[3] = {324, 892, 1749};
+  for (int k = 0; k < 3; ++k) {
+    const double w = 2 * kPi * wf[k], d = std::exp(-6.91 / 0.04 * dt_);
+    wPr_[k] = float(d * std::cos(w * dt_));
+    wPi_[k] = float(d * std::sin(w * dt_));
+  }
+  // The hand on the edge: each mode by how much it moves there, against the
+  // middle mode's (the edge's own modes, many diameters, go first).
+  edge_.assign((plate_.modes() + 15) / 16 * 16, 0.0f);
+  plate_.ringShare(0.95 * plate_.radius(), edge_.data());
+  {
+    std::vector<float> sorted(edge_.begin(), edge_.begin() + plate_.modes());
+    std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2, sorted.end());
+    const double mid = std::max(double(sorted[sorted.size() / 2]), 1e-12);
+    // (A gripping hand covers more than one ring: every mode loses at least
+    // 0.3 of the middle one's share.)
+    for (float& x : edge_) x = float(std::clamp(x / mid, 0.3, 20.0));
+  }
+  // The microphones (as the hi-hat's): each mode by its shape, summed over
+  // the plate with every patch's distance and delay at its pitch; below the
+  // coincidence pitch only the edge sounds (the faces cancel).
+  int maxM = 0;
+  for (int k = 0; k < plate_.modes(); ++k) maxM = std::max(maxM, plate_.diameters(k));
+  const int kR = 20, kT = std::clamp(2 * maxM + 16, 64, 256);
+  const PlateSpec& ps = s_.plate;
+  const double fCoin = kC * kC * std::sqrt(12.0) / (2 * kPi * ps.thickness * std::sqrt(ps.E / (ps.rho * (1 - ps.nu * ps.nu))));
+  const int n = plate_.modes();
+  std::vector<float> pm(n);
+  std::vector<std::complex<double>> g[2];
+  g[0].assign(n, 0.0);
+  g[1].assign(n, 0.0);
+  std::vector<double> kk(n);
+  for (int k = 0; k < n; ++k) kk[k] = 2 * kPi * plate_.frequency(k) / kC;
+  for (int ir = 0; ir < kR; ++ir)
+    for (int it = 0; it < kT; ++it) {
+      const double r = plate_.radius() * (ir + 0.5) / kR, th = 2 * kPi * (it + 0.5) / kT;
+      const double dA = 2 * kPi * r * (plate_.radius() / kR) / kT;
+      plate_.shape(r, th, pm.data());
+      for (int mic = 0; mic < 2; ++mic) {
+        const double mx = (mic ? 1 : -1) * s_.micX, mz = s_.micZ, d0 = std::hypot(mx, mz);
+        const double ddx = r * std::cos(th) - mx, ddy = r * std::sin(th);
+        const double d = std::sqrt(ddx * ddx + ddy * ddy + mz * mz);
+        const double a = dA / d;
+        for (int k = 0; k < n; ++k) {
+          const double ph = -kk[k] * (d - d0);
+          g[mic][k] += double(pm[k]) * a * std::complex<double>(std::cos(ph), std::sin(ph));
+        }
+      }
+    }
+  for (int mic = 0; mic < 2; ++mic) {
+    mic_[mic].assign((n + 15) / 16 * 16, 0.0f);
+    for (int k = 0; k < n; ++k) {
+      const double eff = std::min(1.0, std::sqrt(plate_.frequency(k) / fCoin));
+      mic_[mic][k] = float((g[mic][k].real() < 0 ? -1 : 1) * std::abs(g[mic][k]) * kRho / (2 * kPi) * eff);
+    }
+  }
+  reset();
+}
+
+void Cymbal::reset() {
+  plate_.reset();
+  z_ = vz_ = ax_ = wx_ = ay_ = wy_ = 0;
+  stickOn_ = false;
+  std::fill(bRe_, bRe_ + 6, 0.0f);
+  std::fill(bIm_, bIm_ + 6, 0.0f);
+  std::fill(wRe_, wRe_ + 3, 0.0f);
+  std::fill(wIm_, wIm_ + 3, 0.0f);
+  prev_[0] = prev_[1] = bPrev_ = 0;
+  choke_ = 0;
+  asleep_ = true;
+  quiet_ = 0;
+}
+
+void Cymbal::stick(double speed, double r, double theta, bool shoulder) {
+  wake();
+  r = std::clamp(r, 0.0, 0.99 * plate_.radius());
+  sx_ = r * std::cos(theta);
+  sy_ = r * std::sin(theta);
+  plate_.shape(r, theta, sPhi_.data());
+  double g = 0;
+  for (int k = 0; k < plate_.modes(); ++k) g += double(sPhi_[k]) * sPhi_[k];
+  sm_ = shoulder ? 0.030 : 0.012;   // what of the stick is behind the blow (kg)
+  sK_ = shoulder ? 4e8 : 1.2e9;     // hickory on bronze, 4/3 E sqrt(R) (N/m^1.5)
+  // Inside the bell's rim the cup takes part of the blow (its own modes).
+  sBell_ = r < s_.bellR ? std::pow(std::cos(0.5 * kPi * r / s_.bellR), 2) : 0.0;
+  const double m = plate_.mass(), I = m * plate_.radius() * plate_.radius() / 4;
+  sG_ = dt_ * dt_ * (g + 1 / m + r * r / I + sBell_ * sBell_ * s_.bellN / s_.bellMass);
+  sz_ = z_ + ax_ * sx_ + ay_ * sy_ + plate_.height(sPhi_.data()) + 0.05e-3;
+  sv_ = -speed;
+  stickOn_ = true;
+  sAge_ = 0;
+}
+
+float Cymbal::sample() {
+  if (asleep_) {
+    if (!stickOn_ && brush_->up() && choke_ <= 0) { side_ = 0; return 0; }
+    asleep_ = false;
+    quiet_ = 0;
+  }
+  const double m = plate_.mass(), I = m * plate_.radius() * plate_.radius() / 4;
+  double fz = -s_.seatK * z_ - 2 * s_.seatLoss * std::sqrt(s_.seatK * m) * vz_;
+  double tx = -s_.tiltK * ax_ - 2 * s_.tiltLoss * std::sqrt(s_.tiltK * I) * wx_;
+  double ty = -s_.tiltK * ay_ - 2 * s_.tiltLoss * std::sqrt(s_.tiltK * I) * wy_;
+  // The stick: its tip against the plate where it is now, the force found
+  // for the end of the sample (a hard contact: the plate gives under it).
+  float F = 0;
+  if (stickOn_) {
+    const double h = z_ + ax_ * sx_ + ay_ * sy_ + plate_.height(sPhi_.data());
+    const double hv = vz_ + wx_ * sx_ + wy_ * sy_ + plate_.speed(sPhi_.data());
+    const double free = (h - sz_) + dt_ * (hv - sv_), G = sG_ + dt_ * dt_ / sm_;
+    double f = 0;
+    if (free > 0) {
+      double lo = 0, hi = free;
+      for (int it = 0; it < 30; ++it) {
+        const double x = 0.5 * (lo + hi);
+        if (x + G * sK_ * x * std::sqrt(x) > free) hi = x; else lo = x;
+      }
+      const double x = 0.5 * (lo + hi);
+      f = sK_ * x * std::sqrt(x);
+    }
+    sv_ += dt_ * f / sm_;
+    sz_ += dt_ * sv_;
+    if (f > 0) {
+      plate_.push(sPhi_.data(), float(-f));
+      fz -= f; tx -= f * sx_; ty -= f * sy_;
+      // The bell's modes (velocity phasors, unit... their mass) and the stick's own.
+      const float db = float(sBell_ * f * dt_ / s_.bellMass);
+      for (int k = 0; k < s_.bellN; ++k) bRe_[k] -= db;
+      for (int k = 0; k < 3; ++k) wRe_[k] += float(f * dt_ / 0.01);
+      F = float(f);
+    }
+    if (++sAge_ > int(0.02 * fs_) || (f == 0 && sv_ > 0)) stickOn_ = false;
+  }
+  brush_->step();
+  fz -= brushGain_ * brush_->force();
+  if (!brush_->up() || feel_->dirty) {
+    float* f = plate_.force();
+    float* g = feel_->f.data();
+    for (int k = 0, n = plate_.modes(); k < n; ++k) { f[k] += brushGain_ * g[k]; g[k] = 0; }
+    feel_->dirty = !brush_->up();
+  }
+  if (trace_) {
+    const float bf = brush_->force();
+    std::fwrite(&bf, sizeof bf, 1, trace_);
+  }
+  if (choke_ > 0) plate_.rub(edge_.data(), float(choke_ * s_.choke));
+  vz_ += dt_ * fz / m; z_ += dt_ * vz_;
+  wx_ += dt_ * tx / I; ax_ += dt_ * wx_;
+  wy_ += dt_ * ty / I; ay_ += dt_ * wy_;
+  plate_.step();
+  // The bell's and the stick's modes turn.
+  float bell = 0, wood = 0;
+  for (int k = 0; k < s_.bellN; ++k) {
+    const float re = bRe_[k], im = bIm_[k];
+    bRe_[k] = bPr_[k] * re - bPi_[k] * im;
+    bIm_[k] = bPi_[k] * re + bPr_[k] * im;
+    bell += bRe_[k];
+  }
+  for (int k = 0; k < 3; ++k) {
+    const float re = wRe_[k], im = wIm_[k];
+    wRe_[k] = wPr_[k] * re - wPi_[k] * im;
+    wIm_[k] = wPi_[k] * re + wPr_[k] * im;
+    wood += wRe_[k];
+  }
+  (void)F;
+  // The microphones: the plate's modes by their weights (pressure from the
+  // surface's acceleration); the cup as a small piston; the stick's ring.
+  const float* v = plate_.v();
+  const int n = plate_.modes();
+  const float rMic = float(std::hypot(s_.micX, s_.micZ));
+  const float cupArea = float(kPi * s_.bellR * s_.bellR);
+  const float bellP = float(s_.bellGain * kRho * cupArea / (2 * kPi * rMic)) * (bell - bPrev_) * float(fs_);
+  bPrev_ = bell;
+  const float woodP = float(s_.wood) * wood;
+  float y[2];
+  for (int mic = 0; mic < 2; ++mic) {
+    float s = 0;
+    const float* w = mic_[mic].data();
+    for (int k = 0; k < n; ++k) s += w[k] * v[k];
+    y[mic] = (s - prev_[mic]) * float(fs_) + bellP + woodP;
+    prev_[mic] = s;
+  }
+  const float gn = float(s_.gain);
+  const float l = gn * y[0], r = gn * y[1];
+  side_ = 0.5f * (l - r);
+  const float mono = 0.5f * (l + r);
+  if (!std::isfinite(mono) || !std::isfinite(z_)) { reset(); return 0; }
+  if (std::fabs(mono) < 1e-6f && !stickOn_ && brush_->up()) {
+    if (++quiet_ > int(0.3 * fs_)) asleep_ = true;
+  } else {
+    quiet_ = 0;
+  }
+  return mono;
+}
+
+CymbalModel::CymbalModel(const Instrument& inst)
+    : Tube(inst), which_(std::max(0, whichOf(inst))), cym_(inst.fs, cymbalSpec(which_), 31u + which_) {}
+
+void CymbalModel::resetAir() {
+  Tube::resetAir();
+  cym_.reset();
+}
+
+float CymbalModel::sample() {
+  static const float g = float(knob("PJ_CYM_OUT", 1.0 / 3));
+  last_ = g * cym_.sample();
+  side_.push_back(g * float(outScale()) * cym_.side());
+  return finish(last_);
+}
+
+CymbalPlayer::CymbalPlayer(CymbalModel& m) : Performer(m), m_(m) {
+  home_ = bow_ = bowTo_ = m_.cymbal().spec().bowAt;
+  held_ = 10;
+}
+
+double CymbalPlayer::ur() {
+  rng_ = rng_ * 1664525u + 1013904223u;
+  return (rng_ >> 8) * (1.0 / 16777216.0);
+}
+
+double CymbalPlayer::stickSpeed(int velocity, double dynamics) {
+  // ~ velocity^1.9: General MIDI's ~30 dB from 16 to 127 (the plate is linear
+  // in the stick's speed; a faster stick is also brighter): 0.3 m/s (a
+  // whisper on the bow) .. 5 m/s (a crash).
+  static const double top = knob("PJ_CYM_VMAX", 5.0), ex = knob("PJ_CYM_VEXP", 1.9);
+  const double v = std::clamp(velocity, 1, 127) / 127.0;
+  return (0.06 + top * std::pow(v, ex)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
+}
+
+double CymbalPlayer::bowPlace() {
+  // The hand's place on the bow drifts by phrases (stroke_placement.md 7.2):
+  // held for 8 .. 16 strokes, then it moves (over a few strokes), two times
+  // in three to the other side of home, by up to a tenth of the radius.
+  if (--held_ <= 0) {
+    held_ = 8 + int(9 * ur());
+    if (ur() < 0.65) side_ = -side_;
+    bowTo_ = home_ + side_ * (0.03 + 0.07 * ur());
+  }
+  bow_ += 0.35 * (bowTo_ - bow_);
+  // ... and between those moves it wanders a little, stroke by stroke (a
+  // slow random walk, held near its place), and each stroke lands within a
+  // few mm of it: never the same spot twice.
+  wander_ = 0.85 * wander_ + 0.012 * (ur() - 0.5);
+  return bow_ + wander_ + 0.02 * (ur() - 0.5);
+}
+
+double CymbalPlayer::angle() {
+  // The side facing the drummer: wandering a few degrees, each stroke a
+  // degree or two off that.
+  thWander_ = 0.9 * thWander_ + 0.03 * (ur() - 0.5);
+  return 2 * kPi * 0.1 + thWander_ + 0.04 * (ur() - 0.5);
+}
+
+double CymbalPlayer::lean(int velocity) {
+  // How much the stroke is leaned on, 0 .. 1: the velocity, and, in a song,
+  // where it falls in the bar: 1 and 3 leaned on, 2 and 4 light, what is
+  // between them in between. Where the bar is, the ride's own pattern says
+  // (a song may begin with a pickup): its quarters fall on the most common
+  // quarter-beat phase, and 2 and 4 are the beats a skip note leads into.
+  // Until it has seen enough, 4/4 from the song's beat 0.
+  double w = std::clamp((velocity - 20) / 90.0, 0.0, 1.0);
+  const SongClock& clk = SongClock::get();
+  static const bool kBeat = knob("PJ_CYM_BEAT", 1) > 0;
+  if (!clk.valid || !kBeat) return w;
+  const double q = clk.beat;
+  phaseCount_[int(std::lround(q * 4)) & 3] += 1;
+  int ph = 0;
+  for (int i = 1; i < 4; ++i)
+    if (phaseCount_[i] > phaseCount_[ph]) ph = i;
+  const double pos = q - ph / 4.0;                 // beats, the quarters on whole numbers
+  const long n = std::lround(pos);
+  const bool onBeat = std::fabs(pos - n) < 0.2;
+  if (onBeat) {
+    const double gap = q - lastBeat_;               // a skip note just before: 1/4 .. 1/2 a beat
+    const bool skip = gap > 0.15 && gap < 0.55;
+    beatCount_[n & 1] += 1;
+    skipCount_[n & 1] += skip ? 1 : 0;
+  }
+  lastBeat_ = q;
+  // Which parity is 2 and 4: the one more often led into by a skip note
+  // (enough seen), else the odd beats (counting from 0).
+  int two = 1;
+  if (beatCount_[0] + beatCount_[1] >= 8) {
+    const double r0 = skipCount_[0] / std::max(1.0, beatCount_[0]), r1 = skipCount_[1] / std::max(1.0, beatCount_[1]);
+    if (std::fabs(r0 - r1) > 0.15) two = r0 > r1 ? 0 : 1;
+  }
+  const double beat = !onBeat ? 0.5 : (n & 1) == two ? 0.0 : 1.0;
+  return 0.5 * w + 0.5 * beat;
+}
+
+void CymbalPlayer::noteOn(int midi, int velocity) {
+  static const double kEdge = knob("PJ_CYM_EDGE", 0.9), kBrushV = knob("PJ_CYM_BRUSHV", 1.5);
+  static const bool kShoulder = knob("PJ_CYM_SHOULDER", 1) > 0;
+  articulate(midi, velocity, false);
+  note_ = midi;
+  blowing_ = true;
+  Cymbal& c = m_.cymbal();
+  static const bool allBrush = knob("PJ_CYM_BRUSH", 0) > 0;
+  const bool brush = allBrush || midi >= 73;
+  const int k = midi >= 73 ? midi - 24 : midi;
+  const CymbalSpec& s = c.spec();
+  const double R = c.plate().radius(), speed = stickSpeed(velocity, dyn_) * (1 + 0.05 * (ur() - 0.5));
+  const double th = 2 * kPi * (0.1 + 0.08 * (ur() - 0.5));  // the side of the cymbal facing the drummer
+  noteChoke_ = 0;
+  if (brush) {
+    // A brush: a tap that lands and is drawn on a little (on a crash, a sweep
+    // across the edge): quiet, no ping. (A hand with a brush: at most 3 m/s.)
+    const bool bell = k == 53 && s.ride;
+    const double tb = s.ride ? angle() : th;
+    const double r = bell ? 0.6 * s.bellR : s.ride ? bowPlace() * R : (0.82 + 0.06 * (ur() - 0.5)) * R;
+    const double x = r * std::cos(tb), y = r * std::sin(tb);
+    c.brush().jump(x, y, tb + 0.3);
+    if (s.ride) {
+      // On the ride, how the brush comes down follows how much the stroke is
+      // leaned on (lean(): the velocity and, in a song, 1 and 3 against 2
+      // and 4), continuously: a light stroke is slowed before it lands, only
+      // the tip comes down (a share of the wire ends, on a smaller
+      // footprint) and lifts at once: brief, local, brighter, less damping;
+      // a leaned-on one is thrown, the whole fan lands and follows through.
+      // In a song 1 and 3 are also a little louder, 2 and 4 a little softer.
+      // The hand's speed at the cymbal: its own law (a brush is not thrown as
+      // a stick is), ~velocity^1.3, 0.45 .. 2.65 m/s before the slowing.
+      const double w = lean(velocity);
+      static const double kBv = knob("PJ_CYM_BRUSHVMAX", 2.2), kBe = knob("PJ_CYM_BRUSHVEXP", 1.3);
+      double v = (0.45 + kBv * std::pow(std::clamp(velocity, 1, 127) / 127.0, kBe)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
+                 (1 + 0.05 * (ur() - 0.5));
+      static const bool kBeat = knob("PJ_CYM_BEAT", 1) > 0;
+      if (SongClock::get().valid && kBeat) v *= 0.8 + 0.4 * w;
+      // (The fan lies flat: its ends land over 6-9 mm of height; the slowed tip
+      // lands over ~2 mm and lifts at once. The hand lets the fan through by
+      // ~0.7 of that height (PJ_CYM_FOLLOW), so the ends keep landing one by
+      // one; with the fan's friction low (fanLoss above) they do not run
+      // together into one push.)
+      const double share = 0.4 + 0.6 * w;
+      static const double kFollow = knob("PJ_CYM_FOLLOW", 0.7), kSpread = knob("PJ_CYM_SPREAD", 1);
+      const double spread = kSpread * (2 + (4 + 3 * ur()) * w) * 1e-3, follow = kFollow * spread * w;
+      c.brush().strike(v * (0.6 + 0.4 * w), spread, follow, 0.0, share);
+      c.brush().place(x - 0.01 * w * std::sin(tb), y + 0.01 * w * std::cos(tb), tb + 0.3);
+    } else {
+      c.brush().strike(std::min(kBrushV * speed, 3.0), (6 + 3 * ur()) * 1e-3, (3 + 2 * ur()) * 1e-3, 0.03);
+      c.brush().place(x - 0.05 * std::sin(th), y + 0.05 * std::cos(th), th + 0.3);
+    }
+    c.wake();
+    return;
+  }
+  if (s.ride) {
+    if (k == 53) {
+      c.stick(speed, (0.45 + 0.15 * ur()) * s.bellR, th, false);           // the bell, with the tip
+    } else if (k == 51 || k == 59) {
+      if (velocity >= 112) c.stick(0.9 * speed, (bowPlace() + 0.15) * R, th, true);  // an accent: the shoulder
+      else c.stick(speed, bowPlace() * R, th, false);                            // the bow, with the tip
+    } else if (k == 49 || k == 57 || k == 55 || k == 52) {
+      c.stick(speed, 0.97 * R, th, true);                                    // crashed
+    } else {
+      // Live: the keys from the edge (low) to the bell (high).
+      const double u = std::clamp((k - 36) / 48.0, 0.0, 1.0);
+      c.stick(speed, (0.97 - 0.9 * u) * R, th, false);
+    }
+  } else {
+    if (k == 53) c.stick(speed, 0.5 * s.bellR, th, false);
+    else if (velocity < 48) c.stick(speed, (0.9 + 0.04 * (ur() - 0.5)) * R, th, false);  // soft: the tip near the edge
+    else c.stick(speed, (kEdge + 0.02 * (ur() - 0.5)) * R, th, kShoulder);               // the shoulder on the edge
+  }
+}
+
+void CymbalPlayer::noteOff(int) {
+  static const bool chokes = knob("PJ_CYM_NOTEOFF", 0) > 0;
+  if (chokes) noteChoke_ = 1;
+}
+
+void CymbalPlayer::render(float* out, int n) {
+  constexpr int kBlock = 16;
+  Cymbal& c = m_.cymbal();
+  for (int i = 0; i < n; i += kBlock) {
+    const int m = std::min(kBlock, n - i);
+    tick(m / fs_);
+    // The hand on the edge: the breath (pressure) grabs it; a choking
+    // note-off holds on until the next stroke.
+    const double want = std::max(std::clamp((breathCtl_ - 0.15) / 0.35, 0.0, 1.0), noteChoke_ > 0 ? 1.0 : 0.0);
+    choked_ += (want - choked_) * (1 - std::exp(-m / fs_ / 0.01));
+    c.choke(choked_ > 1e-3 ? choked_ : 0.0);
+    m_.process(out + i, m);
+  }
+  blowing_ = !c.asleep();
+}
+
+}  // namespace pajupilli

@@ -6,6 +6,7 @@
 #include "levels_data.h"
 #include "velgain_data.h"
 #include "instrument.h"
+#include "knob.h"
 
 #include <cmath>
 #include <cstring>
@@ -119,6 +120,16 @@ double gmDb(double v) { return 33.3 * std::log10(v / 90); }
 double velocityGainDb(const Instrument& inst, int velocity) {
   const VelGain* t = velGainOf(inst);
   return t ? std::min(6.0, tableDb(*t, velocity)) : 0;
+}
+
+double noteLead(const Instrument& inst) {
+  static const double kMaracas = knob("PJ_MARACA_LEAD", 0.12);
+  return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
+}
+
+bool& noteLeadsApplied() {
+  static bool applied = false;
+  return applied;
 }
 
 bool velocityAsGain(const Instrument& inst) {

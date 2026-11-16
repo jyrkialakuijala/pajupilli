@@ -196,8 +196,37 @@ void ClavinetModel::strike(int key, double speed) {
   Str& s = str_[key];
   if (s.down) return;
   // A string still ringing after its last release: the tangent clamps it
-  // again, and the yarn side's part is lost in the yarn (quickly).
+  // again. What swings on the speaking length goes on swinging there, under
+  // the new stroke (the old note decays as it would, not cut off); the part
+  // beyond the anvil is lost in the yarn (quickly). Speaking amplitudes from
+  // the whole string's: b_n = (2 / L) int_0^L y sin(n pi x / L) dx =
+  // (Lt / L) sum_m P_mn a_m.
   if (s.j.on) {
+    const double k = s.Lt / s.L;
+    std::vector<double> qs(s.s.n, 0.0), vs(s.s.n, 0.0);
+    for (int m = 0; m < s.j.n; ++m) {
+      const double q = s.j.re[m], v = -s.j.w[m] * s.j.im[m];
+      const float* row = &s.P[size_t(m) * s.s.n];
+      for (int n = 0; n < s.s.n; ++n) {
+        qs[n] += k * row[n] * q;
+        vs[n] += k * row[n] * v;
+      }
+    }
+    for (int n = 0; n < s.s.n; ++n) {
+      s.s.re[n] += float(qs[n]);
+      s.s.im[n] += float(-vs[n] / s.s.w[n]);
+    }
+    // ... and the whole string keeps only what is beyond the anvil.
+    for (int m = 0; m < s.j.n; ++m) {
+      const float* row = &s.P[size_t(m) * s.s.n];
+      double q = 0, v = 0;
+      for (int n = 0; n < s.s.n; ++n) {
+        q += row[n] * qs[n];
+        v += row[n] * vs[n];
+      }
+      s.j.re[m] -= float(q);
+      s.j.im[m] -= float(-v / s.j.w[m]);
+    }
     for (int m = 0; m < s.j.n; ++m) s.j.sig[m] += 300;
     turns(s.j, 1);
     for (int m = 0; m < s.j.n; ++m) s.j.sig[m] -= 300;

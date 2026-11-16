@@ -201,6 +201,13 @@ double velocityGainDb(const Instrument& inst, int velocity);
 // one-line bowed string) or, for one voice sounding every key (a piano's,
 // a pluck's), a velocity remapped to the stroke that sounds that loud.
 bool velocityAsGain(const Instrument& inst);
+// (-play) How long before its note an instrument's player wants the note
+// (s): the maracas' woosh from the chest before the slap that falls on the
+// note. A file player that sends such notes that much early sets
+// noteLeadsApplied() = true; the player then lands its sound that much after
+// the note it gets. Live: 0, nothing early.
+double noteLead(const Instrument& inst);
+bool& noteLeadsApplied();
 int velocityRemap(const Instrument& inst, int velocity);
 const Instrument& concertFlute();
 // All names, comma-separated (for messages).

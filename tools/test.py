@@ -675,14 +675,632 @@ def clavinet():
         c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', 'clavinet', '-note', '52'], env={'PJ_CLAV_PRESS': press}).stdout)
         pc.append(int(c.group(1)) if c else -999)
     check('clavinet: pressing bends the note up', 7 <= pc[1] - pc[0] <= 13, f'{pc[1] - pc[0]} c for 10 c pressed')
+    # A key struck again soon after its release: the old note goes on under the new one (the
+    # tangent clamps a swinging string; only what is beyond the anvil dies in the yarn), not cut.
+    def clav(seq):
+        wav = os.path.join(ROOT, 'tools', '.clav-repeat.wav')
+        run(['-inst', 'clavinet', '-seq', seq, '-o', wav])
+        fs, y = wavfile.read(wav)
+        os.remove(wav)
+        return fs, y.astype(float).mean(1) if y.ndim > 1 else y.astype(float)
+    fs, a = clav('on 60 100 wait 0.3 off 60 wait 0.03 on 60 100 wait 0.3 off 60 wait 0.2')
+    _, b = clav('wait 0.33 on 60 100 wait 0.3 off 60 wait 0.2')
+    n = min(len(a), len(b))
+    w = slice(int(0.35 * fs), int(0.39 * fs))
+    old = 10 * math.log10(np.mean((a[:n] - b[:n])[w] ** 2) / np.mean(b[:n][w] ** 2) + 1e-20)
+    check('clavinet: a key struck again keeps the old note under the new', old > -15,
+          f'the old note 20-60 ms after the re-strike: {old:+.1f} dB against the new')
     ns = cpu_time(['-inst', 'clavinet', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
     check('real-time margin (clavinet, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def jazz_kick():
+    """The jazz bass drum (-inst jazz-kick, src/kick.cc; research/kick.md): its note, a hard stroke's
+    glide and none on a feathered one, General MIDI's range over velocity, the buried beater's short
+    thud, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(vel, env=None, inst='jazz-kick'):
+        wav = os.path.join(ROOT, 'tools', '.kick.wav')
+        run(['-inst', inst, '-seq', f'on 36 {vel} wait 1.5', '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def pitch(fs, x, t, lo=40, hi=110):
+        seg = x[int(t * fs):int((t + 0.12) * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 18))
+        f = np.fft.rfftfreq(1 << 18, 1 / fs)
+        b = (f > lo) & (f < hi)
+        return f[b][np.argmax(sp[b])]
+    fs, x = render(60)
+    f0 = pitch(fs, x, 0.4)
+    check('jazz-kick: its note (18", tuned up)', 64 < f0 < 78, f'{f0:.1f} Hz')
+    glide = {}
+    for v in (44, 127):
+        fs, x = render(v)
+        glide[v] = 1200 * math.log2(pitch(fs, x, 0.0) / pitch(fs, x, 0.6))
+    check('jazz-kick: a hard stroke starts sharp, a feathered one does not',
+          30 < glide[127] < 200 and abs(glide[44]) < 6, f'v127 {glide[127]:+.0f} c, v44 {glide[44]:+.0f} c')
+    def lafmax(x):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        e, m = 0.0, 0.0
+        for v in x[:int(0.5 * fs)] ** 2:
+            e += a * (v - e)
+            m = max(m, e)
+        return 10 * math.log10(m + 1e-20)
+    rng = lafmax(render(127)[1]) - lafmax(render(16)[1])
+    check('jazz-kick: velocity 16 .. 127 on the GM curve (~30 dB)', 24 < rng < 38, f'{rng:.1f} dB (unweighted fast max)')
+    e = lambda x: 10 * math.log10(np.mean(x[int(0.2 * fs):int(0.25 * fs)] ** 2) + 1e-20)
+    open_, buried = e(render(90)[1]), e(render(90, {'PJ_KICK_BURY': '1'})[1])
+    check('jazz-kick: the buried beater damps the drum', open_ - buried > 8, f'at 0.2 s {open_ - buried:.1f} dB under the open stroke')
+    for inst, seed in (('jazz-kick', '1'), ('jazz-kick-20', '2')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    r = run(['-inst', 'jazz-kick', '-fuzz', '10', '3'], env={'PJ_KICK_BURY': '1'})
+    check('fuzz 10 s (jazz-kick, buried)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'jazz-kick', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (jazz-kick, random playing)', ns < 1500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def metal_perc():
+    """The triangle and the cowbell (-inst triangle, cowbell, src/metalperc.cc) and the agogo's
+    partials (src/modalinst.cc; research/triangle_cowbell.md): the open triangle rings, the muted one
+    and a choke die fast, the cowbell's and agogo's partials where recorded ones have them, General
+    MIDI's range over velocity, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt
+    def render(inst, seq):
+        wav = os.path.join(ROOT, 'tools', '.metal.wav')
+        run(['-inst', inst, '-seq', seq, '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def band(fs, x, lo, hi, t0, t1):
+        y = sosfiltfilt(butter(4, [lo, hi], 'bandpass', fs=fs, output='sos'), x)
+        return 10 * math.log10(np.mean(y[int(t0 * fs):int(t1 * fs)] ** 2) + 1e-30)
+    fs, x = render('triangle', 'on 81 100 wait 3 off 81')
+    t60 = 60 * 1.0 / max(1e-3, band(fs, x, 2000, 6000, 0.2, 0.4) - band(fs, x, 2000, 6000, 1.2, 1.4))
+    check('triangle: the open stroke rings (2 - 6 kHz)', 1.5 < t60 < 6, f'T60 {t60:.1f} s')
+    fs, m = render('triangle', 'on 80 100 wait 1.5 off 80')
+    t60m = 60 * 0.4 / max(1e-3, band(fs, m, 2000, 6000, 0.05, 0.15) - band(fs, m, 2000, 6000, 0.45, 0.55))
+    check('triangle: the muted stroke (80) dies fast', t60m < 0.8, f'T60 {t60m:.2f} s')
+    fs, c = render('triangle', 'on 81 100 wait 1.0 off 81 on 80 1 wait 1.0 off 80')
+    choke = band(fs, x, 1000, 12000, 1.4, 1.5) - band(fs, c, 1000, 12000, 1.4, 1.5)
+    check('triangle: a muted key chokes the ringing one', choke > 25, f'0.4 s later {choke:.0f} dB under ringing free')
+    def peak(x, lo, hi):
+        seg = x[int(0.01 * fs):int(0.01 * fs) + (1 << 15)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 16))
+        f = np.fft.rfftfreq(1 << 16, 1 / fs)
+        b = (f > lo) & (f < hi)
+        return f[b][np.argmax(sp[b])], 20 * math.log10(sp[b].max() / sp.max())
+    fs, x = render('cowbell', 'on 56 100 wait 1 off 56')
+    f1, _ = peak(x, 300, 800)
+    f2, l2 = peak(x, 2300, 2700)
+    check("cowbell: its note and the walls' partial (as recorded: 472 Hz; 2.49 kHz at -20 dB)",
+          abs(f1 - 472) < 10 and abs(f2 - 2490) < 40 and -30 < l2 < -10, f'{f1:.0f} Hz; {f2:.0f} Hz at {l2:+.0f} dB')
+    fs, x = render('agogo', 'on 83 100 wait 1 off 83')
+    f5, l5 = peak(x, 4800, 5300)
+    check("agogo: the recorded bells' strong partial at 5.12 x", abs(f5 / 988 - 5.12) < 0.08 and l5 > -25,
+          f'{f5 / 988:.2f} x at {l5:+.0f} dB')
+    def lafmax(x):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        e, mx = 0.0, 0.0
+        for v in x[:int(0.4 * fs)] ** 2:
+            e += a * (v - e)
+            mx = max(mx, e)
+        return 10 * math.log10(mx + 1e-20)
+    for inst, key in (('triangle', 81), ('cowbell', 56)):
+        rng = lafmax(render(inst, f'on {key} 127 wait 0.5')[1]) - lafmax(render(inst, f'on {key} 16 wait 0.5')[1])
+        check(f'{inst}: velocity 16 .. 127 on the GM curve (~30 dB)', 24 < rng < 38, f'{rng:.1f} dB (unweighted fast max)')
+        r = run(['-inst', inst, '-fuzz', '10', '1'])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+        ns = cpu_time(['-inst', inst, '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+        check(f'real-time margin ({inst}, random playing)', ns < 1000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def toms():
+    """The jazz toms (-inst tom-10 .. tom-16-low, src/tom.cc; research/toms.md): each drum on its
+    note, a hard stick stroke's glide and none on a feathered or brushed one, the brush off the head
+    at once (the drum rings on as after a stick), General MIDI's range over velocity, no blow-up,
+    real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import lfilter
+    def render(inst, key, vel):
+        wav = os.path.join(ROOT, 'tools', '.tom.wav')
+        run(['-inst', inst, '-seq', f'on {key} {vel} wait 1.2', '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def pitch(fs, x, t0, t1, lo, hi):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 19))
+        f = np.fft.rfftfreq(1 << 19, 1 / fs)
+        b = (f > lo) & (f < hi)
+        return f[b][np.argmax(sp[b])]
+    notes = {'tom-10': 196.0, 'tom-12': 164.8, 'tom-13': 146.8, 'tom-14': 110.0, 'tom-16': 92.5, 'tom-16-low': 73.4}
+    out = []
+    for inst, f0 in notes.items():
+        fs, x = render(inst, 45, 60)
+        out.append(pitch(fs, x, 0.4, 0.9, 0.7 * f0, 1.3 * f0) / f0 - 1)
+    check('toms: each drum on its note', all(abs(d) < 0.04 for d in out), ' '.join(f'{100 * d:+.1f} %' for d in out))
+    g = {}
+    for lab, key, vel in (('ff', 45, 127), ('feathered', 45, 30), ('brushed', 69, 90)):
+        fs, x = render('tom-14', key, vel)
+        g[lab] = 1200 * math.log2(pitch(fs, x, 0.01, 0.11, 100, 160) / pitch(fs, x, 0.5, 0.9, 100, 120))
+    check('toms: a hard stick stroke starts sharp, a feathered or brushed one does not',
+          g['ff'] > 20 and abs(g['feathered']) < 8 and abs(g['brushed']) < 8,
+          f"14\": ff {g['ff']:+.0f} c, feathered {g['feathered']:+.0f} c, brushed {g['brushed']:+.0f} c")
+    def decay(x, fs):  # dB from 0.1-0.15 s to 0.4-0.45 s
+        e = lambda a, b: 10 * math.log10(np.mean(x[int(a * fs):int(b * fs)] ** 2) + 1e-20)
+        return e(0.1, 0.15) - e(0.4, 0.45)
+    ds, db = decay(*render('tom-14', 45, 90)[::-1]), decay(*render('tom-14', 69, 90)[::-1])
+    check('toms: the brush jumps off and the drum rings on', abs(db - ds) < 4, f'decay 0.1 .. 0.45 s: stick {ds:.1f} dB, brush {db:.1f} dB')
+    def lafmax(fs, x):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        return 10 * math.log10(lfilter([a], [1, a - 1], x * x)[:int(0.6 * fs)].max() + 1e-20)
+    rng = lafmax(*render('tom-14', 45, 127)) - lafmax(*render('tom-14', 45, 16))
+    check('toms: velocity 16 .. 127 on the GM curve (~30 dB)', 24 < rng < 38, f'{rng:.1f} dB (unweighted fast max)')
+    for inst, seed in (('tom-12', '1'), ('tom-16-low', '2')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'tom-14', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (tom-14, random playing)', ns < 1500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def cymbals():
+    """The cymbals (-inst ride-cymbal ... china-cymbal, src/cymbal.cc; research/cymbals_built.md): the
+    ride's band decays near a recorded ride's, the wash building under ride time, the bell pitched
+    and below the bow's brightness, General MIDI's range over velocity (stick and brush), the brush
+    quieter than the stick, a choke, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt
+    def render(seq, inst='ride-cymbal', env=None):
+        wav = os.path.join(ROOT, 'tools', '.cym.wav')
+        run(['-inst', inst, '-seq', seq, '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def band(x, fs, fc):
+        return sosfiltfilt(butter(4, [fc / 2 ** (1 / 6), fc * 2 ** (1 / 6)], 'bandpass', fs=fs, output='sos'), x)
+    def t60(x, fs, fc):
+        y = band(x, fs, fc)[int(0.15 * fs):] ** 2
+        edc = np.cumsum(y[::-1])[::-1]
+        edc = 10 * np.log10(edc / edc[0] + 1e-30)
+        t = np.arange(len(edc)) / fs
+        m = (edc < -5) & (edc > -25)
+        return -60 / np.polyfit(t[m], edc[m], 1)[0]
+    fs, x = render('on 51 90 wait 7')
+    got = [t60(x, fs, fc) for fc in (1000, 4000, 8000, 12500)]
+    want = [3.9, 2.6, 1.65, 1.06]  # a recorded ride (FluidR3)
+    check('ride-cymbal: band decays near a recorded ride\'s (within 25 %)', all(abs(g / w - 1) < 0.25 for g, w in zip(got, want)),
+          ' '.join(f'{fc}: {g:.1f} s ({w})' for fc, g, w in zip((1000, 4000, 8000, 12500), got, want)))
+    b = 60 / 200
+    seq, last = '', 0.0
+    hits = [(bar * 4 + off) * b for bar in range(4) for off in (0, 1, 1.67, 2, 3, 3.67)]
+    for h in hits:
+        seq += f'wait {h - last:.4f} on 51 80 '
+        last = h
+    fs, x = render(seq + 'wait 1')
+    y = band(x, fs, 1000) ** 2
+    pre = lambda t: np.mean(y[int((t - 0.05) * fs):int(t * fs)])
+    build = 10 * math.log10(np.mean([pre(h) for h in hits[-6:]]) / np.mean([pre(h) for h in hits[1:3]]))
+    check('ride-cymbal: ride time builds a wash (1 kHz, bar 4 over bar 1)', build > 2, f'{build:+.1f} dB')
+    def centroid(x, fs, t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+        f = np.fft.rfftfreq(len(seg), 1 / fs)
+        return (sp * f).sum() / sp.sum()
+    cb = centroid(render('on 53 90 wait 1.5')[1], fs, 0.3, 1.0)
+    cw = centroid(render('on 51 90 wait 1.5')[1], fs, 0.3, 1.0)
+    check('ride-cymbal: the bell rings lower and clearer than the bow', cb < 0.6 * cw, f'centroid 0.3-1 s: bell {cb:.0f} Hz, bow {cw:.0f} Hz')
+    def lafmax(x):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        from scipy.signal import lfilter
+        e = lfilter([a], [1, a - 1], x[:int(0.6 * fs)] ** 2)
+        return 10 * math.log10(e.max() + 1e-20)
+    for inst, key in (('ride-cymbal', 51), ('ride-cymbal', 75), ('crash-cymbal', 49)):
+        rng = lafmax(render(f'on {key} 127 wait 0.8', inst)[1]) - lafmax(render(f'on {key} 16 wait 0.8', inst)[1])
+        check(f'{inst} key {key}: velocity 16 .. 127 on the GM curve (~30 dB)', 22 < rng < 40, f'{rng:.1f} dB (unweighted fast max)')
+    quiet = lafmax(render('on 51 80 wait 0.8')[1]) - lafmax(render('on 75 80 wait 0.8')[1])
+    check('ride-cymbal: a brush stroke is quieter than a stick stroke', 6 < quiet < 25, f'{quiet:.1f} dB under the stick at velocity 80')
+    fs, a = render('on 49 110 wait 1.0 off 49 wait 1.5', 'crash-cymbal', {'PJ_CYM_NOTEOFF': '1'})
+    _, b2 = render('on 49 110 wait 1.0 off 49 wait 1.5', 'crash-cymbal')
+    e = lambda x: 10 * math.log10(np.mean(x[int(1.4 * fs):int(1.6 * fs)] ** 2) + 1e-20)
+    check('crash-cymbal: choked by the hand', e(b2) - e(a) > 20, f'0.4 s after the grab {e(b2) - e(a):.1f} dB under the free ring')
+    for inst, seed, env in (('ride-cymbal', '1', None), ('ride-cymbal-2', '2', None), ('crash-cymbal', '3', None),
+                            ('crash-cymbal-2', '4', None), ('splash-cymbal', '5', {'PJ_CYM_BRUSH': '1'}),
+                            ('china-cymbal', '6', None), ('ride-cymbal', '7', {'PJ_CYM_BRUSH': '1'})):
+        r = run(['-inst', inst, '-fuzz', '10', seed], env=env)
+        check(f'fuzz 10 s ({inst}{", brushes" if env else ""})', r.returncode == 0, r.stdout.strip())
+    for inst, env in (('ride-cymbal', None), ('ride-cymbal', {'PJ_CYM_BRUSH': '1'}), ('crash-cymbal-2', None)):
+        ns = cpu_time(['-inst', inst, '-fuzz', '10', '1'], env=dict({'PJ_NOCAL': '1'}, **(env or {}))) / (10 * 48000) * 1e9
+        check(f'real-time margin ({inst}{", brushes" if env else ""}, random playing)', ns < 2500,
+              f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def gm2_extras():
+    """The small sounds below 35 (-inst perc-extras, src/percextras.cc; research/gm2_extras.md): every
+    key sounds; the sticks ring at their free-free modes; about General MIDI's 30 dB from velocity 16
+    to 127; no blow-up; real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(key, vel):
+        wav = os.path.join(ROOT, 'tools', '.percx.wav')
+        run(['-inst', 'perc-extras', '-seq', f'on {key} {vel} wait 0.6', '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        return fs, x
+    keys = (20, 21, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34)
+    silent = [k for k in keys if np.abs(render(k, 100)[1]).max() < 1e-4]
+    check('perc-extras: every key sounds', not silent, f'silent: {silent}' if silent else f'{len(keys)} keys')
+    fs, x = render(31, 100)
+    n = int(0.2 * fs)
+    sp = np.abs(np.fft.rfft(x[:n] * np.hanning(n), 1 << 16))
+    f = np.fft.rfftfreq(1 << 16, 1 / fs)
+    found = []
+    for want in (330, 910, 1780, 2950):  # a 5A hickory stick, free-free
+        band = (f > want * 0.93) & (f < want * 1.07)
+        out = (f > want * 0.8) & (f < want * 1.2) & ~band
+        found.append(sp[band].max() > 3 * np.median(sp[out]))
+    check('perc-extras: the sticks ring at their bending modes', all(found), f'330/910/1780/2950 Hz: {found}')
+    rng = []
+    for k in (31, 34):
+        a, b = render(k, 16)[1], render(k, 127)[1]
+        rng.append(20 * math.log10(np.sqrt(np.mean(b ** 2)) / np.sqrt(np.mean(a ** 2))))
+    check('perc-extras: velocity 16 to 127', all(24 <= r <= 38 for r in rng),
+          f'sticks {rng[0]:.1f} dB, metronome bell {rng[1]:.1f} dB')
+    r = run(['-inst', 'perc-extras', '-fuzz', '10', '3'])
+    check('fuzz 10 s (perc-extras)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'perc-extras', '-fuzz', '10', '3'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (perc-extras, random playing)', ns < 500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def hand_drums():
+    """The hand drums (-inst conga, bongo, timbale; src/handdrum.cc, research/hand_drums.md): each drum's
+    note, the closed conga tone shorter than the open, the conga's barrel heard near 100 Hz, General
+    MIDI's range over velocity, no blow-up (the implicit stick on the light timbale head), real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(inst, key, vel=100):
+        wav = os.path.join(ROOT, 'tools', '.hand.wav')
+        run(['-inst', inst, '-seq', f'on {key} {vel} wait 1.0', '-o', wav], env={'PJ_NOCAL': '1'})
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def spectrum(fs, x, t0=0.01, t1=0.3):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        return np.fft.rfftfreq(1 << 17, 1 / fs), np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 17))
+    out = []
+    for inst, key, hz in (('conga', 63, 262), ('conga', 64, 196), ('bongo', 60, 523), ('bongo', 61, 392),
+                          ('timbale', 65, 330), ('timbale', 66, 247)):
+        f, sp = spectrum(*render(inst, key))
+        b = (f > hz / 1.15) & (f < hz * 1.15)
+        out.append(round(1200 * math.log2(f[b][np.argmax(sp[b])] / hz)))
+    check('hand drums: each note on its tuning', all(abs(c) < 40 for c in out), ' '.join(f'{c:+d} c' for c in out))
+    e = lambda x, fs: 10 * math.log10(np.mean(x[int(0.1 * fs):int(0.15 * fs)] ** 2) + 1e-20)
+    fs, o = render('conga', 63)
+    _, m = render('conga', 62)
+    check('conga: the closed tone (62) dies faster than the open (63)', e(o, fs) - e(m, fs) > 8,
+          f'at 0.1 s {e(o, fs) - e(m, fs):.1f} dB under')
+    f, sp = spectrum(*render('conga', 64))
+    pipe = 20 * math.log10(sp[(f > 80) & (f < 120)].max() / sp[(f > 60) & (f < 3000)].max())
+    check('conga: its barrel sings near 100 Hz', pipe > -30, f'{pipe:.1f} dB against the strongest peak')
+    def lafmax(x, fs):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        y = np.zeros(1)
+        from scipy.signal import lfilter
+        e2 = lfilter([a], [1, a - 1], x[:int(0.5 * fs)] ** 2)
+        return 10 * math.log10(e2.max() + 1e-20)
+    rng = []
+    for inst, key in (('conga', 63), ('bongo', 60), ('timbale', 65)):
+        fs, hi = render(inst, key, 127)
+        _, lo = render(inst, key, 16)
+        rng.append(lafmax(hi, fs) - lafmax(lo, fs))
+    check('hand drums: velocity 16 .. 127 on the GM curve (~30 dB)', all(22 < r < 40 for r in rng),
+          ' '.join(f'{r:.1f}' for r in rng) + ' dB (conga, bongo, timbale)')
+    for inst, seed in (('conga', '1'), ('bongo', '2'), ('timbale', '3')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = max(cpu_time(['-inst', inst, '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) for inst in ('conga', 'bongo', 'timbale')) / (10 * 48000) * 1e9
+    check('real-time margin (hand drums, random playing)', ns < 2500, f'{ns:.0f} ns/sample at most ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def scrapers():
+    """The guiro, cuica, vibraslap and pea whistle (src/scrapers.cc; research/scrapers_friction.md):
+    the guiro's clicks at the stroke's speed over the notch spacing, the cuica speaking (stick-slip)
+    and its thumb's glide, the mute an octave up, the whistle's pitch and the pea's trill, the
+    vibraslap's rattle about a second, velocity on the GM curve, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt, lfilter
+    def render(inst, seq):
+        wav = os.path.join(ROOT, 'tools', '.scraper.wav')
+        run(['-inst', inst, '-seq', seq, '-o', wav])
+        fs, y = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (y.astype(float).mean(1) if y.ndim > 1 else y.astype(float))
+    def lafmax(x, fs):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        return 10 * math.log10(lfilter([a], [1, a - 1], x * x).max() + 1e-20)
+    # Guiro: at the stroke's middle (its fastest) the clicks repeat at v / lambda (4 mm notches).
+    rates = []
+    for vel in (40, 100):
+        fs, x = render('guiro', f'on 74 {vel} wait 0.6')
+        v = vel / 127
+        T = 0.24 * (1.8 - 1.2 * v)
+        vpk = math.pi * 0.15 / (2 * T)
+        t0 = np.argmax(np.abs(x) > 0.02 * np.abs(x).max()) / fs
+        hp = sosfiltfilt(butter(4, [2000, 9000], 'bandpass', fs=fs, output='sos'), x)
+        env = sosfiltfilt(butter(2, 2000, fs=fs, output='sos'), np.abs(hp))
+        seg = env[int((t0 + T / 2 - 0.02) * fs):int((t0 + T / 2 + 0.02) * fs)]
+        seg = seg - seg.mean()
+        ac = np.correlate(seg, seg, 'full')[len(seg) - 1:]
+        lo, hi = int(fs / 2000), int(fs / 60)
+        k = lo + int(np.argmax(ac[lo:hi]))
+        rates.append((fs / k, vpk / 0.004))
+    check('guiro: clicks at the stroke speed over the notch spacing', all(abs(r / e - 1) < 0.1 for r, e in rates),
+          ', '.join(f'{r:.0f} /s for {e:.0f}' for r, e in rates))
+    # Cuica: the open stroke speaks (a pitch through it) and the thumb glides it up; the mute an
+    # octave over the open's start.
+    def pitches(x, fs, t1, t2):
+        out = []
+        for t in np.arange(t1, t2, 0.04):
+            seg = x[int(t * fs):int((t + 0.03) * fs)]
+            seg = seg - seg.mean()
+            if np.sqrt(np.mean(seg ** 2)) < 1e-4:
+                continue
+            ac = np.correlate(seg, seg, 'full')[len(seg) - 1:]
+            lo, hi = int(fs / 1500), int(fs / 150)
+            out.append(fs / (lo + int(np.argmax(ac[lo:hi]))))
+        return out
+    fs, x = render('cuica', 'on 79 100 wait 0.6')
+    po = pitches(x, fs, 0.02, 0.45)
+    fs, x = render('cuica', 'on 78 100 wait 0.4')
+    pm = pitches(x, fs, 0.02, 0.12)
+    glide = 1200 * math.log2(np.median(po[-3:]) / np.median(po[:3])) if len(po) >= 6 else 0
+    octave = 1200 * math.log2(np.median(pm) / np.median(po[:3])) if pm and po else 0
+    check('cuica: speaks, the thumb glides the open stroke up', len(po) >= 8 and 300 < glide < 1000,
+          f'{np.median(po[:3]):.0f} Hz to {np.median(po[-3:]):.0f} Hz ({glide:+.0f} c)')
+    check('cuica: the mute an octave up', 1000 < octave < 1400, f'{octave:+.0f} c over the open')
+    # Pea whistle: its pitch and the pea's trill.
+    fs, x = render('pea-whistle', 'on 72 100 wait 0.6')
+    seg = x[int(0.1 * fs):int(0.4 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+    f = np.fft.rfftfreq(len(seg), 1 / fs)
+    f0 = f[np.argmax(sp * (f > 1000) * (f < 6000))]
+    env = sosfiltfilt(butter(2, 200, fs=fs, output='sos'), np.abs(seg))
+    e = env - env.mean()
+    se = np.abs(np.fft.rfft(e * np.hanning(len(e)), 1 << 16))
+    fe = np.fft.rfftfreq(1 << 16, 1 / fs)
+    trill = fe[np.argmax(se * (fe > 8) * (fe < 120))]
+    check('pea whistle: pitch and the pea\'s trill', 3000 < f0 < 3600 and 20 < trill < 60, f'{f0:.0f} Hz, trill {trill:.0f} Hz')
+    # Vibraslap: the rattle lasts about a second (to -30 dB).
+    fs, x = render('vibraslap', 'on 58 100 wait 2.5')
+    hp = sosfiltfilt(butter(4, [2000, 9000], 'bandpass', fs=fs, output='sos'), x)
+    lev = 10 * np.log10(sosfiltfilt(butter(2, 20, fs=fs, output='sos'), hp * hp).clip(1e-20))
+    last = np.where(lev > lev.max() - 30)[0][-1] / fs
+    check('vibraslap: the rattle dies over about a second', 0.7 < last < 2.2, f'{last:.2f} s to -30 dB')
+    # Velocity: 16 against 127, A-weighting left out (the shape is what counts here).
+    rng = []
+    for inst, key, wait in (('guiro', 74, 0.6), ('guiro', 73, 0.3), ('cuica', 79, 0.6), ('cuica', 78, 0.4),
+                            ('vibraslap', 58, 2.0), ('pea-whistle', 72, 0.7)):
+        fs, lo_ = render(inst, f'on {key} 16 wait {wait}')
+        _, hi_ = render(inst, f'on {key} 127 wait {wait}')
+        rng.append(lafmax(hi_, fs) - lafmax(lo_, fs))
+    check('scrapers: velocity 16 .. 127 near the GM curve (~30 dB)', all(18 < r < 40 for r in rng),
+          ' '.join(f'{r:.1f}' for r in rng) + ' dB (guiro long, short, cuica open, mute, vibraslap, whistle)')
+    for inst, seed in (('guiro', '1'), ('cuica', '2'), ('vibraslap', '3'), ('pea-whistle', '4')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = max(cpu_time(['-inst', inst, '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'})
+             for inst in ('guiro', 'cuica', 'vibraslap', 'pea-whistle')) / (10 * 48000) * 1e9
+    check('real-time margin (scrapers, random playing)', ns < 2500, f'{ns:.0f} ns/sample at most ({ns / 20833 * 100:.1f} % of a core)')
+
+def shakers():
+    """Maracas, shaker, cabasa, tambourine, jingle bell (src/shaker.cc; research/shakers.md): the
+    maraca's chick and its rattle, each body's brightness, no two strokes alike, the cabasa's twist
+    held as long as its key, velocity on the GM curve, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import lfilter
+    def render(inst, seq):
+        wav = os.path.join(ROOT, 'tools', '.shaker.wav')
+        run(['-inst', inst, '-seq', seq, '-o', wav])
+        fs, y = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (y.astype(float).mean(1) if y.ndim > 1 else y.astype(float))
+    def db(x):
+        return 10 * math.log10(np.mean(x * x) + 1e-20)
+    def lafmax(x, fs):
+        a = 1 - math.exp(-1 / (0.125 * fs))
+        return 10 * math.log10(lfilter([a], [1, a - 1], x * x).max() + 1e-20)
+    # The maraca: the chick at once, a rattle under it to ~80 ms, then quiet.
+    fs, x = render('maracas', 'on 70 100 wait 0.06 off 70 wait 0.6')
+    ms = lambda a, b: x[int(a * fs / 1000):int(b * fs / 1000)]
+    chick, rattle, after = db(ms(0, 8)), db(ms(20, 70)), db(ms(200, 300))
+    check('maracas: the chick, then the rattle', -38 < rattle - chick < -8 and after - chick < -50,
+          f'rattle 20-70 ms {rattle - chick:+.1f} dB, 200-300 ms {after - chick:+.1f} dB, against the chick')
+    # Brightness: each body's spectral centre.
+    want = {'maracas': (70, 2500, 5500), 'shaker': (82, 3500, 7500), 'cabasa': (69, 5000, 12000),
+            'tambourine': (54, 4500, 8500), 'jingle-bell': (83, 4000, 8500)}
+    cs = []
+    ok = True
+    for inst, (key, lo, hi) in want.items():
+        fs, y = render(inst, f'on {key} 100 wait 0.08 off {key} wait 0.5')
+        sp = np.abs(np.fft.rfft(y[:int(0.2 * fs)])) ** 2
+        f = np.fft.rfftfreq(int(0.2 * fs), 1 / fs)
+        c = (sp * f).sum() / sp.sum()
+        cs.append(f'{inst} {c:.0f}')
+        ok &= lo < c < hi
+    check('shakers: each body\'s brightness (spectral centre, Hz)', ok, ', '.join(cs))
+    # No two strokes alike; velocity: about General MIDI's 30 dB from 16 to 127.
+    rs, rng = [], []
+    for inst, (key, _, _) in want.items():
+        fs, y = render(inst, f'on {key} 100 wait 0.06 off {key} wait 0.44 ' * 3)
+        a = y[:int(0.15 * fs)]
+        rs.append(abs(np.corrcoef(a, y[int(1.0 * fs):int(1.0 * fs) + len(a)])[0, 1]))
+        fs, y = render(inst, ' '.join(f'on {key} {v} wait 0.06 off {key} wait 0.74' for v in (16, 16, 127, 127)))
+        seg = lambda i: y[int(i * 0.8 * fs):int((i + 1) * 0.8 * fs)]
+        lo, hi = [10 * math.log10(np.mean([10 ** (lafmax(seg(i), fs) / 10) for i in p])) for p in ((0, 1), (2, 3))]
+        rng.append(hi - lo)
+    check('shakers: no two strokes alike', max(rs) < 0.6, 'correlations ' + ' '.join(f'{r:.2f}' for r in rs))
+    check('shakers: velocity 16 to 127 on the GM curve', all(22 < r < 38 for r in rng),
+          ' '.join(f'{r:.1f}' for r in rng) + ' dB (maracas, shaker, cabasa, tambourine, jingle bell)')
+    # The cabasa's twist lasts as long as its key, then eases off.
+    fs, y = render('cabasa', 'on 69 80 wait 0.6 off 69 wait 0.5')
+    seg = lambda a, b: db(y[int(a * fs):int(b * fs)])
+    top = seg(0.0, 0.1)
+    held, gone = seg(0.3, 0.55) - top, seg(0.75, 0.9) - top
+    check('cabasa: held as long as its key', held > -16 and gone < -40, f'0.3-0.55 s {held:+.1f} dB, 0.75-0.9 s {gone:+.1f} dB')
+    for inst, seed in (('maracas', '1'), ('shaker', '2'), ('cabasa', '3'), ('tambourine', '4'), ('jingle-bell', '5')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = max(cpu_time(['-inst', inst, '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'})
+             for inst in ('maracas', 'tambourine')) / (10 * 48000) * 1e9
+    check('real-time margin (shakers, random playing)', ns < 2500, f'{ns:.0f} ns/sample at most ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def stick_snare():
+    """The snare with sticks (-inst stick-snare, src/sticksnare.cc; research/stick_snare.md): every
+    stroke sounds; General MIDI's ~30 dB over velocity; the wires answer (the high band is theirs);
+    the open rim shot louder than a stroke; the buzz roll a continuous run of impacts that stops
+    when the key is let go; no blow-up; real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(seq, env=None):
+        wav = os.path.join(ROOT, 'tools', '.ssnare.wav')
+        run(['-inst', 'stick-snare', '-seq', seq, '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from velcurve import a_weight
+    def laf(x, fs):  # A-weighted, the 125 ms rms's peak (as velcurve.py's LAFmax)
+        xa = a_weight(x, fs)
+        e = np.convolve(xa * xa, np.ones(int(0.125 * fs)) / (0.125 * fs), 'same')
+        return 10 * math.log10(e.max() + 1e-20)
+    def hf(x, fs, t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+        f = np.fft.rfftfreq(len(seg), 1 / fs)
+        return 10 * math.log10(sp[(f > 2000) & (f < 8000)].sum() + 1e-20)
+    silent = [k for k in (36, 37, 38, 39, 40, 42) if np.abs(render(f'on {k} 90 wait 0.4 off {k} wait 0.2')[1]).max() < 1e-4]
+    check('stick-snare: every stroke sounds', not silent, f'silent: {silent}' if silent else '36 37 38 39 40 42')
+    fs, a = render('on 38 16 wait 0.8')
+    _, b = render('on 38 127 wait 0.8')
+    rng = laf(b, fs) - laf(a, fs)
+    check('stick-snare: velocity 16 to 127', 22 <= rng <= 40, f'{rng:.1f} dB')
+    _, w = render('on 38 90 wait 0.6')
+    _, nw = render('on 38 90 wait 0.6', env={'PJ_SNARE_WIRES': '0'})
+    d = hf(w, fs, 0.03, 0.2) - hf(nw, fs, 0.03, 0.2)
+    check('stick-snare: the wires answer the stroke (2-8 kHz, 30-200 ms)', d > 10, f'{d:+.1f} dB with the wires')
+    _, s = render('on 38 100 wait 0.6')
+    _, r = render('on 39 100 wait 0.6')
+    rs = laf(r, fs) - laf(s, fs)
+    check('stick-snare: the open rim shot is louder than a stroke', rs > 3, f'{rs:+.1f} dB')
+    _, x = render('on 36 90 wait 1.5 off 36 wait 0.6')
+    env = np.sqrt(np.convolve(x * x, np.ones(960) / 960, 'same'))
+    held = env[int(0.3 * fs):int(1.4 * fs)]
+    after = env[int(1.9 * fs):int(2.05 * fs)].max()
+    even = 20 * math.log10(np.percentile(held, 95) / max(np.percentile(held, 5), 1e-12))
+    stop = 20 * math.log10(after / max(np.median(held), 1e-12))
+    check('stick-snare: the roll is continuous, and stops when let go', even < 20 and stop < -30,
+          f'level spread while held {even:.1f} dB (5..95 %), {stop:.0f} dB 0.4 s after the release')
+    r = run(['-inst', 'stick-snare', '-fuzz', '10', '1'])
+    check('fuzz 10 s (stick-snare)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'stick-snare', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
+    check('real-time margin (stick-snare, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+def clap_claves_surdo():
+    """The hand clap, claves and wood blocks, surdo and bell tree (src/clap.cc, woodperc.cc, surdo.cc,
+    belltree.cc; research/clap_claves_surdo.md): each where it should sound, the clap and the wood
+    blocks a little different every stroke, the surdo's mute, the bell tree's falling run, General
+    MIDI's ~30 dB over velocity, no blow-up, real time."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(inst, seq):
+        wav = os.path.join(ROOT, 'tools', '.ccs.wav')
+        run(['-inst', inst, '-seq', seq, '-o', wav])
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        return fs, x
+    def spec(x, fs, t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 16)) ** 2
+        return np.fft.rfftfreq(1 << 16, 1 / fs), sp
+    def strongest(x, fs, lo, hi, t0=0.0, t1=0.3):
+        f, sp = spec(x, fs, t0, t1)
+        m = (f > lo) & (f < hi)
+        return f[m][np.argmax(sp[m])]
+    def centre(x, fs, t0, t1):
+        f, sp = spec(x, fs, t0, t1)
+        return (f * sp).sum() / sp.sum()
+    def laf(x, fs):  # A-weighted would be the tool's; the fast peak level suffices here
+        a = math.exp(-1 / (0.125 * fs))
+        e, best = 0.0, 0.0
+        for v in x[::4] ** 2:
+            e = a * e + (1 - a) * v
+            best = max(best, e)
+        return 10 * math.log10(best + 1e-20)
+    # The clap: its centre where a hand clap's is (~1-4 kHz, the cupped palms' pitch), and no two alike.
+    fs, x = render('hand-clap', ' '.join('on 39 100 wait 0.4' for _ in range(4)))
+    segs = [x[int(i * 0.4 * fs):int(i * 0.4 * fs) + int(0.08 * fs)] for i in range(4)]
+    cen = np.mean([centre(s, fs, 0, 0.08) for s in segs])
+    cc = max(np.max(np.abs(np.correlate(segs[i] / np.linalg.norm(segs[i]), segs[j] / np.linalg.norm(segs[j]), 'full')))
+             for i in range(4) for j in range(i + 1, 4))
+    check('hand-clap: a hand clap\'s brightness, every clap its own', 1200 < cen < 4500 and cc < 0.7,
+          f'spectral centre {cen:.0f} Hz; the most alike two of four: correlation {cc:.2f}')
+    # The claves: their ring at ~2.45 kHz.
+    fs, x = render('claves', 'on 75 100 wait 0.6')
+    f = strongest(x, fs, 1000, 6000)
+    check('claves: they ring at ~2.45 kHz', 2300 < f < 2600, f'{f:.0f} Hz')
+    # The wood blocks: on their notes; struck roughly the same place, never quite the same stroke.
+    fs, x = render('wood-blocks', 'on 76 100 wait 0.5 on 77 100 wait 0.5')
+    hi, lo = strongest(x, fs, 300, 3000, 0, 0.4), strongest(x, fs, 300, 3000, 0.5, 0.9)
+    seq = ' '.join('on 76 100 wait 0.5' for _ in range(8))
+    fs, x = render('wood-blocks', seq)
+    lv = []
+    for i in range(8):
+        f2, sp = spec(x, fs, i * 0.5, i * 0.5 + 0.3)
+        band = lambda c: 10 * math.log10(sp[(f2 > c * 0.985) & (f2 < c * 1.015)].max() + 1e-20)
+        lv.append([band(1638) - band(746), band(672) - band(746)])
+    sd = float(np.mean(np.std(np.array(lv), 0)))
+    check('wood-blocks: on their notes, each stroke a little different', abs(hi - 746) < 25 and abs(lo - 502) < 20 and sd > 0.5,
+          f'high {hi:.0f} Hz, low {lo:.0f} Hz; partials\' balance varies {sd:.1f} dB stroke to stroke')
+    # The surdo: its low note; the hand's mute.
+    fs, a = render('surdo', 'on 87 100 wait 1')
+    _, b = render('surdo', 'on 86 100 wait 1')
+    f0 = strongest(a, fs, 40, 100, 0.05, 0.8)
+    lev = lambda x, t: 10 * math.log10(np.mean(x[int(t * fs):int((t + 0.05) * fs)] ** 2) + 1e-20)
+    mute = lev(a, 0.2) - lev(b, 0.2)
+    check('surdo: its low note, and the hand mutes it', 55 < f0 < 70 and mute > 15, f'{f0:.1f} Hz; muted {mute:.0f} dB under open at 0.2 s')
+    # The bell tree: the beater drawn down the stack: high bells first.
+    fs, x = render('bell-tree', 'on 84 100 wait 1.5')
+    c0, c1 = centre(x, fs, 0.0, 0.06), centre(x, fs, 0.3, 0.36)
+    check('bell-tree: a falling run', c0 > 1.3 * c1, f'spectral centre {c0:.0f} Hz at the start, {c1:.0f} Hz at 0.3 s')
+    # About General MIDI's 30 dB from velocity 16 to 127.
+    rng = {}
+    for inst, k in (('hand-clap', 39), ('claves', 75), ('wood-blocks', 76), ('surdo', 87), ('bell-tree', 84)):
+        rng[inst] = laf(render(inst, f'on {k} 127 wait 1.2')[1], fs) - laf(render(inst, f'on {k} 16 wait 1.2')[1], fs)
+    check('clap, claves, blocks, surdo, bell tree: velocity 16 to 127', all(22 <= v <= 40 for v in rng.values()),
+          ', '.join(f'{k} {v:.1f} dB' for k, v in rng.items()))
+    for inst, seed in (('hand-clap', '1'), ('claves', '2'), ('wood-blocks', '3'), ('surdo', '4'), ('bell-tree', '5')):
+        r = run(['-inst', inst, '-fuzz', '10', seed])
+        check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = max(cpu_time(['-inst', inst, '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'})
+             for inst in ('hand-clap', 'claves', 'wood-blocks', 'surdo', 'bell-tree')) / (10 * 48000) * 1e9
+    check('real-time margin (clap, claves, blocks, surdo, bell tree)', ns < 2500, f'{ns:.0f} ns/sample at most ({ns / 20833 * 100:.1f} % of a core)')
 
 
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

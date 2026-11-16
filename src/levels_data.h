@@ -56,6 +56,36 @@ constexpr LevelTrim kLevelTrims[] = {
     {"clavinet", -3.5f},
     {"clavinet-e7", -4.0f},
     {"clavinet-c", -9.4f},
+    {"brush-snare", 12.0f},
+    {"hi-hat", 20.0f},
+    {"jazz-kick", -4.3f},
+    {"jazz-kick-20", -5.4f},
+    {"maracas", -2.9f},
+    {"shaker", -0.4f},
+    {"cabasa", -0.4f},
+    {"tambourine", 0.4f},
+    {"jingle-bell", 0.1f},
+    {"guiro", 9.4f},
+    {"cuica", -1.2f},
+    {"vibraslap", 8.7f},  // (6 dB under the common level: its rattle is all peaks)
+    {"pea-whistle", -10.7f},
+    {"ride-cymbal", 11.2f},
+    {"ride-cymbal-2", 16.3f},
+    {"crash-cymbal", 27.3f},
+    {"crash-cymbal-2", 24.3f},
+    {"splash-cymbal", 31.8f},
+    {"china-cymbal", 26.0f},
+    {"tom-10", 2.5f},
+    {"tom-12", -0.7f},
+    {"tom-13", -2.7f},
+    {"tom-14", -3.6f},
+    {"tom-16", -4.5f},
+    {"tom-16-low", -3.4f},
+    {"triangle", 0.9f},
+    {"cowbell", -3.9f},
+    {"conga", 3.0f},
+    {"bongo", 7.9f},
+    {"timbale", -4.9f},
     {"pad-new-age", -1.9f},
     {"pad-warm", -0.6f},
     {"pad-polysynth", -1.4f},
@@ -65,5 +95,12 @@ constexpr LevelTrim kLevelTrims[] = {
     {"pad-halo", -5.3f},
     {"pad-sweep", 0.7f},
     {"fx-crystal", -4.9f},
+    {"perc-extras", 10.1f},  // (12 dB under the common level, by hand: small sounds, and their clicks peak high)
+    {"stick-snare", -1.0f},  // (by hand: 2 dB under the common level, so an accent (velocity 127) peaks near 1.2)
+    {"hand-clap", 0.0f},     // (by hand, by the peak: ~0.6 at velocity 100; ~10 dB under the common loudness, as short sounds are)
+    {"claves", 1.0f},        // (by hand: a peak ~0.8 at velocity 100)
+    {"wood-blocks", 0.0f},   // (by hand, by the peak: ~0.8 at velocity 100; ~9 dB under the common loudness)
+    {"surdo", -0.2f},
+    {"bell-tree", -4.5f},
 };
 }  // namespace pajupilli

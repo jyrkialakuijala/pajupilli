@@ -357,6 +357,10 @@ const char kUsage[] =
     "Modes:\n"
     "  -live               play from a MIDI keyboard (Akai MPK mini mk3)\n"
     "  -selftest           -live without a keyboard: plays an arpeggio\n"
+    "  -inst drums         (live) the drum kit on the keys and the pads, as General\n"
+    "                      MIDI's drum keys: the MPK's lowest C the bass drum (36)\n"
+    "  -pads drums         (live) the pads play the drum kit beside any instrument\n"
+    "                      (bank A 36..43, bank B 44..51) instead of breath and flutter\n"
     "  -note M             play one note, print its pitch\n"
     "  -scale              play the whole range, print a tuning table\n"
     "  -demo               a slurred scale and a short phrase\n"
@@ -500,6 +504,7 @@ int main(int argc, char** argv) {
   int note = -1, imp = -1, slurFrom = -1, slurTo = -1, ramp = -1;
   bool scale = false, demo = false, live = false, cal = false, cfoot = false, polyDemo = false;
   LiveOptions lopt;
+  bool kitOnKeys = false, padDrums = false;  // -inst drums; -pads drums
   std::string ensemble;  // instruments, comma-separated
   const RoomSpec* room = findRoom("hall");
   double secs = 1.0, dyn = 0.5;
@@ -513,7 +518,11 @@ int main(int argc, char** argv) {
     if (a == "-h" || a == "-help" || a == "--help") { std::fputs(kUsage, stdout); return 0; }
     auto next = [&]() { return i + 1 < argc ? argv[++i] : (char*)""; };
     if (a == "-inst") {
-      gInst = findInstrument(next());
+      const char* nm = next();
+      // (The drum kit is every percussion at once: its keys and pads are
+      // General MIDI's drum keys; the keyboard's own instrument stays silent.)
+      if (std::string(nm) == "drums") { kitOnKeys = padDrums = true; nm = "taiko"; }
+      gInst = findInstrument(nm);
       if (!gInst) { std::fprintf(stderr, "-inst: %s\n", instrumentNames().c_str()); return 1; }
     }
     else if (a == "-cfoot") cfoot = true;
@@ -528,6 +537,11 @@ int main(int argc, char** argv) {
     else if (a == "-demo") demo = true;
     else if (a == "-seq") seq = next();
     else if (a == "-live") live = true;
+    else if (a == "-pads") {
+      const std::string what = next();
+      if (what == "drums") padDrums = true;
+      else if (what != "breath") { std::fprintf(stderr, "-pads: drums or breath\n"); return 1; }
+    }
     else if (a == "-selftest") { live = true; lopt.selfTest = true; }
     else if (a == "-dev") lopt.device = next();
     else if (a == "-midi") lopt.midiName = next();
@@ -668,7 +682,14 @@ int main(int argc, char** argv) {
                           : std::unique_ptr<Ensemble>(new Ensemble(roster, lopt.verbose || polyDemo, room));
   };
   if (live) {
-    auto ens = makeEnsemble(lopt.poly);
+    auto ens = makeEnsemble(kitOnKeys ? 1 : lopt.poly);
+    std::unique_ptr<DrumKit> kit;
+    if (padDrums) {
+      std::fprintf(stderr, "calibrating the drum kit...\n");
+      kit.reset(new DrumKit(room, lopt.verbose));
+      lopt.kit = kit.get();
+      lopt.kitOnKeys = kitOnKeys;
+    }
     return runLive(roster.empty() ? *gInst : concertFlute(), lopt, *ens);
   }
   if (polyDemo) {

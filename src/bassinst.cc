@@ -50,6 +50,56 @@ extern const Instrument kPlucked[] = {
     {"clavinet", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     {"clavinet-e7", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     {"clavinet-c", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The snare drum under brushes (src/snare.cc): General MIDI's drum keys 37 .. 41.
+    {"brush-snare", 0, 36, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The hi-hat (src/hihat.cc): General MIDI's drum keys 42, 44, 46.
+    {"hi-hat", 0, 36, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The jazz bass drum, 18" (and 20") (src/kick.cc): General MIDI's drum keys 35, 36.
+    {"jazz-kick", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"jazz-kick-20", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // Shakers and jingles (src/shaker.cc): General MIDI's drum keys 70, 69, 54; GM2's 82, 83.
+    {"maracas", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"shaker", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"cabasa", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tambourine", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"jingle-bell", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The cymbals (src/cymbal.cc): General MIDI's drum keys 49, 51, 52, 53, 55, 57, 59 (24 up: brushed).
+    {"ride-cymbal", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"ride-cymbal-2", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"crash-cymbal", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"crash-cymbal-2", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"splash-cymbal", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"china-cymbal", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The toms (src/tom.cc): General MIDI's drum keys 41 .. 50, one drum a key (24 up: brushed).
+    {"tom-10", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tom-12", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tom-13", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tom-14", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tom-16", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"tom-16-low", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The triangle and the cowbell (src/metalperc.cc): General MIDI's drum keys 80, 81 and 56.
+    {"triangle", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"cowbell", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The guiro, cuica, vibraslap and whistle (src/scrapers.cc): General MIDI's drum keys 73/74, 78/79, 58, 71/72 (the pea whistle).
+    {"guiro", 0, 73, 74, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"cuica", 0, 78, 79, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"vibraslap", 0, 58, 58, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"pea-whistle", 0, 71, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The hand drums (src/handdrum.cc): General MIDI's 60, 61 (bongos), 62 .. 64 (congas), 65, 66 (timbales).
+    {"conga", 0, 62, 64, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"bongo", 0, 60, 61, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"timbale", 0, 65, 66, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The small sounds below 35 (src/percextras.cc; research/gm2_extras.md).
+    {"perc-extras", 0, 20, 34, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The hand clap, claves and wood blocks, surdo, bell tree (src/clap.cc, woodperc.cc, surdo.cc,
+    // belltree.cc; research/clap_claves_surdo.md): General MIDI's 39, 75 .. 77; GM2's 86/87, 84.
+    {"hand-clap", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"claves", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"wood-blocks", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"surdo", 0, 13, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"bell-tree", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The snare with sticks (src/sticksnare.cc; research/stick_snare.md): 36 roll .. 44.
+    {"stick-snare", 0, 36, 44, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
 };
 extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 

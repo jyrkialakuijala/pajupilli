@@ -4,6 +4,7 @@
 #include <string>
 
 #include "calibrate.h"
+#include "drumkit.h"
 #include "ensemble.h"
 
 namespace pajupilli {
@@ -20,6 +21,13 @@ struct LiveOptions {
   bool verbose = false;
   bool selfTest = false;           // play an arpeggio without a keyboard
   int poly = 8;                    // flutes in the pool (1: a single flute)
+  // The drum kit (src/drumkit.h; null: none). Its pads (channel 10: the
+  // MPK's send General MIDI's drum keys, bank A 36 .. 43, bank B 44 .. 51)
+  // then play the kit instead of the breath and the flutter; kitOnKeys: the
+  // keys play it too (-inst drums), the MPK's lowest C (48) the bass drum
+  // (36) unless -transpose says otherwise.
+  DrumKit* kit = nullptr;
+  bool kitOnKeys = false;
 };
 
 // inst: the keyboard's instrument (its transposition); ens: who plays.

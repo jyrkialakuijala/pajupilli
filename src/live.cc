@@ -141,6 +141,7 @@ class Controls {
     transpose_ = o.transpose != LiveOptions::kAutoTranspose
                      ? o.transpose
                      : 12 + 12 * int(std::lround(inst.transpose / 12.0));
+    kitShift_ = o.transpose != LiveOptions::kAutoTranspose ? o.transpose : -12;
   }
   int fold(int n) const {
     n += transpose_;
@@ -177,6 +178,17 @@ class Controls {
  private:
   bool isPad(int ch) const { return ch == 9; }
   void noteOn(int ch, int note, int vel) {
+    if (o_.kit && (isPad(ch) || o_.kitOnKeys)) {
+      const int k = isPad(ch) ? note : note + kitShift_;
+      const bool built = o_.kit->noteOn(k, vel);
+      if (o_.verbose || !built) {
+        const char* nm = drumName(k);
+        if (o_.verbose || !warned_[k & 127])
+          std::fprintf(stderr, "drum %d%s%s vel %d%s\n", k, *nm ? " " : "", nm, vel, built ? "" : *nm ? " (not built: silent)" : " (no drum on this key)");
+        warned_[k & 127] = true;
+      }
+      return;
+    }
     if (isPad(ch)) {
       const int pad = (note - 36) % 8;  // bank A 36-43, bank B 44-51
       if (pad == 0) { breathPad_ = true; p_.all(&Performer::setBreath, 0); }
@@ -189,6 +201,7 @@ class Controls {
     p_.noteOn(n, vel);
   }
   void noteOff(int ch, int note) {
+    if (o_.kit && (isPad(ch) || o_.kitOnKeys)) { o_.kit->noteOff(isPad(ch) ? note : note + kitShift_); return; }
     if (isPad(ch)) {
       const int pad = (note - 36) % 8;
       if (pad == 0) { breathPad_ = false; p_.all(&Performer::setBreath, joyBreath_); }
@@ -199,6 +212,7 @@ class Controls {
     sounding_[note] = -1;
   }
   void padPressure(int note, int value) {
+    if (o_.kit) return;  // (the pads are drums)
     const int pad = note < 0 ? (breathPad_ ? 0 : 1) : (note - 36) % 8;
     if (pad == 0 && breathPad_) p_.all(&Performer::setBreath, -0.5 + value / 127.0);  // breath controller
     else if (pad == 1) p_.all(&Performer::setFlutter, 0.3 + 0.7 * value / 127.0);
@@ -263,6 +277,8 @@ class Controls {
   const LiveOptions& o_;
   int sounding_[128] = {};
   int lo_, hi_, transpose_;
+  int kitShift_ = -12;       // the keys as drum keys: the MPK's lowest C (48) the bass drum (36)
+  bool warned_[128] = {};
   bool breathPad_ = false;
   bool circuit_ = false;  // a synth lead: K2 cutoff, K3 resonance
   bool plucked_ = false;
@@ -279,6 +295,7 @@ class Controls {
     for (int n = 0; n < 128; ++n)
       if (sounding_[n] >= 0) { p_.noteOff(sounding_[n]); sounding_[n] = -1; }
     p_.setHold(false);
+    if (o_.kit) o_.kit->allOff();
   }
 };
 
@@ -311,7 +328,10 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
   }
   Controls ctl(player, inst, o);
   ctl.init();
-  std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());
+  if (!o.kitOnKeys) std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());
+  if (o.kit)
+    std::fprintf(stderr, "drum kit on the %s (General MIDI keys%s):\n%s", o.kitOnKeys ? "keys and pads" : "pads",
+                 o.kitOnKeys ? "; the MPK's lowest C is the bass drum, 36" : "", o.kit->describe().c_str());
 
   std::vector<float> left(period), right(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);
@@ -337,7 +357,16 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
     // A port appeared (the MPK plugged in again): connect. Rare, so the few
     // syscalls here are fine in this thread.
     if (portStarted) midi.connected = connectSources(midi, o.midiName, true) || midi.connected;
-    if (o.selfTest) {  // a slurred arpeggio without a keyboard
+    if (o.selfTest && o.kit && o.kitOnKeys) {  // a bar of drums without a keyboard
+      const int keys[] = {36, 42, 38, 42, 36, 36, 38, 46, 41, 45, 48, 50, 37, 39, 56, 49};
+      const long step = 48000 / 4;
+      if (frames / step != demoStep - 1 && demoStep < 17) {
+        if (demoStep > 0) o.kit->noteOff(keys[demoStep - 1]);
+        if (demoStep < 16) o.kit->noteOn(keys[demoStep], 60 + 40 * (demoStep % 2 == 0));
+        ++demoStep;
+      }
+      if (frames > 48000 * 6) gStop = true;
+    } else if (o.selfTest) {  // a slurred arpeggio without a keyboard
       const int notes[] = {60, 64, 67, 72, 76, 79, 84, 79, 76, 72, 67, 64, 60};
       const long step = 48000 / 4;
       if (frames / step != demoStep - 1 && demoStep < 14) {
@@ -348,6 +377,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
       if (frames > 48000 * 5) gStop = true;
     }
     player.render(left.data(), right.data(), int(period));
+    if (o.kit) o.kit->renderAdd(left.data(), right.data(), int(period));
     for (size_t i = 0; i < period; ++i) {
       gain += 0.002f * (float(ctl.gain_) - gain);  // ~10 ms volume glide, no clicks
       for (int c = 0; c < 2; ++c) {
@@ -381,7 +411,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
   snd_pcm_close(pcm);
   snd_seq_close(midi.seq);
   std::fprintf(stderr, "stopped after %.1f s, %ld xruns, %d state resets\n", frames / 48000.0,
-               xruns, player.resets());
+               xruns, player.resets() + (o.kit ? o.kit->resets() : 0));
   return 0;
 }
 

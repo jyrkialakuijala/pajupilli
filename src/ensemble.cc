@@ -143,11 +143,12 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
 }
 
 // Which reverb channel an instrument plays into: the synth basses a small
-// room (their low end stays clear); the toms and drums the gated reverb (a
-// big live room, its ambience compressed and gated: Phil Collins); the rest
-// the main one.
+// room (their low end stays clear); the synth toms and drums the gated
+// reverb (a big live room, its ambience compressed and gated: Phil Collins);
+// the rest, the acoustic drums with them (the brushed kit: in the room with
+// the band, its ambience open), the main one.
 int Ensemble::reverbChannel(const Instrument& in) {
-  if (std::strcmp(in.family, "drum") == 0 || std::strcmp(in.family, "tom") == 0) return 2;  // gated
+  if ((std::strcmp(in.family, "drum") == 0 || std::strcmp(in.family, "tom") == 0) && in.circuit()) return 2;  // gated
   if (std::strcmp(in.family, "bass") == 0) return 0;
   return 1;
 }
