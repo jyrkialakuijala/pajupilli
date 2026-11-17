@@ -43,7 +43,9 @@ class SnareModel : public Tube {
 //   39  a slap: the fan flat, pressed in for a moment;
 //   40  the swirl, for as long as the key is held: both brushes on the head;
 //   37  the cross-stick (side stick): the stick's butt on the hoop;
-//   36, 41  taps at the middle of the head and near its edge.
+//   36, 41  taps at the middle of the head and near its edge;
+//   42  (held) the right hand is away, swirling on a cymbal (-play sends it
+//       with the cymbal's swirl, drumkit.h): only the left hand circles here.
 // Brushing is two-handed, and the drummer does not wait to be asked for it:
 // whenever brush strokes are played there is one whoosh under them that
 // never stops.
@@ -112,7 +114,7 @@ class SnarePlayer : public Performer {
   double vary_ = 1.0, lastPhase_ = 0, zone_ = 1;
   int turn_ = 0, zoneHold_ = 2;
   double tapSwoosh_ = 0.7, held_ = 0.42, meat_ = 1.0, flatShare_ = 0.22, flatHard_ = 0.8;
-  bool lastFlat_ = false;
+  bool lastFlat_ = false, rhAway_ = false;
   double rhT_ = -1, rhDur_ = 0, rhV0_ = 0, rhX_ = 0, rhY_ = 0, rhDx_ = 0, rhDy_ = 0, rhAng_ = 1.2, phaseR_ = 3.1;
 };
 

@@ -1,7 +1,12 @@
 #include "drumkit.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+
+#include "knob.h"
 
 namespace pajupilli {
 
@@ -12,6 +17,13 @@ bool brushKitWanted() {
 
 Drum drumFor(int k, Kit kit, bool gs) {
   const bool brush = kit == Kit::kBrush;
+  // (The brush player's own swirl on a cymbal: -play's keys, not General MIDI's.)
+  if (kit != Kit::kStandard) {
+    if (k == kKeyRightHandAway) return {"brush-snare", 42};
+    if (k == kKeySwirlRide) return {"ride-cymbal", 84};
+    if (k == kKeySwirlCrash2) return {"crash-cymbal-2", 84};
+    if (k == kKeySwirlCrash) return {"crash-cymbal", 84};
+  }
   // The usual snare is played with sticks (src/sticksnare.cc: the same drum
   // under sticks, with its rim shot and roll). A jazz group's (Kit::kJazz: a
   // file with a piano and an upright bass) and a Brush kit's is the brushed
@@ -124,6 +136,135 @@ const char* drumName(int k) {
   if (k == 86) return "mute surdo";
   if (k == 87) return "open surdo";
   return k >= 35 && k <= 81 ? kNames[k - 35] : "";
+}
+
+std::vector<CymbalSwirl> planCymbalSwirls(const std::vector<DrumPlanNote>& notes, const std::vector<DrumTempo>& tempo, bool gs) {
+  std::vector<CymbalSwirl> out;
+  if (knob("PJ_SWIRL", 1) <= 0 || notes.empty()) return out;
+  // The tempo map both ways (none: 120 to the minute).
+  auto beatAt = [&](double t) {
+    const DrumTempo* m = nullptr;
+    for (const DrumTempo& x : tempo)
+      if (x.t <= t) m = &x;
+    return m ? m->beat + (t - m->t) / m->len : t / 0.5;
+  };
+  auto timeAt = [&](double b) {
+    const DrumTempo* m = nullptr;
+    for (const DrumTempo& x : tempo)
+      if (x.beat <= b) m = &x;
+    return m ? m->t + (b - m->beat) * m->len : b * 0.5;
+  };
+  // Bar by bar (four beats, from the song's start): how many notes, how
+  // loud, the brushed snare's strokes; and when each cymbal is struck.
+  const int nBars = int(beatAt(notes.back().t) / 4) + 1;
+  if (nBars < 8) return out;
+  static const char* const kCym[3] = {"ride-cymbal", "crash-cymbal-2", "crash-cymbal"};
+  static const int kKey[3] = {kKeySwirlRide, kKeySwirlCrash2, kKeySwirlCrash};
+  std::vector<int> count(nBars, 0), drumN(nBars, 0);
+  std::vector<double> vel(nBars, 0), drumVel(nBars, 0);
+  std::vector<double> struck[3];
+  int first = -1;
+  uint32_t seed = 2166136261u;  // (FNV-1a over the notes: the same file, the same swirls)
+  for (const DrumPlanNote& n : notes) {
+    const int bar = std::clamp(int(beatAt(n.t) / 4), 0, nBars - 1);
+    ++count[bar];
+    vel[bar] += n.velocity;
+    for (uint32_t v : {uint32_t(std::lround(n.t * 1000)), uint32_t(n.key), uint32_t(n.velocity), uint32_t(n.drum)}) {
+      seed ^= v;
+      seed *= 16777619u;
+    }
+    if (!n.drum) continue;
+    ++drumN[bar];
+    drumVel[bar] += n.velocity;
+    const Drum d = drumFor(n.key, n.kit, gs);
+    if (!d.inst) continue;
+    if (n.kit != Kit::kStandard && std::strcmp(d.inst, "brush-snare") == 0 && first < 0) first = bar;
+    for (int c = 0; c < 3; ++c)
+      if (std::strcmp(d.inst, kCym[c]) == 0) struck[c].push_back(n.t);
+  }
+  if (first < 0) return out;  // (no brushed snare)
+  uint32_t rng = seed;
+  auto ur = [&]() {
+    rng = rng * 1664525u + 1013904223u;
+    return (rng >> 8) * (1.0 / 16777216.0);
+  };
+  // A ballad (a slow beat: 75 to the minute or slower): longer swirls.
+  std::vector<double> lens;
+  for (const DrumTempo& x : tempo) lens.push_back(x.len);
+  std::sort(lens.begin(), lens.end());
+  const double beatLen = lens.empty() ? 0.5 : lens[lens.size() / 2];
+  const bool ballad = beatLen >= 0.8;
+  // How quiet and how sparse each bar is (0 .. 1): the band's mean
+  // velocity, and its notes a beat.
+  std::vector<double> calm(nBars, 0);
+  for (int b = 0; b < nBars; ++b) {
+    if (count[b] == 0) continue;
+    const double quiet = std::clamp((105 - vel[b] / count[b]) / 60, 0.0, 1.0);
+    const double sparse = 1 / (1 + count[b] / 4.0 / 3);
+    calm[b] = std::sqrt(quiet * sparse);
+  }
+  auto busy = [&](int b0, int b1) {  // notes a beat over bars b0 .. b1 - 1, and their mean velocity
+    int n = 0;
+    double v = 0;
+    for (int b = std::max(b0, 0); b < std::min(b1, nBars); ++b) { n += count[b]; v += vel[b]; }
+    return std::make_pair(n / (4.0 * std::max(1, b1 - b0)), n ? v / n : 0.0);
+  };
+  const int last = nBars - 1;
+  struct Cand { double score; int s, e, c; };
+  std::vector<Cand> cand;
+  for (int e = first + 3; e <= last + 1; ++e) {
+    // Where it ends: a phrase's end (every fourth bar), a section's (the
+    // eighth, or where the band changes: busier or sparser, louder or
+    // softer after it), the song's end.
+    double end = e % 8 == 0 ? 0.3 : e % 4 == 0 ? 0.15 : e % 2 == 0 ? 0.0 : -0.2;
+    if (e <= last) {
+      const auto a = busy(e - 4, e), b = busy(e, e + 4);
+      if (std::fabs(std::log((b.first + 0.1) / (a.first + 0.1))) > 0.45 || std::fabs(b.second - a.second) > 15) end += 0.35;
+    } else {
+      end += 0.2;
+    }
+    for (int L : {2, 3, 4, 6, 8}) {
+      const int s0 = e - L;
+      if (s0 <= first) continue;  // (the brushing has begun, a bar before)
+      bool playing = true;
+      double c = 0;
+      for (int b = s0; b < e; ++b) { playing &= count[b] > 0; c += calm[b]; }
+      if (!playing) continue;  // (a general pause: the brushes rest too)
+      c /= L;
+      // Which cymbal: the ride, else a crash, the first the file does not
+      // strike from a beat before the swirl to its end. A stroke on it just
+      // after: the swirl leads into it (and lifts first).
+      const double on = timeAt(4.0 * s0), off = timeAt(4.0 * e);
+      int pick = -1;
+      double into = 0;
+      for (int k = 0; k < 3 && pick < 0; ++k) {
+        bool free = true;
+        for (double t : struck[k]) free &= t < on - beatLen || t >= off - 0.06;
+        if (!free) continue;
+        pick = k;
+        for (double t : struck[k]) into = std::max(into, t >= off - 0.06 && t < off + beatLen ? 0.2 : 0.0);
+      }
+      if (pick < 0) continue;
+      const double fit = ballad ? (L >= 4 ? 0.1 : 0.0) : (L <= 4 ? 0.1 : -0.05);
+      cand.push_back({1.5 * c + end + into + fit + (ballad ? 0.15 : 0) + 0.15 * ur(), s0, e, pick});
+      if (c < 0.45) cand.back().score = -1;  // (not in a loud, busy passage)
+    }
+  }
+  std::stable_sort(cand.begin(), cand.end(), [](const Cand& a, const Cand& b) { return a.score > b.score; });
+  const int most = int(knob("PJ_SWIRL_MAX", std::clamp(1 + nBars / 40, 1, 3)));
+  for (const Cand& k : cand) {
+    if (int(out.size()) >= most || k.score < 0.9) break;
+    bool apart = true;  // (eight bars at least between two)
+    for (const CymbalSwirl& o : out) apart &= k.e + 8 <= o.bar0 || k.s >= o.bar0 + o.bars + 8;
+    if (!apart) continue;
+    double v = 0;
+    int n = 0;
+    for (int b = k.s; b < k.e; ++b) { v += drumN[b] ? drumVel[b] : vel[b]; n += drumN[b] ? drumN[b] : count[b]; }
+    const int velocity = int(std::clamp(v / std::max(n, 1), 45.0, 90.0));
+    out.push_back({timeAt(4.0 * k.s), timeAt(4.0 * k.e) - 0.06, kKey[k.c], velocity, k.s, k.e - k.s});
+  }
+  std::sort(out.begin(), out.end(), [](const CymbalSwirl& a, const CymbalSwirl& b) { return a.on < b.on; });
+  return out;
 }
 
 DrumKit::DrumKit(const RoomSpec* room, bool verbose, int voices, Kit kit) {

@@ -589,3 +589,39 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 points; the 122's transformer saturation; the half-moon's stop and the brake on MIDI; motor and
 belt noise.
 
+**The cabinet's imperfections (2026-11-17, the user's request) [design]:**
+
+| Flaw | Physical cause | Model | Size (age 1) |
+|---|---|---|---|
+| Uneven rotation within a turn | off-centre pulley, unbalanced rotor | speed × (1 + e cos(φ + a)) | horn e ~3 %, drum ~1.2 % |
+| Belt wobble | belt seam and stretch | speed × (1 + b cos φ_belt), the belt turning 2.6 (horn) / 2.3 (drum) × the rotor | 1 % / 0.6 % |
+| Hunting | induction motors' slip under load and mains | Ornstein-Uhlenbeck on the target speed, τ 0.5 / 0.8 s | fast 1 %, slow 3 % |
+| The dummy bell | the twin horn's sealed bell leaks | a source at the rotor's other end, facing out, with its own Doppler | −16 dB (`PJ_LESLIE_DUMMY`) |
+| The horn's wind | turbulence off the spinning horn | 1.5-5 kHz noise × (ω/ω_fast)², sent through the horn | +9 dB idle, fast vs slow |
+| A loose panel | a louvre or back panel touching | a resonance (150-220 Hz, Q 15-25) driven by the bass under 200 Hz; what passes its clearance, high-passed, radiated | ~33 dB under the chord's highs at a loud rock bass |
+| Machinery | motor hum and rumble, amp hum, the speed relay | 120 / 28.75 / 60 Hz tones; a 4 ms 2.3 kHz click on a switch | relay +35 dB over the idle floor |
+| Crossover | aged capacitors | ±8 % of 800 Hz | |
+| Microphones | placement | ±4°, ±3 cm | |
+
+The rotor's within-turn wobble could not be read back from the audio: the horn's 18 dB beam swing
+breaks a pitch tracker's lock in the dips. It is simple enough to check by reading the code.
+
+**Into the room (2026-11-17, the user: "the Leslie is not connected to the room, like mic'ed in a
+dead room from close proximity") [design]:**
+- **Before,** the room got the close microphones' mid as an ordinary point source. Its late field
+  pulsed with the mics' tremolo, and the mics' side signal was added dry.
+- **Now** (using the room's own-early hooks, `Tube::ownEarly` / `takeEarly`), the cabinet sends
+  six rays (0, ±60, ±120, 180°), each the horn seen from far along that direction: its Doppler
+  from the distance along it, its beam from the angle. The listener's pair (2 m apart, 4 m off)
+  hears them by image paths:
+  - direct and off the floor;
+  - off the side walls 4 m out;
+  - off the back wall 1.5 m behind the cabinet and its corners.
+
+  The late field is fed the rays' mean.
+- **The level balance.** The ensemble's level trim is the listener's alone (the room is fed
+  without it), so a quiet model with a big trim sounds drier than the rest. The Hammond's output
+  was raised 14 dB and its trims lowered 10.9 dB (the other 3 dB make up the 4 m distance).
+- **Measured** (a held chord, fast, in the hall), room vs close mics: tail −18 vs −21 dB,
+  left-right correlation 0.60; the horn band's level swing ~21 dB (the direct sound's beam).
+

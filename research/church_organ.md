@@ -1092,18 +1092,55 @@ scratchpad only, measured for harmonics, speech, onset and noise.
   - the smallest pipes (above 2.5 kHz) oversampled 2-4x, their jets deflected by flow / mouth width;
   - the chiff: the first overtone driven harder at the attack (fading over 25-60 ms): the Montre's
     octave leads by -3..+10 dB, ours 0..+9; the Bourdon's twelfth +2..+6, ours +1..+4.
+  - the small pipes' chiff (2026-11-17; our own renders, key by key, G5-F#6 and C6 struck six times):
+    it was one setting from the 8' (fading from the key's fall over >= 25 ms, so mostly spent before a
+    small pipe spoke; on the octave's steady weight, so an open flute's, its octave ~-30 dB, did
+    nothing: its leads the same with the chiff off), the stopped 4' top x3 (its twelfth leading
+    +14..+20 dB for ~50 ms, up to +50: overblown), each attack alike (a flute's within 0.1-0.3 dB).
+    Not too loud otherwise: the octave's peak 15-27 dB under the held tone. (The attacks that are
+    +7..+15 dB over their held level, a few swell flutes' keys, e.g. the Flöte 4' C6, are pipes whose
+    held level sits 10-15 dB under their neighbours' in the box, not their chiff: open.) Now, from C6
+    (fully from C7; the 8' and 4' middle and the strings untouched): its time ~0.03 sqrt(262 / f) s
+    (~11 ms at 2 kHz, ~5 at 8), fading from when the wind is in the foot; on the first overtone in its
+    own weight (a principal's octave: principals 2, flutes 2, stopped 5); each pipe x exp(+-0.25),
+    each attack +-15 % (a quicker pallet up to 15 % more); a key struck again before its pallet
+    closed ~ the square of how far it had. Leads (G5-F#6): Waldflöte 2' +7 -> +10, Superoctave 2' +4
+    (as was), Gedacktflöte 4' +14 -> +4 dB; C6's presses' spread (Waldflöte) 0.3 -> 0.9 dB.
   - Matched (the recordings' F# octaves): Principal octave -8..-14 dB, 3rd/4th ~-20, speech 108 /
     74 / 44 / 25 / 19 ms (Montre 133 / 113 / 66 / 43 / 11); Gedackt twelfth -13..-21, the 5th-9th
     within the Bourdon's range, breath and puff within a few dB; Gamba from the middle up within a
     few dB.
+  - the strings' middle (2026-11-17; our own renders): C3-C5 spoke late and unsure (the pipe alone
+    ~200 ms to 90 % at C3, ~120 at middle C; in the swell box ~225 / ~160): the chiff's octave led
+    ~40 ms while the fundamental stalled ~40 dB down, ~+100 c sharp, then crept up at the narrow
+    pipe's Q (~40: its ring-up q1 / (pi f) ~100 ms at C3); gain, harmFeed, bias and the box's hearing
+    changed little (once the jet saturates only the Q sets the ring-up). Now a frein harmonique
+    (`freinHz`: its loss at the mouth adds ~5 Hz to every mode's bandwidth, Q ~16 at C3, ~23 at
+    middle C, the treble's little changed; from F#2 in, full from C3): the octave's precursor braked
+    (the chiff a quarter), a string's low cut-up (the jet's travel 0.22 of the period: less phase
+    lost while the foot fills), an open toe (the foot filling in half the time; the cut-up's ~0.8 dB
+    back). In the box C3-C5 to 90 % in ~105 ms on average (was ~155), to 30 % within 60 ms (was
+    60-105: no hesitation), the pitch within 5 c ~90 ms (was ~110); level within 0.6 dB, H2/H3 as
+    before. Left: a quick scoop from flat at C3-D3 (up to ~40 c above -10 dB for ~30 ms, the jet slow
+    while its foot fills; ~15-20 c from the pipe alone, the box's reverberation adding to it).
 - **The reed pipe** (`src/organreed.h`): a tongue beating on the shallot, the gap's flow and the
   resonator's modes solved together each sample (2x oversampled), a formant band at the top.
   Found: a reed must not hear its enclosure (its loud sound fed back howled on after the release);
   the gap's flow viscous near no pressure; a reed's pitch follows a retuning unevenly (a 16′'s
   bistable): calibrated by secant steps and a fine scan. Matched: the Trompette's and Hautbois's
-  bass and middle (harmonics over the fundamental), the bass speech ~30-55 ms. Open: their top
-  octave (the recordings' 2nd harmonic up to +10 dB at 1.5 kHz, ours -9; one sample an octave,
-  irregular).
+  bass and middle (harmonics over the fundamental), the bass speech ~30-55 ms. The treble
+  (2026-11-17; measured on our own renders): in tune (within 1 c) and steady (pitch sd < 0.1 c,
+  ±20 % wind moves it ~3 c, no regime change) all along, but thin and loud: with the formant fixed
+  at 1.3-1.5 kHz and the top's roll at 5-9 kHz, a pipe above the band kept only its fundamental (C7
+  at 8': H2 -7..-15, H3 -17..-25 dB; the Clairon's C7 at 4 kHz H2 -21, H3 -51), and the model's
+  flow, per unit of a pipe's scale, radiated as its rate of change, rose ~27 dB (K-weighted) from
+  middle C to C7 (the flues: flat within 4 dB). Now: the band follows the pipe from half its
+  frequency (a small top radiates higher: on the 2nd harmonic), the roll at >= 6 harmonics; each pipe
+  from middle C regulated down 12 dB at C5 and 6 more per octave (the Oboe 4 and 5), the treble ~+1
+  dB per octave over middle C; the Clairon breaks back at c''' (a reprise at 8' pitch, as most do;
+  re-regulated +11 dB, its middle as before, its bass no longer a hole). C7 at 8': H2 -0..-8, H3
+  -6..-14 dB; the top two octaves' line within 0.5-5 dB. Not taken: a flue reprise for the 8'
+  reeds' top (they speak well to C7) and harmonic (double-length) treble resonators.
 - **Calibration:** every pipe in tune where it stands (its enclosure's field acting on it, at its
   regulated level), its fundamental through two band-passes in double; cached on disk.
 - **Placement:** divided chests (C side left, C# right) in every division; the swell's two boxes;
@@ -1114,6 +1151,17 @@ scratchpad only, measured for harmonics, speech, onset and noise.
   ~1 %; the flues ~0.5 c per 1 %. Tremulants: a beater on the regulator's top (±8 L, 5.5 Hz):
   ~13 % p-p, ±3 c.
 - **Regulation:** every stop's output set against the Principal 8′ (balanced-organ targets).
+  The reeds re-regulated (2026-11-17): their treble line (above) had taken ~20 dB off the treble key of
+  the three the regulation averaged, so the reeds sat 6-13 dB under their targets (Trompete 8′ -7,
+  Trompette -12, chamade -4 dB against the Principal at C3-C5), and the crescendo roller's top added
+  nothing (f -> ff +1.1, ff -> fff +0.0 dB K-weighted, three chords averaged; a single chord over 2 s
+  read the fff step -0.8: the unisons' slow beats, ±0.5-1 dB by chance, which also made the Contra
+  Posaune 32′ look as if it lowered the organ: averaged it adds ~0, coupled or not; the wind at fff, a
+  4-note chord, sags 0.7 %, the reeds' field into the boxes ~0.2 dB). Now on target at C3-C5 (the 16′s
+  C4-C5, the Pedal C2-D3), and the roller's fff takes the swell's reed battery whole (Fagott, Trompette,
+  Clairon: the French crescendo's last step) with the 16′, 32′ and chamade; ff the Hauptwerk's and the
+  Pedal's reed chorus and the high mixtures. Steps from mf: +1.4, +1.9, +1.6 dB (Zwicker-style loudness
+  +3.5, +3.1, +1.7 phon); the planner's zones (organ-88) f..fff +0.6, +3.5, +1.8 (were +0.3, +0.8, +1.0).
 - **Cost:** a flue ~30 ns a pipe-sample, a reed ~50; enclosures rendered by blocks on 3 threads
   (they meet only in the wind): the full organ (53 stops) with 8 keys ~1.4x faster than real time on
   a busy machine.

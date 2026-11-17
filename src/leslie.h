@@ -16,6 +16,7 @@
 //   - The microphones: a pair ±60° off the front at 0.4 m: left and right.
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -31,7 +32,13 @@ class Leslie {
   double hornHz() const { return hornW_; }
   double drumHz() const { return drumW_; }
   // One sample of the console signal in; left and right out.
-  void process(float in, float& left, float& right);
+  void process(float in, float& left, float& right, float* rays = nullptr);
+  // The cabinet radiating into the room: the sound leaving it toward kRays directions round it
+  // (0: the front, toward the listener; then +-60, +-120, 180 degrees), each with its Doppler
+  // (the horn's distance along it) and the horn's beam toward it, at 1 m (filled when rays is
+  // given to process()).
+  static constexpr int kRays = 6;
+  static double rayAngle(int k) { static const double a[kRays] = {0, 60, -60, 120, -120, 180}; return a[k] * M_PI / 180; }
 
  private:
   struct Ring {
@@ -55,6 +62,19 @@ class Leslie {
   float drumFixed_[2048] = {};
   int dfw_ = 0;
   // The cabinet's tail.
+  // The cabinet's own flaws (seeded by its serial; PJ_LESLIE_AGE scales them, PJ_LESLIE_NOISE the
+  // machinery's noises).
+  double age_ = 1, noise_ = 1;
+  double hornEcc_ = 0, hornEccPh_ = 0, drumEcc_ = 0, drumEccPh_ = 0;  // a rotor's speed within a turn
+  double beltEcc_[2] = {}, beltPh_[2] = {};                          // its belt's own wobble
+  double huntH_ = 0, huntD_ = 0;                                     // the motors' hunting
+  int ctl_ = 0;
+  double micX_[2] = {}, micY_[2] = {};
+  double windLp_ = 0, windHp_ = 0;                                   // the horn's wind
+  double rattleX_ = 0, rattleV_ = 0, rattleW_ = 1000, rattleQ_ = 20, rattleGap_ = 1, rattleHp_ = 0, rattleIn_ = 0;
+  double click_ = 0, clickPh_ = 0, t_ = 0;
+  bool lastFast_ = false;
+  double normal();
   std::vector<float> fdn_[4];
   int fdnPos_[4] = {}, fdnLen_[4] = {};
   double fdnG_[4] = {};

@@ -35,6 +35,35 @@ bool brushKitWanted();
 Drum drumFor(int gmKey, Kit kit = brushKitWanted() ? Kit::kBrush : Kit::kStandard, bool gs = false);
 const char* drumName(int gmKey);  // General MIDI's name of the key ("" outside 35 .. 81)
 
+// The brush player's own swirls on a cymbal (-play, with the brushed snare:
+// research/jazz_drums.md 5.7). Now and then, for a few bars, the drummer
+// takes the right hand off the snare and swirls that brush on the ride (or
+// a crash) while the left hand goes on circling on the snare: in quiet,
+// sparse passages and ballads, leading into a phrase's or a section's end;
+// two to eight bars; at most a few times in a piece; never on a cymbal the
+// file strikes then (the swirl ends just before a stroke on it).
+// These keys are not General MIDI's: they are what -play sends for it on
+// the drum channel (with any kit but the Standard), held from the swirl's
+// start to its end.
+constexpr int kKeyRightHandAway = 124;  // the brushed snare's key 42: its right hand away
+constexpr int kKeySwirlCrash = 125, kKeySwirlCrash2 = 126, kKeySwirlRide = 127;  // the cymbal's key 84: swirled
+struct DrumPlanNote {
+  double t;      // s
+  int key, velocity;
+  bool drum;     // on the drum channel (key: General MIDI's)
+  Kit kit;       // (the drum channel's kit then)
+};
+struct DrumTempo { double t, beat, len; };  // from t (s), at `beat` quarter notes, a quarter lasts len s
+struct CymbalSwirl {
+  double on, off;      // s
+  int key, velocity;   // a kKeySwirl* key
+  int bar0, bars;      // (where: the bar it begins on, from 0, and how many)
+};
+// The swirls for a song: its note-ons in time order and its tempo map. The
+// same notes give the same swirls (the choice is seeded from them).
+// PJ_SWIRL=0: none; PJ_SWIRL_MAX: at most this many.
+std::vector<CymbalSwirl> planCymbalSwirls(const std::vector<DrumPlanNote>& notes, const std::vector<DrumTempo>& tempo, bool gs);
+
 class DrumKit {
  public:
   // voices: strokes ringing at once on each instrument.

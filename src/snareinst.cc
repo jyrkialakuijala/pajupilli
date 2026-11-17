@@ -73,6 +73,7 @@ double SnarePlayer::strokeSpeed(int velocity, double dynamics) {
 }
 
 void SnarePlayer::noteOn(int midi, int velocity) {
+  if (midi == 42) { rhAway_ = true; return; }  // (the right hand gone to a cymbal, to swirl there)
   articulate(midi, velocity, false);
   note_ = midi;
   blowing_ = true;
@@ -183,6 +184,7 @@ void SnarePlayer::noteOn(int midi, int velocity) {
 
 void SnarePlayer::noteOff(int midi) {
   if (midi == 40) swirl_ = false;
+  if (midi == 42) rhAway_ = false;
 }
 
 void SnarePlayer::control(double dt) {
@@ -308,7 +310,8 @@ void SnarePlayer::control(double dt) {
   // side and the other way round, half a turn behind (its pull falls where
   // the left hand eases). Between strokes that are coming it is in the air
   // (its stroke's own sweep done), on its way to the next.
-  if (!time && !rhBusy) {
+  if (rhAway_ && !rhBusy && rhT_ < 0) rh.rest(0);  // (swirling on a cymbal: only the left hand circles here)
+  if (!time && !rhBusy && !rhAway_) {
     const Round& rr = now_[1];
     double pr = phase_ + kPi;
     if (pr >= 2 * kPi) pr -= 2 * kPi;

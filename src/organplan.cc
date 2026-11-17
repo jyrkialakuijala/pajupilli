@@ -30,7 +30,7 @@ const char* const kPos[8] = {
     "rohrgedackt8,posoctave4,gedacktflote4", "rohrgedackt8,gedacktflote4,sesquialtera",
     "rohrgedackt8,posoctave4,cromorne8", "rohrgedackt8,posoctave4,gedacktflote4,sesquialtera,cromorne8"};
 const char* const kPed[8] = {
-    "subbass16", "subbass16", "subbass16", "subbass16,octavbass8", "subbass16,violonbass16,octavbass8,choralbass4",
+    "subbass16", "subbass16,gedacktbass8", "subbass16,gedacktbass8", "subbass16,octavbass8", "subbass16,violonbass16,octavbass8,choralbass4",
     "principalbass16,octavbass8,choralbass4,posaune16",  // (f: the organo pleno's pedal)
     "principalbass16,subbass16,violonbass16,octavbass8,choralbass4,pedmixtur4,posaune16",
     "principalbass16,subbass16,violonbass16,octavbass8,choralbass4,pedmixtur4,posaune16,pedtrompete8,untersatz32"};

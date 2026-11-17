@@ -50,6 +50,11 @@ CymbalSpec cymbalSpec(int which) {
   s.brush.fanLoss = knob("PJ_CYM_FANLOSS", 0.4);
   s.brush.rough = 3e-6;
   s.brush.grain = 0.3e-3;
+  // The lathing: tonal grooves ~0.6 mm apart, the ridges between them a few
+  // microns over the floor (an unlathed china: none).
+  s.brush.groove = knob("PJ_CYM_GROOVE", 0.6e-3);
+  s.brush.ridge = which == 5 ? 0.0 : knob("PJ_CYM_RIDGE", 4e-6);
+  s.brush.reshape = knob("PJ_CYM_RESHAPE", 0.1e-3);
   // Losses (1/s) lossA w^0.6 + lossB: a ride's band T60s (FluidR3's recorded
   // ride: 3.9 s at 1-2 kHz, 2.6 s at 4 kHz, 1.65 s at 8 kHz, 1.06 s at
   // 12.5 kHz), a little longer in the lows (the user: free cymbals die
@@ -139,6 +144,8 @@ CymbalSpec cymbalSpec(int which) {
   s.wood = knob("PJ_CYM_WOOD", s.wood);
   s.bellGain *= knob("PJ_CYM_BELL", 1);
   s.choke = knob("PJ_CYM_CHOKE", s.choke);
+  s.press = knob("PJ_CYM_PRESS", s.press);
+  s.taper = knob("PJ_CYM_THICK", s.taper);
   s.gain = knob("PJ_CYM_GAIN", 1);
   return s;
 }
@@ -163,12 +170,13 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
     }
     plate_.retune();
   }
-  // The wire ends feel the modes below ~7 kHz (above, the plate's own; most
-  // of the cost).
+  // The wire ends feel the modes below ~12 kHz (above, the plate's own; most
+  // of the cost). (7 kHz left a swirl near the bell no brighter than one at
+  // the bow: the shimmer it brings out is the modes above that.)
   BrushSpec bs = spec.brush;
   if (bs.modes == 0) {
     int n = 0;
-    while (n < plate_.modes() && plate_.frequency(n) < knob("PJ_CYM_BRUSHTOP", 7000)) ++n;
+    while (n < plate_.modes() && plate_.frequency(n) < knob("PJ_CYM_BRUSHTOP", 12000)) ++n;
     bs.modes = n;
   }
   // (Brushed, the cymbal is heard at its own level, as a kit's brushed
@@ -178,6 +186,9 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
   // friction low (fanLoss 0.4) more of its ends land, and 20 dB left the
   // brush only 4-5 dB under a stick; 13 puts it ~11 dB under.)
   brushGain_ = float(std::pow(10.0, knob("PJ_CYM_BRUSHDB", 13) / 20));
+  // (And a swirl, the brush lying on the plate, at its own level against
+  // the strokes: PJ_CYM_SWIRLDB more.)
+  swirlGain_ = float(std::pow(10.0, knob("PJ_CYM_SWIRLDB", 12) / 20));
   feel_.reset(new Feel(plate_));
   brush_.reset(new Brush(fs, *feel_, bs, seed));
   if (const char* tr = std::getenv("PJ_CYM_TRACE")) trace_ = std::fopen(tr, "wb");
@@ -204,6 +215,7 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
     std::vector<float> sorted(edge_.begin(), edge_.begin() + plate_.modes());
     std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2, sorted.end());
     const double mid = std::max(double(sorted[sorted.size() / 2]), 1e-12);
+    mid_ = mid;
     // (A gripping hand covers more than one ring: every mode loses at least
     // 0.3 of the middle one's share.)
     for (float& x : edge_) x = float(std::clamp(x / mid, 0.3, 20.0));
@@ -246,7 +258,29 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
       mic_[mic][k] = float((g[mic][k].real() < 0 ? -1 : 1) * std::abs(g[mic][k]) * kRho / (2 * kPi) * eff);
     }
   }
+  press_.assign(edge_.size(), 0.0f);
+  {
+    const double t = 1 + s_.taper * (1 - 2 * s_.bowAt);
+    bowStiff_ = t * t;
+  }
   reset();
+}
+
+void Cymbal::brushFeel() {
+  // Where the brush is: the plate's stiffness under its ends (its thickness
+  // there against the bow's: the bow's is the brush's own), and, lying on
+  // the plate, its press: each mode's share round the circle it is on (the
+  // brush goes round it), the loss by how hard it is pressed.
+  const double R = plate_.radius(), r = std::min(brushRadius(), R);
+  const double t = 1 + s_.taper * (1 - 2 * r / R);
+  brush_->stiffness(t * t / bowStiff_);
+  const double load = brush_->load();
+  pressRate_ = float(s_.press * load);
+  if (load > 0) {
+    plate_.ringShare(r, press_.data());
+    const float k = float(1 / mid_);
+    for (int i = 0, n = plate_.modes(); i < n; ++i) press_[i] = std::min(press_[i] * k, 20.0f);
+  }
 }
 
 void Cymbal::reset() {
@@ -323,12 +357,28 @@ float Cymbal::sample() {
     }
     if (++sAge_ > int(0.02 * fs_) || (f == 0 && sv_ > 0)) stickOn_ = false;
   }
+  if (!brush_->up() && --pressAge_ <= 0) { brushFeel(); pressAge_ = 32; }
   brush_->step();
-  fz -= brushGain_ * brush_->force();
+  const float bg = brush_->load() > 0 ? brushGain_ * swirlGain_ : brushGain_;
+  fz -= bg * brush_->force();
+  if (!brush_->up()) {
+    // Inside the bell's rim (and the fan's half-length round it) the cup
+    // feels the wire ends too: its few clear modes, the glassy ring of a
+    // swirl drawn near the bell.
+    const double r = brushRadius(), bw = s_.bellR + 0.03;
+    if (r < bw) {
+      const double c = std::cos(0.5 * kPi * r / bw);
+      const float db = float(c * c * bg * brush_->force() * dt_ / s_.bellMass);
+      for (int k = 0; k < s_.bellN; ++k) bRe_[k] -= db;
+    }
+    if (pressRate_ > 0) plate_.rub(press_.data(), pressRate_);
+  } else {
+    pressRate_ = 0;
+  }
   if (!brush_->up() || feel_->dirty) {
     float* f = plate_.force();
     float* g = feel_->f.data();
-    for (int k = 0, n = plate_.modes(); k < n; ++k) { f[k] += brushGain_ * g[k]; g[k] = 0; }
+    for (int k = 0, n = plate_.modes(); k < n; ++k) { f[k] += bg * g[k]; g[k] = 0; }
     feel_->dirty = !brush_->up();
   }
   if (trace_) {
@@ -487,6 +537,27 @@ void CymbalPlayer::noteOn(int midi, int velocity) {
   note_ = midi;
   blowing_ = true;
   Cymbal& c = m_.cymbal();
+  if (midi == 84) {  // the swirl, held
+    static const double kLoad = knob("PJ_CYM_SWIRLLOAD", 1.0);
+    swLoad_ = kLoad * (0.15 + 0.85 * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
+    if (!swirl_) {
+      swirl_ = true;
+      swirling_ = false;
+      swPause_ = 0;
+      swR_ = swRTo_ = c.spec().ride ? c.spec().bowAt + 0.05 : 0.7;
+      swHold_ = 1;
+      swTh_ = 2 * kPi * (0.1 + 0.05 * (ur() - 0.5));
+    }
+    c.wake();
+    return;
+  }
+  // (A stroke while the swirl is held: the hand leaves the plate for it and
+  // comes back to swirl on.)
+  if (swirl_) {
+    swPause_ = 0.25;
+    swirling_ = false;
+    c.brush().rest(0);
+  }
   static const bool allBrush = knob("PJ_CYM_BRUSH", 0) > 0;
   const bool brush = allBrush || midi >= 73;
   const int k = midi >= 73 ? midi - 24 : midi;
@@ -555,7 +626,58 @@ void CymbalPlayer::noteOn(int midi, int velocity) {
   }
 }
 
-void CymbalPlayer::noteOff(int) {
+void CymbalPlayer::swirl(double dt) {
+  Cymbal& c = m_.cymbal();
+  Brush& b = c.brush();
+  if (!swirl_) {
+    if (swirling_) { b.rest(0); swirling_ = false; }
+    return;
+  }
+  if (swPause_ > 0) { swPause_ -= dt; return; }
+  const CymbalSpec& s = c.spec();
+  const double R = c.plate().radius();
+  // A turn every two beats (one a beat when slow), as the snare's left hand.
+  const SongClock& clk = SongClock::get();
+  const double B = clk.valid ? clk.beatLen : 0.6;
+  const double P = 2 * B > 2.6 ? B : 2 * B < 0.8 ? 4 * B : 2 * B;
+  swPhase_ += 2 * kPi * dt / P;
+  if (swPhase_ >= 2 * kPi) {
+    swPhase_ -= 2 * kPi;
+    // The loops' middle wanders: held two to four turns, then moved, more
+    // often than not to the other side: out towards the edge (the wash, a
+    // lower roar), in towards the bell (higher, glassier).
+    if (--swHold_ <= 0) {
+      swHold_ = 2 + int(3 * ur());
+      if (ur() < 0.65) swSide_ = -swSide_;
+      const double home = s.ride ? s.bowAt : 0.62;
+      swRTo_ = std::clamp(home + swSide_ * (0.12 + 0.12 * ur()), 0.3, 0.86);
+    }
+    swTh_ += 0.15 * (ur() - 0.5);
+  }
+  static const double kAt = knob("PJ_CYM_SWIRLAT", 0);  // (the loops' middle held there, a share of the radius; 0: wandering)
+  if (kAt > 0) swRTo_ = kAt;
+  swR_ += (swRTo_ - swR_) * std::min(1.0, dt / P);
+  // The loop: long along the grooves (an arc of ~70 degrees), narrow across
+  // them, the fan's wires pointing in towards the bell.
+  const double ph = swPhase_, r = (swR_ + 0.05 * std::cos(ph)) * R, th = swTh_ + 0.6 * std::sin(ph);
+  const double x = r * std::cos(th), y = r * std::sin(th), ang = th + kPi + 0.3 * std::cos(ph);
+  // The press eases and leans: a little more weight as the hand comes back
+  // round towards the drummer (on the beat).
+  // (Lighter in towards the bell, where a pressed brush sounds pinched;
+  // leaning in out at the edge, for its roar.)
+  const double load = swLoad_ * (0.8 + 0.4 * std::pow(0.5 + 0.5 * std::sin(ph), 2)) * (0.35 + 0.8 * std::min(r / R, 1.0));
+  static const double kShare = knob("PJ_CYM_SWIRLFAN", 0.25);
+  if (!swirling_ || b.up()) {
+    b.jump(x, y, ang);
+    swirling_ = true;
+  }
+  b.place(x, y, ang);
+  b.rest(load, kShare);
+  c.wake();
+}
+
+void CymbalPlayer::noteOff(int midi) {
+  if (midi == 84) { swirl_ = false; return; }
   static const bool chokes = knob("PJ_CYM_NOTEOFF", 0) > 0;
   if (chokes) noteChoke_ = 1;
 }
@@ -571,6 +693,7 @@ void CymbalPlayer::render(float* out, int n) {
     const double want = std::max(std::clamp((breathCtl_ - 0.15) / 0.35, 0.0, 1.0), noteChoke_ > 0 ? 1.0 : 0.0);
     choked_ += (want - choked_) * (1 - std::exp(-m / fs_ / 0.01));
     c.choke(choked_ > 1e-3 ? choked_ : 0.0);
+    swirl(m / fs_);
     m_.process(out + i, m);
   }
   blowing_ = !c.asleep();

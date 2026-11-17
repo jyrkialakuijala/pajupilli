@@ -17,6 +17,9 @@
 //   - The Leslie: the file's own controls if it has them; else planned from the notes (seeded by
 //     them: the same file, the same plan): most pieces slow throughout, about one in four fast in
 //     its strongest phrase (or two).
+//   - The harmonic percussion where the tune is single, detached and moving (the jazz line), not
+//     in legato, chordal or slow playing: one choice for the piece, switched for one long contrasting
+//     stretch at most (two changes), the percussive organ always on.
 #pragma once
 
 #include <map>
@@ -39,6 +42,9 @@ struct HammondPlan {
   HammondRegistration reg;
   // The Leslie's planned speed changes (tick, fast); empty when the file sets it itself.
   std::vector<std::pair<long, bool>> leslie;
+  // The harmonic percussion's planned switches (tick, on): at most two, mostly none (the piece's
+  // choice is in reg).
+  std::vector<std::pair<long, bool>> percussion;
   std::string summary;
 };
 

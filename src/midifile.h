@@ -19,6 +19,13 @@
 
 namespace pajupilli {
 
+// Reinstrumenting (-reinstrument): rules FROM=TO, comma-separated, applied to
+// each channel's instrument as its program picks it: FROM an instrument's name
+// (grand-piano), its family (piano) or * (every channel but the drums); TO an
+// instrument ("organ": the church organ by its plan, organ-plan). The first
+// rule that matches wins. Returns false (and says why) if a rule is wrong.
+bool setReinstrument(const std::string& spec);
+
 // Returns the process exit code.
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
                  bool verbose, bool roomGiven = true);

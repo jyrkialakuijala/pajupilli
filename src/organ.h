@@ -33,8 +33,10 @@
 #include <vector>
 
 #include "organbox.h"
+#include "organnave.h"
 #include "organpipe.h"
 #include "organreed.h"
+#include "organroom.h"
 #include "organwind.h"
 #include "performer.h"
 #include "tube.h"
@@ -97,6 +99,9 @@ class OrganModel : public Tube {
   bool asleep() const;
   double testResponse() const override { return last_; }
   const float* takeSide(int n) override;
+  bool ownEarly() const override { return paths_; }
+  void takeEarly(int n, float* l, float* r, float g) override;
+  bool ownLate() const override { return naveOn_; }
   void resetAir() override;
 
  private:
@@ -129,6 +134,11 @@ class OrganModel : public Tube {
     } log;
     Vec3 at;
     float hear = 1;  // how strongly its jet hears the field at its mouth
+    // (its own paths to the listener, src/organroom.h: its mouth's source and
+    // its top's, -1 none; its last block's sound, gain applied; sounding in it)
+    int rsrc = -1, rtop = -1;
+    float blk[16] = {}, blkTop[16] = {};
+    bool live = false;
     // (a pedal reed on its open chest inside the case: its sound's mids and
     // highs shelved down by the casework on their way out; caseG 1: none)
     float caseA = 1, caseG = 1, caseLp = 0, caseLp2 = 0, caseHz = 0;
@@ -154,6 +164,17 @@ class OrganModel : public Tube {
   long long jiSig_ = 0;
   void justSolve();
   void justGlide();
+  // The church warming while it plays (PJ_ORGAN_WARMUP_C, 1 C, and
+  // PJ_ORGAN_WARMUP_RH, +5 % humidity, over PJ_ORGAN_WARMUP_SECS, 10 min):
+  // the air's speed of sound up, the flues' pitch with it (~3 c a degree), the
+  // reeds a little flat (their tongues set it, softening as they warm: -0.1 of
+  // the flues' rise): cents now, flues and reeds.
+  double climate_[2] = {0, 0};
+  void climateStep();
+  void retune(int i) {
+    Pipe& pp = pipes_[i];
+    pp.p.tune(pp.baseRatio * std::exp2((jiNow_[pp.key] + climate_[pp.p.reed ? 1 : 0]) / 1200));
+  }
   void writePitchLog() const;
   double moveSecs_ = 0;  // (> 0 while a registration changes: the sliders' time)
   // Each key's pallet on each division (one for all its stops): its opening
@@ -203,6 +224,29 @@ class OrganModel : public Tube {
     float ringL[64] = {}, ringR[64] = {};
   };
   std::vector<Mic> mic_;
+  // Each pipe its own paths through the church (PJ_ORGAN_PATHS, on): the
+  // listener's early sound; the mic stage above is then the room's feed (the
+  // sound at 1 m) and the dry output.
+  bool paths_ = false;
+  OrganRoom nave_;
+  std::vector<int> regionSrc_;               // each enclosure's field as a source at its opening
+  std::vector<std::array<float, 16>> encField_;
+  float roomOut_[2][16] = {};
+  float eLo1_[2] = {}, eLo2_[2] = {};  // (the early sound's crossover: its lows the same in both channels)
+  std::vector<float> earlyL_, earlyR_;
+  void buildPaths();
+  void scatterPaths(int mic);
+  // Its own nave's late field (src/organnave.h; PJ_NAVE, on with the paths):
+  // fed by the organ's sound at 1 m, one block behind; heard at the
+  // microphones (lateL_, lateR_) and back at the case (church_, a block later
+  // still). It runs only in a room (-play, -inst organ through the ensemble).
+  bool naveOn_ = false;
+  OrganNave late_;
+  float naveIn_[16] = {}, naveL_[16] = {}, naveR_[16] = {}, naveP_[16] = {};
+  float naveGain_ = 1, naveFb_ = 1, lateTrim_ = 1;
+  std::vector<float> lateL_, lateR_;
+  void setupNave();
+  void runNave();
   // The rendering, by blocks: each enclosure (its pipes, their field) on its
   // own (they meet only in the wind, which moves slowly: its pressures read
   // at a block's start, its flows averaged over it), on a few threads.

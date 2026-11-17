@@ -45,6 +45,8 @@ struct ReedVoicing {
   double valve = 0.02, footRise = 0.008, release = 0.035;
   double noise = 0.002;     // the air's turbulence through the gap
   double viscous = 0.1;     // the pressure difference below which the gap's flow turns viscous (linear)
+  double level = 1.0;       // its output (the voicer's regulation along the compass: the model's flow is
+                            // per unit of the pipe's scale, a treble pipe's shallot and resonator smaller)
 };
 
 class ReedPipe {
@@ -114,7 +116,7 @@ class ReedPipe {
     if (!awake_) return 0;
     float out = 0;
     for (int s = 0; s < kOs; ++s) out += step(wind, room);
-    out *= 1.0f / kOs;
+    out *= float(v_.level) / kOs;
     if (!on_ && foot_ < 1e-4f && std::fabs(out) < 1e-6f) {
       if (++quiet_ > int(0.05 * fs_)) { awake_ = false; reset(); }
     } else {

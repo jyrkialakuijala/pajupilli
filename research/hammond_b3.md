@@ -1092,3 +1092,76 @@ perfect simulation") [design, from §3.1's couplings and §4's causes]:**
 All but the crackles depend only on absolute time, so the phase lock holds (a chord begun at two
 moments differs by −187 dB).
 
+**The percussion planned (2026-11-17, the user's request: "where it makes sense, no more than twice a
+piece, preferably not at all") [design]:**
+- **Where:** the upper manual's line suits it when it is mostly single notes (≥ 60 % of its
+  onsets), detached (< 45 % of its moves overlapping) and moving (≥ 1.5 onsets a second). That is
+  the jazz line the 3rd, fast, was made for: every fresh note pings, and single-trigger means
+  legato would not strike it anyway.
+- **Not:** legato, chordal, ballad and rock styles leave it off (it would only take the 1').
+- **One choice for the piece.** In eight-bar windows (4/4 assumed), the longest run asking the
+  other way switches it if it covers at least a quarter of the piece (and four windows exist): on
+  at its first upper note, back after its end. Two changes at most.
+- GM 18 keeps it on throughout.
+- **Checked:** detached → on; legato → off; detached with a 16-bar legato middle → on, off for bars
+  17-32; a 2-bar legato passage → no switch.
+
+**Level against TiMidity (2026-11-17) [rec-like: renders, not recordings].** Six GM files with
+prominent organ were each split into the organ's notes (by each note's channel program at the
+time) and the rest. Both halves were rendered by TiMidity++ (FluidR3_GM) and by pajupilli, and the
+organ's integrated loudness (BS.1770, gated) compared with the rest's in each. The files: *Good
+Bait*, *A Whiter Shade of Pale*, *Jamming*, *Born to Be Wild*, *Crocodile Rock*, *Do the
+Hucklebuck*.
+
+- **At first** the organ sat 0.8-19 dB under TiMidity's against the band (median +1.9 dB needed).
+- **Two causes found:**
+  - one Hammond playing several channels took the first channel's CC7 only (*Whiter Shade*'s
+    organ channels are at 27, 87, 41 and 89). It now takes their note-weighted mean.
+  - the 122's amp divided its output by its drive, so the rock organ got quieter as it was driven
+    harder. Its output now grows as drive^0.7, compressed.
+- **Then** the trims were set to the common level + 3 dB.
+- **After:** organ against the band, TiMidity minus pajupilli −6.8 to +5.4 dB per file, median
+  −0.3 dB.
+
+**The drawbar knobs (2026-11-17, the user's request: "K1 to K4 ... respecting the Hammond tradition";
+then: "not a linear mapping, an emotional one ... K1 the most used, soft to hard ... another from
+full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated") [design]:**
+- A first version reduced 43 classics by PCA to four components (79 % of their variety). Decoding
+  them reproduced no classic exactly, so it decoded through the classics as landmarks. It was
+  replaced by these hand-made paths, closer to how players think.
+- **K1:** 16 stations from the 8' alone to full organ, piecewise linear in drawbar steps; the 122's
+  drive rises over its last third.
+- **K2:** hollow (16' × 0.4, 5⅓', 4', 2', 1⅓', 1' out; 2⅔' and 1⅗' raised to 0.9 and 0.7 of the
+  foundation) to full (each drawbar toward 1, 1, 1, 1, 0.9, 0.85, 0.6, 0.6, 0.7 of the
+  foundation).
+- **K3:** dark (2' and above out, 4' and 2⅔' halved) to bright (1' to 8, 1⅓' and 2' rising).
+- **K4:** light (16', 5⅓' out) to deep (16' to 8, 5⅓' to 6).
+- The middles of K2-K4 (±10 %) leave K1's registration as it is.
+- **K5** is the Leslie's half-moon: stop / slow / fast.
+- **Continuous and controlled (the user: "the drawbars need to move softly without integer values,
+  a PI control system that brings them to the goal values dynamically"):**
+  - The knobs give fractional goals.
+  - Each drawbar (upper, lower, pedals) is a slider moved by a PI control of its speed:
+    u = Kp e + Ki ∫e, Kp 8 /s, Ki 20 /s² (ζ ≈ 0.9: settling in ~0.5 s, a slight overshoot).
+  - The speed is limited to 16 steps a second, the position stopped at 0 and 8, and the integral
+    frozen while limited or stopped (no windup).
+  - The organ's gain follows the slider (3 dB a step; below 1, linear to silence), updated every
+    32 samples.
+  - The first registration, and one set before playing, stand at once.
+- **The lower manual derived from the upper (the user: "the lower manual slightly darker or a
+  complement ... usually melody on the upper, accompaniment on the lower, softer and darker"):**
+  - lower_d = upper_d × keep_d − 1 step (0 where the upper is 0);
+  - keep = 0.85, 0.45, 1, 0.55, 0.45, 0.3, 0.25, 0.2, 0.15 (16' .. 1'): the foundation kept, the
+    5⅓' halved (less buzz under the tune), the top mostly gone;
+  - the 1 step (~3 dB) is `PJ_HAMMOND_LOWER_SOFTER`;
+  - examples: jazz 888000000 → ~637000000 (near the classic 838 comping), ballad 838000000 →
+    ~607000000, gospel 888800000 → ~637300000;
+  - live from K1-K4, and in `-play`'s plans (replacing their fixed 838 / 808).
+- **The pedals derived from the upper (the user: "bright sounds can benefit from bright pedals,
+  rounder sounds will want more simple pedal harmonics"):**
+  - 16' = 4.5 + 3.5 × loud, where loud is the upper's summed drawbar gain over three full ones,
+    capped at 1;
+  - 8' = 1.5 + 8 × bright, where bright is the 4'-and-above share of the upper's gain;
+  - whisper 5.7/1.5, ballad 7/1.5, jazz 8/1.5, gospel 8/3.5, full 8/6.8;
+  - live and in `-play`'s plans.
+

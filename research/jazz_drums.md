@@ -818,6 +818,97 @@ All values **[calc]**.
     2001; Rath & Rocchesso, Sounding Objects; Avanzini, Serafin & Rocchesso on friction) **[memory]**.
 - **Brushes on the ride and hi-hat:** the same tap and sweep exciters on the plate's modes.
 
+### 5.7 The brush swirled on a cymbal (2026-11-17; built: `src/cymbal.cc` key 84, `src/drumkit.cc` `planCymbalSwirls`)
+
+- **What it is.** The drummer lays a brush (or, more rarely, a stick's tip or shoulder) on the ride or a
+  crash and draws it round, lightly, for a while: a sustained shimmering swoosh with no attack. It is a
+  colour, not time-keeping **[memory]**. The user's description: a classic jazz and orchestral
+  texture; along the lathing grooves it brings out subtle high-frequency vibrations; near the outer
+  edge a lower, washier roar, nearer the bell higher, glassy harmonics; a light touch, since pressing
+  hard chokes the cymbal and dulls the overtones.
+- **What the sources say.** The teaching pages found describe the brush swirl on the *snare*. The
+  usual pattern is one hand circling while the other taps 2 and 4 or plays the ride rhythm. One page
+  describes both hands sweeping in contrary motion as a quiet substitute for the ride pattern **[web:
+  thedrumninja.com, drumeo.com, youllhearit.com]**. Thin or flat rides "open up" easily under
+  brushes, and a thin crash can serve as the ride when playing very softly with brushes
+  **[web: Wikipedia, Ride cymbal]**. No source described a swirl on a cymbal held against a snare
+  swirl in so many words (two searches). The rest is **[memory]** of practice: in ballads and soft
+  passages the drummer moves one brush to the ride (or a crash) and swirls there while the left hand
+  keeps circling the snare. The cymbal's shimmer then rises over the snare's hiss, often as tension
+  into a new section (the next chorus, the bridge, out of a solo). It ends on the phrase's end, often
+  into a stroke on that cymbal or a crash, and lasts a few bars (2–8). It happens a few times a tune,
+  not continuously.
+- **Lathing [web: zZounds, Cymbal Anatomy Part II; SoundPure].** Lathing cuts concentric tonal
+  grooves; closer grooves push the response towards the treble. The bell is the stiff, thick part
+  (its ping, high and with few overtones), and the thin edge is where a crash's motion is largest.
+  No source on the friction sound of a brush on the grooves was found.
+- **The physics (the model) [design, from §5.6].**
+  - **Friction excitation.** Each wire end lies on the plate with part of the hand's load and rides
+    the surface as the hand draws it: the bronze's fine grain (a few µm), and the lathing's concentric
+    ridges (~0.6 mm apart, a few µm high, **[memory]** for the numbers). Drawn *along* a groove an end
+    feels only the grain. Drawn *across* the grooves it is lifted over a ridge every pitch, a buzz at
+    the radial speed over the pitch. The many ends' stick-slip and micro-impacts sum to a broadband
+    force at the moving contact, weighted into each mode by its shape there. As the hand goes round,
+    the weights change: the colour moves.
+  - **Radius.** A cymbal is thicker towards the bell (~2:1 bow to edge, **[memory]**). A plate's give at
+    a point goes as 1/h² (an infinite plate's point mobility, 1/(8 √(D ρ h)), with D ∝ h³). So under
+    the wire ends the plate is stiffer towards the bell: the ends spring off sooner (a contact resonance
+    √(k/m_tip) rising from ~3.5 kHz). The force is brighter, and inside the cup's rim the cup's own few
+    modes ring with it (glassy). At the thin edge the ends sink in and stay longer, and the plate's
+    many-diameter low modes, largest there, take more of it: washier and lower.
+  - **Damping.** The brush lying on the plate is a moving damper: the wires' rub and the fan's friction
+    take energy from every mode that moves where the brush lies, more the harder it is pressed. A light
+    touch lets the cymbal ring under the swoosh. A heavy one chokes it and dulls the overtones (the
+    highest modes lose most, as they move most under the brush).
+- **What was built.** Key 84 held on a cymbal (velocity: the press):
+  - **The fan.** A quarter of the wire ends (12 groups) lie on the plate and are drawn round in long
+    loops along the grooves: an arc of ±0.6 rad, ±5 % of the radius across, a turn every two beats.
+    The press leans in on the way back towards the drummer.
+  - **Where.** The loops' middle wanders between 0.3 and 0.86 of the radius: held two to four turns,
+    then moved, two times in three to the other side. The hand is lighter in towards the bell.
+  - **The plate under the ends.** The contact stiffness goes as (h(r)/h_bow)², with h(r) ∝
+    1 + 0.5 (1 − 2r/R). The ends ride the grain and the ridges at their own radius.
+  - **The cup and the damping.** The cup's modes are driven inside its rim. The rub is a loss of
+    2 s⁻¹ per N on each mode by its mean square shape round the circle the brush is on, against a
+    middling mode's.
+  - **The brush's modes.** It now feels the plate's modes to 12 kHz (7 kHz before; with 7 kHz a swirl
+    near the bell was no brighter than one at the bow).
+- **Measured on the model [calc].** On the 22" ride at velocity 60:
+  - The swoosh holds for 8 s, every half second within ~7 dB of its median.
+  - The centroid wanders 5.4–7.9 kHz. Held at 0.3 R it is ~8.7 kHz, at 0.88 R ~4.8 kHz, where the
+    0.2–1.5 kHz band rises 12 dB against the 5–16 kHz band.
+  - On a ride ringing from a stick stroke (2 kHz band, 0.7 s into the swirl), the swirl takes ~4 dB off
+    at velocity 30 and ~13 dB at 110.
+  - It costs ~1.6 µs a sample, the plate included (~8 % of a core).
+- **The automatic player (-play) [design].** With the brushed snare, `planCymbalSwirls` reads the
+  whole file first:
+  - **Bars.** It counts, per 4/4 bar, the band's notes and mean velocity.
+  - **Calm.** A bar's calm is √(quiet · sparse): quiet is (105 − mean velocity)/60, clipped to 0..1,
+    and sparse is 1/(1 + notes a beat / 3).
+  - **Candidate spans.** Each candidate is 2, 3, 4, 6 or 8 bars, ending on a bar line. A bar with no
+    notes (a general pause) rules a span out.
+  - **Score.** 1.5 × the mean calm, plus:
+    - an ending on the 8th bar (0.3) or the 4th (0.15);
+    - a section change after it (the next four bars busier or sparser by e^0.45, or ±15 in
+      velocity: 0.35), or the song's end (0.2);
+    - leading into a stroke on that cymbal (0.2);
+    - for a ballad (a beat of 0.8 s or longer) longer spans, otherwise shorter (0.1).
+  - **Jitter and cut-offs.** A seeded jitter of up to 0.15 is added. A span whose calm is under 0.45
+    is never taken, and nothing scoring under 0.9.
+  - **The cymbal.** The ride, else the 18" crash, else the 16": the first that the file does not strike
+    from a beat before the swirl to its end. The swirl lifts 60 ms before the bar line, so a stroke
+    there on it falls after.
+  - **How many.** The best go first: one in a short piece, one more per 40 bars, three at most, at
+    least eight bars apart.
+  - **Seeding.** The seed is FNV-1a over every note-on (time in ms, key, velocity, channel). The same
+    file gives the same swirls, bit for bit.
+  - **The snare.** While the swirl lasts, the snare's right hand is "away" (its key 42): only the left
+    hand circles there, and the file's own strokes still play.
+- **Open.** The level of the cymbal swirl against the snare's swirl is set by ear-less judgement
+  (`PJ_CYM_SWIRLDB` 12): in the test file it adds ~3 dB above 8 kHz in the quiet passage. A stick
+  swirl (the shoulder drawn on the bow) is not built. The thickness taper acts only under the brush;
+  the plate's modes are still a uniform plate's.
+
 ## 6. The rest of the kit
 
 | Drum | Jazz voicing | Physics / numbers | Model | Status |
@@ -1161,6 +1252,11 @@ Web pages, abstracts and excerpts:
   JASA 131(1), 897–906 (2012) (tension modulation by energy estimation); S. Bilbao, "Time domain
   simulation and sound synthesis for the snare drum", JASA 131, 914–925 (2012); Bilbao, Russo, Webb,
   Ducceschi, "Real-time guitar synthesis", DAFx24.
+
+Web pages for §5.7 (2026-11-17): https://thedrumninja.com/how-to-play-drums-with-brushes/ ,
+https://www.drumeo.com/beat/a-drummers-guide-to-jazz/ , https://youllhearit.com/blog-the-basics-of-brushes ,
+https://en.wikipedia.org/wiki/Ride_cymbal , https://blog.zzounds.com/2018/10/05/cymbal-anatomy-part-2-lathing/ ,
+https://www.soundpure.com/a/expert-advice/drums/cymbal-anatomy-101/ (seen as search excerpts).
 
 In this repository: `research/drums.md` (goals, the brush strokes, Demucs progress),
 `research/bells_blocks.md` §0 and §4 (Hertz table, crash modes and damping, reverse cymbal methods),

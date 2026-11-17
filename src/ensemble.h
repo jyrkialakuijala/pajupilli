@@ -68,6 +68,12 @@ class Ensemble {
   void all(void (Performer::*set)(double), double x) {
     for (Slot& s : f_) (s.v->player().*set)(x);
   }
+  // An instrument's own knob (Performer::setKnob): true if its players took it.
+  bool instrumentKnob(int k, double x) {
+    bool took = false;
+    for (Slot& s : f_) took |= s.v->player().setKnob(k, x);
+    return took;
+  }
   // (-play) Let a released note ring out: a new note takes the voice released
   // longest ago; a wind's the one released last if within a minor third (its
   // line keeps to its player). Live keeps its own choice.

@@ -145,6 +145,14 @@ class Enclosure {
   }
   // The sample's end: the lines advance; out: the sound leaving the opening
   // (delayed to the listener), the church's pressure coming in.
+  // The field alone, at the opening, before the shutters (its last sample):
+  // the enclosure as a source of its own when its pipes have their own paths
+  // to the listener (src/organroom.h); the shutters' state, to apply them there.
+  float lastField() const { return lastField_; }
+  bool shutters() const { return p_.shutters; }
+  float shutterA() const { return a_; }
+  float shutterGain() const { return gainOpen_; }
+  float leak() const { return float(p_.leak); }
   float step(float church) {
     if (--ctl_ <= 0) retune();
     open_ += (target_ - open_) * 0.0004f;  // (the shutters' travel: ~50 ms)
@@ -168,7 +176,8 @@ class Enclosure {
       dl2_ += dirA_ * (dl1_ - dl2_);
       dir = dl2_;
     }
-    const float x = dir + float(p_.field) * 0.5f * fieldOut;
+    lastField_ = float(p_.field) * 0.5f * fieldOut;
+    const float x = dir + lastField_;
     direct_[dw_] = 0;
     dw_ = (dw_ + 1) & dmask_;
     // The shutters: louder and brighter as they open; the walls' leak.
@@ -226,6 +235,7 @@ class Enclosure {
   int dmask_ = 0, dw_ = 0, omask_ = 0, ow_ = 0, outN_ = 0, ctl_ = 0;
   float hist_[4][kHist] = {};
   float dirA_ = 1, dl1_ = 0, dl2_ = 0;
+  float lastField_ = 0;
   int histPos_ = 0;
   float open_ = 1, target_ = 1, a_ = 1, gainOpen_ = 1, l1_ = 0, l2_ = 0, k1_ = 0, energy_ = 0;
 };

@@ -55,6 +55,15 @@ class Tube {
   // metal pipes): the last n samples' difference (left = out + side, right =
   // out - side), taken once; null if it has none.
   virtual const float* takeSide(int /*n*/) { return nullptr; }
+  // A model that makes its own early sound at the listener (the organ: each
+  // pipe its own paths through the church, src/organroom.h): the room then
+  // adds only its late field for it. Its last n samples' left and right
+  // (in its output's units), added to l and r.
+  virtual bool ownEarly() const { return false; }
+  virtual void takeEarly(int /*n*/, float* /*l*/, float* /*r*/, float /*g*/) {}
+  // ... and its own late field too (the organ's nave, src/organnave.h): the
+  // room then hears nothing of it (it comes back in takeEarly).
+  virtual bool ownLate() const { return false; }
   virtual double testResponse() const = 0;
   // Clear all air motion (keys and settings stay); done automatically on NaN.
   virtual void resetAir();

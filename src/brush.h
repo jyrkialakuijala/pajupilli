@@ -53,6 +53,17 @@ struct BrushSpec {
   double rough = 8e-6;        // its height, rms (m)
   double drag = 0.5;          // the press's own rise and fall on the grain (a share of it, rms)
   double bite = 0.5;          // rougher by this share pushed against the wires, smoother pulled along them
+  // A cymbal's lathing: concentric grooves `groove` m apart, their ridges
+  // `ridge` m high (0: none, a drum head). Each wire end rides them at its
+  // own radius: drawn along a groove it feels only the grain; drawn across
+  // the grooves it is lifted over a ridge every `groove` m (a buzz at the
+  // radial speed over the pitch).
+  double groove = 0, ridge = 0;
+  // Drawn along, the ends' shares of each mode are found anew one end at a
+  // time, each time the fan has moved this far (m; 0: every sample). (A
+  // big plate's shapes are dear, and its modes to 7 kHz change little over
+  // a tenth of a millimetre.)
+  double reshape = 0;
 };
 
 class Brush {
@@ -73,8 +84,15 @@ class Brush {
   // struck, so that rings on brighter and longer.
   void strike(double speed, double spread, double follow, double dwell, double share = 1);
   // Lying on the head with `load` N (0: lift). The ends ride the grain as
-  // place() draws them along.
-  void rest(double load);
+  // place() draws them along. share: how much of the fan lies on it (as
+  // strike's; set when it comes down).
+  void rest(double load, double share = 1);
+  // The surface's own give under the wire ends, times this (a cymbal is
+  // thicker, stiffer, towards its bell: the ends spring off it sooner).
+  void stiffness(double k) { stiff_ = k; }
+  double x() const { return x_; }
+  double y() const { return y_; }
+  double load() const { return mode_ == kRest ? load_ : 0; }
   bool up() const { return mode_ == kUp; }
   bool touching() const { return touching_ > 0; }
   // One sample, before the head's step(): the ends against the head.
@@ -107,6 +125,7 @@ class Brush {
   std::vector<float> phi_, full_;   // [tip][mode]; one shape of all the surface's modes
   std::vector<float> tex_;   // the grain's profile
   int n_, next_ = 0, touching_ = 0, active_ = 0;
+  double stiff_ = 1, drawn_ = 0;
   float force_ = 0, scrape_ = 0;
   uint32_t rng_;
 };

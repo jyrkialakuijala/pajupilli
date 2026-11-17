@@ -255,6 +255,26 @@ PipeVoicing gamba(double hz) {
   v.biasFrac = 0.4 * (1 - sb) + v.biasFrac * sb;
   v.evenTilt = 1.5 * (1 - sb);
   v.breath *= 0.8;
+  // The frein harmonique (a cross-bar before the mouth, from F#2 in, full
+  // from C3; research/church_organ.md §8a). Without it the narrow middle
+  // spoke late and unsure (the pipe alone: C3 to 90 % in ~200 ms, middle C
+  // ~120): the octave led ~40 ms with the fundamental stalled ~40 dB down,
+  // ~+100 c sharp, then it crept up at its narrow pipe's Q (~40: a ring-up
+  // q1 / (pi f) ~100 ms at C3). The bar's loss (the mouth's flow squeezed
+  // past it) adds ~5 Hz to every mode's bandwidth: the fundamental's Q ~40
+  // -> ~16 at C3, ~23 at middle C, the treble's little changed; it rings up
+  // in ~1 / (pi (f / q1 + 5)), ~40 ms at C3. It brakes the octave's
+  // precursor (the chiff a quarter). With it the string takes its low
+  // cut-up (the jet's travel 0.22 of the period, not 0.25: less phase lost
+  // while the foot fills, a shallower scoop into the pitch), its toe open
+  // (the wind regulated at the flue: the foot fills in half the time, the
+  // level the lower cut-up loses back, ~+0.8 dB).
+  const double fw = std::clamp(2 * std::log2(hz / 92.5), 0.0, 1.0);
+  v.freinHz = knob("PJ_GAMBA_FREIN", 5.0) * fw;
+  v.chiff *= 1 - (1 - knob("PJ_GAMBA_FREINCHIFF", 0.25)) * fw;
+  v.tauFrac -= knob("PJ_GAMBA_CUTUP", 0.03) * fw;
+  v.drive *= 1 + knob("PJ_GAMBA_FREINTOE", 0.10) * std::clamp(std::pow(262 / hz, 0.45), 0.53, 1.0) * fw;
+  v.footRise *= 1 - (1 - knob("PJ_GAMBA_FOOT", 0.5)) * fw;
   return v;
 }
 
@@ -320,6 +340,23 @@ ReedVoicing reedVoicing(Family f, double hz) {
     default:
       break;
   }
+  // The treble (C5 up at 8' pitch: research/church_organ.md §8a). The formant
+  // is the band the resonator's top radiates best (ka ~ 1 at its flare's
+  // mouth); a treble pipe's top is a few mm to 2 cm across, its band higher:
+  // once the pitch reaches half the stop's band (F#5 at 8' for the trumpets,
+  // E5 the oboe) it rides on the 2nd harmonic, its top's roll above the 6th,
+  // so the treble keeps the middle's spectrum (fixed, the top octave's
+  // harmonics fell 15-45 dB below its fundamental: a sine). And the voicer's
+  // line (the model's flow is per unit of a pipe's scale, its sound the
+  // flow's rate of change: from middle C to C7 the reeds rose ~27 dB, the
+  // formant reached as well): each pipe regulated from middle C up, 12 dB
+  // down at C5 and 6 dB per octave more, the treble ~+1 dB per octave over
+  // middle C (kept a little forward, as voicers leave a reed's treble); the
+  // Oboe's 4 and 5 (its middle C a dip, its line its bass's).
+  if (v.formantHz > 0) v.formantHz = std::max(v.formantHz, knob("PJ_REED_TREBLE_FORMANT", 2.0) * hz);
+  v.rollHz = std::max(v.rollHz, knob("PJ_REED_TREBLE_ROLL", 6.0) * hz);
+  const double up = std::log2(hz / 262), line1 = f == kOboe ? 4 : 12, line2 = f == kOboe ? 5 : 6;
+  v.level = std::pow(10.0, -knob("PJ_REED_LINE", 1.0) * (line1 * std::clamp(up, 0.0, 1.0) + line2 * std::max(0.0, up - 1)) / 20);
   return v;
 }
 
@@ -343,6 +380,7 @@ struct Stop {
   double comp[5] = {0, 0, 0, 0, 0};
   double cents = 0;  // tuned off (a céleste: sharp, beating against its unison)
   int fromKey = 0;   // its compass's start (a céleste: tenor C)
+  int breakKey = 0;  // a reprise: from this key up an octave lower (the Clairon's top octave)
 };
 const Stop kStops[] = {
     // Hauptwerk: the principal chorus.
@@ -381,7 +419,9 @@ const Stop kStops[] = {
     {"fagott16", kSW, kFagott, 0.5, 8, -2},
     {"trompette8", kSW, kTrumpet, 1, 9, 0},
     {"oboe8", kSW, kOboe, 1, 10, -3},
-    {"clairon4", kSW, kTrumpet, 2, 11, -1},
+    // (the Clairon breaks back at c''' (key 84), as most do: its top octave's pipes would sound
+    // 2-4 kHz, resonators a few cm long; repeated at 8' pitch, no reed above C7)
+    {"clairon4", kSW, kTrumpet, 2, 11, -1, {0, 0, 0, 0, 0}, 0, 0, 84},
     {"swprincipal8", kSW, kOpenPrincipal, 1, 12, -1},
     {"swoctave4", kSW, kOpenPrincipal, 2, 13, -3},
     // Plein jeu IV (2'): 2' 1 1/3' 1' 2/3' at C, breaking back an octave at each c.
@@ -437,6 +477,15 @@ const Stop kStops[] = {
 // the Swell's Principal -2, the Plein jeu and the Scharf -3/-4, the Gemshorn
 // -7, the chamade +5 (the loudest stop), the Contra Posaune 0. Its output only
 // (the pipes' flow, the wind they draw, unchanged).
+// The reeds re-regulated (2026-11-17) after their treble line (reedVoicing:
+// 12 dB down at C5, 6 more per octave): their three keys' mean had counted a
+// treble ~20 dB too loud, so they had come out 6-13 dB under these targets
+// (the Trompete 8' -7, the Trompette -12, the chamade -4 against the
+// Principal), and the crescendo's top steps added nothing. Now measured at
+// C3, C4, C5 (the 16's at C4, C5; the Pedal's at C2, G2, D3) to the targets
+// above, and the Swell's Trompette 0, the Fagott -2, the Clairon -1 (~1 dB
+// under the Trompette, as it was), the Cromorne -6 (a solo reed, as the Oboe),
+// the Klarine -2; the Dulcian (-6) as it was.
 struct Regulation {
   const char* token;
   float db;
@@ -448,7 +497,7 @@ const Regulation kRegulation[] = {
     {"rohrflote8", 7.4f},
     {"mixtur5", 6.2f},
     {"cymbel3", 10.0f},
-    {"trompete8", 19.9f},
+    {"trompete8", 29.3f},
     {"gedackt8", 2.4f},
     {"bourdon16", 6.8f},
     {"flute4", 3.0f},
@@ -457,28 +506,28 @@ const Regulation kRegulation[] = {
     {"terz135", 8.0f},
     {"gamba8", 3.5f},
     {"celeste8", 2.9f},
-    {"fagott16", 37.8f},
-    {"trompette8", 19.3f},
-    {"oboe8", 16.0f},
-    {"clairon4", 9.3f},
+    {"fagott16", 44.0f},
+    {"trompette8", 31.8f},
+    {"oboe8", 22.9f},
+    {"clairon4", 32.2f},  // (its treble evened: re-regulated ~1 dB under the Trompette, its middle as before)
     {"rohrgedackt8", -0.7f},
     {"posoctave4", 0.0f},
     {"gedacktflote4", 1.3f},
     {"sesquialtera", 2.1f},
-    {"cromorne8", 22.8f},
+    {"cromorne8", 31.2f},
     {"subbass16", 8.2f},
     {"octavbass8", 2.0f},
     {"choralbass4", 3.4f},
     {"pedmixtur4", 7.1f},
-    {"posaune16", 28.4f},
+    {"posaune16", 34.5f},
     {"principal8", 0.0f},
     {"principal16", 1.8f},
     {"fluteharm8", 9.8f},
-    {"trompete16", 28.0f},
+    {"trompete16", 30.3f},
     {"untersatz32", 16.7f},
     {"principalbass16", 14.1f},
     {"violonbass16", 10.7f},
-    {"pedtrompete8", 29.9f},
+    {"pedtrompete8", 35.1f},
     {"salicional8", 4.3f},
     {"blockflote4", 8.0f},
     {"swprincipal8", 11.1f},
@@ -491,10 +540,10 @@ const Regulation kRegulation[] = {
     {"sifflote1", 3.7f},
     {"scharf4", 6.2f},
     {"dulcian16", 37.5f},
-    {"chamade8", 21.2f},
+    {"chamade8", 30.1f},
     {"gedacktbass8", 13.2f},
-    {"contraposaune32", 39.5f},
-    {"klarine4", 32.6f}
+    {"contraposaune32", 45.0f},
+    {"klarine4", 39.5f}
 };
 float regulationDb(const char* token) {
   for (const Regulation& r : kRegulation)
@@ -676,6 +725,9 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
   if (crescendo_ || byManual_) manualRanks_ = true;
   calibrate();
   linkNeighbours();
+  paths_ = knob("PJ_ORGAN_PATHS", 1) != 0;
+  if (paths_) buildPaths();
+  if (paths_) setupNave();
   // The wind (src/organwind.h; PJ_WIND=0: steady, as before).
   windOn_ = knob("PJ_WIND", 1) != 0;
   OrganWind::Params wp;
@@ -773,6 +825,38 @@ PipeVoicing voicing(Family f, double hz) {
   // jet deflected by the flow / the drive, so they still lock (at 4-8 kHz
   // the drive ~0.1: by the flow alone the loop's gain fell short).
   if (hz > 2000) v.driveNorm = std::max(v.driveNorm, 1.0);
+  // The small pipes' chiff (from C6, ~1 kHz, fully from C7, ~2 kHz: the 2'
+  // and smaller ranks, the mutations' and mixtures' upper ranks, the 4' top
+  // octave; the 8' and 4' middle, and the strings, as they were;
+  // research/church_organ.md §8a). A small pipe's chiff is the jet's first
+  // few unsteady breaths: short (it forms in a few periods: ~11 ms at 2 kHz,
+  // ~8 at 4, ~5 at 8, fading from when the wind reaches the foot, not from the
+  // key's fall: else it was spent before the pipe spoke), on its first
+  // overtone whatever the voicer's steady octave (an open flute's languid
+  // sets its octave ~-30 dB; its chiff was then inaudible whatever its
+  // strength), a stopped pipe's twelfth no stronger than the Gedackt's (it
+  // was x3, the 4' top's twelfth leading by ~+16 dB, up to +50: overblown at
+  // the attack). Its strength in the octave's own weight (1: driven at a
+  // full principal's octave at the attack's peak): the principals, lightly
+  // nicked, 2 (more tips them into the octave: at 4 their leads jumped from
+  // ~+6 to +20..+30 dB); the open flutes' low cut-up as much (their leads a
+  // few dB over the principals' all the same); the stopped 5. Each pipe its
+  // own (the cut-up and the nicking never quite alike: x exp(+-0.25)), each
+  // attack its own (+-15 %, a quicker pallet up to 15 % more); a key struck
+  // again before its pallet closed gets less (FluePipe::open).
+  if (const double w = std::clamp((std::log2(hz / 1046.5) - 0.02) / 0.98, 0.0, 1.0); w > 0 && f != kString) {  // (C6 itself, with its few cents of life, as it was)
+    const double tSmall = std::clamp(0.03 * std::sqrt(262 / hz), 0.005, 0.03) * knob("PJ_SMALL_CHIFFTIME", 1.0);
+    v.chiffTime = (1 - w) * v.chiffTime + w * tSmall;
+    v.chiffFoot = w;
+    const double cSmall = v.stopped ? knob("PJ_SMALL_CHIFF_S", 5.0)
+                          : f == kOpenFlute || f == kHarmonicFlute ? knob("PJ_SMALL_CHIFF_F", 2.0)
+                          : knob("PJ_SMALL_CHIFF_P", 2.0);
+    const double unit = v.stopped ? 1.0 : v.openEven;  // (an open pipe's chiff in its octave's own weight)
+    v.chiffEven = v.stopped ? 0.0 : 1.0;
+    v.chiff = (1 - w) * v.chiff * unit + w * cSmall;
+    v.chiffVar = w * knob("PJ_SMALL_CHIFFVAR", 0.25);
+    v.chiffPress = w * knob("PJ_SMALL_CHIFFPRESS", 0.15);
+  }
   // The wind's pitch: a flue ~0.5 c flat per 1 % of sag (research §4a.3: the
   // full organ's ~8 % sag, ~4 c, as the user chose).
   v.windTau = knob("PJ_WIND_PITCH", 0.6);
@@ -849,7 +933,10 @@ void OrganModel::addRank(int stop) {
     return false;
   };
   int nChest[2] = {0, 0}, nOff[2] = {0, 0};
-  auto ratio = [&](int m) { return st.ratio > 0 ? st.ratio : st.comp[std::clamp((m - 36) / 12, 0, 4)]; };
+  auto ratio = [&](int m) {
+    const double r = st.ratio > 0 ? st.ratio : st.comp[std::clamp((m - 36) / 12, 0, 4)];
+    return st.breakKey && m >= st.breakKey ? r / 2 : r;
+  };
   for (int m = lo; m <= hi; ++m) {
     const double hz = 440 * std::exp2((m - 69) / 12.0) * ratio(m);
     (offset(hz) ? nOff : nChest)[(m - lo) % 2]++;
@@ -955,7 +1042,7 @@ void OrganModel::addRank(int stop) {
     if (pedal && isReed(st.fam)) {  // (inside the case: PJ_PEDREED_CASE_DB down above PJ_PEDREED_CASE_HZ)
       pp.caseHz = float(knob("PJ_PEDREED_CASE_HZ", 300));
       pp.caseA = float(1 - std::exp(-2 * M_PI * pp.caseHz / fs));
-      pp.caseG = float(std::pow(10.0, -knob("PJ_PEDREED_CASE_DB", 10) / 20));
+      pp.caseG = float(std::pow(10.0, -knob("PJ_PEDREED_CASE_DB", 5) / 20));
     }
     pp.target = hz;
     pipes_.push_back(pp);
@@ -986,7 +1073,7 @@ static std::string organCachePath(const char* inst) {
       // (not the settings that do not touch the pipes: the threads, the logs)
       bool skip = false;
       for (const char* k : {"PJ_ORGAN_THREADS=", "PJ_ORGAN_RENDER_THREADS=", "PJ_WIND_LOG=", "PJ_CALDBG=",
-                            "PJ_PLAY_THREADS=", "PJ_PLAY_LEAD="})
+                            "PJ_PLAY_THREADS=", "PJ_PLAY_LEAD=", "PJ_ROLLER_OMIT="})
         skip |= std::strncmp(*e, k, std::strlen(k)) == 0;
       if (!skip) env.emplace_back(*e);
     }
@@ -1379,7 +1466,11 @@ struct RollerStep {
   double at;  // (0..1: the roller's position where it is drawn)
 };
 std::vector<RollerStep> rollerSteps() {
-  // (each dynamic its band of the roller, its stops spread evenly over it)
+  // (each dynamic its band of the roller, its stops spread evenly over it;
+  // ff the Hauptwerk's and the Pedal's reed chorus and the high mixtures, fff
+  // the swell's reed battery 16-8-4 whole, as the French crescendo ends, with
+  // the 16', 32' and the chamade: a reed added under a full chorus is what
+  // still adds; another flute or mutation there adds nothing)
   const std::vector<std::vector<const char*>> levels = {
       {"gedackt8", "subbass16"},                                                         // ppp
       {"gamba8", "flute4", "salicional8"},                                               // pp (no céleste: it beats)
@@ -1389,14 +1480,22 @@ std::vector<RollerStep> rollerSteps() {
        "violonbass16"},                                                                  // mf
       {"principal16", "superoctave2", "quinte223", "posoctave2", "waldflote2", "nasard223", "mixtur5", "pleinjeu4",
        "choralbass4", "pedmixtur4"},                                                     // f
-      {"trompette8", "fagott16", "oboe8", "trompete8", "cymbel3", "scharf4", "terz135", "sesquialtera", "quinte113",
-       "sifflote1", "posaune16", "pedtrompete8", "untersatz32"},                         // ff
-      {"clairon4", "trompete16", "cromorne8", "dulcian16", "klarine4", "contraposaune32", "chamade8"},  // fff
+      {"oboe8", "trompete8", "cymbel3", "scharf4", "terz135", "sesquialtera", "quinte113", "sifflote1", "cromorne8",
+       "posaune16", "pedtrompete8", "untersatz32"},                                      // ff
+      {"fagott16", "trompette8", "clairon4", "trompete16", "dulcian16", "klarine4", "contraposaune32",
+       "chamade8"},                                                                      // fff
+  };
+  // (PJ_ROLLER_OMIT: stops left off the roller, to hear what each adds)
+  const char* omit = std::getenv("PJ_ROLLER_OMIT");
+  auto omitted = [omit](const char* t) {
+    if (!omit) return false;
+    const std::string s = std::string(",") + omit + ",";
+    return s.find(std::string(",") + t + ",") != std::string::npos;
   };
   std::vector<RollerStep> out;
   for (size_t l = 0; l < levels.size(); ++l)
     for (size_t k = 0; k < levels[l].size(); ++k)
-      out.push_back({levels[l][k], 0.04 + 0.12 * (l + double(k) / levels[l].size())});
+      if (!omitted(levels[l][k])) out.push_back({levels[l][k], 0.04 + 0.12 * (l + double(k) / levels[l].size())});
   return out;
 }
 }  // namespace
@@ -1448,7 +1547,146 @@ void OrganModel::resetAir() {
     p.y = 0;
   }
   for (Enclosure& e : enc_) e.reset();
+  if (paths_) nave_.reset();
+  if (naveOn_) late_.reset();
   blockPos_ = kBlock;
+}
+
+// The enclosures' places in the church (src/organroom.h's coordinates: the
+// west gallery's floor at 7 m, the main case's front 3 m from the west wall),
+// their sizes, their cases.
+namespace {
+struct EncPlace {
+  OrganRoom::V3 centre, dims;
+  int caseId;
+};
+const EncPlace kPlace[kEnclosures] = {
+    {{-2.3, 14.6, 2.1}, {2.6, 2.4, 1.6}, OrganRoom::kSwellCaseC},   {{2.3, 14.6, 2.1}, {2.6, 2.4, 1.6}, OrganRoom::kSwellCaseCis},
+    {{-0.6, 8.6, 5.0}, {1.1, 1.4, 0.7}, OrganRoom::kPosCase},       {{0.6, 8.6, 5.0}, {1.1, 1.4, 0.7}, OrganRoom::kPosCase},
+    {{-1.0, 11.8, 2.3}, {2.0, 3.0, 1.4}, OrganRoom::kMainCase},     {{1.0, 11.8, 2.3}, {2.0, 3.0, 1.4}, OrganRoom::kMainCase},
+    {{-1.15, 10.9, 3.25}, {2.2, 4.0, 0.4}, OrganRoom::kNoCase},     {{1.15, 10.9, 3.25}, {2.2, 4.0, 0.4}, OrganRoom::kNoCase},
+    {{-3.6, 10.2, 2.0}, {1.8, 6.0, 1.8}, OrganRoom::kPedCaseC},     {{3.6, 10.2, 2.0}, {1.8, 6.0, 1.8}, OrganRoom::kPedCaseCis},
+};
+}  // namespace
+
+// Each pipe's mouth and top (a reed's resonator's top) a source of its own
+// in the church; each enclosure's field one at its opening.
+void OrganModel::buildPaths() {
+  // (the listener: a main pair on a tall stand, as an organ is recorded: 4 m
+  // high, 10 m into the nave: ~10 m from the main case, the direct sound ~4 dB
+  // over a listener's in the pews at 15 m)
+  nave_.setup(fs_, knob("PJ_ORGAN_LISTENER", 10), knob("PJ_ORGAN_LISTENER_X", 0), knob("PJ_ORGAN_LISTENER_Y", 4));
+  static const double kPedOccl = knob("PJ_ORGAN_PEDAL_OCCL", 0.5);  // (the towers behind the case and the façade: darker)
+  auto setOf = [](int e) { return e == kSwellC ? 1 : e == kSwellCis ? 2 : 0; };
+  auto world = [](int e, const Vec3& at) {
+    const OrganRoom::V3& c = kPlace[e].centre;
+    return OrganRoom::V3{c.x + at.x, c.y + at.y, c.z + at.z};
+  };
+  auto occl = [&](const Pipe& pp) {
+    const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
+    double o = facade ? 0.0 : std::min(0.6, 0.12 * kStops[pp.stop].row);
+    if (pp.enc == kPedC || pp.enc == kPedCis) o += kPedOccl;
+    return o;
+  };
+  for (Pipe& pp : pipes_) {
+    const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
+    pp.rsrc = nave_.addSource(world(pp.enc, pp.at), kPlace[pp.enc].caseId, facade, occl(pp), pp.p.reed ? 0.0 : 0.8, setOf(pp.enc));
+  }
+  const int mouths = nave_.sources();
+  for (Pipe& pp : pipes_)
+    if (pp.p.openPipe()) {
+      Vec3 top = pp.at;
+      top.y += 0.95 * 343 / (2 * pp.hz);
+      const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
+      pp.rtop = nave_.addSource(world(pp.enc, top), kPlace[pp.enc].caseId, facade, 0.5 * occl(pp), 0.0, setOf(pp.enc));
+    }
+  regionSrc_.assign(enc_.size(), -1);
+  for (int e = 0; e < int(enc_.size()); ++e) {
+    const EncPlace& P = kPlace[e];
+    double y = P.centre.y;
+    if (e == kFacC || e == kFacCis) y -= 1.4;
+    if (e == kHwC || e == kHwCis) y -= 0.6;
+    if (e == kPedC || e == kPedCis) y -= 1.8;
+    const double zf = P.caseId >= 0 ? nave_.caseBox(P.caseId).hi.z : P.centre.z + P.dims.z / 2;
+    regionSrc_[e] = nave_.addSource({P.centre.x, y, zf + 0.05}, OrganRoom::kNoCase, false, 0, 0, setOf(e));
+  }
+  nave_.finish(mouths);
+  encField_.assign(enc_.size(), {});
+}
+
+// One microphone's block: the pipes sounding in the last block and the
+// enclosures' fields scattered into its rings, read out through the classes'
+// filters (the swell's rings through its shutters).
+void OrganModel::scatterPaths(int mic) {
+  for (const Pipe& pp : pipes_) {
+    if (!pp.live) continue;
+    nave_.scatter(pp.rsrc, mic, pp.blk);
+    if (pp.rtop >= 0) nave_.scatter(pp.rtop, mic, pp.blkTop);
+  }
+  for (size_t e = 0; e < enc_.size(); ++e) nave_.scatter(regionSrc_[e], mic, encField_[e].data());
+  nave_.endBlock(mic, roomOut_[mic]);
+}
+
+void OrganModel::takeEarly(int n, float* l, float* r, float g) {
+  const int have = int(earlyL_.size()), m = std::min(n, have);
+  const float ge = g;
+  for (int i = 0; i < m; ++i) {
+    l[n - m + i] += ge * earlyL_[have - m + i];
+    r[n - m + i] += ge * earlyR_[have - m + i];
+  }
+  earlyL_.clear();
+  earlyR_.clear();
+  if (naveOn_) {
+    // (the late field as the shared room's was: its microphones' gain (in g)
+    // and the player's velocity, not the instrument's gain and level trim)
+    const int hl = int(lateL_.size()), ml = std::min(n, hl);
+    const float gl = g * lateTrim_ * naveGain_;
+    for (int i = 0; i < ml; ++i) {
+      l[n - ml + i] += gl * lateL_[hl - ml + i];
+      r[n - ml + i] += gl * lateR_[hl - ml + i];
+    }
+    lateL_.clear();
+    lateR_.clear();
+  }
+}
+
+// The organ's own nave (src/organnave.h): a 50 x 20 x 20 m stone church
+// (PJ_NAVE_VOLUME, the same proportions), its T60 per octave (PJ_NAVE_T60_63
+// .. PJ_NAVE_T60_16K, s; all scaled by PJ_NAVE_T60); the late field from
+// PJ_NAVE_ONSET_MS after the direct sound. Its level is physical against the
+// pipes' early paths (both re the organ at 1 m: 1/r and 16 pi / A), and both
+// reach the output through the room's microphone gain (src/ensemble.cc), so
+// their balance stays the physical one (PJ_NAVE_GAIN: dB on the late field
+// only; PJ_ORGAN_EARLY_DB the early's).
+void OrganModel::setupNave() {
+  naveOn_ = knob("PJ_NAVE", 1) != 0;
+  if (!naveOn_) return;
+  OrganNave::Params np;
+  const double v = std::max(100.0, knob("PJ_NAVE_VOLUME", np.volume)), sc = std::cbrt(v / np.volume);
+  np.surface *= sc * sc;
+  np.volume = v;
+  static const char* const kT60[OrganNave::kBands] = {"PJ_NAVE_T60_63", "PJ_NAVE_T60_125", "PJ_NAVE_T60_250",
+                                                      "PJ_NAVE_T60_500", "PJ_NAVE_T60_1K", "PJ_NAVE_T60_2K",
+                                                      "PJ_NAVE_T60_4K", "PJ_NAVE_T60_8K", "PJ_NAVE_T60_16K"};
+  const double t60 = knob("PJ_NAVE_T60", 1.0);
+  for (int b = 0; b < OrganNave::kBands; ++b) np.t60[b] = std::max(0.1, t60 * knob(kT60[b], np.t60[b]));
+  np.onsetMs = knob("PJ_NAVE_ONSET_MS", np.onsetMs);
+  np.latency = kBlock;  // (fed a block late)
+  np.lensDepth = knob("PJ_NAVE_LENS", 0.0);
+  np.lensSecs = knob("PJ_NAVE_LENS_SECS", np.lensSecs);
+  late_.setup(fs_, np);
+  naveFb_ = float(knob("PJ_NAVE_FB", 1.0));
+  lateTrim_ = float(1 / (inst_.gain * levelTrim(inst_)));
+  naveGain_ = float(std::pow(10.0, knob("PJ_NAVE_GAIN", 0.0) / 20));
+}
+
+// One block of the nave: the organ's last block in; the microphones' late
+// field and the pressure at the case for the next.
+void OrganModel::runNave() {
+  std::fill(naveL_, naveL_ + kBlock, 0.0f);
+  std::fill(naveR_, naveR_ + kBlock, 0.0f);
+  std::fill(naveP_, naveP_ + kBlock, 0.0f);
+  late_.process(naveIn_, kBlock, naveL_, naveR_, naveP_);
 }
 
 // One enclosure's block: its sounding pipes (each the field at its mouth,
@@ -1459,9 +1697,13 @@ void OrganModel::renderEnclosure(int e) {
   std::array<double, 4>& demand = encDemand_[e];
   demand.fill(0);
   bool any = false;
-  for (int i : encPipes_[e]) any |= pipes_[i].p.awake();
+  for (int i : encPipes_[e]) {
+    any |= pipes_[i].p.awake();
+    pipes_[i].live = false;
+  }
   if (!any && enc.quiet()) {
     encOut_[e].fill(0.0f);
+    if (paths_) encField_[e].fill(0.0f);
     return;
   }
   for (int s = 0; s < kBlock; ++s) {
@@ -1469,8 +1711,10 @@ void OrganModel::renderEnclosure(int e) {
       Pipe& pp = pipes_[i];
       if (!pp.p.awake()) {
         pp.y = 0;
+        pp.blk[s] = pp.blkTop[s] = 0;
         continue;
       }
+      pp.live = true;
       float heard = enc.heard(pp.src);
       for (int c = 0; c < 4 && pp.near[c] >= 0; ++c) heard += pp.nearG[c] * pipes_[pp.near[c]].y;
       float y = 0, top = 0;
@@ -1499,7 +1743,7 @@ void OrganModel::renderEnclosure(int e) {
             const double t = double(L.sounding) - v / (v - L.prev);
             if (L.lastCross >= 0) {
               // (against where it is meant to be now: its just offset too)
-              const double c = 1200 * std::log2(fs_ / (t - L.lastCross) / pp.target) - (ji_ ? jiNow_[pp.key] : 0.0);
+              const double c = 1200 * std::log2(fs_ / (t - L.lastCross) / pp.target) - (ji_ ? jiNow_[pp.key] : 0.0) - climate_[pp.p.reed ? 1 : 0];
               if (std::fabs(c) < 200) {
                 L.sum += c;
                 L.sum2 += c * c;
@@ -1529,8 +1773,11 @@ void OrganModel::renderEnclosure(int e) {
       }
       enc.add(pp.src, pp.gain * out, pp.p.reed ? kReedField : 1.0f);
       if (pp.srcTop >= 0) enc.add(pp.srcTop, pp.gain * top / float(pp.os));
+      pp.blk[s] = pp.gain * out;
+      pp.blkTop[s] = pp.gain * top / float(pp.os);
     }
     encOut_[e][s] = enc.step(church_[s]);
+    if (paths_) encField_[e][s] = enc.lastField();
   }
 }
 
@@ -1594,13 +1841,13 @@ void OrganModel::justSolve() {
     for (int i = 0; i < n; ++i)
       for (int j = 0; j < n; ++j)
         if (young[i] && young[j]) A[i][j] += 4.0 / (double(ny) * ny);
-  // Each pair's pull: by the interval table (the default), or by the spectra
-  // (PJ_JI_SPECTRAL=1): every two partials of theirs within 36 c of each other beat, and pull the interval to where
+  // Each pair's pull: by the spectra (the default; PJ_JI_SPECTRAL=0: by the
+  // interval table alone): every two partials of theirs within 36 c of each other beat, and pull the interval to where
   // they meet, by the weaker one's level (the beating's depth); the keys' spectra their sounding
   // pipes' modelled spectra (each harmonic's level in the pipe's own output,
   // read from the model once at calibration and cached: a Gedackt's odd partials only, a Nasard's at 3x, a Terz's at 5x,
   // a mixture's ranks). Else (or with no partials met) the interval table's.
-  static const bool kSpectral = knob("PJ_JI_SPECTRAL", 0) != 0;  // (off: the table, the version the user liked; 1: by the spectra)
+  static const bool kSpectral = knob("PJ_JI_SPECTRAL", 1) != 0;  // (on: by the spectra; 0: the interval table alone)
   static const double kSpecW = knob("PJ_JI_SPECTRAL_W", 1.0);
   std::vector<std::vector<std::pair<double, double>>> spec(n);  // per key: (log2 of the partial over the key's 8' pitch, strength)
   if (kSpectral)
@@ -1710,10 +1957,27 @@ void OrganModel::justGlide() {
     }
     const double step = std::max(jiRate_[m], 0.001) * blockMs;
     jiNow_[m] += std::clamp(want - jiNow_[m], -step, step);
-    const double r = std::exp2(jiNow_[m] / 1200);
-    for (int i : byKey_[m]) pipes_[i].p.tune(pipes_[i].baseRatio * r);
-    for (int i : byPedal_[m]) pipes_[i].p.tune(pipes_[i].baseRatio * r);
+    for (int i : byKey_[m]) retune(i);
+    for (int i : byPedal_[m]) retune(i);
   }
+}
+
+// The air's speed of sound ~ sqrt(T) (+1 C at 20: +0.17 %, 2.95 c) and a
+// little with the humidity (+0.0035 % a % RH at 20 C); applied a few times a
+// second when it has moved 0.02 c. A reed's tongue, at the wind's temperature
+// (its own motion warms it by nothing), softens and lengthens as it warms
+// (~ -0.35 c a degree), its resonator's air pulling it up a little: a little
+// flat on the whole, -0.1 of the flues' rise.
+void OrganModel::climateStep() {
+  static const double kDT = knob("PJ_ORGAN_WARMUP_C", 1.0), kDRH = knob("PJ_ORGAN_WARMUP_RH", 5.0),
+                      kSecs = knob("PJ_ORGAN_WARMUP_SECS", 600), kReed = knob("PJ_ORGAN_WARMUP_REED", -0.1);
+  if (now_ % (kBlock * 512) != 0) return;
+  const double u = std::clamp(double(now_) / fs_ / std::max(kSecs, 1.0), 0.0, 1.0);
+  const double flue = 1200 * std::log2(std::sqrt((293.15 + kDT * u) / 293.15) * (1 + 0.000035 * kDRH * u));
+  if (std::fabs(flue - climate_[0]) < 0.02) return;
+  climate_[0] = flue;
+  climate_[1] = kReed * flue;
+  for (int i = 0; i < int(pipes_.size()); ++i) retune(i);
 }
 
 void OrganModel::renderBlock() {
@@ -1721,10 +1985,12 @@ void OrganModel::renderBlock() {
     justSolve();
     justGlide();
   }
+  climateStep();
   now_ += kBlock;
   for (int s = 0; s < kBlock; ++s) {
     if (roomPos_ < roomN_) pRoom_ = room_[roomPos_++];
     church_[s] = pRoom_ / float(outScale());
+    if (naveOn_ && room_) church_[s] += naveFb_ * naveP_[s] / float(outScale());  // (its own nave's field)
   }
   for (int d = 0; d < 4; ++d) windNow_[d] = wind_.pressure(d);
   const int n = int(enc_.size());
@@ -1732,6 +1998,21 @@ void OrganModel::renderBlock() {
     pool_->run(n, [this](int e) { renderEnclosure(e); });
   } else {
     for (int e = 0; e < n; ++e) renderEnclosure(e);
+  }
+  if (paths_) {  // (each pipe's own paths: the two microphones on two threads)
+    for (int k : {1, 2}) {
+      const Enclosure& sw = enc_[k == 1 ? kSwellC : kSwellCis];
+      nave_.setShutter(k, sw.shutterA(), sw.shutterGain(), sw.leak());
+    }
+    const bool late = naveOn_ && room_;  // (its own nave: a third job)
+    if (pool_) {
+      pool_->run(late ? 3 : 2, [this](int m) { m < 2 ? scatterPaths(m) : runNave(); });
+    } else {
+      scatterPaths(0);
+      scatterPaths(1);
+      if (late) runNave();
+    }
+    nave_.advance();
   }
   // The wind: the block's flows, averaged, drawn sample by sample.
   double demand[4] = {0, 0, 0, 0};
@@ -1774,6 +2055,32 @@ float OrganModel::sample() {
   organPos_ = (organPos_ + 1) % int(organHist_.size());
   last_ = g * mid;
   side_.push_back(g * float(outScale()) * sd);
+  if (paths_) {
+    // (below the crossover both microphones hear the paths alike, as the mic
+    // stage's lows: the bass's wavelengths over the pair's spacing)
+    float e[2];
+    for (int m = 0; m < 2; ++m) {
+      const float y = roomOut_[m][bp];
+      eLo1_[m] += xoverA_ * (y - eLo1_[m]);
+      eLo2_[m] += xoverA_ * (eLo1_[m] - eLo2_[m]);
+      e[m] = y - eLo2_[m];
+    }
+    const float lo = 0.5f * (eLo2_[0] + eLo2_[1]);
+    // (the early sound's balance against the church's late field, as a
+    // recording's main pair against its room: PJ_ORGAN_EARLY_DB)
+    static const float kEarly = float(std::pow(10.0, knob("PJ_ORGAN_EARLY_DB", 0.0) / 20));
+    if (earlyL_.size() >= 65536) {  // (nobody taking it: -seq, no room; keep the recent)
+      earlyL_.erase(earlyL_.begin(), earlyL_.begin() + 32768);
+      earlyR_.erase(earlyR_.begin(), earlyR_.begin() + 32768);
+    }
+    earlyL_.push_back(kEarly * g * float(outScale()) * (lo + e[0]));
+    earlyR_.push_back(kEarly * g * float(outScale()) * (lo + e[1]));
+    if (naveOn_ && room_) {  // (its own nave: the sound at 1 m in, Pa, as the room's feed was)
+      naveIn_[bp] = last_;
+      lateL_.push_back(float(outScale()) * naveL_[bp]);
+      lateR_.push_back(float(outScale()) * naveR_[bp]);
+    }
+  }
   return finish(last_);
 }
 

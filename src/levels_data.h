@@ -128,9 +128,11 @@ constexpr LevelTrim kLevelTrims[] = {
     {"bandoneon", -5.7f},  // (measured -22.5 LUFS)
     {"harmonica", 2.2f},  // (measured -30.4 LUFS with the hands cupped)
     {"reed-organ", 9.3f},  // (measured -37.5 LUFS, stops 1 + 4)
-    {"hammond", 9.2f},           // (measured -37.4 LUFS through the Leslie, slow)
-    {"drawbar-organ", 9.2f},
-    {"percussive-organ", 12.0f},  // (measured -42.0; by hand 2 dB under: the ping's peak)
-    {"rock-organ", 10.9f},        // (measured -39.1, the amp driven)
+    {"hammond", 0.6f},           // (its output x5 (+14 dB: a Leslie is loud, the room hears it so; heard from 4 m in a room, ~3 dB under
+                                  // its close microphones), then 3 dB over the common level: in a
+                                  // band it sat ~3 dB under TiMidity's FluidR3 organ, against the band, in 5 GM files)
+    {"drawbar-organ", 0.6f},
+    {"percussive-organ", 4.1f},  // (measured -41.3: the ping decays within the measured second; +3 dB as above)
+    {"rock-organ", -4.2f},         // (measured -31.9, the 122 driven hot; +3 dB as above)
 };
 }  // namespace pajupilli

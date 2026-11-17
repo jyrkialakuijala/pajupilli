@@ -65,6 +65,9 @@ class Room {
   void process(const float* const* src, int n, float* const* atSource, float* left, float* right,
                const float* listenGain);
   int sources() const { return int(x_.size()); }
+  // The microphones' gain on everything the room delivers (early and late):
+  // an instrument bringing its own early sound to the listener takes it too.
+  float micGain() const { return micGain_; }
   const RoomSpec& spec() const { return spec_; }
   // Source s's first reflections off the side walls: when, and how much louder
   // in the right channel than the left.

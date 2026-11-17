@@ -93,17 +93,18 @@ void Brush::strike(double speed, double spread, double follow, double dwell, dou
   t_ = 0;
 }
 
-void Brush::rest(double load) {
+void Brush::rest(double load, double share) {
   if (load <= 0) {
     if (mode_ == kRest) { mode_ = kLift; speed_ = 0.3; }
     return;
   }
   if (mode_ != kRest) {
-    layout();
+    layout(share);
     x_ = xTo_; y_ = yTo_; ang_ = angTo_;
     double low = 0;
     for (int i = 0; i < s_.tips; ++i) {
       Tip& t = tip_[i];
+      if (i >= active_) { t.h = -0.05; continue; }  // (held back: in the air)
       t.h = 2.0e-3 * urand(rng_);  // (a light hand: only the longest ends touch; a heavy one: all)
       shapes(i);
       low = std::max(low, heightAt(i) + t.h);
@@ -128,10 +129,14 @@ void Brush::step() {
   const double moved = std::hypot(dx, dy);
   // Which way it is drawn against the wires' lie: +1 pushed point first, -1 pulled.
   const double lead = moved > 1e-9 ? (dx * std::cos(ang_) + dy * std::sin(ang_)) / moved : 0;
-  if (moved > 1e-7) {  // one end's shares a sample, in turn
+  drawn_ += moved;
+  if (moved > 1e-7 && drawn_ >= s_.reshape) {  // one end's shares a sample, in turn (those that are down)
+    drawn_ = 0;
+    if (next_ >= active_) next_ = 0;
     shapes(next_);
-    next_ = (next_ + 1) % s_.tips;
+    next_ = (next_ + 1) % std::max(active_, 1);
   }
+  const double ca = std::cos(ang_), sa = std::sin(ang_);
   // The hand's height.
   t_ += dt_;
   switch (mode_) {
@@ -187,7 +192,15 @@ void Brush::step() {
     if (t.travel >= kTex) t.travel -= kTex;
     const int j = int(t.travel);
     const double fr = t.travel - j;
-    const double g = s_.rough * (1 + s_.bite * lead) * (tex_[j] + fr * (tex_[(j + 1) % kTex] - tex_[j]));
+    double g = s_.rough * (1 + s_.bite * lead) * (tex_[j] + fr * (tex_[(j + 1) % kTex] - tex_[j]));
+    if (s_.ridge > 0) {
+      // The lathing under this end, at its own radius: a ridge, rounded,
+      // every groove's width (the end, ~0.3 mm, rides over its crest).
+      const double px = x_ - sa * t.u + ca * t.w, py = y_ + ca * t.u + sa * t.w;
+      const double c = std::hypot(px, py) / s_.groove;
+      const double f = c - std::floor(c) - 0.5;
+      g += s_.ridge * (1 / 3.0 - 4 * f * f);  // (its mean 0)
+    }
     float zs = 0, vs = 0;
     {
       const float *q = head_.q(), *v = head_.v();
@@ -197,13 +210,13 @@ void Brush::step() {
     const double pen = zh + g - t.z;  // how far the end is into the film
     double fc = 0;
     if (pen > 0) {
-      fc = s_.contact * pen * std::max(0.0, 1 + s_.contactLoss * (vh - t.v));
+      fc = stiff_ * s_.contact * pen * std::max(0.0, 1 + s_.contactLoss * (vh - t.v));
       // Drawn along, the wire leans on the grain it meets: its press on
       // the head rises and falls with the grain, in proportion to the press.
       const int j2 = (j * 7 + 1234) % kTex;
       fc *= std::max(0.0, 1 + s_.drag * (1 + s_.bite * lead) * (tex_[j2] + fr * (tex_[(j2 + 7) % kTex] - tex_[j2])) * std::min(1.0, moved * fs_ / 0.05));
       ++touching_;
-      scrape_ += float(s_.contact * g);
+      scrape_ += float(stiff_ * s_.contact * g);
     }
     t.on = pen > 0;
     t.v += dt_ * (fFan + fc) / s_.tipMass;

@@ -114,6 +114,13 @@ const float* Voice::side(int n) {
   return model_->takeSide(n);
 }
 
+bool Voice::ownEarly() const { return rs_.identity() && model_->ownEarly(); }
+bool Voice::ownLate() const { return ownEarly() && model_->ownLate(); }
+
+void Voice::early(int n, float* l, float* r, float g) {
+  if (ownEarly()) model_->takeEarly(n, l, r, g);
+}
+
 std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.reed()) return std::unique_ptr<Tube>(new Reed(inst));
   if (inst.lip()) return std::unique_ptr<Tube>(new Horn(inst));

@@ -58,6 +58,15 @@ struct PipeVoicing {
   double chiff = 0;         // the attack's chiff: the first overtone (an open pipe's octave, a stopped
   double chiffTime = 0.03;  // one's twelfth) driven (1 + chiff) x, fading over chiffTime: it leads, then
                             // settles (the recorded pipes' octave 5-10 dB over its steady level at first)
+  double chiffFoot = 0;     // 0..1: the chiff's fading clocked by the foot's pressure (1: it fades over chiffTime
+                            // once the wind is in the foot, as the jet forms; 0: from the key, as before)
+  double chiffVar = 0;      // this pipe's own chiff, x exp(chiffVar u) (u in -1..1, seeded: the voicer's cut-up
+                            // and nicking never quite alike pipe to pipe), its time x (1 + chiffVar u / 2)
+  double chiffEven = 0;     // 0..1: an open pipe's chiff on its octave driven as if unweighted by the voicer's octave
+                            // (openEven: the languid's offset sets the steady octave; the jet's first, unsteady
+                            // breaths across the mouth drive the octave as they find it: a flute's chiff too)
+  double chiffPress = 0;    // each attack's, x (1 + chiffPress u) (the jet's first breath turbulent), and a pallet
+                            // opened faster than the voicing's up to (1 + chiffPress) x
   double noiseLp = 0;       // the breath's and the puff's low-pass (Hz; 0: none): a pipe behind a wall or a case
   double sympDrive = 0;     // the field at the mouth driving its modes at the start (sympathetic resonance:
   double sympTime = 0.05;   // a partial already in the air builds up faster), fading over sympTime
@@ -92,6 +101,12 @@ struct PipeVoicing {
   double windTau = 0;       // the jet's travel lengthened further by a sagging chest, (1 + windTau (1 - wind)):
                             // its disturbances' convection (~0.4-0.5 its speed) and its profile thickening
                             // at lower pressure; the foot's own rise at the attack unchanged
+  // A frein harmonique (a string's beard, roller or cross-bar before its
+  // mouth): the mouth's acoustic flow squeezed past it loses energy there, a
+  // resistance at the column's open end, adding the same bandwidth (Hz) to
+  // every mode: the fundamental's Q falls most, so it rings up (speaks) in
+  // ~1 / (pi (f / q1 + freinHz)) instead of its narrow pipe's q1 / (pi f).
+  double freinHz = 0;
   double valve = 0.024;     // the pallet's opening (s)
   double footRise = 0.006;  // the foot's pressure rising behind it (s)
   double release = 0.03;   // the wind falling when it closes (s)
@@ -104,6 +119,11 @@ class FluePipe {
     v_ = v;
     hz_ = hz;
     rng_.reseed(seed);
+    if (v_.chiffVar > 0) {  // (drawn only when asked: the other pipes' noise streams as they were)
+      const double u = rng_.uniform(), u2 = rng_.uniform();
+      v_.chiff *= std::exp(v_.chiffVar * u);
+      v_.chiffTime *= 1 + 0.5 * v_.chiffVar * u2;
+    }
     k_.clear();
     for (int k = 1; int(k_.size()) < v.maxModes; k += v.stopped && v.evenLevel <= 0 ? 2 : 1) {
       const double f = hz * k * (1 + v.stretch * (k - 1));
@@ -137,7 +157,8 @@ class FluePipe {
     for (size_t i = 0; i < k_.size(); ++i) {
       const int k = k_[i];
       const double f = hz_ * ratio * k * (1 + v_.stretch * (k - 1));
-      const double q = std::min(v_.qCap, v_.q1 * std::pow(double(k), v_.qRise));
+      const double q0 = std::min(v_.qCap, v_.q1 * std::pow(double(k), v_.qRise));
+      const double q = 1 / (1 / q0 + v_.freinHz / f);
       const double r = std::exp(-M_PI * f / (q * fs_)), w = 2 * M_PI * f / fs_;
       c_[i] = float(r * std::cos(w));
       s_[i] = float(r * std::sin(w));
@@ -146,6 +167,7 @@ class FluePipe {
       const double cz = (k - v_.chimneyK) / v_.chimneyWidth;
       const double chimney = 1 + v_.chimneyBoost * std::exp(-cz * cz);
       in_[i] = float((1 - r) * std::pow(double(k), -v_.modeTilt) * roll * even * chimney);  // (each mode's resonance gain ~ its weight)
+      if (i == 1) chiffScale_ = v_.chiffEven > 0 && even > 0 ? float(std::pow(1 / even, v_.chiffEven)) : 1.0f;
     }
     tau_ = v_.tauFrac * fs_ / (hz_ * ratio);
     uScale_ = float(std::pow(std::max(v_.drive, 1e-3), -v_.driveNorm));
@@ -172,7 +194,16 @@ class FluePipe {
       const float soft = secs > v_.valve ? float(std::clamp(std::sqrt(v_.valve / secs), 0.35, 1.0)) : 1.0f;
       const float closed = 1 - std::clamp(valvePos_, 0.0f, 1.0f);
       puffEnv_ = std::max(puffEnv_, closed * soft);
-      chiffEnv_ = std::max(chiffEnv_, closed * soft);
+      float press = soft;
+      if (v_.chiffPress > 0) {  // (a quicker pallet a little more; each breath its own)
+        if (secs > 0 && secs < v_.valve) press = float(std::min(std::sqrt(v_.valve / secs), 1 + v_.chiffPress));
+        press *= float(1 + v_.chiffPress * rng_.uniform());
+      }
+      // (a jet still flowing barely re-forms: a small pipe's chiff, clocked by
+      // its foot, ~ the square of how far the pallet had closed; else a key
+      // struck again at once found its pipe speaking and boosted its octave
+      // at full strength, more than a fresh attack's)
+      chiffEnv_ = std::max(chiffEnv_, float(std::pow(closed, 1 + v_.chiffFoot)) * press);
       sympEnv_ = std::max(sympEnv_, closed);
     }
     on_ = true;
@@ -225,8 +256,11 @@ class FluePipe {
       sympEnv_ *= sympDecay_;
     }
     if (chiffEnv_ > 1e-4f) {  // (the chiff: mode 1 of the list is the first overtone)
-      chiffBoost_ = 1 + float(v_.chiff) * chiffEnv_;
-      chiffEnv_ *= chiffDecay_;
+      chiffBoost_ = 1 + float(v_.chiff) * chiffScale_ * chiffEnv_;
+      if (v_.chiffFoot > 0)  // (clocked by the foot's pressure: the jet's forming, not the key's fall)
+        chiffEnv_ *= 1 - (1 - chiffDecay_) * (1 - float(v_.chiffFoot) + float(v_.chiffFoot) * std::min(p, 1.0f));
+      else
+        chiffEnv_ *= chiffDecay_;
     } else {
       chiffBoost_ = 1;
     }
@@ -351,7 +385,7 @@ class FluePipe {
   float valvePos_ = 0, foot_ = 0, prev_ = 0, prevD_ = 0, jl1_ = 0, jl2_ = 0, jl3_ = 0, jl4_ = 0, prevHiss_ = 0, jetA_ = 1, puffLp_ = 0, puffEnv_ = 0, puffDecay_ = 0, bl1_ = 0, bl2_ = 0, prevTop_ = 0, topOut_ = 0, swing_ = 0;
   bool on_ = false, awake_ = false;
   Rng rng_;
-  float chiffEnv_ = 0, chiffDecay_ = 0, chiffBoost_ = 1, sympEnv_ = 0, sympDecay_ = 0;
+  float chiffEnv_ = 0, chiffDecay_ = 0, chiffBoost_ = 1, chiffScale_ = 1, sympEnv_ = 0, sympDecay_ = 0;
   float noiseA_ = 1, nl1_ = 0, nl2_ = 0;
   double moveTime_ = 0.012;
   float lastD_ = 0, uScale_ = 1, swingUp_ = 0.01f, swingDown_ = 0.0003f;

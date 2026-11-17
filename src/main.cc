@@ -380,6 +380,10 @@ const char kUsage[] =
     "  -play FILE.mid      play a MIDI file: each channel's GM program on its\n"
     "                      instrument (or the nearest built), drums on the\n"
     "                      percussion built; played as it is rendered (or -o)\n"
+    "  -reinstrument R     with -play: FROM=TO[,FROM=TO]: a channel's instrument\n"
+    "                      (a name, a family, or * for all but the drums) on\n"
+    "                      another (organ: the church organ by its plan), e.g.\n"
+    "                      -reinstrument grand-piano=organ,piano=hammond\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
@@ -553,6 +557,9 @@ int main(int argc, char** argv) {
     else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
     else if (a == "-polydemo") polyDemo = true;
     else if (a == "-play") playFile = next();
+    else if (a == "-reinstrument") {
+      if (!setReinstrument(next())) return 1;
+    }
     else if (a == "-ensemble") {
       ensemble = "bass,alto,flute,flute,piccolo";
       if (i + 1 < argc && argv[i + 1][0] != '-') ensemble = argv[++i];

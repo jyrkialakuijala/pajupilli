@@ -56,6 +56,9 @@ class Performer {
   // (-play) How much the other parts are playing in this instrument's register just now (0:
   // nothing, ~1: a full texture). A soloist plays with more drama over less (the harmonica's hands).
   virtual void setAccompaniment(double /*busy*/) {}
+  // (live) An instrument's own use of the MPK's knobs K1..K8 (k 0..7, x 0..1); true if it took
+  // the knob (the Hammond's drawbars on K1-K4), false to leave it to the common map.
+  virtual bool setKnob(int /*k*/, double /*x*/) { return false; }
 
   void setDynamics(double d) { dyn_ = d; }      // 0 pp .. 1 ff (breath, lip opening)
   void setBreath(double b) { breathCtl_ = b; }   // added to dynamics (joystick, pad pressure)

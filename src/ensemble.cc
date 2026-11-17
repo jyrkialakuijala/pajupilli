@@ -866,11 +866,14 @@ void Ensemble::block(float* left, float* right, int n) {
       const float g = float(f_[i].v->instrument().gain * levelTrim(f_[i].v->instrument())) / send;
       // (Velocity's gain is the player's: the room hears it too, early and
       // late. It is at most +6 dB, velocityGainDb.)
-      const float gs = float(f_[i].vg) / (g * k);
+      // (an instrument with its own late field, the organ's nave: nothing)
+      const float gs = f_[i].v->ownLate() ? 0.0f : float(f_[i].vg) / (g * k);
       for (int j = 0; j < n; ++j) srcBuf_[size_t(i) * n + j] = buf_[i][j] * gs;
       src[i] = &srcBuf_[size_t(i) * n];
       at[i] = f_[i].room.data();
-      lg[i] = g;
+      // (an instrument making its own early sound, the organ's pipes each
+      // through the church: the room adds only its late field)
+      lg[i] = f_[i].v->ownEarly() ? 0.0f : g;
     }
     for (int c = 0; c < 3; ++c) {
       if (!rooms_[c]) continue;
@@ -887,6 +890,12 @@ void Ensemble::block(float* left, float* right, int n) {
     for (int i = 0; i < nf; ++i)
       for (int j = 0; j < n; ++j) at[i][j] *= roomFb_;
     for (int j = 0; j < n; ++j) { left[j] *= k; right[j] *= k; }
+    for (int i : go)
+      if (f_[i].v->ownEarly()) {  // (through its room's microphones, as the room's own early sound)
+        const int c = reverbChannel(f_[i].v->instrument());
+        const float mg = rooms_[c] ? rooms_[c]->micGain() : 1.0f;
+        f_[i].v->early(n, left, right, mg * float(f_[i].vg * f_[i].v->instrument().gain * levelTrim(f_[i].v->instrument())));
+      }
   } else if (panned_) {
     for (int i = 0; i < nf; ++i) {
       const float gl = float(f_[i].gl * f_[i].vg), gr = float(f_[i].gr * f_[i].vg);
@@ -905,7 +914,9 @@ void Ensemble::block(float* left, float* right, int n) {
   // An instrument that sounds differently to its two sides (the double bass):
   // its direct sound's difference, to the left and from the right.
   for (int i : go)
-    if (const float* sd = f_[i].v->side(n)) {
+    if (room_ && f_[i].v->ownEarly()) {
+      f_[i].v->side(n);  // (its own early sound has its sides: this one dropped)
+    } else if (const float* sd = f_[i].v->side(n)) {
       const float g = float(f_[i].vg);
       for (int j = 0; j < n; ++j) {
         left[j] += g * sd[j];

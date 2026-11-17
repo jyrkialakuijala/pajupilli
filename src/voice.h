@@ -46,6 +46,10 @@ class Voice {
   // A model that sounds differently to its two sides (the double bass): the
   // last n samples' difference (left = out + side, right = out - side), or null.
   const float* side(int n);
+  // Its own early sound (Tube::ownEarly), its last n samples x g, added to l and r.
+  bool ownEarly() const;
+  void early(int n, float* l, float* r, float g);
+  bool ownLate() const;  // (Tube::ownLate)
   void seed(unsigned s) { model_->seed(s); player_->seed(s); }
 
  private:

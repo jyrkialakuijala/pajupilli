@@ -31,6 +31,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cmath>
 #include <cstdio>
 #include <memory>
 #include <vector>
@@ -62,6 +63,15 @@ struct CymbalSpec {
   // The hand on the edge: the loss (1/s, for a mode of middling edge motion)
   // when fully choked.
   double choke = 300;
+  // The brush lying on the plate (a swirl): its wires' rub, a loss (1/s,
+  // for a mode of middling motion on the circle where it lies) per N it is
+  // pressed with: a light touch lets the cymbal ring, a heavy one chokes it.
+  double press = 2;
+  // The plate's thickness from the bell to the edge, as 1 + taper (1 - 2 r/R)
+  // of its mean: under the wire ends it is stiffer towards the bell (the
+  // plate's give at a point ~ 1/h^2), so they spring off sooner (brighter),
+  // and softer at the edge (they sink in and stay: washier).
+  double taper = 0.5;
   // The stick's own ring (its bending modes, damped by the hand), by how
   // much of the blow (a share of the plate's own sound).
   double wood = 0.03;
@@ -98,6 +108,8 @@ class Cymbal {
   Plate& plate() { return plate_; }
   // The hand on the edge: 0 off .. 1 a full grip.
   void choke(double amount) { choke_ = amount; if (amount > 0) wake(); }
+  // Where the brush lies now, from the centre (m).
+  double brushRadius() const { return std::hypot(brush_->x(), brush_->y()); }
   float sample();
   float side() const { return side_; }
   void reset();
@@ -112,7 +124,7 @@ class Cymbal {
   Plate plate_;
   std::unique_ptr<Feel> feel_;
   std::unique_ptr<Brush> brush_;
-  float brushGain_ = 1;
+  float brushGain_ = 1, swirlGain_ = 1;
   // The body: height and two tilts.
   double z_ = 0, vz_ = 0, ax_ = 0, wx_ = 0, ay_ = 0, wy_ = 0;
   // The stick.
@@ -125,7 +137,14 @@ class Cymbal {
   float wRe_[3] = {}, wIm_[3] = {}, wPr_[3] = {}, wPi_[3] = {};
   // The choke.
   std::vector<float> edge_;
-  double choke_ = 0;
+  double choke_ = 0, mid_ = 1;
+  // The brush's press: each mode's share where it lies, the loss, and when
+  // they were last found; the plate's stiffness under the ends at the bow.
+  std::vector<float> press_;
+  float pressRate_ = 0;
+  int pressAge_ = 0;
+  double bowStiff_ = 1;
+  void brushFeel();
   // The microphones.
   std::vector<float> mic_[2];
   float prev_[2] = {}, bPrev_ = 0, side_ = 0;
@@ -169,6 +188,14 @@ class CymbalModel : public Tube {
 //   other keys: the tip, from the edge (low) to the bell (high).
 // With a brush: a tap that lands and is drawn on a little (a crash: a
 // sweep across the edge), quiet, no ping.
+//   84      the brush swirled on the cymbal for as long as the key is held
+//           (velocity: how hard it is pressed, light): the fan lies on the
+//           plate and is drawn round in long loops along the lathing, a
+//           turn every two beats, the loops' middle wandering between the
+//           edge (lower, washier) and towards the bell (higher, glassier),
+//           the press easing and leaning on the beat. A stroke while it is
+//           held takes the hand for a moment, and it swirls on after.
+//           (-play sends it of its own accord with the brushes: drumkit.h.)
 // The choke: the breath (channel pressure, pad pressure) is the hand
 // grabbing the edge. Note-offs do nothing (GM's drum keys), unless
 // PJ_CYM_NOTEOFF=1 (then a note-off chokes, as an e-kit's cymbal pad does).
@@ -187,7 +214,14 @@ class CymbalPlayer : public Performer {
   double bowPlace();   // the ride's bow, drifting by phrases (share of the radius)
   double angle();      // the side facing the drummer, wandering (rad)
   double lean(int velocity);  // how much a brush stroke is leaned on, 0 .. 1
+  void swirl(double dt);       // the brush swirled, one block
   CymbalModel& m_;
+  // The swirl: held, how hard (N), where in its turn, the loop's middle
+  // (share of the radius) and where it is going, turns left there, the
+  // middle's angle; a stroke's pause (s).
+  bool swirl_ = false, swirling_ = false;
+  double swLoad_ = 0, swPhase_ = 0, swR_ = 0.6, swRTo_ = 0.6, swTh_ = 0, swPause_ = 0;
+  int swHold_ = 0, swSide_ = 1;
   uint32_t rng_ = 52361u;
   // The drift: where the hand is, where it goes, strokes left at this place.
   double bow_ = 0, bowTo_ = 0, home_ = 0, wander_ = 0, thWander_ = 0;

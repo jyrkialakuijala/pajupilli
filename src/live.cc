@@ -219,6 +219,11 @@ class Controls {
   }
   void cc(int num, int v) {
     const double x = v / 127.0;
+    // (an instrument's own use of a knob first: the Hammond's drawbars on K1-K4, its Leslie on K5)
+    if (num >= 70 && num <= 77 && p_.instrumentKnob(num - 70, x)) {
+      if (o_.verbose) std::fprintf(stderr, "cc %d = %d\n", num, v);
+      return;
+    }
     switch (num) {
       case 1:  // joystick Y: breath push
         joyBreath_ = 0.5 * x;
