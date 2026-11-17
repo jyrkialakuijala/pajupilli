@@ -625,3 +625,34 @@ dead room from close proximity") [design]:**
 - **Measured** (a held chord, fast, in the hall), room vs close mics: tail −18 vs −21 dB,
   left-right correlation 0.60; the horn band's level swing ~21 dB (the direct sound's beam).
 
+**Inside the horn compartment (2026-11-17, the user's observations of a 122; the sources) [web,
+design]:**
+- **The sources.** Hammond's own description: the louvres "reflect the resonance of inside sounds,
+  while simultaneously spreading the sounds outside" [web, Hammond]. A Leslie "vents the sound from
+  within the box after the sound has bounced around inside" [web]. Smith and Serafin: the cabinet
+  is a "multiply-reflecting enclosure", its comb filtering by delayed reflections "critical to a
+  realistic simulation" of the chorus and phasing [paper, SSAB02]. Herrera, Hanson and Abel
+  modelled time-varying first-order reflections off the inside walls [paper, HHA09]. The outside
+  size is 41 × 29 × 21 in, height first (b3world.com).
+- **The user's look.** Louvres on all four sides: of their sound ~25 % out, ~25 % turned up and
+  down by the slats, ~50 % back in. The four corners are solid, thick wood. The long sides are
+  narrowed in their middle (six openings a turn). Both rotors sit off-centre. The slots are ~5 cm
+  apart one over another.
+- **Built:**
+  - each path's way out by where it meets the wall: amplitude √0.25 at a louvre; none at a corner
+    post (6 cm along each wall) or the long sides' middle (±5 cm); 1 cm soft edges;
+  - images off the four walls (√0.5, turning the other way) and the lid and the motor board (√0.25
+    each, 0.12 m above and below, the same way);
+  - the horn's axis 3 cm back and 4 cm left of the middle;
+  - the highs (above 4 kHz) on the close microphones through six slots 5 cm apart, at the mics'
+    elevations (+12°, −8°);
+  - the close microphones moved to the sides (±80°, 0.65 m).
+- **Measured** (a full-drawbar chord, fast, close microphones), against the horn alone with no
+  inside, posts, offset or slots:
+  - the partials' level changes 2.0 vs 1.5 dB per 10 ms, 33 % more restless;
+  - left vs right above 6 kHz 1.8 vs 1.3 dB.
+- **The posts.** At the microphones the posts' own fourfold and sixfold pattern is lost under the
+  reflections: what a post blocks comes round off the walls. That is as the user describes the box.
+- **Not found:** the rotors' exact offsets, the corner posts' sizes, the louvres' slot count and
+  depth. The numbers above are the user's estimates and defaults.
+

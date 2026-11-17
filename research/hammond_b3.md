@@ -1165,3 +1165,41 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
   - whisper 5.7/1.5, ballad 7/1.5, jazz 8/1.5, gospel 8/3.5, full 8/6.8;
   - live and in `-play`'s plans.
 
+**By ear (2026-11-17, the user):**
+- **The tone:** the Hammond was "a bit too dark". The preamp's tone control now lifts the mids and
+  highs 3 dB (a first-order shelf from 1 kHz, `PJ_HAMMOND_BRIGHT`): +2.7 dB at 2-5 kHz, +3.2 dB
+  above 6 kHz.
+- **Played low, registered higher (the user: "higher drawbar settings so that it doesn't get too
+  muddy, or even the 000800000 kind"):** `-play`'s plan moves the upper registration up an
+  octave when the upper manual's mean pitch is under E3 (52), two under F#2 (42). Each drawbar
+  goes to the one an octave above (the 1⅗', 1⅓', 1' have none). The jazz 888000000 becomes
+  008880000, or 000808080; the 8' alone becomes the 4' alone.
+- **A line that never sounds two notes together** is a tune, whatever its register: it goes to
+  the upper manual (before, a single low line went to the lower).
+- **The user's ~/Downloads/rdmdngt.mid ("the accompaniment louder than the melody"):**
+  - Its tracks, "Hammond Left" and "Hammond Right", had been assigned right: right to the upper,
+    left to the lower.
+  - But it writes its balance in velocity (the tune 127, the left hand ~56) and per-channel CC11.
+    The organ ignored the one and let either channel's CC11 move its single pedal.
+  - Now the planner sets the balance in registration (the lower manual softer by the measured gap,
+    11 dB here, so 2.7 steps more: 304000000 under 888000000), and only the tune's channels move
+    the pedal.
+- **Low lines keep a little sub** (the user: "they wouldn't play low without a reason, but want to
+  add some subharmonics"): a third of the 16' an octave up (308880000); two octaves up, a third of
+  the 8' and a fifth of the 16' (203808080).
+- **General pauses re-register** (the user: "always an opportunity to re-register and pull one
+  drawbar out, more toward the end; the dramatic arc"):
+  - one drawbar out at each pause of half a beat and 0.25 s or more, in the order 4', 2', 2⅔',
+    1', 1⅓', 1⅗';
+  - at most four, the later ones where there are more;
+  - the lower manual and pedals follow.
+
+  rdmdngt.mid has one such pause (0.66 beat): 888000000 → 888800000.
+- **Routing instruments** (the user, via the organ session): hammond-upper-manual,
+  hammond-lower-manual and hammond-pedal join the one Hammond and pin their notes to that
+  division.
+- **A 4' melody** (the user: "when the melody is relatively low in comparison to the accompaniment
+  and by itself, it might be a 000800000-like melody, perhaps with some subharmonics"): a tune whose
+  mean pitch is within a fourth above its lower manual's (+5: in its range; rdmdngt.mid's tune 70 over 67), or alone under E3, gets 302800000. The
+  two-octave shift stays for tunes under F#2.
+

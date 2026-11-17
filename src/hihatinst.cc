@@ -22,8 +22,14 @@ void HiHatModel::resetAir() {
 
 float HiHatModel::sample() {
   static const float g = float(knob("PJ_HAT_OUT", 1.0 / 3));
-  last_ = g * hat_.sample();
-  side_.push_back(g * float(outScale()) * hat_.side());
+  // The highs 3 dB down, as the cymbals' (src/cymbal.cc: heard from a little further off).
+  static const float kHi = float(std::pow(10.0, knob("PJ_CYM_HIGHS", -4.3) / 20) - 1);
+  static const float kA = float(1 - std::exp(-2 * M_PI * 3000 / fs_));
+  const float x = hat_.sample(), sd = hat_.side();
+  shelfM_ += kA * (x - shelfM_);
+  shelfS_ += kA * (sd - shelfS_);
+  last_ = g * (x + kHi * (x - shelfM_));
+  side_.push_back(g * float(outScale()) * (sd + kHi * (sd - shelfS_)));
   return finish(last_);
 }
 

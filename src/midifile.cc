@@ -234,6 +234,9 @@ bool isHammond(const Instrument* in) { return in && std::strcmp(in->family, "ham
 
 }  // namespace
 
+static int gPlayTranspose = 0;
+void setPlayTranspose(int semitones) { gPlayTranspose = semitones; }
+
 bool setReinstrument(const std::string& spec) {
   gReinstrument.clear();
   for (size_t at = 0; at <= spec.size();) {
@@ -277,6 +280,7 @@ struct Part {
   std::map<int, int> hammondDiv;             // channel * 128 + key -> division (held notes)
   size_t leslieNext = 0;                     // the plan's next Leslie change
   size_t percNext = 0;                       // the plan's next percussion switch
+  size_t regNext = 0;                        // the plan's next re-registration
   std::map<int, int> hammondChans;           // channel -> its notes (a Hammond playing several)
   int maxPoly = 1, maxHeld = 1, played = 0;  // (voices: notes held at once, their tails counted)
   double vol = 100 / 127.0, expr = 1;
@@ -291,6 +295,17 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   std::string err;
   if (!readSong(path, &song, &err)) { std::fprintf(stderr, "-play: %s\n", err.c_str()); return 1; }
   if (song.ev.empty()) { std::fprintf(stderr, "-play: no events in %s\n", path.c_str()); return 1; }
+  if (gPlayTranspose != 0) {  // (every note but the drums', before anything plans on them)
+    int clipped = 0;
+    for (Event& e : song.ev) {
+      const int kind = e.status & 0xf0;
+      if ((e.status & 15) == 9 || (kind != 0x80 && kind != 0x90 && kind != 0xa0)) continue;
+      const int k = e.a + gPlayTranspose;
+      clipped += k < 0 || k > 127;
+      e.a = uint8_t(std::clamp(k, 0, 127));
+    }
+    std::fprintf(stderr, "  transposed %+d semitones%s\n", gPlayTranspose, clipped ? " (some notes clamped to 0..127)" : "");
+  }
   // A file played hot throughout (every note near 127: a sequencer's default,
   // a keyboard with a hard curve) has no loudness to spare: its velocities
   // are scaled together until the median is 96 (PJ_PLAY_VELMEDIAN), keeping
@@ -541,17 +556,25 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     if (std::strcmp(p.inst->family, "hammond") != 0 || id / 128 == 9) continue;
     std::vector<HammondNote> notes;
     std::map<int, std::pair<uint64_t, int>> on;  // channel * 128 + key -> (tick, velocity)
-    int progs[16] = {};
+    int progs[16] = {}, cc11[16];
+    std::fill(cc11, cc11 + 16, 127);
+    std::map<int, int> onExpr;  // channel * 128 + key -> its channel's expression then
     for (const Event& e : song.ev) {
       const int ech = e.status & 15, kind = e.status & 0xf0;
       if (kind == 0xc0) progs[ech] = e.a;
+      if (kind == 0xb0 && e.a == 11) cc11[ech] = e.b;
       if (ech == 9 || !isHammond(forProgram(progs[ech]))) continue;
       if (kind == 0x90 && e.b > 0) {
         on[ech * 128 + e.a] = {e.tick, e.b};
+        onExpr[ech * 128 + e.a] = cc11[ech];
       } else if (kind == 0x80 || kind == 0x90) {
         auto it = on.find(ech * 128 + e.a);
         if (it == on.end()) continue;
-        notes.push_back({ech * 1000 + e.track, long(it->second.first), long(e.tick), e.a, it->second.second, ech});
+        // (an instrument routing to one division: hammond-upper-manual, -lower-manual, -pedal)
+        const std::string nm = forProgram(progs[ech])->name;
+        const int forced = nm == "hammond-upper-manual" ? HammondModel::kUpper : nm == "hammond-lower-manual" ? HammondModel::kLower
+                         : nm == "hammond-pedal" ? HammondModel::kPedal : -1;
+        notes.push_back({ech * 1000 + e.track, long(it->second.first), long(e.tick), e.a, it->second.second, ech, onExpr[ech * 128 + e.a], forced});
         on.erase(it);
       }
     }
@@ -885,6 +908,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
               if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setPercussion(p.hplan->percussion[p.percNext].second);
               ++p.percNext;
             }
+        for (auto& [id, p] : parts)
+          if (p.hplan)
+            while (p.regNext < p.hplan->upperChanges.size() && p.hplan->upperChanges[p.regNext].first <= long(e.tick)) {
+              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0)))
+                hp->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra);
+              ++p.regNext;
+            }
         // An organ's plan: its registrations and manuals from their bar on (before a note at the same tick).
         for (auto& [id, p] : parts)
           if (p.plan)
@@ -978,7 +1008,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             bool swell = false;
             for (auto& [id, p] : parts)
               if (hears(id, p) && (std::strcmp(p.inst->family, "organ") == 0 || std::strcmp(p.inst->family, "hammond") == 0)) {
-                if (!p.plan) p.ens->all(&Performer::setBreath, e.b / 127.0 - 0.5);  // (a plan's swell wins)
+                // (a plan's swell wins; a Hammond's pedal follows its tune's channels only, the
+                // accompaniment's loudness being in its registration)
+                if (!p.plan && !(p.hplan && !p.hplan->exprChannels.count(ch))) p.ens->all(&Performer::setBreath, e.b / 127.0 - 0.5);
                 swell = true;
               }
             if (!swell) chExpr[ch] = e.b / 127.0;

@@ -132,6 +132,9 @@ constexpr LevelTrim kLevelTrims[] = {
                                   // its close microphones), then 3 dB over the common level: in a
                                   // band it sat ~3 dB under TiMidity's FluidR3 organ, against the band, in 5 GM files)
     {"drawbar-organ", 0.6f},
+    {"hammond-upper-manual", 0.6f},
+    {"hammond-lower-manual", 0.6f},
+    {"hammond-pedal", 0.6f},
     {"percussive-organ", 4.1f},  // (measured -41.3: the ping decays within the measured second; +3 dB as above)
     {"rock-organ", -4.2f},         // (measured -31.9, the 122 driven hot; +3 dB as above)
 };

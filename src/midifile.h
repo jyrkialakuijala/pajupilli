@@ -26,6 +26,10 @@ namespace pajupilli {
 // rule that matches wins. Returns false (and says why) if a rule is wrong.
 bool setReinstrument(const std::string& spec);
 
+// Transposing (-transpose N with -play): every note but the drums' N
+// semitones (12: an octave up), as the file is read, before any planning.
+void setPlayTranspose(int semitones);
+
 // Returns the process exit code.
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
                  bool verbose, bool roomGiven = true);

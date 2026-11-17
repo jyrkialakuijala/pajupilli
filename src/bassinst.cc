@@ -141,6 +141,10 @@ extern const Instrument kPlucked[] = {
     {"drawbar-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
     {"percussive-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
     {"rock-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    // (routing: one Hammond and its Leslie, the notes on this division: -reinstrument piano=hammond-upper-manual)
+    {"hammond-upper-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    {"hammond-lower-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    {"hammond-pedal", 0, 24, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
 };
 extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 

@@ -40,11 +40,14 @@ double HammondModel::wheelHz(int n) { return 20 * kRatio[gearOf(n)] * teethOf(n)
 // accompaniment, from the same family but softer and darker, as organists derive it. Each drawbar
 // keeps a share of the upper's (the foundation all of it, the 5 1/3' half: less buzz under the
 // tune; the top little), then a step less (~3 dB under).
-std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper) {
+std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter) {
   static const double kKeep[9] = {0.85, 0.45, 1.0, 0.55, 0.45, 0.3, 0.25, 0.2, 0.15};
   static const double kSofter = knob("PJ_HAMMOND_LOWER_SOFTER", 1.0);  // (steps)
   std::array<double, 9> lower{};
-  for (int d = 0; d < 9; ++d) lower[d] = std::clamp(upper[d] * kKeep[d] - (upper[d] > 0 ? kSofter : 0), 0.0, 8.0);
+  for (int d = 0; d < 9; ++d)
+    lower[d] = std::clamp(upper[d] * kKeep[d] - (upper[d] > 0 ? kSofter + extraSofter : 0), 0.0, 8.0);
+  // (never silenced: the 8' stays at least a whisper where the upper has one)
+  if (upper[2] > 0) lower[2] = std::max(lower[2], std::min(2.0, upper[2]));
   return lower;
 }
 
@@ -528,6 +531,14 @@ float HammondModel::sample() {
   const double g = std::pow(10.0, -35 * std::pow(1 - std::clamp(expr_, 0.0, 1.0), 1.3) / 20);
   // (the B+ ripple: 120 Hz, a fifth of a percent, on the gain)
   double y = g * (x + 1.2 * (1 - expr_) * shelf_) * kConsole * (1 + 0.002 * std::sin(2 * M_PI * 120 * t_));
+  // The preamp's tone: the mids and highs 3 dB up (above ~1 kHz, a first-order shelf:
+  // PJ_HAMMOND_BRIGHT dB; by ear, the user's: it was a little dark).
+  {
+    static const double kGain = std::pow(10.0, knob("PJ_HAMMOND_BRIGHT", 3.0) / 20) - 1;
+    static const double kA = 1 - std::exp(-2 * M_PI * 1000 / fs);
+    tone_ += kA * (y - tone_);
+    y += kGain * (y - tone_);
+  }
   y = std::tanh(1.5 * y) / 1.5;
   rng_ = rng_ * 1664525u + 1013904223u;
   y += 2e-6 * ((rng_ >> 8) * (2.0 / 16777216.0) - 1);  // (the preamp's hiss)

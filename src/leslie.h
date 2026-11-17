@@ -59,6 +59,7 @@ class Leslie {
   double hornLo_ = 0, hornMid_ = 0, aLo_, aMid_;
   double drumLo_ = 0, aDrum_;
   Ring horn_[3], drum_;  // the horn's three bands, the drum's turning part
+  Ring hornAll_;         // the horn's whole band (its reflections inside the cabinet)
   float drumFixed_[2048] = {};
   int dfw_ = 0;
   // The cabinet's tail.
@@ -69,7 +70,8 @@ class Leslie {
   double beltEcc_[2] = {}, beltPh_[2] = {};                          // its belt's own wobble
   double huntH_ = 0, huntD_ = 0;                                     // the motors' hunting
   int ctl_ = 0;
-  double micX_[2] = {}, micY_[2] = {};
+  double micX_[2] = {}, micY_[2] = {}, micEl_[2] = {};
+  double rayMean_ = 0;
   double windLp_ = 0, windHp_ = 0;                                   // the horn's wind
   double rattleX_ = 0, rattleV_ = 0, rattleW_ = 1000, rattleQ_ = 20, rattleGap_ = 1, rattleHp_ = 0, rattleIn_ = 0;
   double click_ = 0, clickPh_ = 0, t_ = 0;

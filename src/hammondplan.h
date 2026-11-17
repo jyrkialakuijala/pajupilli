@@ -22,7 +22,9 @@
 //     stretch at most (two changes), the percussive organ always on.
 #pragma once
 
+#include <array>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -34,6 +36,8 @@ struct HammondNote {
   int line;          // channel * 1000 + track
   long on, off;      // ticks
   int pitch, vel, ch;
+  int expr = 127;    // its channel's expression (CC11) when it began
+  int forced = -1;   // a division its instrument routes it to (hammond-upper-manual ...), or -1
 };
 
 struct HammondPlan {
@@ -45,6 +49,13 @@ struct HammondPlan {
   // The harmonic percussion's planned switches (tick, on): at most two, mostly none (the piece's
   // choice is in reg).
   std::vector<std::pair<long, bool>> percussion;
+  // The re-registrations at the general pauses (tick, the upper's drawbars from there): a drawbar
+  // pulled out at each, toward the end; the lower manual and pedals follow (lowerExtra: its
+  // balance's extra softness, steps).
+  std::vector<std::pair<long, std::array<int, 9>>> upperChanges;
+  double lowerExtra = 0;
+  // The channels whose expression (CC11) is the organ's pedal: the tune's (mostly upper notes).
+  std::set<int> exprChannels;
   std::string summary;
 };
 

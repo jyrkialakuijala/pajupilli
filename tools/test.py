@@ -2148,6 +2148,57 @@ def hammond():
             os.remove(wav)
         got_ = re.search(r'pedals; percussion ([^;]*);', r_.stderr)
         return got_.group(1) if got_ else '?'
+    # Played low, registered higher: a 4' melody around C3-E3 (302800000), the 888 two octaves up for
+    # one an octave lower: no mud.
+    def low_tune(base):
+        ev_, t = [(0, [0xC0, 16])], 0
+        for i in range(32):
+            m_ = base + [0, 2, 4, 5, 7, 5, 4, 2][i % 8]
+            ev_ += [(t, [0x90, m_, 90]), (t + 200, [0x80, m_, 0])]
+            t += 240
+        out, last = b'', 0
+        for tk, e_ in ev_:
+            out += vlq(tk - last) + bytes(e_)
+            last = tk
+        out += b'\x00\xff\x2f\x00'
+        with open(mid, 'wb') as fh:
+            fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+        r_ = run(['-play', mid, '-o', wav])
+        if os.path.exists(wav):
+            os.remove(wav)
+        got_ = re.search(r'upper (\d{9})', r_.stderr)
+        return got_.group(1) if got_ else '?'
+    # Routing to a division (hammond-upper-manual, -lower-manual, -pedal): a piano and a bass
+    # remapped onto one Hammond, the tune on the upper, the bass on the pedals; and the general
+    # pauses re-registering (a drawbar out at each, two pauses here).
+    ev_ = [(0, [0xC0, 0]), (0, [0xC1, 32])]
+    for i in range(24):
+        if 8 <= i < 10 or 16 <= i < 18:
+            continue  # (two general pauses)
+        m_ = [72, 74, 76, 77][i % 4]
+        ev_ += [(i * 480, [0x90, m_, 90]), (i * 480 + 460, [0x80, m_, 0])]
+        if i % 2 == 0:
+            b_ = [36, 43][(i // 2) % 2]
+            ev_ += [(i * 480, [0x91, b_, 90]), (i * 480 + 460, [0x81, b_, 0])]
+    ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+    out, last = b'', 0
+    for tk, e_ in ev_:
+        out += vlq(tk - last) + bytes(e_)
+        last = tk
+    out += b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    r_ = run(['-play', mid, '-reinstrument', 'grand-piano=hammond-upper-manual,double-bass=hammond-pedal', '-o', wav])
+    if os.path.exists(wav):
+        os.remove(wav)
+    got_ = re.search(r'notes: (\d+) upper, (\d+) lower, (\d+) pedals', r_.stderr)
+    reg_ = re.search(r're-registered at (\d+) pause', r_.stderr)
+    parts_ = len(re.findall(r'hammond plan', r_.stderr))
+    check('hammond: routed to its divisions (one organ), re-registered at the general pauses',
+          got_ is not None and got_.groups() == ('20', '0', '10') and parts_ == 1 and reg_ is not None and reg_.group(1) == '2',
+          (' '.join(got_.groups()) if got_ else '?') + f' (upper lower pedals), {parts_} organ, ' + (reg_.group(0) if reg_ else 'no re-registration'))
+    regs = [low_tune(62), low_tune(48), low_tune(36)]
+    check('hammond: a low tune registered higher (no mud)', regs == ['888000000', '302800000', '203808080'], ' / '.join(regs))
     plans = [piece([('det', 24)]), piece([('leg', 24)]), piece([('det', 16), ('leg', 16), ('det', 16)]),
              piece([('det', 30), ('leg', 2), ('det', 16)])]
     check('hammond: the percussion planned (detached on, legato off, a long legato middle switched, a short one not)',
@@ -2192,8 +2243,8 @@ def hammond():
         y = y.astype(float)
         held, tail = y[int(1 * fs):int(2.9 * fs)], y[int(3.1 * fs):int(4.5 * fs)]
         res[mode] = (10 * math.log10(np.mean(tail ** 2) / np.mean(held ** 2)), np.corrcoef(held[:, 0], held[:, 1])[0, 1])
-    check('hammond: the Leslie in the room (more room in the tail than close microphones, the ears apart)',
-          res['room'][0] > res['close'][0] + 1.5 and res['room'][1] < 0.85,
+    check('hammond: the Leslie in the room (a full tail, at least the close microphones\', the ears apart)',
+          res['room'][0] > -20 and res['room'][0] >= res['close'][0] and res['room'][1] < 0.85,
           f'tail {res["room"][0]:.0f} dB (close mics {res["close"][0]:.0f}); left-right correlation {res["room"][1]:.2f}')
     os.remove(mid)
     # The drawbar knobs (live K1-K4; PJ_HAMMOND_KNOBS): K1 through sixteen classics, soft to hard,

@@ -55,7 +55,8 @@ struct HammondRegistration {
   std::string text() const;         // "upper 888000000, lower 838000000, pedal 83, perc 3rd fast, C3, ..."
 };
 // The lower manual for an upper (the accompaniment: softer, darker, of the same family).
-std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper);
+// extraSofter: steps more (a file whose accompaniment is written quieter than its tune).
+std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter = 0);
 // The pedals' two drawbars for an upper (16' by its loudness, 8' by its brightness).
 std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper);
 // The General MIDI program's registration (by the instrument's name).
@@ -146,7 +147,7 @@ class HammondModel : public Tube {
   int linePos_ = 0;
   double scanPh_ = 0, lineLp_ = 0;
   // The preamp and the pedal.
-  double expr_ = 0.8, exprTarget_ = 0.8, shelf_ = 0;
+  double expr_ = 0.8, exprTarget_ = 0.8, shelf_ = 0, tone_ = 0;
   double t_ = 0;
   Leslie leslie_;
   uint32_t rng_ = 1;
@@ -182,6 +183,20 @@ class HammondPlayer : public Performer {
   bool setKnob(int k, double x) override;
   // The drawbars of a point of the knobs (k 0..1 each); K1's station's name when exactly on it.
   static std::array<double, 9> drawbarsAt(const double k[4], const char** classic);
+  // A plan's re-registration: the upper's drawbars (the sliders glide there); the lower manual and
+  // pedals follow (lowerExtra: the lower's extra softness, steps).
+  void setUpper(const std::array<int, 9>& upper, double lowerExtra) {
+    HammondRegistration r = m_.registration();
+    std::array<double, 9> up{};
+    for (int d = 0; d < 9; ++d) { up[d] = upper[d]; r.upper[d] = upper[d]; }
+    const std::array<double, 9> low = hammondLowerFor(up, lowerExtra);
+    const std::array<double, 2> ped = hammondPedalFor(up);
+    r.leslieFast = leslieFast_;
+    m_.setRegistration(r);
+    m_.setUpperGoal(up);
+    m_.setLowerGoal(low);
+    m_.setPedalGoal(ped);
+  }
   // The harmonic percussion's tab (a plan's switch during the piece).
   void setPercussion(bool on) {
     HammondRegistration r = m_.registration();

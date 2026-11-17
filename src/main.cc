@@ -400,7 +400,8 @@ const char kUsage[] =
     "  -period N           frames per period (default 64)\n"
     "  -periods N          periods in the buffer (default 3)\n"
     "  -transpose N        keys to sounding pitch (default: the lowest C plays\n"
-    "                      the instrument's lowest octave)\n"
+    "                      the instrument's lowest octave); with -play: every\n"
+    "                      note but the drums N semitones (12: an octave up)\n"
     "  -v                  verbose\n"
     "  -poly N             up to N flutes (default 8; 1 = a single flute): keys\n"
     "                      struck together, or held together over 100 ms, get\n"
@@ -619,7 +620,10 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  if (!playFile.empty()) return playMidiFile(playFile, out, room, lopt.device, lopt.verbose, roomGiven);
+  if (!playFile.empty()) {
+    if (lopt.transpose != LiveOptions::kAutoTranspose) setPlayTranspose(lopt.transpose);
+    return playMidiFile(playFile, out, room, lopt.device, lopt.verbose, roomGiven);
+  }
   if (!roomGiven && std::strcmp(gInst->family, "organ") == 0) room = findRoom("church");  // an organ plays in a church
   if (cfoot && gInst == findInstrument("flute")) gInst = findInstrument("flute-c");
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;

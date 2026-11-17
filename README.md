@@ -1117,6 +1117,27 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   lowered 10.9 dB; the rest makes up being heard from 4 m), so the room hears a loud Leslie as
   it is.
 
+  **Inside the horn compartment** (the 122, 41 × 29 × 21 in, height first: 737 × 533 mm; the
+  user's look at one):
+  - **The walls:** louvres on all four sides. Of their sound ~25 % gets out, ~25 % is turned up and
+    down by the slats (to the lid and the motor board), ~50 % goes back into the box.
+  - **The posts:** the four corners are solid, thick wood, and the two long sides are narrowed in
+    their middle: six openings a turn. A path's way out depends on where it meets the wall (out at
+    a louvre, none at a post, its edges softened over 1 cm).
+  - **The images:** the horn's sound comes back off each surface as from the horn mirrored in it:
+    the side walls, front and back turning the other way (the Doppler opposite), the lid and the
+    board the same way, later. Each image is its own delay line read, so the overtones meet their
+    own oppositely shifted copies: a comb moving with the turn. Against the horn alone, the
+    partials' levels change ~33 % faster.
+  - **Off-centre:** the horn's axis is off the middle (3 cm back, 4 cm left: `PJ_LESLIE_OFFX`,
+    `_OFFY`), so each side has its own delays and response.
+  - **The slots as a grating:** 5 cm apart one over another (`PJ_LESLIE_SLOT`), they send the highs
+    out as a vertical row of sources. The close microphones, one a little above the horn and one
+    below, hear the row at slightly different times: a comb above 4 kHz, different left and right.
+  - **The close microphones** are at the compartment's sides (±80°, 0.65 m), in front of the
+    louvres, as players mike it.
+  - Knobs: `PJ_LESLIE_INSIDE` (the reflections), `_POST`, `_MIDPOST` (the posts' reach).
+
   **Each cabinet's own flaws** (seeded by the organ's serial; `PJ_LESLIE_AGE` scales them,
   `PJ_LESLIE_NOISE` the machinery's sounds):
   - **Uneven rotation:** an off-centre pulley and an unbalanced horn make each rotor run a few %
@@ -1157,6 +1178,26 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     - slow: a ballad's 838/808 with C3;
     - chordal: a fuller 888800000;
     - the program sets rock and percussive.
+  - **A 4' melody:** a tune within a fourth above its accompaniment (in its range), or alone and low (mean under E3),
+    gets the 4' leading an octave up with a little 16' and 8' under it: 302800000.
+  - **Played very low, registered higher:** when the upper manual's notes lie low (mean under E3: an
+    octave; under F#2: two), every drawbar moves to the one an octave above (16' → 8', 5⅓' →
+    2⅔', 8' → 4', 4' → 2', 2⅔' → 1⅓', 2' → 1'; the top three have none). The jazz 888000000
+    becomes 008880000 (or 000808080); the 8' alone becomes the 4' alone, 000800000. A low line
+    stays clear instead of muddy. A little of the sub-octave stays (a third of the 16' an octave
+    up: 308880000), as a low line may be low for its weight. A track that never sounds two notes together is a tune,
+    whatever its register: all of it on the upper manual.
+  - **The file's own balance:** an accompaniment written quieter than the tune (by velocity and
+    its channels' expression, on General MIDI's square law) gets a lower manual that much softer,
+    3 dB a step. The expression pedal follows only the tune's channels (CC11), the
+    accompaniment's loudness being in its registration.
+  - **General pauses re-register:** where every line rests half a beat and a quarter second or
+    more, one more drawbar is pulled out (the 4', the 2', the 2⅔', the 1', the 1⅓', the 1⅗').
+    At most four; with more pauses, the ones nearest 35, 55, 75 and 90 % of the piece, so the
+    organ grows toward the end. The lower manual and pedals follow, the sliders gliding.
+  - **Routing:** `hammond-upper-manual`, `hammond-lower-manual` and `hammond-pedal` are the same one
+    Hammond and Leslie, their notes kept on that division whatever the plan says, e.g.
+    `-reinstrument grand-piano=hammond-upper-manual,double-bass=hammond-pedal`.
   - **The harmonic percussion** (3rd, fast) where the upper manual's line is mostly single notes,
     detached and moving (≥ 60 % single, < 45 % legato, ≥ 1.5 notes a second): the jazz line.
     - Not in legato, chordal, slow or rock playing.
@@ -1368,6 +1409,9 @@ Lead-saw's circuit:
     ./pajupilli -play song.mid -room church  # in another room
     ./pajupilli -reinstrument grand-piano=organ -play song.mid   # the piano's part on the church organ
     ./pajupilli -reinstrument piano=hammond,*=organ -play song.mid
+
+`-transpose N` with `-play` moves every note but the drums N semitones (12: an octave up, -12 down)
+as the file is read, so the organ's and the Hammond's plans are made for the transposed piece.
 
 `-reinstrument FROM=TO[,FROM=TO]` plays a channel on another instrument: FROM is the instrument its
 program picks (`grand-piano`, `electric-grand`), its family (`piano`) or `*` (every channel but the

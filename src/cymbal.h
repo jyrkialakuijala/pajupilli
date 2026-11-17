@@ -168,6 +168,7 @@ class CymbalModel : public Tube {
   void resetAir() override;
 
  private:
+  float shelfM_ = 0, shelfS_ = 0;  // (the highs' shelf)
   void controlStep() override {}
   float sample() override;
   int which_;

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <set>
+#include <string>
 
 namespace pajupilli {
 
@@ -67,7 +68,11 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       continue;
     }
     // (with a separate lower line and this the upper, still split off what lies far below)
-    const bool mayPedal = pedalLine < 0;
+    // (a line that never sounds two notes together is a tune, whatever its register: all of it on
+    // the upper manual)
+    bool chords = false;
+    for (size_t i = 1; i < v.size() && !chords; ++i) chords = v[i]->on - v[i - 1]->on <= together;
+    const bool mayPedal = pedalLine < 0 && chords;
     int lastSingle = -1, lastDiv = HammondModel::kUpper;
     for (size_t i = 0; i < v.size();) {
       size_t j = i;
@@ -90,7 +95,8 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         // the low register goes to the lower manual (or, alone and low, the pedals).
         const HammondNote* n = g[lo];
         int div;
-        if (lastSingle >= 0 && std::abs(n->pitch - lastSingle) <= 5) div = lastDiv;
+        if (!chords && mode == 'S') div = HammondModel::kUpper;
+        else if (lastSingle >= 0 && std::abs(n->pitch - lastSingle) <= 5) div = lastDiv;
         else if (mayPedal && lo == 0 && n->pitch < 43) div = HammondModel::kPedal;
         else div = n->pitch < 55 ? HammondModel::kLower : HammondModel::kUpper;
         if (div != HammondModel::kPedal) { lastSingle = n->pitch; lastDiv = div; }
@@ -116,6 +122,15 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     std::snprintf(buf, sizeof buf, "channel %d track %d: %s; ", id / 1000 + 1, id % 1000, mode == 'L' ? "lower" : "split by hand");
     lineText += buf;
   }
+  // Notes routed to a division by their instrument (hammond-upper-manual, -lower-manual, -pedal):
+  // there, whatever the plan said.
+  for (const HammondNote& n : notes)
+    if (n.forced >= 0) {
+      int& d = plan.division[{n.ch * 128 + n.pitch, n.on}];
+      --counts[d];
+      d = n.forced;
+      ++counts[d];
+    }
   // The piece's character: the upper manual's notes a second, how many of its moments are chords.
   long first = notes.front().on, last = 0;
   int upperOnsets = 0, chordOnsets = 0, allOnsets = 0;
@@ -151,11 +166,95 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     r.upper = {8, 8, 8, 0, 0, 0, 0, 0, 0};
     r.vibrato = 6;
   }
+  // Played low, the registration moves up: a low line on the 888 is mud, so organists take the
+  // drawbars an octave (or two) higher, the 8' alone becoming the 4' alone (000800000): each
+  // drawbar to the one an octave above (16' > 8', 5 1/3' > 2 2/3', 8' > 4', 4' > 2', 2 2/3' >
+  // 1 1/3', 2' > 1'; the 1 3/5', 1 1/3', 1' having none, gone). By the upper manual's mean pitch:
+  // under E3 (52) an octave, under F#2 (42) two; a little of the sub-octave kept.
+  std::string shiftText, balanceText_;
+  {
+    double sum = 0;
+    int n = 0;
+    for (const HammondNote& nt : notes)
+      if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == HammondModel::kUpper) { sum += nt.pitch; ++n; }
+    const double mean = n ? sum / n : 72;
+    double lsum = 0;
+    int ln = 0;
+    for (const HammondNote& nt : notes)
+      if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == HammondModel::kLower) { lsum += nt.pitch; ++ln; }
+    // (a melody low in itself, or under its accompaniment: a 4' melody, the 4' leading an octave up
+    // with a little 16' and 8' under it for weight, 302800000; very low, the whole registration
+    // two octaves up instead)
+    const bool under = ln > 0 && mean <= lsum / ln + 5;  // (within a fourth above it: in its range)
+    int shift = mean < 42 ? 2 : mean < 52 ? 1 : 0;
+    if (shift < 2 && (under || shift == 1)) {
+      r.upper = {3, 0, 2, 8, 0, 0, 0, 0, 0};
+      shift = 0;
+      char b6[96];
+      std::snprintf(b6, sizeof b6, "; a 4' melody (its tune %s, mean MIDI %.0f)", under ? "in its accompaniment's range" : "low", mean);
+      shiftText = b6;
+    }
+    static const int kUp[9] = {2, 4, 3, 5, 7, 8, -1, -1, -1};  // (each drawbar's octave above; -1 none)
+    const std::array<int, 9> orig = r.upper;
+    for (int s_ = 0; s_ < shift; ++s_) {
+      std::array<int, 9> up{};
+      for (int d = 0; d < 9; ++d)
+        if (kUp[d] >= 0) up[kUp[d]] = std::max(up[kUp[d]], r.upper[d]);
+      r.upper = up;
+    }
+    // (a low line may be low for its weight: a little of the sub-octave stays, a third of the 16'
+    // an octave up; two octaves up, a third of the 8' and a fifth of the 16')
+    if (shift == 1) r.upper[0] = std::max(r.upper[0], int(std::lround(orig[0] / 3.0)));
+    if (shift == 2) {
+      r.upper[2] = std::max(r.upper[2], int(std::lround(orig[2] / 3.0)));
+      r.upper[0] = std::max(r.upper[0], int(std::lround(orig[0] / 5.0)));
+    }
+    if (shift) {
+      char b4[96];
+      std::snprintf(b4, sizeof b4, "; registered %s up (its tune low, mean MIDI %.0f)", shift == 1 ? "an octave" : "two octaves", mean);
+      shiftText = b4;
+    }
+  }
   // The lower manual: the upper's accompaniment, softer and darker (hammondLowerFor).
   {
     std::array<double, 9> up{};
     for (int d = 0; d < 9; ++d) up[d] = r.upper[d];
-    const std::array<double, 9> low = hammondLowerFor(up);
+    // (the file's own balance: an accompaniment written quieter than the tune, by velocity and its
+    // channels' expression, played on a softer lower manual: 3 dB a step, General MIDI's square law)
+    auto med = [&](int div, bool cc) {
+      std::vector<double> v;
+      for (const HammondNote& nt : notes)
+        if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == div) v.push_back(cc ? nt.expr : nt.vel);
+      if (v.empty()) return -1.0;
+      std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
+      return v[v.size() / 2];
+    };
+    double extra = 0;
+    const double vu = med(HammondModel::kUpper, false), vl = med(HammondModel::kLower, false);
+    const double eu = med(HammondModel::kUpper, true), el = med(HammondModel::kLower, true);
+    if (vu > 0 && vl > 0) {
+      const double db = 40 * std::log10(vu / vl) + 40 * std::log10(std::max(eu, 1.0) / std::max(el, 1.0));
+      // (the softening that puts the lower's whole level that far under the upper's (3 dB at
+      // least): searched, as the keep shares and the steps stack differently on each registration)
+      auto level = [](const std::array<double, 9>& b) {
+        double g = 0;
+        for (double x : b) g += x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20);
+        return 20 * std::log10(std::max(g, 1e-9));
+      };
+      const double want = level(up) - std::max(db, 3.0);
+      double bestErr = 1e9;
+      for (double e = -1; e <= 6; e += 0.1) {
+        const double err = std::fabs(level(hammondLowerFor(up, e)) - want);
+        if (err < bestErr) { bestErr = err; extra = e; }
+      }
+      if (db >= 4) {
+        char b5[96];
+        std::snprintf(b5, sizeof b5, "; the lower %.0f dB under the upper (the file's balance)", db);
+        balanceText_ = b5;
+      }
+    }
+    plan.lowerExtra = extra;
+    const std::array<double, 9> low = hammondLowerFor(up, extra);
     for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(low[d]));
     const std::array<double, 2> ped = hammondPedalFor(up);  // (and the pedals by its loudness and brightness)
     r.pedal = {int(std::lround(ped[0])), int(std::lround(ped[1]))};
@@ -238,6 +337,66 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     }
   }
   hammondOverrides(r);  // (PJ_HAMMOND_*: by hand, over the plan)
+  // At the general pauses (every line silent for half a beat and 0.25 s or more), the organist
+  // re-registers: one more drawbar of the upper pulled out each time, in the tradition's order
+  // (the 4', the 2', the 2 2/3', the 1', the 1 1/3', the 1 3/5'), to 8 (the top ones to 6). A
+  // dramatic arc: at most four, and with more pauses than that the later ones (the piece growing
+  // toward its end: the pauses nearest 35, 55, 75 and 90 % of it). The lower manual and pedals
+  // follow each.
+  std::string regText;
+  {
+    std::vector<const HammondNote*> byOn;
+    for (const HammondNote& nt : notes) byOn.push_back(&nt);
+    std::sort(byOn.begin(), byOn.end(), [](const HammondNote* a, const HammondNote* b) { return a->on < b->on; });
+    const long minGap = std::max<long>(tpq / 2, long(0.25 / (60 / std::max(bpm, 20.0) / tpq)));  // (half a beat and a quarter second: time to pull a drawbar)
+    std::vector<long> pauses;  // (the pause's middle)
+    long reach = byOn.empty() ? 0 : byOn[0]->off;
+    for (size_t i = 1; i < byOn.size(); ++i) {
+      if (byOn[i]->on - reach >= minGap) pauses.push_back((reach + byOn[i]->on) / 2);
+      reach = std::max(reach, byOn[i]->off);
+    }
+    std::vector<long> use;
+    if (pauses.size() <= 4) use = pauses;
+    else
+      for (double at : {0.35, 0.55, 0.75, 0.9}) {
+        const long t = first + long(at * (last - first));
+        long best = -1;
+        for (long pz : pauses)
+          if (std::find(use.begin(), use.end(), pz) == use.end() && (best < 0 || std::labs(pz - t) < std::labs(best - t))) best = pz;
+        if (best >= 0) use.push_back(best);
+      }
+    std::sort(use.begin(), use.end());
+    static const int kOrder[6] = {3, 5, 4, 8, 7, 6};
+    std::array<int, 9> cur = r.upper;
+    for (long t : use) {
+      bool pulled = false;
+      for (int d : kOrder) {
+        const int top = d >= 6 ? 6 : 8;
+        if (cur[d] < top) {
+          cur[d] = std::min(top, cur[d] + (cur[d] == 0 ? top : 8));  // (out to its full mark)
+          pulled = true;
+          break;
+        }
+      }
+      if (!pulled) break;
+      plan.upperChanges.push_back({t, cur});
+    }
+    if (!plan.upperChanges.empty()) {
+      regText = "; re-registered at " + std::to_string(plan.upperChanges.size()) + " pause" + (plan.upperChanges.size() > 1 ? "s" : "") + ", to ";
+      for (int v : plan.upperChanges.back().second) regText += char('0' + v);
+    }
+  }
+  // The expression pedal follows the tune: the channels whose notes are mostly on the upper manual.
+  {
+    std::map<int, std::pair<int, int>> byCh;  // channel -> (upper notes, all)
+    for (const HammondNote& nt : notes) {
+      auto& c = byCh[nt.ch];
+      ++c.second;
+      if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == HammondModel::kUpper) ++c.first;
+    }
+    for (auto& [ch, c] : byCh)
+      if (2 * c.first >= c.second) plan.exprChannels.insert(ch);
+  }
   // The Leslie: the file's own (CC1, CC64, CC82) if it has any; else planned. Most pieces stay on
   // the slow rotors (chorale) throughout; about one in four (one in two on the rock organ) goes
   // fast where it builds most: the phrase (between the band's rests) with the most, loudest notes
@@ -296,7 +455,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
                 "hammond plan: %s (%.0f bpm, %.1f tune notes a second, %.0f %% chords): %s\n"
                 "%snotes: %d upper, %d lower, %d pedals; percussion %s; Leslie %s\n",
                 style.c_str(), bpm, busy, 100 * chordal, r.text().c_str(), lineText.c_str(), counts[HammondModel::kUpper],
-                counts[HammondModel::kLower], counts[HammondModel::kPedal], percText.c_str(), leslieText.c_str());
+                counts[HammondModel::kLower], counts[HammondModel::kPedal], percText.c_str(), (leslieText + shiftText + balanceText_ + regText).c_str());
   plan.summary = buf;
   return plan;
 }
