@@ -1168,18 +1168,22 @@ def bagpipe_drones():
           f'{cents[0]:+.1f} c, {cents[1]:+.1f} c; after the keys are up {20 * math.log10(after + 1e-12):.0f} dB')
 
 
+EXACT = {'PJ_ORGAN_DETUNE_HZ': '0', 'PJ_ORGAN_RANK_HZ': '0'}  # (the organ's tuning without its +-1/7 Hz life)
+
+
 def organ():
-    """The church organ's first ranks (src/organ.cc, src/organpipe.h, src/organbox.h): each pipe a jet
+    """The church organ's first ranks (src/organ.cc, src/organpipe.h, src/organbox.h; the Principal 8' an open
+    pipe sounding from its mouth and its top, its bass in the façade): each pipe a jet
     driving its column's modes, calibrated in tune where it stands (its enclosure's field acting on it);
     the Schwellwerk's Gedackt 8' in two swell boxes (C side left, C# right), the Positiv's Rohrgedackt 8'
     (a chimney flute) at the rail, both together; they speak in time, with their tones (a stopped pipe's
     twelfth; the chimney's even harmonics and lifted 5th), stable, real time."""
     import numpy as np
     from scipy.io import wavfile
-    for inst in ('gedackt-8', 'rohrgedackt-8', 'gedackt-rohrgedackt'):
+    for inst in ('gedackt-8', 'rohrgedackt-8', 'gedackt-rohrgedackt', 'principal-8'):
         cents = []
-        for m in (36, 48, 60, 72, 84, 96):
-            c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', inst, '-note', str(m), '-secs', '1']).stdout)
+        for m in (36, 48, 60, 72, 84, 96):  # (the tuning's life, its +-1/7 Hz offsets, off: the calibration checked)
+            c = re.search(r'\(([+-]\d+) cents\)', run(['-inst', inst, '-note', str(m), '-secs', '1'], env=EXACT).stdout)
             cents.append(int(c.group(1)) if c else 999)
         # (the swell box's air ~0.6 C warmer than the church: its Gedackt ~+2 c; each pipe +-0.5 c)
         check(f'organ: {inst} speaks in tune', all(abs(c) <= 5 for c in cents), ' '.join(f'{c:+d} c' for c in cents))
@@ -1196,8 +1200,12 @@ def organ():
         f0 = 440 * 2 ** ((m - 69) / 12)
         h = [sp[(f > k * f0 * 0.98) & (f < k * f0 * 1.02)].max() for k in range(1, 7)]
         return [20 * math.log10(v / h[0]) for v in h]
-    speech, ged, rohr = [], [], []
+    speech, ged, rohr, prin, pspeech = [], [], [], [], []
     for m in (36, 60):
+        fs, x = render('principal-8', m)
+        env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
+        pspeech.append(np.where(env > 0.708 * env[int(0.8 * fs):int(1.1 * fs)].mean())[0][0] / fs * 1e3)
+        prin.append(harmonics(fs, x, m))
         fs, x = render('gedackt-8', m)
         env = np.sqrt(np.convolve(x ** 2, np.ones(480) / 480, 'same'))
         st = env[int(0.8 * fs):int(1.1 * fs)].mean()
@@ -1211,6 +1219,12 @@ def organ():
           all(r[1] > g[1] + 5 and r[4] > g[4] + 5 for r, g in zip(rohr, ged)),
           'octave ' + ', '.join(f'{r[1]:+.0f}/{g[1]:+.0f}' for r, g in zip(rohr, ged)) + ', 5th ' +
           ', '.join(f'{r[4]:+.0f}/{g[4]:+.0f}' for r, g in zip(rohr, ged)) + ' dB (Rohr/Gedackt)')
+    check('organ: the Principal an open pipe (the octave within 16 dB, 30 over the Gedackt\'s)',
+          all(p[1] > -16 and p[1] > g[1] + 30 for p, g in zip(prin, ged)),
+          'octave ' + ', '.join(f'{p[1]:+.0f}/{g[1]:+.0f}' for p, g in zip(prin, ged)) + ' dB (Principal/Gedackt), 3rd ' +
+          ', '.join(f'{p[2]:+.0f}' for p in prin) + ', 4th ' + ', '.join(f'{p[3]:+.0f}' for p in prin) + ' dB')
+    check('organ: the Principal speaks in time (8\' C ~100-250 ms, middle C ~30-90)',
+          100 < pspeech[0] < 250 and 30 < pspeech[1] < 90, f'{pspeech[0]:.0f} ms, {pspeech[1]:.0f} ms')
     # The swell: the box closed (dynamics 0) quieter and darker than open (1).
     lv = []
     for d in ('0', '1'):
@@ -1221,11 +1235,12 @@ def organ():
         x = x.astype(float)
         lv.append(10 * math.log10(np.mean(x[int(0.7 * fs):int(1.1 * fs)] ** 2) + 1e-20))
     check('organ: the swell box closes (quieter)', lv[0] < lv[1] - 6, f'closed {lv[0] - lv[1]:+.1f} dB')
-    for inst in ('gedackt-8', 'gedackt-rohrgedackt'):
+    for inst in ('gedackt-8', 'gedackt-rohrgedackt', 'principal-8', 'organ'):
         r = run(['-inst', inst, '-fuzz', '10', '1'])
         check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
-    ns = cpu_time(['-inst', 'gedackt-rohrgedackt', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1'}) / (10 * 48000) * 1e9
-    check('real-time margin (gedackt-rohrgedackt, random playing)', ns < 5000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    run(['-inst', 'organ', '-note', '60', '-secs', '0.1'], env={'PJ_NOCAL': '1', 'PJ_ORGAN_STOPS': 'principal8,gedackt8,rohrgedackt8'})  # (the calibration cached first)
+    ns = cpu_time(['-inst', 'organ', '-fuzz', '10', '1'], env={'PJ_NOCAL': '1', 'PJ_ORGAN_STOPS': 'principal8,gedackt8,rohrgedackt8'}) / (10 * 48000) * 1e9
+    check('real-time margin (organ: three ranks, random playing)', ns < 8000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 def accordions():
     """The accordion and the bandoneón (-inst accordion, bandoneon; src/accordion.cc, src/freereed.h;
@@ -1504,6 +1519,333 @@ def reed_organ():
     os.remove(wav)
     check('real-time margin (reed-organ: Grand Jeu, an eight-note chord, 32 reeds)', ns < 2500,
           f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
+def organ_stops():
+    """Every stop of the organ built so far (src/organ.cc's kStops) speaks at its pitch on three keys (each
+    rank's strongest peak near its harmonic of the key: 16' 1/2 .. 1 3/5' 5; the mixtures' ranks each at its
+    composition), the smallest pipes too (oversampled, their jets deflected by the flow / their mouths)."""
+    import numpy as np
+    from scipy.io import wavfile
+    stops = {'octave4': [2], 'quinte223': [3], 'superoctave2': [4], 'rohrflote8': [1], 'bourdon16': [0.5],
+             'flute4': [2], 'nasard223': [3], 'waldflote2': [4], 'terz135': [5], 'posoctave4': [2],
+             'gedacktflote4': [2], 'sesquialtera': [3, 5], 'subbass16': [0.5], 'octavbass8': [1], 'choralbass4': [2],
+             'gamba8': [1], 'celeste8': [2 ** (6 / 1200)],
+             'trompete8': [1], 'trompette8': [1], 'oboe8': [1], 'clairon4': [2], 'fagott16': [0.5], 'cromorne8': [1],
+             'posaune16': [0.5], 'principal16': [0.5], 'fluteharm8': [1], 'trompete16': [0.5], 'untersatz32': [0.25],
+             'principalbass16': [0.5], 'violonbass16': [0.5], 'pedtrompete8': [1],
+             'salicional8': [1], 'blockflote4': [2], 'swprincipal8': [1], 'swoctave4': [2], 'posprincipal8': [1],
+             'gemshorn8': [1], 'posoctave2': [4], 'dulcian16': [0.5], 'chamade8': [1], 'gedacktbass8': [1],
+             'contraposaune32': [0.25], 'klarine4': [2]}
+    mix = {'mixtur5': {36: [4, 6, 8, 12, 16], 60: [2, 3, 4, 6, 8], 96: [1, 1.5, 2, 3, 4]},
+           'cymbel3': {36: [16, 24, 32], 60: [4, 6, 8], 96: [2, 3, 4]}, 'pedmixtur4': {36: [3, 4, 6, 8], 60: [3, 4, 6, 8]},
+           'pleinjeu4': {36: [4, 6, 8, 12], 60: [2, 3, 4, 6], 96: [1, 1.5, 2, 3]},
+           'scharf4': {36: [8, 12, 16, 24], 60: [4, 6, 8, 12], 96: [2, 3, 4, 6]},
+           'quinte113': {36: [6], 60: [6], 84: [3]}, 'sifflote1': {36: [8], 60: [8], 84: [4]}}
+    wav = os.path.join(ROOT, 'tools', '.organ.wav')
+    def peaks(stop, key, ratios):
+        run(['-inst', 'organ', '-seq', f'on {key} 80 wait 2.0 off {key} wait 0.1', '-o', wav], env={'PJ_ORGAN_STOPS': stop, **EXACT})
+        fs, x = wavfile.read(wav)
+        x = x.astype(float)[int(0.7 * fs):int(2.0 * fs)]
+        sp = np.abs(np.fft.rfft(x * np.hanning(len(x)), 1 << 20))
+        f = np.fft.rfftfreq(1 << 20, 1 / fs)
+        out = []
+        for r in ratios:
+            f0 = 440 * 2 ** ((key - 69) / 12) * r
+            m = np.where((f > f0 * 0.985) & (f < f0 * 1.015))[0]
+            i = m[sp[m].argmax()]
+            a_, b_, c_ = np.log(sp[i - 1:i + 2] + 1e-30)  # (the peak between bins: a parabola through three)
+            fp = f[i] + 0.5 * (a_ - c_) / (a_ - 2 * b_ + c_) * (f[1] - f[0])
+            out.append(1200 * math.log2(fp / f0) if sp[i] > 1e-6 * sp.max() + 1e-12 else 999)
+        return out
+    bad = []
+    for stop, ratios in stops.items():
+        keys = (36, 48, 67) if stop in ('subbass16', 'octavbass8', 'choralbass4', 'posaune16', 'untersatz32',
+                                         'principalbass16', 'violonbass16', 'pedtrompete8', 'gedacktbass8',
+                                         'contraposaune32', 'klarine4') else (48, 72, 96) if stop == 'celeste8' else (36, 72, 96)
+        for k in keys:
+            c = peaks(stop, k, ratios)
+            if any(abs(v) > 5 for v in c):
+                bad.append(f'{stop}@{k}: ' + ' '.join(f'{v:+.0f}' for v in c))
+    for stop, comp in mix.items():
+        for k, ratios in comp.items():
+            c = peaks(stop, k, ratios)
+            if any(abs(v) > 5 for v in c):
+                bad.append(f'{stop}@{k}: ' + ' '.join(f'{v:+.0f}' for v in c))
+    # The reeds die away when their keys are let go (their resonators' sound does not feed back through
+    # the enclosures; the gap's flow viscous near no pressure).
+    sang = []
+    for stop, k in (('posaune16', 38), ('oboe8', 40), ('trompete8', 36), ('cromorne8', 48), ('fagott16', 36)):
+        run(['-inst', 'organ', '-seq', f'on {k} 80 wait 1.0 off {k} wait 0.6', '-o', wav], env={'PJ_ORGAN_STOPS': stop})
+        fs, x = wavfile.read(wav)
+        x = np.abs(x.astype(float))
+        held, tail = x[int(0.5 * fs):int(0.9 * fs)].max(), x[int(1.45 * fs):].max()
+        if tail > 0.3 * held:
+            sang.append(f'{stop}@{k} {20 * math.log10(tail / held):+.0f} dB')
+    check('organ: the reeds die away after their keys', not sang, ', '.join(sang) or 'all five')
+    # The crescendo roller (-inst organ-crescendo; K1 / -dyn): silence at 0, then each dynamic from ppp to
+    # fff louder than the one before.
+    lv = []
+    for d in ('0.02', '0.155', '0.275', '0.395', '0.515', '0.635', '0.755', '0.875', '0.995'):
+        run(['-inst', 'organ-crescendo', '-dyn', d, '-seq', 'on 48 80 on 55 80 on 60 80 on 64 80 wait 3 off 48 off 55 off 60 off 64 wait 0.1', '-o', wav])
+        fs, x = wavfile.read(wav)
+        x = x.astype(float)[int(0.8 * fs):int(2.9 * fs)]  # (2 s: the coinciding partials' slow beats averaged)
+        from levels import k_weight  # (as heard: the upper stops add brightness more than power)
+        lv.append(10 * math.log10(np.mean(k_weight(x, fs) ** 2) + 1e-30))
+    steps = np.diff(lv[1:])
+    # (each step no softer; fff well over ppp: the upper steps add brilliance more than loudness)
+    # (a step may measure a little softer: coinciding partials of pipes in tune add at a fixed phase)
+    check('organ: the crescendo roller, silence to fff', lv[0] < -150 and all(steps > -3) and lv[-1] - lv[1] > 15,
+          f'ppp {lv[1]:.0f} dB, then ' + ' '.join(f'{v:+.1f}' for v in steps) + f' (fff {lv[-1] - lv[1]:+.0f} dB over ppp)')
+    # No clicks as pipes start and stop in a texture: three overlapping lines (a trio's), the highs checked
+    # for bursts over the median.
+    from scipy.signal import butter, sosfilt
+    seq, t = [], 0.0
+    for i in range(40):
+        a1, a2, a3 = 60 + (i * 5) % 12, 55 + (i * 7) % 10, 36 + (i * 3) % 12
+        seq.append(f'on {a1} 80 on {a2} 80' + (f' on {a3} 80' if i % 2 == 0 else '') + ' wait 0.2')
+        seq.append(f'off {a1} off {a2}' + (f' off {a3}' if i % 2 == 0 else ''))
+    run(['-inst', 'organ', '-seq', ' '.join(seq) + ' wait 0.5', '-o', wav], env={'PJ_ORGAN_STOPS': 'rohrflote8,octave4,rohrgedackt8,gedacktflote4,subbass16,octavbass8'})
+    fs, y = wavfile.read(wav)
+    hp = sosfilt(butter(4, 8000, 'highpass', fs=fs, output='sos'), y.astype(float))
+    e = np.sqrt(np.convolve(hp ** 2, np.ones(48) / 48, 'same'))
+    worst = 20 * math.log10(e.max() / (np.median(e) + 1e-12))
+    check('organ: no clicks as pipes start in a texture (the head start smooth)', worst < 30, f'worst high burst {worst:.0f} dB over the median')
+    # The pajupilli intonation (PJ_ORGAN_JI, on by default): a held C major triad's third just (386 c), its fifth just (702 c).
+    run(['-inst', 'organ', '-seq', 'on 48 80 on 52 80 on 55 80 wait 2.5 off 48 off 52 off 55', '-o', wav], env={'PJ_ORGAN_STOPS': 'principal8', **EXACT})
+    fs, y = wavfile.read(wav)
+    seg = y.astype(float)[int(1.2 * fs):int(2.4 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 21))
+    f = np.fft.rfftfreq(1 << 21, 1 / fs)
+    def pk(f0):
+        m = np.where((f > f0 * 0.98) & (f < f0 * 1.02))[0]
+        i = m[sp[m].argmax()]
+        a_, b_, c_ = np.log(sp[i - 1:i + 2])
+        return f[i] + 0.5 * (a_ - c_) / (a_ - 2 * b_ + c_) * (f[1] - f[0])
+    c, e, g = (pk(440 * 2 ** ((k - 69) / 12)) for k in (48, 52, 55))
+    third, fifth = 1200 * math.log2(e / c), 1200 * math.log2(g / c)
+    check('organ: the pajupilli intonation (a triad: the third and the fifth just)', abs(third - 386.3) < 3 and abs(fifth - 702.0) < 2,
+          f'third {third:.1f} c, fifth {fifth:.1f} c')
+    # The 88-key keyboard in zones (-inst organ-88): A0-B2 the pedal (an octave up: C1 plays the 16' C), C3-E4
+    # the Schwellwerk, F4 up the Hauptwerk / Positiv.
+    got = []
+    for k, f in ((24, 32.7), (52, 164.8), (72, 523.3)):
+        out = run(['-inst', 'organ-88', '-dyn', '0.6', '-note', str(k), '-secs', '0.8']).stdout
+        m = re.search(r'played ([0-9.]+) Hz', out)
+        got.append((k, f, float(m.group(1)) if m else 0))
+    check('organ: the 88-key zones (pedal, swell, Hauptwerk)', all(abs(1200 * math.log2(max(g, 1) / f)) < 10 for _, f, g in got),
+          ', '.join(f'key {k}: {g:.1f} Hz' for k, _, g in got))
+    # The wind (src/organwind.h): one stop, one note barely moves its chest; the full organ (every stop)
+    # with a 10-note chord held sags it ~5-12 % (its flues ~4 c flat, as the user chose).
+    def lowest(stops, keys, hold):
+        seq = ' '.join(f'on {k} 80' for k in keys) + f' wait {hold} ' + ' '.join(f'off {k}' for k in keys) + ' wait 0.1'
+        r = run(['-inst', 'organ', '-seq', seq, '-o', wav], env={'PJ_ORGAN_STOPS': stops, 'PJ_WIND_LOG': '1'})
+        m = re.search(r'lowest chest ([0-9.]+)', r.stderr)
+        return float(m.group(1)) if m else 0
+    every = ','.join(list(stops) + list(mix) + ['principal8', 'gedackt8', 'rohrgedackt8'])
+    one, full = lowest('gedackt8', [60], 1.0), lowest(every, [36, 48, 55, 60, 64, 67, 72, 76, 79, 84], 4.0)
+    # The tremulant (a beater working the swell's regulator): the chest swings ~10-20 % p-p at ~5.5 Hz.
+    r = run(['-inst', 'organ', '-seq', 'on 72 80 wait 2 off 72 wait 0.1', '-o', wav], env={'PJ_ORGAN_STOPS': 'gedackt8,tremsw', 'PJ_WIND_LOG': '1'})
+    m = re.search(r'lowest chest ([0-9.]+)', r.stderr)
+    trem = 1 - float(m.group(1)) if m else 0
+    check('organ: the tremulant swings the wind', 0.04 < trem < 0.12, f'the swell chest down to -{100 * trem:.1f} %')
+    check('organ: the wind holds one note (< 0.5 % sag) and sags the full organ 5-12 %',
+          one > 0.995 and 0.88 < full < 0.95, f'one note {100 * (1 - one):.2f} %, full organ {100 * (1 - full):.1f} %')
+    if os.path.exists(wav):
+        os.remove(wav)
+    check('organ: every stop speaks at its pitch (cents within 5)', not bad, '; '.join(bad) or f'{len(stops) + len(mix)} stops')
+
+
+def hammond():
+    """The Hammond B-3 and its Leslie (-inst hammond, drawbar-organ, percussive-organ, rock-organ;
+    src/hammond.cc, src/leslie.cc, src/hammondplan.cc; research/hammond_b3.md, leslie.md,
+    hammond_character.md): the wheels geared as built (A 440 exact, C -0.58 c), phase-locked (a
+    chord the same whenever it is played), each with its flaws (sidebands at its rotation rate);
+    a key click never the same twice; single-trigger percussion; the Leslie's horn at its speed;
+    a MIDI file's hands, pedals and drawbars planned; stable, real time."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    wav = os.path.join(ROOT, 'tools', '.hammond.wav')
+    def render(seq, env=None, inst='hammond'):
+        run(['-inst', inst, '-seq', seq, '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        return fs, x.mean(1) if x.ndim > 1 else x
+    dry = {'PJ_HAMMOND_UPPER': '008000000', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_DIRT': '0'}
+    fs, x = render('on 69 100 on 84 100 wait 8 off 69 off 84', dict(dry, PJ_HAMMOND_MAINS='0', PJ_HAMMOND_FLUTTER='0'))  # (the gears alone)
+    seg = x[int(1 * fs):int(7.5 * fs)]
+    N = 1 << 21
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), N))
+    f = np.fft.rfftfreq(N, 1 / fs)
+    def pk(hz, w=0.3):
+        m = (f > hz - w) & (f < hz + w)
+        return 20 * math.log10(sp[m].max() + 1e-12), f[m][sp[m].argmax()]
+    (la, fa), (lc, fc) = pk(440), pk(20 * 85 / 104 * 64)
+    ca, cc = 1200 * math.log2(fa / 440), 1200 * math.log2(fc / 1046.502)
+    check('hammond: the wheels geared as built (A4 exact, C6 -0.58 c)', abs(ca) < 0.1 and abs(cc + 0.58) < 0.15, f'A4 {ca:+.2f} c, C6 {cc:+.2f} c')
+    side = [pk(440 - 27.5)[0] - la, pk(440 + 27.5)[0] - la]
+    check('hammond: each wheel\'s flaws: sidebands at its rotation rate (A4 +-27.5 Hz)', all(-45 < s_ < -20 for s_ in side),
+          ', '.join(f'{s_:.0f} dB' for s_ in side))
+    # Phase lock: the same chord begun at two moments sounds the same at the same moment after.
+    a = render('wait 0.1 on 60 100 on 64 100 on 67 100 wait 1.2 off 60 off 64 off 67', dry)[1]
+    b = render('wait 0.37 on 60 100 on 64 100 on 67 100 wait 0.93 off 60 off 64 off 67', dry)[1]
+    wa, wb = a[int(1.0 * fs):int(1.2 * fs)], b[int(1.0 * fs):int(1.2 * fs)]
+    diff = 20 * math.log10(np.sqrt(np.mean((wa - wb) ** 2)) / np.sqrt(np.mean(wa ** 2)) + 1e-12)
+    check('hammond: one generator, phase-locked (a chord the same whenever begun)', diff < -40, f'difference {diff:.0f} dB')
+    # The organic flaws: each wheel's flutter on its coupling (a few tenths of a cent), the grid's
+    # slow drift (under a cent), a floor of hum and leakage under it all.
+    from scipy.signal import hilbert, filtfilt, butter as _bt
+    fs, x = render('on 96 100 wait 6 off 96 wait 2', dict(dry, PJ_HAMMOND_MAINS='0'))
+    bb, aa = _bt(2, [(2092.3 - 25) / (fs / 2), (2092.3 + 25) / (fs / 2)], 'band')
+    an = hilbert(filtfilt(bb, aa, x[int(0.5 * fs):int(5.5 * fs)]))
+    inst = np.convolve(np.diff(np.unwrap(np.angle(an))) * fs / (2 * np.pi), np.ones(480) / 480, 'same')[2000:-2000]
+    flutter = (1200 * np.log2(inst / 2092.3)).std()
+    floor = 10 * math.log10(np.mean(x[int(6.6 * fs):int(7.9 * fs)] ** 2) / np.mean(x[int(1 * fs):int(5 * fs)] ** 2))
+    fs, x = render('on 69 100 wait 30 off 69', dict(dry, PJ_HAMMOND_FLUTTER='0'))
+    bb, aa = _bt(2, [434 / (fs / 2), 446 / (fs / 2)], 'band')
+    an = hilbert(filtfilt(bb, aa, x[int(1 * fs):int(29 * fs)]))
+    inst = np.convolve(np.diff(np.unwrap(np.angle(an))) * fs / (2 * np.pi), np.ones(4800) / 4800, 'same')[9600:-9600]
+    drift = 1200 * np.log2(inst[::4800] / 440)
+    check('hammond: organic flaws: the wheels\' flutter, the grid\'s drift, a floor of hum and leakage',
+          0.1 < flutter < 1.0 and 0.1 < drift.max() - drift.min() < 2.5 and -75 < floor < -40,
+          f'flutter {flutter:.2f} c rms; drift {drift.min():+.2f}..{drift.max():+.2f} c; floor {floor:.0f} dB under a note')
+    # The click: above 5 kHz in a press's first 5 ms, louder than the tone, never twice the same.
+    from scipy.signal import butter, lfilter
+    seq = ''.join('on 60 100 wait 0.4 off 60 wait 0.2 ' for _ in range(5))
+    fs, x = render(seq, {'PJ_HAMMOND_UPPER': '888888888', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
+    bb, aa = butter(4, 5000 / (fs / 2), 'high')
+    h = lfilter(bb, aa, x)
+    ons = [h[int(i * 0.6 * fs):int(i * 0.6 * fs) + 240] for i in range(5)]
+    over = [10 * math.log10(np.mean(o ** 2) / (np.mean(h[int((i * 0.6 + 0.2) * fs):int((i * 0.6 + 0.2) * fs) + 240] ** 2) + 1e-15)) for i, o in enumerate(ons)]
+    corr = max(abs(np.corrcoef(ons[0], o)[0, 1]) for o in ons[1:])
+    check('hammond: the key click, never the same twice', min(over) > 6 and corr < 0.9, f'{min(over):.0f}..{max(over):.0f} dB over the tone; likeness at most {corr:.2f}')
+    # Percussion: the 3rd's fast ping; legato does not strike it again.
+    fs, x = render('on 60 100 wait 1.5 off 60 wait 0.3 on 62 100 wait 0.5 on 64 100 off 62 wait 1 off 64',
+                   {'PJ_HAMMOND_PERC': '3f', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
+    bb, aa = butter(2, [700 / (fs / 2), 900 / (fs / 2)], 'band')
+    e = np.sqrt(np.convolve(lfilter(bb, aa, x) ** 2, np.ones(480) / 480, 'same'))
+    p0 = e[:int(0.1 * fs)].max()
+    t20 = np.where(e[int(0.02 * fs):int(1.5 * fs)] < 0.1 * p0)[0]
+    t20 = (t20[0] / fs + 0.02) * 1e3 if len(t20) else 9999
+    bb, aa = butter(2, [820 / (fs / 2), 1000 / (fs / 2)], 'band')
+    e2 = np.sqrt(np.convolve(lfilter(bb, aa, x) ** 2, np.ones(480) / 480, 'same'))
+    rest, legato = e2[int(1.8 * fs):int(2.0 * fs)].max(), e2[int(2.3 * fs):int(2.5 * fs)].max()
+    check('hammond: percussion (3rd, fast), single-trigger', 100 < t20 < 300 and legato < 0.3 * rest,
+          f'to -20 dB in {t20:.0f} ms; legato ping {20 * math.log10(legato / rest + 1e-12):.0f} dB under one after a rest')
+    # The Leslie fast: the horn's swirl at its speed.
+    fs, x = render('on 72 100 wait 4 off 72', {'PJ_HAMMOND_LESLIE': 'fast'})
+    bb, aa = butter(2, [1000 / (fs / 2), 1200 / (fs / 2)], 'band')
+    env = np.sqrt(np.convolve(lfilter(bb, aa, x[int(1 * fs):int(4 * fs)]) ** 2, np.ones(240) / 240, 'same'))
+    L = 20 * np.log10(env + 1e-9)
+    L -= L.mean()
+    sp = np.abs(np.fft.rfft(L * np.hanning(len(L)), 1 << 18))
+    f = np.fft.rfftfreq(1 << 18, 1 / fs)
+    m = (f > 2) & (f < 12)
+    rate = f[m][sp[m].argmax()]
+    check('hammond: the Leslie\'s horn fast (~6.7 Hz)', 6.3 < rate < 7.1, f'{rate:.2f} Hz, {np.percentile(L, 95) - np.percentile(L, 5):.0f} dB p-p')
+    # The plan: one track with a tune, chords under it and a bass.
+    def vlq(n):
+        b_ = [n & 127]
+        n >>= 7
+        while n:
+            b_.insert(0, (n & 127) | 128)
+            n >>= 7
+        return bytes(b_)
+    ev = [(0, [0xC0, 16])]
+    for i, m_ in enumerate([72, 74, 76, 77, 79, 77, 76, 74] * 2):
+        on = i * 480
+        ev += [(on, [0x90, m_, 90]), (on + 460, [0x80, m_, 0])]
+        if i % 2 == 0:
+            for c_ in (60, 64, 67):
+                ev += [(on, [0x90, c_, 70]), (on + 940, [0x80, c_, 0])]
+            b_ = 36 if (i // 2) % 2 == 0 else 43
+            ev += [(on, [0x90, b_, 80]), (on + 920, [0x80, b_, 0])]
+    ev.sort(key=lambda e_: (e_[0], e_[1][0] == 0x90))
+    trk, last = b'', 0
+    for tk, e_ in ev:
+        trk += vlq(tk - last) + bytes(e_)
+        last = tk
+    trk += b'\x00\xff\x2f\x00'
+    mid = os.path.join(ROOT, 'tools', '.hammond.mid')
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+    r = run(['-play', mid, '-o', wav])
+    os.remove(mid)
+    if os.path.exists(wav):
+        os.remove(wav)
+    got = re.search(r'notes: (\d+) upper, (\d+) lower, (\d+) pedals', r.stderr)
+    counts = tuple(int(g) for g in got.groups()) if got else None
+    check('hammond: a MIDI file planned: the tune upper, the chords lower, the bass the pedals', counts == (16, 24, 8),
+          f'{counts} (upper, lower, pedals)')
+    # Three tracks (an organist's three staves) with the Leslie on CC82: the pedals and two
+    # manuals, the file's Leslie.
+    def track(evs):
+        evs = sorted(evs, key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+        out, last = b'', 0
+        for t, e_ in evs:
+            out += vlq(t - last) + bytes(e_)
+            last = t
+        out += b'\x00\xff\x2f\x00'
+        return b'MTrk' + struct.pack('>I', len(out)) + out
+    t0 = [(0, [0xC0, 16]), (0, [0xB0, 82, 100]), (7680, [0xB0, 82, 60])]
+    tu, tl, tp = [], [], []
+    for i in range(16):
+        m_ = [72, 74, 76, 77][i % 4]
+        tu += [(i * 480, [0x90, m_, 90]), (i * 480 + 460, [0x80, m_, 0])]
+        if i % 4 == 0:
+            for c_ in (55, 60, 64):
+                tl += [(i * 480, [0x90, c_, 70]), (i * 480 + 1900, [0x80, c_, 0])]
+            b_ = [36, 41, 43, 36][(i // 4) % 4]
+            tp += [(i * 480, [0x90, b_, 80]), (i * 480 + 1890, [0x80, b_, 0])]
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 1, 4, 480) + track(t0) + track(tu) + track(tl) + track(tp))
+    r = run(['-play', mid, '-o', wav])
+    got = re.search(r'track 1: (\w+); track 2: (\w+); track 3: (\w+);.*Leslie (.*)', r.stderr)
+    check('hammond: three tracks: two manuals and the pedals; the file\'s Leslie (CC82)',
+          got is not None and got.groups()[:3] == ('upper', 'lower', 'pedals') and got.group(4).startswith("the file"),
+          ' / '.join(got.groups()) if got else r.stderr[-200:])
+    # The Leslie's three parts at the microphones (fast, a C6 wheel; a full chord): the Doppler
+    # (pitch), the tremolo (level), the cabinet's reflections (each partial swinging its own way).
+    from scipy.signal import hilbert, filtfilt
+    def held(notes, env):
+        ev_ = [(0, [0xC0, 16])] + [(0, [0x90, n_, 100]) for n_ in notes] + [(4800, [0x80, notes[0], 0])] + [(0, [0x80, n_, 0]) for n_ in notes[1:]]
+        trk_ = b''.join(vlq(d) + bytes(e_) for d, e_ in ev_) + b'\x00\xff\x2f\x00'
+        with open(mid, 'wb') as fh:
+            fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 960) + b'MTrk' + struct.pack('>I', len(trk_)) + trk_)
+        run(['-play', mid, '-room', 'dry', '-o', wav], env=env)
+        fs_, y = wavfile.read(wav)
+        os.remove(wav)
+        return fs_, y.astype(float)
+    fast = {'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_PERC': 'off', 'PJ_HAMMOND_LESLIE': 'fast'}
+    fs, y = held([84], dict(fast, PJ_HAMMOND_UPPER='008000000'))
+    bb, aa = butter(2, [950 / (fs / 2), 1150 / (fs / 2)], 'band')
+    an = hilbert(filtfilt(bb, aa, y[int(0.6 * fs):int(2.4 * fs), 0]))
+    inst = np.convolve(np.diff(np.unwrap(np.angle(an))) * fs / (2 * np.pi), np.ones(96) / 96, 'same')[500:-500]
+    cents = 1200 * np.log2(np.clip(inst, 500, 2000) / 1046.15)
+    dop = np.percentile(cents, 95) - np.percentile(cents, 5)
+    am = 20 * np.log10(np.abs(an)[500:-500] + 1e-9)
+    trem = np.percentile(am, 95) - np.percentile(am, 5)
+    fs, y = held([72, 76, 79, 84], dict(fast, PJ_HAMMOND_UPPER='888888888'))
+    win, hop = 2048, int(fs / 6.67 / 16)
+    fr = np.array([20 * np.log10(np.abs(np.fft.rfft(y[i:i + win, 0] * np.hanning(win))) + 1e-9)
+                   for i in range(int(0.6 * fs), int(2.4 * fs) - win, hop)])
+    hz = [440 * 2 ** ((m_ - 69) / 12) * k for m_ in (72, 76, 79, 84) for k in (1, 2, 3, 4, 6, 8)]
+    idx = sorted(set(int(round(h_ / (fs / win))) for h_ in hz if 900 < h_ < 7000))
+    dev = fr[:, idx] - fr[:, idx].mean(0)
+    corr = np.corrcoef(dev.T)[np.triu_indices(len(idx), 1)].mean()
+    check('hammond: the Leslie\'s Doppler, tremolo and reflections',
+          50 < dop < 110 and trem > 8 and corr < 0.6,
+          f'pitch {dop:.0f} c p-p, level {trem:.0f} dB p-p; partials swinging alike {corr:.2f}')
+    os.remove(mid)
+    r = run(['-inst', 'hammond', '-fuzz', '10', '1'])
+    check('fuzz 10 s (hammond)', r.returncode == 0, r.stdout.strip())
+    seq = 'on 48 100 on 60 100 on 64 100 on 67 100 on 72 100 wait 10 off 48 off 60 off 64 off 67 off 72'
+    base = cpu_time(['-inst', 'hammond', '-seq', 'wait 0.01', '-o', wav])
+    ns = (cpu_time(['-inst', 'hammond', '-seq', seq, '-o', wav]) - base) / (10 * 48000) * 1e9
+    os.remove(wav)
+    check('real-time margin (hammond: 91 wheels, a five-note chord, the Leslie)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
 def scrapers():
@@ -1797,7 +2139,7 @@ def clap_claves_surdo():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, accordions, harmonica, reed_organ):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

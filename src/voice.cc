@@ -15,6 +15,7 @@
 #include "accordion.h"
 #include "harmonica.h"
 #include "harmonium.h"
+#include "hammond.h"
 #include "harpsichord.h"
 #include "hihatinst.h"
 #include "kick.h"
@@ -128,6 +129,7 @@ std::unique_ptr<Tube> Voice::makeModel(const Instrument& inst) {
   if (inst.plucked() && accordionInstrument(inst)) return std::unique_ptr<Tube>(new AccordionModel(inst));
   if (inst.plucked() && harmonicaInstrument(inst)) return std::unique_ptr<Tube>(new HarmonicaModel(inst));
   if (inst.plucked() && harmoniumInstrument(inst)) return std::unique_ptr<Tube>(new HarmoniumModel(inst));
+  if (inst.plucked() && hammondInstrument(inst)) return std::unique_ptr<Tube>(new HammondModel(inst));
   if (inst.plucked() && barInstrument(inst)) return std::unique_ptr<Tube>(new BarsModel(inst));
   if (inst.plucked() && jazzKick(inst)) return std::unique_ptr<Tube>(new KickModel(inst));
   if (inst.plucked() && shakerInstrument(inst)) return std::unique_ptr<Tube>(new ShakerModel(inst));
@@ -170,6 +172,8 @@ std::unique_ptr<Performer> Voice::makePlayer(Tube& t) {
     return std::unique_ptr<Performer>(new HarmonicaPlayer(static_cast<HarmonicaModel&>(t)));
   if (t.instrument().plucked() && harmoniumInstrument(t.instrument()))
     return std::unique_ptr<Performer>(new HarmoniumPlayer(static_cast<HarmoniumModel&>(t)));
+  if (t.instrument().plucked() && hammondInstrument(t.instrument()))
+    return std::unique_ptr<Performer>(new HammondPlayer(static_cast<HammondModel&>(t)));
   if (t.instrument().plucked() && hiHat(t.instrument()))
     return std::unique_ptr<Performer>(new HiHatPlayer(static_cast<HiHatModel&>(t)));
   if (t.instrument().plucked() && jazzKick(t.instrument()))

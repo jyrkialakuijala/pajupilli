@@ -21,6 +21,6 @@ namespace pajupilli {
 
 // Returns the process exit code.
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
-                 bool verbose);
+                 bool verbose, bool roomGiven = true);
 
 }  // namespace pajupilli

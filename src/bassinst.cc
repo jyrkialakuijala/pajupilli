@@ -122,6 +122,11 @@ extern const Instrument kPlucked[] = {
     {"gedackt-8", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
     {"rohrgedackt-8", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
     {"gedackt-rohrgedackt", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"principal-8", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"organ", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"organ-crescendo", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"organ-88", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
+    {"organ-plan", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "organ"},
     // The free reeds with a bellows (src/accordion.cc; research/free_reeds.md): the accordion's musette
     // and bass (General MIDI 22), the bandoneón (24, the tango accordion).
     {"accordion", 0, 24, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "accordion"},
@@ -130,6 +135,12 @@ extern const Instrument kPlucked[] = {
     {"harmonica", 0, 48, 98, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "harmonica"},
     // The reed organ (src/harmonium.cc; research/reed_organ.md): a pressure harmonium, C2..C7 (General MIDI 21).
     {"reed-organ", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "reed organ"},
+    // The Hammond B-3 through its Leslie 122 (src/hammond.cc, src/leslie.cc; research/hammond_b3.md,
+    // research/leslie.md): General MIDI 17 (drawbar-organ), 18 (percussive-organ), 19 (rock-organ).
+    {"hammond", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    {"drawbar-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    {"percussive-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    {"rock-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
 };
 extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 

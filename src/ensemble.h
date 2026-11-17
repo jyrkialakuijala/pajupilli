@@ -84,6 +84,7 @@ class Ensemble {
   int resets() const;
   int lines() const { return lines_; }
   int size() const { return int(f_.size()); }
+  Performer& player(int i) { return f_[i].v->player(); }  // (an organ's plan talks to its player)
   int lo() const { return lo_; }  // sounding range of the whole ensemble
   int hi() const { return hi_; }
   std::string describe() const;
@@ -120,7 +121,7 @@ class Ensemble {
   void split();
   void take(int flute, int key, int pitch, int velocity);
   void release(int key);
-  void retune();  // just intonation among the sounding flutes
+  void retune();  // the pajupilli intonation among the sounding flutes (adaptive just)
   void block(float* left, float* right, int n);
 
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
@@ -140,7 +141,7 @@ class Ensemble {
   int lines_ = 1;
   std::string playing_ = "none";  // last printed: "2 x flute, piccolo"
   bool verbose_;
-  bool ji_;                 // PJ_JI (1): adaptive just intonation
+  bool ji_;                 // PJ_JI (1): the pajupilli intonation (adaptive just)
   long long tuneSig_ = -1;  // the sounding set last tuned for
   std::vector<std::vector<float>> buf_;
   // Three reverb channels, each a room of its own: small (the synth

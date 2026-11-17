@@ -10,6 +10,11 @@
 
 namespace pajupilli {
 
+// A seed for one of many sources (an organ's pipe: its stop, its key):
+// distinct for every pair by construction; the generator's splitmix64 makes
+// their streams unrelated.
+inline uint64_t randomSeed(int stop, int key) { return (uint64_t(uint32_t(stop)) << 8) | uint64_t(key & 0xff); }
+
 class Rng {
  public:
   explicit Rng(uint64_t seed = 1) { reseed(seed); }

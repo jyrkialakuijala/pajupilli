@@ -109,9 +109,16 @@ constexpr LevelTrim kLevelTrims[] = {
     {"perc-extras", 10.1f},  // (12 dB under the common level, by hand: small sounds, and their clicks peak high)
     {"stick-snare", -1.0f},  // (by hand: 2 dB under the common level, so an accent (velocity 127) peaks near 1.2)
     {"vibraphone-25r", -0.8f},  // (the vibraphone with Balter 25R mallets: brighter and louder at velocity 90)
-    {"gedackt-8", 8.3f},  // (the organ's ranks, measured: -36.5 LUFS in its swell boxes 3/4 open,
-    {"rohrgedackt-8", 2.7f},  //  -30.9 at the Positiv's rail, -29.9 both: one trim each, so a
-    {"gedackt-rohrgedackt", 1.7f},  //  rank alone sounds at the common level; together their own balance)
+    // (the organ's registrations, each trimmed to the common level; within one, the stops' own
+    // balance, src/organ.cc's regulation: the Gedackt in its swell boxes 3/4 open, the
+    // Rohrgedackt at the rail, both, the Principal 8', and -inst organ's default, the Principal
+    // with the Gedackt and the Subbass)
+    {"gedackt-8", 7.6f},
+    {"rohrgedackt-8", 5.2f},
+    {"gedackt-rohrgedackt", 4.1f},
+    {"principal-8", 0.9f},
+    {"organ", -0.9f},
+    {"organ-crescendo", -6.6f},  // (at mp, the default position, at the common level: fff ~8 dB over it)  // (the default registration: Principal 8', the swell's Gedackt 8', the Subbass 16' on the bass line)
     {"hand-clap", 0.0f},     // (by hand, by the peak: ~0.6 at velocity 100; ~10 dB under the common loudness, as short sounds are)
     {"claves", 1.0f},        // (by hand: a peak ~0.8 at velocity 100)
     {"wood-blocks", 0.0f},   // (by hand, by the peak: ~0.8 at velocity 100; ~9 dB under the common loudness)
@@ -121,5 +128,9 @@ constexpr LevelTrim kLevelTrims[] = {
     {"bandoneon", -5.7f},  // (measured -22.5 LUFS)
     {"harmonica", 2.2f},  // (measured -30.4 LUFS with the hands cupped)
     {"reed-organ", 9.3f},  // (measured -37.5 LUFS, stops 1 + 4)
+    {"hammond", 9.2f},           // (measured -37.4 LUFS through the Leslie, slow)
+    {"drawbar-organ", 9.2f},
+    {"percussive-organ", 12.0f},  // (measured -42.0; by hand 2 dB under: the ping's peak)
+    {"rock-organ", 10.9f},        // (measured -39.1, the amp driven)
 };
 }  // namespace pajupilli

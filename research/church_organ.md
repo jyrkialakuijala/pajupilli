@@ -461,9 +461,12 @@ well as excites the space itself."*
   pipes (longer feet for the large ones), ~1 m for pedal flues **[memory]**.
 - **Where each pipe radiates:**
   - **open flue:** two sources, the **mouth** and the **open top** (a length L ≈ λ/2 above it); for
-    the fundamental they radiate in opposite phase (one end breathes out as the other breathes in):
-    a pair of monopoles, at low frequency nearly a dipole along the pipe's axis; for the even
-    harmonics in phase **[paper, F&R; memory]**;
+    the fundamental and the odd harmonics they breathe out **in phase** (the pressure antinode in the
+    middle pushes air out of both ends together), for the even harmonics in **opposite phase** (a
+    dipole along the pipe's axis, cancelling broadside: a listener level with the pipe's middle hears
+    less octave; one below the gallery, the top ~0.3 L farther than the mouth, hears it) **[calc:
+    the open-open modes' velocity cos(kπx/L) at the two ends; corrected from an earlier draft that
+    had the phases the other way round]**;
   - **stopped flue** (Gedackt, Bourdon, Subbass, Untersatz): the **mouth** only, a monopole;
   - **chimney flue** (Rohrflöte, Rohrgedackt): the mouth, plus the chimney's top weakly;
   - **reed:** the **resonator's top** only (the boot is closed); the en chamade horizontal, pointing
@@ -1066,6 +1069,59 @@ climate and maintenance). How the design stands against it, and what it adds **[
 
 Cost of the work: steps 2–3 are the bulk (a pipe voicing solver and ~19 families); the wind and
 console are smaller. Each step ends with something to hear.
+
+## 8a. What is built (2026-11-16) [meas: the project's own renders; GrandOrgue's demo set, numbers only]
+
+All 37 stops of §6, and then the rest of the user's disposition (53 in all: everything but the Vox
+humana), `-inst organ` with `PJ_ORGAN_STOPS` (stops and named registrations: README).
+References: GrandOrgue's demo sample set (GPL-2+ / CC-BY-SA; Bourdon 8′, Montre 8′, Gamba 8′,
+Flûte harmonique 8′, Octavin 2′, Trompette 8′, Hautbois 8′; F#/G of each octave), decoded in the
+scratchpad only, measured for harmonics, speech, onset and noise.
+
+- **The flue pipe** (`src/organpipe.h`): the jet (its travel a quarter period, a tanh of its
+  deflection by the mouth's flow, its turbulence) driving the column's modes; the sound from the
+  mouth and, for an open pipe, its top (half a wavelength up; the odd modes in phase, the even ones
+  opposite: a listener below the gallery hears the octave). Found on the way:
+  - the jet's own flow radiated directly made a buzz of upper harmonics (-30 dB to the 9th):
+    low-passed (4 poles at 2x the pitch) it gives the even harmonics without it;
+  - an open pipe's octave needs an asymmetric jet: the languid's offset set against the jet's swing
+    (a fixed offset vanishes against a saturated jet's swing); a voicer's octave weight on the even
+    modes; strings centred (the duty near 1/2 keeps the 3rd), their bass bridged;
+  - the jet hears the field ~ pressure / frequency (the acoustic velocity): else the treble's pipes
+    hopped between regimes in their boxes;
+  - the smallest pipes (above 2.5 kHz) oversampled 2-4x, their jets deflected by flow / mouth width;
+  - the chiff: the first overtone driven harder at the attack (fading over 25-60 ms): the Montre's
+    octave leads by -3..+10 dB, ours 0..+9; the Bourdon's twelfth +2..+6, ours +1..+4.
+  - Matched (the recordings' F# octaves): Principal octave -8..-14 dB, 3rd/4th ~-20, speech 108 /
+    74 / 44 / 25 / 19 ms (Montre 133 / 113 / 66 / 43 / 11); Gedackt twelfth -13..-21, the 5th-9th
+    within the Bourdon's range, breath and puff within a few dB; Gamba from the middle up within a
+    few dB.
+- **The reed pipe** (`src/organreed.h`): a tongue beating on the shallot, the gap's flow and the
+  resonator's modes solved together each sample (2x oversampled), a formant band at the top.
+  Found: a reed must not hear its enclosure (its loud sound fed back howled on after the release);
+  the gap's flow viscous near no pressure; a reed's pitch follows a retuning unevenly (a 16′'s
+  bistable): calibrated by secant steps and a fine scan. Matched: the Trompette's and Hautbois's
+  bass and middle (harmonics over the fundamental), the bass speech ~30-55 ms. Open: their top
+  octave (the recordings' 2nd harmonic up to +10 dB at 1.5 kHz, ours -9; one sample an octave,
+  irregular).
+- **Calibration:** every pipe in tune where it stands (its enclosure's field acting on it, at its
+  regulated level), its fundamental through two band-passes in double; cached on disk.
+- **Placement:** divided chests (C side left, C# right) in every division; the swell's two boxes;
+  the Positiv at the rail; the façade (the Principal 16′ / 8′ basses); the pedal towers; each
+  enclosure a 4-line room; the microphones: below 300 Hz both alike, above it a few dB to the side.
+- **The wind** (`src/organwind.h`): blower 570 L/s (~34 m³/min, for all 53 stops), a regulator per division (a fast
+  valve in a ~4 Hz loop), a relief valve; the full organ with a 10-note chord sags ~8-11 %, a plenum
+  ~1 %; the flues ~0.5 c per 1 %. Tremulants: a beater on the regulator's top (±8 L, 5.5 Hz):
+  ~13 % p-p, ±3 c.
+- **Regulation:** every stop's output set against the Principal 8′ (balanced-organ targets).
+- **Cost:** a flue ~30 ns a pipe-sample, a reed ~50; enclosures rendered by blocks on 3 threads
+  (they meet only in the wind): the full organ (53 stops) with 8 keys ~1.4x faster than real time on
+  a busy machine.
+- **Not built:** the dedicated nave (§7b.2: the T60s of organ-9.wav, per-pipe early reflections,
+  the low modes): `-play -room church` meanwhile (the project's 4 s church). The int16 / multirate
+  pipes of §7c-d (the float32 model is fast enough so far). Couplers (all manuals sound on every key;
+  the Pedal on the lowest key below G3). A principal's octave-first onset by the jet itself (the
+  chiff stands in for it).
 
 ## 9. The user's organ recordings [meas]
 

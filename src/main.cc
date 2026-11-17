@@ -507,6 +507,7 @@ int main(int argc, char** argv) {
   bool kitOnKeys = false, padDrums = false;  // -inst drums; -pads drums
   std::string ensemble;  // instruments, comma-separated
   const RoomSpec* room = findRoom("hall");
+  bool roomGiven = false;  // -room: otherwise the hall, an organ the church
   double secs = 1.0, dyn = 0.5;
   const char* out = nullptr;
   std::string playFile;  // -play: a MIDI file
@@ -559,6 +560,7 @@ int main(int argc, char** argv) {
     else if (a == "-room") {
       room = findRoom(next());
       if (!room) { std::fprintf(stderr, "-room: dry, studio, hall or church\n"); return 1; }
+      roomGiven = true;
     }
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
     else if (a == "-nantest") return nanTest();
@@ -610,7 +612,8 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  if (!playFile.empty()) return playMidiFile(playFile, out, room, lopt.device, lopt.verbose);
+  if (!playFile.empty()) return playMidiFile(playFile, out, room, lopt.device, lopt.verbose, roomGiven);
+  if (!roomGiven && std::strcmp(gInst->family, "organ") == 0) room = findRoom("church");  // an organ plays in a church
   if (cfoot && gInst == findInstrument("flute")) gInst = findInstrument("flute-c");
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;
   if (cal) { calibrate(*gInst, 440, stdout); return 0; }

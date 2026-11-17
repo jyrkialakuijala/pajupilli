@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <vector>
 
 namespace pajupilli {
@@ -38,6 +39,7 @@ class Enclosure {
     double field = 0.5;                   // the box's field against the direct sound at the opening
     double outDelay = 0;                  // s: farther from the listener than the nearest division
     double pan = 0;                       // -1 left .. 1 right
+    double directLp = 0;                  // its direct sound's low-pass (Hz; 0: none): behind a case
   };
 
   void setup(double fs, const Params& p) {
@@ -72,6 +74,7 @@ class Enclosure {
     omask_ = od - 1;
     outN_ = odn;
     open_ = target_ = p.shutters ? 0.75 : 1.0;
+    dirA_ = p.directLp > 0 ? float(1 - std::exp(-2 * M_PI * p.directLp / fs)) : 1.0f;
     retune();
   }
 
@@ -87,8 +90,11 @@ class Enclosure {
     s.g[3] = 0.6f;  // (the oblique line: the diffuse part, everywhere)
     e += 0.36;
     for (float& g : s.g) g = float(g / std::sqrt(e));
-    // The direct sound to the opening (the front face).
-    const double dist = std::max(0.1, p_.dims.z / 2 - rel.z) + 0.15;
+    // The direct sound to the opening (the front face) and on down to the
+    // listener in the nave, ~17 degrees below the gallery: a higher source
+    // is farther (an open pipe's top ~0.3 x its length behind its mouth: the
+    // two ends' even harmonics, in opposite phase, then do not cancel).
+    const double dist = std::max(0.1, p_.dims.z / 2 - rel.z) + 0.15 + 0.3 * (rel.y + p_.dims.y / 2);
     s.delay = int(std::lround(dist / 343 * fs_));
     s.gain = float(std::min(1.0, 0.5 / dist));
     src_.push_back(s);
@@ -98,14 +104,42 @@ class Enclosure {
   void setOpening(double s) { target_ = p_.shutters ? std::clamp(s, 0.03, 1.0) : 1.0; }
 
   // The box's pressure at source i now (the lines' current outputs).
+  // The field at source i over the last kHist samples, analysed at the given
+  // frequencies (Hz): each one's complex amplitude, its phase as it is now
+  // (a Hann-windowed DFT: what a resonator there tuned to it would have
+  // gathered: sympathetic resonance, a pipe's head start).
+  static constexpr int kHist = 2048;
+  void fieldAt(int i, const double* hz, int n, std::complex<double>* out) const {
+    const Src& s = src_[i];
+    for (int k = 0; k < n; ++k) out[k] = 0;
+    double wsum = 0;
+    std::vector<std::complex<double>> rot(n), ph(n);
+    for (int k = 0; k < n; ++k) {
+      rot[k] = std::polar(1.0, 2 * M_PI * hz[k] / fs_);
+      ph[k] = std::polar(1.0, -2 * M_PI * hz[k] / fs_ * (kHist - 1));  // (the oldest sample's phase against now)
+    }
+    for (int t = 0; t < kHist; ++t) {
+      const int at = (histPos_ + t) & (kHist - 1);  // (oldest first)
+      const double f = s.g[0] * hist_[0][at] + s.g[1] * hist_[1][at] + s.g[2] * hist_[2][at] + s.g[3] * hist_[3][at];
+      const double w = 0.5 - 0.5 * std::cos(2 * M_PI * (t + 0.5) / kHist);
+      wsum += w;
+      for (int k = 0; k < n; ++k) {
+        out[k] += w * f * std::conj(ph[k]);
+        ph[k] *= rot[k];
+      }
+    }
+    for (int k = 0; k < n; ++k) out[k] *= 2 / wsum;
+  }
   float heard(int i) const {
     const Src& s = src_[i];
     return s.g[0] * o_[0] + s.g[1] * o_[1] + s.g[2] * o_[2] + s.g[3] * o_[3];
   }
   // Source i's sound this sample.
-  void add(int i, float y) {
+  // (field: the share of it into the box's field, the part the jets there
+  // hear; its direct sound whole)
+  void add(int i, float y, float field = 1) {
     const Src& s = src_[i];
-    for (int k = 0; k < 4; ++k) in_[k] += s.g[k] * y;
+    for (int k = 0; k < 4; ++k) in_[k] += s.g[k] * field * y;
     direct_[(dw_ + s.delay) & dmask_] += s.gain * y;
     energy_ = std::max(energy_, std::fabs(y));
   }
@@ -124,9 +158,17 @@ class Enclosure {
       in_[k] = 0;
       pos_[k] = pos_[k] + 1 == int(line_[k].size()) ? 0 : pos_[k] + 1;
       o_[k] = line_[k][pos_[k]];
+      hist_[k][histPos_] = o_[k];
       fieldOut += o_[k];
     }
-    const float x = direct_[dw_] + float(p_.field) * 0.5f * fieldOut;
+    histPos_ = (histPos_ + 1) & (kHist - 1);
+    float dir = direct_[dw_];
+    if (dirA_ < 1) {
+      dl1_ += dirA_ * (dir - dl1_);
+      dl2_ += dirA_ * (dl1_ - dl2_);
+      dir = dl2_;
+    }
+    const float x = dir + float(p_.field) * 0.5f * fieldOut;
     direct_[dw_] = 0;
     dw_ = (dw_ + 1) & dmask_;
     // The shutters: louder and brighter as they open; the walls' leak.
@@ -152,8 +194,9 @@ class Enclosure {
       o_[k] = in_[k] = lp_[k] = 0;
     }
     std::fill(direct_.begin(), direct_.end(), 0.0f);
+    for (auto& h : hist_) std::fill(std::begin(h), std::end(h), 0.0f);
     std::fill(out_.begin(), out_.end(), 0.0f);
-    l1_ = l2_ = k1_ = energy_ = 0;
+    l1_ = l2_ = k1_ = energy_ = dl1_ = dl2_ = 0;
   }
 
  private:
@@ -181,6 +224,9 @@ class Enclosure {
   std::vector<Src> src_;
   std::vector<float> direct_, out_;
   int dmask_ = 0, dw_ = 0, omask_ = 0, ow_ = 0, outN_ = 0, ctl_ = 0;
+  float hist_[4][kHist] = {};
+  float dirA_ = 1, dl1_ = 0, dl2_ = 0;
+  int histPos_ = 0;
   float open_ = 1, target_ = 1, a_ = 1, gainOpen_ = 1, l1_ = 0, l2_ = 0, k1_ = 0, energy_ = 0;
 };
 

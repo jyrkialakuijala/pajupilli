@@ -85,8 +85,8 @@ each player has its own vibrato (rate ±8 %, depth ±15 %, its own phase, drifti
 breath) and its own flutter tongue (23-31 Hz), so the flutes never pulse together. `./pajupilli -polydemo -o
 poly.wav` plays a line, a held note under a melody, and chords.
 
-Flutes sounding together tune to each other (adaptive just intonation, `PJ_JI=0` turns it
-off): every pair asks for its interval's nearest simple ratio (fifth +2 c, major third
+Flutes sounding together tune to each other by **the pajupilli intonation** (an adaptive just
+intonation of the project's own design, `PJ_JI=0` turns it off): every pair asks for its interval's nearest simple ratio (fifth +2 c, major third
 -14 c, minor third +16 c, ...), simpler and closer intervals weighing more; a least-squares
 solve gives each flute its offset (within ±30 c), weakly pulled to equal temperament, and
 a note already sounding stays where it is so a new note fits the chord and progressions do
@@ -115,7 +115,7 @@ held under it, as in a slur). A note goes to the instrument it suits
 whole, low notes to low instruments, without voices crossing (the keys of a chord struck
 within 35 ms may move to a better instrument as the chord arrives; it prints `deal: C3 bass,
 G3 alto, E4 flute 1, C5 flute 2, G5 piccolo`), and a line keeps to its instrument. The
-just intonation works across the ensemble.
+pajupilli intonation works across the ensemble.
 
 The instruments play in a room, a reverberant space of its own: a shoebox of the room's
 volume, the players on a line across the stage (high instruments on the left), the listener a
@@ -633,7 +633,7 @@ classical guitar with nylon strings. E2–B5; notes outside are moved in by octa
 
 ### Church organ (first ranks)
 
-The church organ's first two ranks (`src/organ.cc`, `src/organpipe.h`, `src/organbox.h`,
+The church organ's first three ranks (`src/organ.cc`, `src/organpipe.h`, `src/organbox.h`,
 `research/church_organ.md`), C2-C7, each key its own pipe: an air jet crossing the mouth (its travel a
 quarter period, deflected by the flow there and by the field around the mouth, a tanh of the
 deflection entering the pipe, its turbulence) driving the column's modes, whose flow deflects the jet
@@ -650,6 +650,66 @@ in turn: a self-sustained loop, float32 at 48 kHz.
 - `-inst rohrgedackt-8`: the Positiv's Rohrgedackt 8', a metal chimney flute: the chimney half-opens
   the stopper (even modes: the octave ~-50 dB in the bass .. -30 at the top) and lifts the 4th-6th
   (the 5th ~-20 dB): brighter, "liquid".
+- `-inst principal-8`: the Hauptwerk's Principal 8', open metal at normal scale, voiced against a
+  recorded Montre 8' (GrandOrgue's demo set): the octave ~-9 dB (-14 at the top), the 3rd ~-20, the
+  4th ~-20, harmonics to the 12th; speaking ~230 ms at 8' C, ~70 at middle C, ~20 at the top. An
+  open pipe sounds from its **mouth and its top** (half a wavelength above: the odd harmonics
+  breathing out of both ends in phase, the even ones in opposite phase, so a listener below the
+  gallery, the top farther than the mouth, hears the octave). Its octave comes from the jet: the
+  languid set against the jet's swing (`PJ_PRIN_BFRAC`), the jet in the pipe more than half of each
+  period, its flow asymmetric; the voicer's octave (`PJ_PRIN_OCT`) on the even modes. Its bass,
+  C2-F3, stands in the **façade** in front of the main case, the rest on the Hauptwerk's chest inside
+  (C side left, C# right).
+- `-inst organ`: a registration, `PJ_ORGAN_STOPS`, a comma-separated list of the stops built (default
+  `principal8,gedackt8,subbass16`), every manual coupled to the keys; the Pedal's stops play the lowest
+  key held below G3 (`PJ_ORGAN_SPLIT`, 55: the bass line), or every key when only pedal stops are drawn.
+  The 37 stops of the research's selection (`src/organ.cc`'s `kStops`; research/church_organ.md §6),
+  each regulated against the Principal 8′ as a voicer does on site (its output only), their pitches pure to the
+  harmonic (a mutation tuned to its partial, not to equal temperament):
+  - **Hauptwerk:** `principal16` (its bass in the façade too), `principal8`, `fluteharm8` (the Flûte
+    harmonique: from G3 up double-length pipes overblowing to the octave, round and singing), `octave4`, `quinte223` (2⅔′), `superoctave2`, `rohrflote8`, `mixtur5`
+    (2′: 2′ 1⅓′ 1′ ⅔′ ½′ at C, breaking back an octave at each c), `cymbel3` (½′, breaking each octave);
+  - **Schwellwerk** (in its two boxes): `gedackt8`, `bourdon16`, `flute4`, `nasard223`, `waldflote2`,
+    `terz135` (1⅗′: with the Gedackt, the flute and the Nasard, the cornet), `gamba8` and `celeste8` (the
+    strings: narrow pipes, their upper modes keeping their Q, the jet driving them nearly as hard as the
+    fundamental, voiced against a recorded Gamba 8′; the bass octave bridged, its voicing towards the
+    Principal's, as real string basses are; the céleste from tenor C, ~6 c sharp: a slow beat);
+  - **Positiv:** `rohrgedackt8`, `posoctave4`, `gedacktflote4`, `sesquialtera` (2⅔′ + 1⅗′);
+  - **Pedal** (two towers at the case's sides, behind the case and the façade: its flues' breath and
+    puff low-passed at ~800 Hz and 6 dB softer, `PJ_PEDAL_NOISELP`; the towers' direct sound softened
+    above ~2.5 kHz, `PJ_PEDAL_LP`; its reeds on their open chest inside the case, their sound shelved
+    10 dB down above ~300 Hz, `PJ_PEDREED_CASE_DB`, `PJ_PEDREED_CASE_HZ`): `subbass16`, `octavbass8`, `choralbass4`, `pedmixtur4`
+    (2⅔′ 2′ 1⅓′ 1′), `posaune16`, `untersatz32` (stopped, C 16.35 Hz), `principalbass16`, `violonbass16`
+    (a string bass), `pedtrompete8`;
+  - **the rest of the user's disposition** (beyond the research's 37; all 53 but the unwanted Vox
+    humana): `salicional8`, `blockflote4` (Hauptwerk); `swprincipal8`, `swoctave4`, `pleinjeu4`
+    (Schwellwerk); `posprincipal8`, `gemshorn8`, `posoctave2`, `quinte113`, `sifflote1` (the last two
+    breaking back in the top octave), `scharf4`, `dulcian16`, `chamade8` (the Trompette en chamade, at
+    the rail, the loudest stop) (Positiv); `gedacktbass8`, `contraposaune32`, `klarine4` (Pedal);
+  - **the reeds** (`src/organreed.h`): `trompete16`, `trompete8` (Hauptwerk), `fagott16`, `trompette8`, `oboe8`,
+    `clairon4` (Schwellwerk), `cromorne8` (Positiv), `posaune16` (Pedal). A brass tongue, tuned near
+    the pitch, beating against the shallot as the wind closes it; the flow through its gap (Bernoulli's
+    √ of the pressure across it, viscous near none) and the resonator's modes solved together each
+    sample (2x oversampled); a cone's every harmonic (trumpets, oboe, bassoon), the Cromorne's
+    half-length cylinder its odd ones; the resonator's top radiating through a band around ~1.3-1.5 kHz
+    (the recorded Trompette's and Hautbois's harmonics there louder than the fundamental). Voiced against
+    GrandOrgue's Trompette 8′ and Hautbois 8′. A reed does not hear the room (its boot's pressure is
+    hundreds of times the field at its top). Its pitch follows a retuning unevenly (a plateau, then
+    steep; a 16′ reed's bistable at places): calibrated by secant steps and, where that fails, the best
+    of a fine scan. ~50 ns a pipe-sample (under 2x a flue).
+
+  E.g. the plenum: `PJ_ORGAN_STOPS=principal8,octave4,quinte223,superoctave2,mixtur5,cymbel3,subbass16,octavbass8,choralbass4,pedmixtur4`;
+  the cornet: `gedackt8,flute4,nasard223,waldflote2,terz135`. The families: stopped wood (the
+  Gedackt's voicing), chimney (the Rohrgedackt's), open principal (the Principal's), open flute (a wide
+  scale: the octave ~-20 dB, the upper harmonics falling fast). The smallest pipes (above 2.5 kHz) run
+  2x or 4x oversampled and their jets are deflected by the flow / their mouth's width, so even the 1⅗′'s
+  top (10.5 kHz) speaks. Unison pipes of a key in neighbouring rows of a chest hear each other (and can
+  pull each other's pitch). The pipes' calibration (~1.5 s for every stop on 4 threads,
+  `PJ_ORGAN_THREADS`) is cached in ~/.cache/pajupilli by the binary and the `PJ_*` settings. A flue pipe
+  costs ~30 ns a sample, a reed ~50: rendered by blocks of 16 samples, each enclosure (its pipes and
+  their field) on its own thread (they meet only in the wind: its pressures read at a block's start,
+  its flows averaged over the block), on 3 threads (`PJ_ORGAN_RENDER_THREADS`) the full organ (all 53
+  stops) with eight keys held renders ~1.4x faster than real time on a busy machine, the 37 ~2x.
 - `-inst gedackt-rohrgedackt`: both drawn, the manuals coupled: every key sounds both, from the boxes
   and from the rail; the swell box's air ~0.6 C warmer than the church's (`PJ_SWELL_WARM`), so its
   Gedackt stands ~2 c sharp and the two flutes beat slowly.
@@ -668,10 +728,132 @@ the box's warmth). Out through the opening: each pipe's direct sound (delayed by
 front) and the box's field. **The swell pedal** (the dynamics, `-dyn`, the knob; the breath
 controller) opens both boxes' shutters: 0.5 (the default) ~3/4 open, 2/3 and up fully; closed, ~14 dB
 quieter and dark (600 Hz .. 16 kHz), the box ringing longer (0.6 s against 0.3), its walls leaking
-the bass. No velocity (a pallet opens the same however the key is struck), no sustain pedal. Steady
+the bass. **To the two microphones in the nave:** below ~300 Hz they hear every enclosure alike (the
+bass's wavelengths against the gallery's width, the church's field everywhere: 8' C within ~1 dB
+left to right), above it a few dB more on the enclosure's side (the swell boxes ~6 dB, the
+Hauptwerk and the Positiv ~3: `PJ_ORGAN_WIDTH`); spaced microphones' time difference optionally
+(`PJ_ORGAN_ITD`, s: off by default, as it combs the mono sum). No velocity (a pallet opens the same however the key is struck), no sustain pedal. Steady
 wind for now; the blower and the wind's sag, the other ranks, the church's acoustics follow the
-research's plan. ~8 % of a core for both ranks in random playing. The noises come from `src/rng.h`
-(xoshiro256**, seeded through splitmix64).
+research's plan. ~15 % of a core for the three ranks together in random playing.
+
+**The wind** (`src/organwind.h`, research/church_organ.md §4a): a small network solved every sample.
+A centrifugal blower (Q = Qmax √(1 − P/p0), shut off at 1.25 × the working pressure; Qmax 570 L/s,
+~34 m³/min, `PJ_WIND_QMAX`) fills a plenum; a regulator per division (Hauptwerk, Schwellwerk, Positiv, Pedal)
+feeds its chest through a valve that opens as the chest's pressure falls (stiff and well damped, a
+modern organ: `PJ_WIND_STIFF`, `PJ_WIND_VALVE`, `PJ_WIND_DAMP`). Every sounding pipe draws its flow
+(~3 L/s at 8' C, ~0.5 at middle C, a few hundredths for a mixture's smallest, ~ √ its foot's
+pressure) and its jet runs on its chest's pressure, so a sagging wind makes the pipes flat and a
+little softer by themselves (~0.5 c per 1 %, `PJ_WIND_PITCH`). One note: nothing moves; a hymn's
+plenum: a few tenths of a percent; the full organ, all 53 stops, with a 10-note chord held (~290 L/s):
+the blower falls behind, the chests sag ~8 % over a second or two
+and every flue droops ~4 c (the user's "struggle"), recovering when the keys are let go. A relief valve spills above +1 %. **The tremulants** (draw
+`tremsw`, `trempos` among the stops): a beater working the division's regulator, its top's volume
+swung by ±8 L at ~5.5 Hz (`PJ_TREM_DEPTH`, `PJ_TREM_RATE`; the Positiv's a little quicker and
+lighter): the chest's pressure swings ~13 % peak to peak and every pipe on it follows, in pitch
+(~±3 c) and level, by itself. **Registrations by name** in `PJ_ORGAN_STOPS`, alone or with stops:
+`foundations`, `plenum`, `plenum16`, `grandjeu`, `cornet`, `sesquialtera`, `strings`, `soft`,
+`tutti` (all 53 but the Voix céleste, which beats against the chorus), `tutti37` (the research's
+37). `PJ_WIND=0`: steady wind.
+
+**The crescendo roller** (`-inst organ-crescendo`, or `crescendo` in `PJ_ORGAN_STOPS`): every stop
+built, drawn by one control (live: K1; `-dyn`; in `-play`, CC11): silence at 0, then ppp (the swell's
+Gedackt and the Subbass, the boxes closed), pp (the Gamba, the swell's Flûte 4′, the Salicional), p
+(the Positiv's flutes, the Gemshorn, the Gedacktbass), mp (the 8′ flutes, the Bourdon 16′, the swell's
+Principal, the Octavbass), mf (the Principals 8′ and the Octaves 4′, the Principalbass, the
+Violonbass), f (the Principal 16′, the 2′s and mutations, the Mixtur and the Plein jeu, the pedal's
+chorus), ff (the reeds 16′ and 8′, the Cymbel and the Scharf, the Sesquialtera, the pedal reeds, the
+Untersatz 32′), fff (the Clairon, the Trompete 16′, the Cromorne, the Dulcian, the Klarine, the Contra
+Posaune 32′, the Trompette en chamade): each stop at its point of the roller, drawn or retired at once
+on the keys held; the swell boxes opening from closed at ppp to open at mf; ~25 dB from ppp to fff.
+`PJ_ORGAN_SAY=1` prints the dynamic as it changes.
+
+**One 88-key keyboard as the whole organ** (`-inst organ-88`): its keys in zones: A0-B2 the Pedal
+(an octave up: C1 plays the 16′ C, 32.7 Hz), C3-E4 the left hand on the Schwellwerk (an expressive
+colour, its box following the level), F4 up the right hand on the Hauptwerk (at ppp-p the Positiv, the
+Hauptwerk too loud there; the top octave folded into the manuals' compass); K1 the level: silence,
+then ppp .. fff, each division at its rung (`src/organplan.cc`'s ladders). `PJ_ORGAN_SPLITS=48,65`
+moves the zones' borders, `PJ_ORGAN_PEDAL_UP` the pedal's transposition.
+
+**Playing by manuals, a piece's registration plan** (`src/organplan.h`): from an organ part's notes by
+track, made by rules (no tables per piece): the pedal is the lowest track staying in the pedal's
+compass, mostly one voice, clearly under the rest; a trio (two one-voice upper tracks crossing in one
+range) gets the right hand on the Hauptwerk and the left on the Positiv, contrasting colours as strong,
+one registration; otherwise
+the hands play the Hauptwerk and each large part (the tempo's big changes: a passacaglia and its
+fugue) builds from mp (or f) to fff in 8-bar phrases, a step at a time, nudged by its texture; where
+the pedal rests for a phrase the hands go to the Positiv (the thinnest phrases to the swell), two
+steps softer. For BWV 582 it finds the pedal, the manualiter variations 11-15 and the fugue's
+episodes, and builds the Passacaglia from mp to fff at variation 17 and the fugue from f to fff; BWV
+525 it plays as a trio. The model plays a key on a division (`OrganModel::openOn`), with couplers
+(`sw-hw`, `pos-hw`, `hw-ped` ...) in `setRegistration`; with no pedal track, the pedal takes the
+lowest key held below G3.
+
+**In `-play`** an organ part (General MIDI's church organ: `organ-plan`, every stop built) is played by
+its plan: every channel on the organ joins one part, its lines each channel's tracks; the plan is
+printed with each change's registration on every division. The planner first recognises the kind of
+piece: a trio (the right hand on the Hauptwerk, the left on the Positiv, the left moving to the swell
+at each section), a cantus firmus (the melody on the swell's cornet, the accompaniment on the
+Positiv's flutes), a meditative piece (slow, long notes: the swell's Gamba and Voix céleste), a chordal
+one (the romantic grand chœur: the fonds coupled, the swell opening, the reeds at the climaxes), a
+contrapuntal one (the organo pleno: Principal 8′ 4′ 2′ and the Mixtur, the pedal's principals and
+Posaune; a step more at each new section), a long contrapuntal one (built up phrase by phrase); the
+sections are the tempo's changes and the general pauses (each a little more than the last, a clearly
+slower one less). Each division keeps its own stops (no couplers but the grand chœur's), so each line
+has its own colour. The pedal is detached in the Baroque styles (a quarter of each note given to
+silence, 60-180 ms, more before a strong beat), held in the romantic ones.
+
+**Tuning by the spectra** (`PJ_JI_SPECTRAL=1`, off: the interval table above is the default): each
+key's spectrum from its sounding pipes' modelled partials (each pipe's harmonics as its model sounds them
+alone, read once at calibration and cached; a pedal reed's through its case: a Gedackt's odd ones, a
+Nasard's at 3×, a Terz's at 5×, a mixture's ranks), every two keys' partials within 36 c of each other
+(`PJ_JI_SPECTRAL_WINDOW`; a key's correction still at most ±30 c) pulling their interval to where they
+meet, by the weaker partial's level (the beating's depth); no partials meeting, the table's pull, a
+tenth as strong (`PJ_JI_SPECTRAL_W` scales the spectra's). A third whose partials don't meet (a
+Gedackt's) stays near equal temperament: it doesn't beat.
+
+**A little life in the tuning:** each pipe ±1/4.5 Hz off its stop (`PJ_ORGAN_DETUNE_HZ`), each stop ±1/4.5 Hz
+off the others (`PJ_ORGAN_RANK_HZ`), uniform, fixed; the Rohrgedackt at 0 Hz and the Gedackt +0.15 Hz as a
+pair (`PJ_ORGAN_ROHR_HZ`, `PJ_ORGAN_GEDACKT_HZ`; the swell box's warmth on top), each pipe's own offset on top: two pipes beat at most ~0.44 Hz whatever their
+pitch, a slow swell of a few seconds (in the bass more in cents: ~7 c at 16′ C); pure intervals and an
+exact calibration alone sound clinical.
+
+**The pajupilli intonation** (`PJ_ORGAN_JI`, on; 0: equal temperament), the project's own system:
+an adaptive just intonation (relatives: Hermode Tuning, Sethares's adaptive tuning) with its own rules,
+and on the organ a deliberate imperfection on top (the ±1/4.5 Hz above, the wind's droop). The held keys'
+offsets solved as the flutes' (src/ensemble.cc's rules: each pair pulled to its just interval, a new key a little to equal
+temperament, a sounding one near where it is, the chord's offset healing to 0 c), every pipe of a key
+gliding to its offset (+-30 c, a pedal key +-15, the highest key +-10: `PJ_JI_RANGE`,
+`PJ_JI_RANGE_PEDAL`, `PJ_JI_RANGE_TOP`; no glide quicker than 25 ms, none faster than 1 c a millisecond:
+`PJ_JI_GLIDEMS`, `PJ_JI_GLIDERATE`): a triad's third 386 c, its fifth 702 c.
+
+**The pitch log** (`PJ_ORGAN_PITCHLOG=file`): every pipe's frequency as it plays (two band-passes at
+its pitch, its zero crossings timed once it has spoken): its mean against its tuning, the spread, the
+extremes, how long it sounded; for the per-pipe tuning in context (BWV 537: the flues within +-0.3 c
+on average, +-4 c at the extremes; the Posaune 16′ within -6..+1).
+
+**The pallets and the sliders:** a pallet opens over 24 ms and closes over 30, each key's on each
+division drawn afresh at every press and release, ±6 ms (`PJ_ORGAN_PALLETVAR`: a finger's, a
+tracker's, a spring's unevenness; all of a key's stops on its pallet together), the bass's bigger
+pallets up to 4 ms slower, the pedal's 6; a
+stop drawn or retired under held keys (a plan's change, the roller) moves as a slider, over 80 ms
+(`PJ_ORGAN_SLIDER`); a key struck again before its pallet has closed re-articulates its pipe a little,
+not with a fresh attack.
+
+**The finger:** a softer finger opens a pallet up to 2.5× slower and closes it up to 2× (its puff and
+chiff gentler, ~ the square root of the speed; `PJ_ORGAN_SOFTTOUCH` scales it). Played live: after a
+long melody note (1 s or more, C4 up, within 7 s), a note rising above the previous onset's top is
+softer, the more the leap, the more it stands above the recent high notes (their mean, their spread),
+the quieter the playing (`PJ_ORGAN_LIVETOUCH`); a high note held long released softly. In `-play` also
+from the score: a long high note (G4 .. C6, 0.5 .. 2 s), a phrase's last note (a rest of 250 ms after
+it: on the Hauptwerk 0.6, elsewhere 0.35). Trills (two keys a step apart alternating, 8 notes or
+more) stay legato, unshortened; a perfectly quantized one is played alive, ~25 % slower at its start
+quickening to ~25 % faster at its end (`PJ_ORGAN_TRILL`, 0.25).
+
+**A head start from the room** (off for now): a pipe about to speak given what the field at its mouth
+already holds at its partials. Set into its modes at the key (`PJ_ORGAN_PRESET=1`) it sped a C4 with C3
+sounding from ~56 to ~35 ms, but kinked the sound as the jet came in (clicks in trios and arpeggios);
+the field driving its modes at the start instead (`PJ_ORGAN_SYMP=1`) slowed its speech (the field
+holds the pipe's own sound too). To be reworked.
 
 ### Accordion and bandoneón (free reeds)
 
@@ -790,6 +972,106 @@ Mustel / Schiedmayer kind, C2-C7, A = 440. The reeds are blown by the wind, not 
 - 5.7 % of a core for Grand Jeu with an eight-note chord (32 reeds).
 
     ./pajupilli -inst reed-organ -seq "on 48 70 on 64 70 on 67 70 on 72 70 wait 2 off 48 off 64 off 67 off 72 wait 0.5"
+
+### Hammond B-3 and Leslie
+
+`-inst hammond` and GM 17-19 (`drawbar-organ`, `percussive-organ`, `rock-organ`): a tonewheel organ
+through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
+`research/hammond_b3.md`, `research/leslie.md`, `research/hammond_character.md`).
+
+- **The generator:** all 91 wheels turn all the time, geared to one shaft through the 12 gear
+  pairs. A is exactly 440 and C is −0.58 c, as built. The wheels are phase-locked, so a chord sounds
+  the same whenever it is begun. Each wheel is a table of one revolution of its own pickup's
+  voltage: its teeth (2-192), a few harmonics (the bottom octave's "complex" wheels rich in odd
+  ones), the tuned filters of wheels 49-91, and its flaws:
+  - eccentricity and ovality, a swell once a revolution: sidebands at the rotation rate,
+    ~−30 dB;
+  - a sub-octave line under the 2- and 4-tooth wheels;
+  - each tooth a little off in place and depth, and the wheel's own level.
+
+  The organ's serial number (`PJ_HAMMOND_SERIAL`) draws the flaws, and `PJ_HAMMOND_AGE` scales them
+  (1: a used organ). The shaft's 20 Hz wobble and the motor's 120 Hz pulses ripple every wheel
+  together. The organic rest, all running in absolute time, so chords stay phase-locked:
+  - **Flutter:** each wheel sits on its own spring coupling, a torsional resonance of 3-8 Hz
+    excited by the motor's pulses (all wheels alike) and its bearing (its own). Each wheel's speed
+    wobbles ~0.4 c rms (`PJ_HAMMOND_FLUTTER`), each its own way, so a chord shimmers.
+  - **Mains drift:** the synchronous motor and the scanner follow the grid's slow drift, ±0.5 c over
+    tens of seconds (`PJ_HAMMOND_MAINS`).
+  - **Breathing colour:** where the off-centre wheel runs closer, its harmonics swell more than its
+    fundamental, so its colour breathes once a revolution, not only its level.
+  - **Loading:** a wheel's voltage sags ~3 % for each contact it feeds beyond the first, so big
+    chords and full drawbars compress a little.
+  - **Hum and ripple:** the power supply's 60/120/180 Hz hum (`PJ_HAMMOND_HUM`) and its 120 Hz
+    ripple on the preamp's gain. With the leakage, the idle floor is ~−53 dB under a note.
+  - **Dirty contacts:** a held contact breaks for 0.1-2 ms now and then (`PJ_HAMMOND_DIRT`, 0.3:
+    about one crackle in 10 s under a held full-drawbar chord). Each wheel's shaft partner leaks in at −45 dB, and the whole generator whispers behind
+  everything at ~−70 dB per wheel.
+- **Keys:** upper and lower manuals (C2-C7, nine drawbars with the foldback) and pedals (C1-C3,
+  16' + 8').
+  - A key closes nine contacts one after another, each bouncing: the click, never the same twice
+    and 10-14 dB over the tone above 5 kHz.
+  - A hard key closes them within ~0.1 ms, a soft one over ~3 ms, below velocity 20 one by one
+    (10-100 ms).
+  - Velocity has no other effect.
+- **Percussion** (upper): the 2nd or 3rd harmonic, fast (−20 dB in ~0.17 s) or slow, normal or
+  soft. It is single-trigger: legato does not strike it again, and a short gap re-arms it only
+  part way. The 1' drawbar is silent while it is on.
+- **Vibrato and chorus:** V1-V3 and C1-C3, a delay line read back and forth at 6.87 Hz.
+- **Preamp:** the expression pedal (CC11, ~35 dB, the bass held up as it closes) and the tube's
+  soft knee, into the Leslie's amp.
+- **The Leslie:**
+  - an asymmetric soft clip with supply sag (the drive per program: the rock organ hot), then the
+    800 Hz crossover;
+  - the horn on a 0.17 m arm: to each of two microphones its direct path and two wall images,
+    each a delay line read at the moving distance (Doppler) with the mouth's three-band beam, plus
+    the base's leakage;
+  - the drum: fixed below 200 Hz, its scoop turning above;
+  - a 40 ms cabinet tail.
+
+  The horn speeds up in ~0.5 s and slows in 0.8 s; the drum takes 3.5 and 2.5 s. The speeds are
+  0.8/6.7 Hz (horn) and 0.67/5.9 Hz (drum), each cabinet ±3 %. The mod wheel (CC1 ≥ 64) or the
+  sustain pedal switches fast/slow, and CC82 (as the Leslie 2101's default) switches stop / slow /
+  fast (0-42 / 43-85 / 86-127). Measured at the microphones on a fast C6:
+  - the Doppler: −39..+44 c;
+  - the tremolo: 15-16 dB;
+  - the reflections: a chord's partials each swinging 9-22 dB their own way (correlation 0.30).
+
+  `PJ_LESLIE_*` knobs set the speeds, ramps and mic distance.
+- **Registrations:**
+  - GM 17: upper 888000000, C3, Leslie slow.
+  - GM 18: with the 3rd percussion, fast.
+  - GM 19: 888800000, the Leslie fast, the amp driven.
+  - Lower 838000000 and pedals 8/3 throughout.
+  - Overrides: `PJ_HAMMOND_UPPER`, `_LOWER`, `_PEDAL` (digits), `_PERC` (`off`, `3f`, `2s`,
+    `3fs`), `_VIB` (`off`, `V1`..`C3`), `_LESLIE` (`slow`, `fast`, `off`: dry).
+- **`-play` plans the part from the file** (`src/hammondplan.cc`), printed under the channel list:
+  - **Pedals and manuals:**
+    - a low, one-note-at-a-time track takes the pedals, the highest track the upper manual, the
+      others the lower;
+    - with three tracks (an organist's three staves), the lowest is the pedals and the other two
+      the manuals;
+    - every channel on one Hammond program joins one organ and one Leslie, its channels as lines;
+    - one track holding both hands is split moment by moment: the top note and a block chord
+      moving with it go to the upper manual, held chords under a moving tune to the lower, and a
+      low note a fifth or more under the rest to the pedals;
+    - a tune keeps its manual while it moves by steps.
+  - **The drawbars** from the piece's character:
+    - quick and linear: the jazz 888 with the 3rd percussion;
+    - slow: a ballad's 838/808 with C3;
+    - chordal: a fuller 888800000;
+    - the program sets rock and percussive.
+  - **The expression:** with no CC11 in the file it follows the velocities (slowly, as a foot).
+  - **The Leslie:** the file's own if it sends CC1, CC64 or CC82. Otherwise it is planned:
+    - most pieces stay slow throughout;
+    - about one in four (one in two on the rock organ) goes fast in its strongest phrase (the most,
+      loudest notes a second between the band's rests), or in two;
+    - the choice is drawn from a hash of the notes, so the same file gets the same plan every run.
+
+    Played live, the player rides it by the music's intensity instead.
+  - The `PJ_HAMMOND_*` overrides apply over the plan.
+- 2.8 % of a core for a five-note chord with the Leslie.
+
+    ./pajupilli -inst hammond -seq "on 48 100 on 60 100 on 64 100 on 67 100 wait 3 off 48 off 60 off 64 off 67 wait 1"
 
 ### Harpsichord
 
@@ -929,7 +1211,7 @@ Lead-saw's circuit:
 - **Its parasitics:** emitter resistance (the top a little flat) and leakage (the bottom a little
   sharp, more so when warm).
 - **Each voice its own:** parts and temperature, which drifts slowly. It tunes itself at power-on,
-  per octave, as polyphonic analog synths do. The ensemble's just intonation trims each voice's
+  per octave, as polyphonic analog synths do. The ensemble's pajupilli intonation trims each voice's
   control voltage.
 - **Then:** a 4-pole transistor ladder (Huovilainen's nonlinear model), an OTA amplifier and RC
   envelopes.
@@ -1155,7 +1437,7 @@ GM2's 86/87 (XG's 13/14) and 84.
 
 Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
 on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
-CP-80, organs to the calliope, guitars to the koto and banjo, cello to the contrabass, string
+CP-80, guitars to the koto and banjo, cello to the contrabass, string
 sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
 built (bass drum: the jazz kick; snare and side stick: the brushed snare; hi-hats: the hi-hat; toms, bongos, congas: melodic tom; cowbell,
 agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel

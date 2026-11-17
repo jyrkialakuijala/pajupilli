@@ -1,5 +1,10 @@
 #include "midifile.h"
 
+#include "organ.h"
+#include "organplan.h"
+#include "hammond.h"
+#include "hammondplan.h"
+
 #include <alsa/asoundlib.h>
 
 #include <algorithm>
@@ -12,6 +17,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <set>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -37,6 +43,10 @@ struct Event {
   double t;      // seconds
   int order;     // (ties: in the file's order)
   uint8_t status, a, b;
+  int track = 0;       // (the file's track: an organ part's manuals)
+  uint64_t tick = 0;
+  float touch = 0;     // (an organ note-on's finger: 0 normal .. 1 the softest, a long high note)
+  bool trill = false;  // (an organ note-on in a trill: kept legato, not articulated)
 };
 
 struct Song {
@@ -48,6 +58,8 @@ struct Song {
   // The tempo map: from `t` seconds on (at `beat` quarter notes), a quarter lasts `len` s.
   struct Tempo { double t, beat, len; };
   std::vector<Tempo> tempo;
+  int div = 480;       // ticks a quarter
+  long barTicks = 0;   // a bar (the first time signature; 0: none given, 4/4 taken)
 };
 
 uint32_t be(const uint8_t* p, int n) {
@@ -63,8 +75,9 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
   if (d.size() < 14 || std::string(d.begin(), d.begin() + 4) != "MThd") { *err = "not a MIDI file"; return false; }
   const int ntrk = int(be(&d[10], 2)), div = int(be(&d[12], 2));
   if (div & 0x8000) { *err = "SMPTE time division is not supported"; return false; }
+  song->div = div;
   // Every track's events in ticks; the tempo map from all of them.
-  struct Raw { uint64_t tick; int order; uint8_t s, a, b; };
+  struct Raw { uint64_t tick; int order; uint8_t s, a, b; int track; };
   std::vector<Raw> raw;
   std::vector<std::pair<uint64_t, double>> tempo;  // tick, seconds per tick from there
   size_t pos = 8 + be(&d[4], 4);
@@ -103,6 +116,8 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
           song->keySigned = true;
         }
         if (type == 0x03 && song->title.empty() && tr <= 1) song->title.assign(d.begin() + p, d.begin() + std::min(end, p + n));
+        if (type == 0x58 && n >= 2 && p + 2 <= end && song->barTicks == 0)  // the time signature: a bar's ticks
+          song->barTicks = long(d[p]) * div * 4 / (1L << std::min<int>(d[p + 1], 6));
         p += n;
         continue;
       }
@@ -122,7 +137,7 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
       const int kind = s & 0xf0;
       const int nb = kind == 0xc0 || kind == 0xd0 ? 1 : 2;
       if (p + nb > end) break;
-      raw.push_back({tick, order++, s, d[p], uint8_t(nb == 2 ? d[p + 1] : 0)});
+      raw.push_back({tick, order++, s, d[p], uint8_t(nb == 2 ? d[p + 1] : 0), tr});
       p += nb;
     }
   }
@@ -143,7 +158,7 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
       t0 += (tempo[k + 1].first - tempo[k].first) * tempo[k].second;
       ++k;
     }
-    song->ev.push_back({t0 + (r.tick - tempo[k].first) * tempo[k].second, r.order, r.s, r.a, r.b});
+    song->ev.push_back({t0 + (r.tick - tempo[k].first) * tempo[k].second, r.order, r.s, r.a, r.b, r.track, r.tick});
   }
   return true;
 }
@@ -159,10 +174,11 @@ const char* const kGm[128][3] = {
     {"celesta", "vibraphone", "tinkle-bell"}, {"glockenspiel", "vibraphone", "tinkle-bell"},
     {"music-box", "kalimba", "vibraphone"}, {"vibraphone"}, {"marimba", "vibraphone"}, {"xylophone", "vibraphone"},
     {"tubular-bells", "tinkle-bell", "vibraphone"}, {"dulcimer", "koto"},
-    // Organs, accordions, harmonica: the calliope's pipes, a reedy square; the accordion and the
-    // bandoneón (the tango accordion) are their own.
+    // Organs, accordions, harmonica: the church organ (all its stops), the reed organ, the accordion,
+    // the harmonica and the bandoneón (the tango accordion) are their own; the drawbar organs fall
+    // back to the calliope's pipes.
     {"drawbar-organ", "lead-calliope"}, {"percussive-organ", "lead-calliope"}, {"rock-organ", "lead-calliope"},
-    {"church-organ", "lead-calliope"}, {"reed-organ", "lead-square"}, {"accordion", "lead-square"},
+    {"organ-plan", "organ", "lead-calliope"}, {"reed-organ", "lead-square"}, {"accordion", "lead-square"},
     {"harmonica", "lead-square"}, {"bandoneon", "accordion", "lead-square"},
     // Guitars.
     {"nylon-guitar", "koto"}, {"steel-guitar", "banjo", "koto"}, {"jazz-guitar", "koto"}, {"clean-guitar", "koto"},
@@ -212,6 +228,16 @@ const Instrument* forProgram(int prog) {
 struct Part {
   const Instrument* inst;
   std::unique_ptr<Ensemble> ens;
+  // An organ played by a plan (organ-plan: src/organplan.h): its tracks to
+  // the Pedal and the manuals, its registration by the bar.
+  std::unique_ptr<OrganPlan> plan;
+  size_t planNext = 0;
+  std::map<int, int> manualOf;               // track -> division
+  std::map<int, std::pair<int, int>> organKey;  // channel * 128 + key -> (division, key)
+  // A Hammond by its plan (src/hammondplan.h): each note's division, the drawbars for the piece.
+  std::unique_ptr<HammondPlan> hplan;
+  std::map<int, int> hammondDiv;             // channel * 128 + key -> division (held notes)
+  size_t leslieNext = 0;                     // the plan's next Leslie change
   int maxPoly = 1, maxHeld = 1, played = 0;  // (voices: notes held at once, their tails counted)
   double vol = 100 / 127.0, expr = 1;
   std::vector<float> l, r;
@@ -220,7 +246,7 @@ struct Part {
 }  // namespace
 
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
-                 bool verbose) {
+                 bool verbose, bool roomGiven) {
   Song song;
   std::string err;
   if (!readSong(path, &song, &err)) { std::fprintf(stderr, "-play: %s\n", err.c_str()); return 1; }
@@ -345,7 +371,27 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   static const double kTail = std::getenv("PJ_PLAY_TAIL") ? std::atof(std::getenv("PJ_PLAY_TAIL")) : 1.5;  // s
   std::map<int, std::vector<std::pair<double, int>>> busy;  // part -> (time, +1 on / -1 tail's end)
   int skipped = 0, unbuilt = 0;
+  // (every channel played on the organ by a plan joins one organ part: its
+  // lines are the channels' tracks, the plan gives them their manuals)
+  int organPart = -1;
+  // (and every channel on one Hammond program joins one Hammond: both hands and the pedals on one
+  // organ through one Leslie, the channels its lines)
+  std::map<const Instrument*, int> hammondPart;
   auto partOf = [&](int ch, int key, int* playKey) -> int {
+    if (ch != 9) {
+      const Instrument* in = forProgram(prog[ch]);
+      if (in && std::strcmp(in->name, "organ-plan") == 0) {
+        *playKey = key;
+        if (organPart < 0) organPart = ch * 128 + prog[ch];
+        return organPart;
+      }
+      if (in && std::strcmp(in->family, "hammond") == 0) {
+        *playKey = key;
+        auto h = hammondPart.find(in);
+        if (h == hammondPart.end()) h = hammondPart.emplace(in, ch * 128 + prog[ch]).first;
+        return h->second;
+      }
+    }
     if (ch == 9) {
       const Drum dr = drumFor(key, kitOf(prog[ch]), song.gs);
       if (!dr.inst || !findInstrument(dr.inst)) return -1;
@@ -396,6 +442,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
                    song.keySigned ? "the file's key signature" : "the key its notes fit best");
       break;
     }
+  // An organ plays in a church, unless -room said otherwise.
+  if (!roomGiven)
+    for (auto& [id, p] : parts)
+      if (std::strcmp(p.inst->family, "organ") == 0) {
+        room = findRoom("church");
+        std::fprintf(stderr, "  (an organ: in the church)\n");
+        break;
+      }
   std::map<const Instrument*, std::unique_ptr<Calibration>> cals;
   for (auto& [id, p] : parts) {
     if (!cals.count(p.inst)) {
@@ -413,6 +467,249 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     else
       std::fprintf(stderr, "  %s %2d: %s (%d held at once; %d voices for their tails)\n", id / 128 == 9 ? "drums  " : "channel",
                    id / 128 + 1, p.inst->name, p.maxHeld, poly);
+  }
+  // A Hammond: its notes by track, its pedals and manuals and drawbars planned (src/hammondplan.h).
+  for (auto& [id, p] : parts) {
+    if (std::strcmp(p.inst->family, "hammond") != 0 || id / 128 == 9) continue;
+    std::vector<HammondNote> notes;
+    std::map<int, std::pair<uint64_t, int>> on;  // channel * 128 + key -> (tick, velocity)
+    int progs[16] = {};
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) progs[ech] = e.a;
+      if (ech == 9 || forProgram(progs[ech]) != p.inst) continue;
+      if (kind == 0x90 && e.b > 0) {
+        on[ech * 128 + e.a] = {e.tick, e.b};
+      } else if (kind == 0x80 || kind == 0x90) {
+        auto it = on.find(ech * 128 + e.a);
+        if (it == on.end()) continue;
+        notes.push_back({ech * 1000 + e.track, long(it->second.first), long(e.tick), e.a, it->second.second, ech});
+        on.erase(it);
+      }
+    }
+    // Does the file set the Leslie itself (the mod wheel, the sustain pedal, CC82)?
+    bool fileLeslie = false;
+    {
+      int pg[16] = {};
+      for (const Event& e : song.ev) {
+        const int ech = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0xc0) pg[ech] = e.a;
+        if (kind == 0xb0 && ech != 9 && forProgram(pg[ech]) == p.inst && (e.a == 1 || e.a == 64 || e.a == 82)) fileLeslie = true;
+      }
+    }
+    const double bpm = song.tempo.empty() ? 120 : 60 / song.tempo[0].len;
+    p.hplan.reset(new HammondPlan(planHammond(notes, song.div, bpm, p.inst->name, fileLeslie)));
+    std::string sum = p.hplan->summary;
+    for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
+    std::fprintf(stderr, "    %s", sum.c_str());
+    if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) {
+      hp->setRegistration(p.hplan->reg);
+      hp->setLeslieExternal();  // (the file's controls or the plan: the player does not ride it)
+    }
+  }
+  // An organ played by a plan: its notes by track, planned (src/organplan.h).
+  for (auto& [id, p] : parts) {
+    if (std::strcmp(p.inst->name, "organ-plan") != 0) continue;
+    // (its lines: each channel's tracks on the organ, channel * 1000 + track)
+    std::vector<OrganNote> notes;
+    std::map<int, std::pair<int, uint64_t>> on;  // channel * 128 + key -> (line, tick)
+    int progs[16] = {};
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) progs[ech] = e.a;
+      if (ech == 9) continue;
+      const Instrument* in = forProgram(progs[ech]);
+      if (!in || std::strcmp(in->name, "organ-plan") != 0) continue;
+      if (kind == 0x90 && e.b > 0) {
+        on[ech * 128 + e.a] = {ech * 1000 + e.track, e.tick};
+      } else if (kind == 0x80 || kind == 0x90) {
+        auto it = on.find(ech * 128 + e.a);
+        if (it == on.end()) continue;
+        notes.push_back({it->second.first, long(it->second.second), long(e.tick), e.a});
+        on.erase(it);
+      }
+    }
+    std::vector<long> starts;
+    std::vector<std::pair<long, double>> bpm;
+    for (size_t i = 0; i < song.tempo.size(); ++i) {
+      const long tk = long(std::lround(song.tempo[i].beat * song.div));
+      if (i > 0) starts.push_back(tk);
+      bpm.push_back({tk, 60 / song.tempo[i].len});
+    }
+    p.plan.reset(new OrganPlan(planOrgan(notes, song.div, song.barTicks ? song.barTicks : 4L * song.div, starts, bpm)));
+    std::string sum = p.plan->summary;
+    for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
+    std::fprintf(stderr, "    %s", sum.c_str());
+    bool pedal = false;
+    for (const OrganPlanChange& c : p.plan->changes)
+      for (auto& [t, d] : c.manuals) pedal |= d == 3;
+    if (auto* op = dynamic_cast<OrganPlayer*>(&p.ens->player(0))) op->setAutoPedal(!pedal);
+    // The articulation: the organ has no touch dynamics, so the notes'
+    // lengths are its expression. In the Baroque styles (toucher ordinaire)
+    // every note a little detached (a manual's ~12 %, 25 .. 90 ms; the pedal's
+    // a quarter, 60 .. 180 ms: its low notes clearing in the church), more
+    // before a strong beat (the silence before it: an agogic accent); in the
+    // romantic ones (legato absolu) held. A note struck again at once (the
+    // same key: its pipe would only sound on) halved in the Baroque, a short
+    // break in the romantic, so that the repeat is heard.
+    // Trills played alive: a line alternating two keys a step apart (8 notes
+    // or more, each under 180 ms) in a perfectly even rhythm (its onsets within
+    // 3 ms of even: a quantized file) has its time warped within its span:
+    // relaxed at its start (the repercussions ~25 % slower), quickening to its
+    // end (~25 % faster), its start and its end kept (PJ_ORGAN_TRILL, 0.25).
+    {
+      static const double kTrill = std::getenv("PJ_ORGAN_TRILL") ? std::atof(std::getenv("PJ_ORGAN_TRILL")) : 0.25;
+      int progs3[16] = {};
+      std::map<int, std::vector<std::pair<size_t, size_t>>> lineNotes;  // line -> (note-on, note-off) indices
+      std::map<int, size_t> open3;
+      for (size_t i = 0; i < song.ev.size(); ++i) {
+        const Event& e = song.ev[i];
+        const int ech = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0xc0) progs3[ech] = e.a;
+        const Instrument* in = ech == 9 ? nullptr : forProgram(progs3[ech]);
+        if (!in || std::strcmp(in->name, "organ-plan") != 0) continue;
+        const int k = (ech * 1000 + e.track) * 128 + e.a;
+        if (kind == 0x90 && e.b > 0) {
+          open3[k] = i;
+        } else if (kind == 0x80 || kind == 0x90) {
+          auto it = open3.find(k);
+          if (it == open3.end()) continue;
+          lineNotes[ech * 1000 + e.track].push_back({it->second, i});
+          open3.erase(it);
+        }
+      }
+      int trills = 0, trillsFound = 0;
+      for (auto& [line, ns] : lineNotes) {
+        std::sort(ns.begin(), ns.end(), [&](auto& x, auto& y) { return song.ev[x.first].t < song.ev[y.first].t; });
+        size_t a = 0;
+        while (a + 8 <= ns.size()) {
+          auto key = [&](size_t q) { return int(song.ev[ns[q].first].a); };
+          auto at = [&](size_t q) { return song.ev[ns[q].first].t; };
+          const int k0 = key(a), k1 = a + 1 < ns.size() ? key(a + 1) : -1;
+          const double ioi = a + 1 < ns.size() ? at(a + 1) - at(a) : 1;
+          // (a trill: the two keys alternating, each step under 180 ms and
+          // within 30 % of the first; even within 3 ms throughout: quantized)
+          size_t b = a + 1;
+          bool even = true;
+          if (std::abs(k1 - k0) >= 1 && std::abs(k1 - k0) <= 2 && ioi > 0.02 && ioi < 0.18)
+            while (b < ns.size() && key(b) == ((b - a) % 2 ? k1 : k0) && std::fabs(at(b) - at(b - 1) - ioi) < 0.3 * ioi) {
+              even = even && std::fabs(at(b) - at(b - 1) - ioi) < 0.003;
+              ++b;
+            }
+          if (b - a >= 8) {
+            for (size_t q = a; q < b; ++q) song.ev[ns[q].first].trill = true;
+            ++trillsFound;
+          }
+          if (kTrill > 0 && b - a >= 8 && even) {
+            const double t0 = at(a), t1 = song.ev[ns[b - 1].second].t, D = t1 - t0;
+            auto warp = [&](double t) {
+              const double u = std::clamp((t - t0) / D, 0.0, 1.0);
+              return t0 + D * ((1 + kTrill) * u - kTrill * u * u);  // (its rate from 1 - kTrill .. 1 + kTrill)
+            };
+            for (size_t q = a; q < b; ++q) {
+              song.ev[ns[q].first].t = warp(song.ev[ns[q].first].t);
+              song.ev[ns[q].second].t = warp(song.ev[ns[q].second].t);
+            }
+            ++trills;
+            a = b;
+          } else if (b - a >= 8) {
+            a = b;
+          } else {
+            ++a;
+          }
+        }
+      }
+      if (trills) std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& x, const Event& y) { return x.t < y.t; });
+      if (trillsFound)
+        std::fprintf(stderr, "    (%d trills, legato; %d of them quantized, played alive: relaxed at their start, quickening)\n",
+                     trillsFound, trills);
+    }
+    std::set<int> pedalLines;
+    for (const OrganPlanChange& c : p.plan->changes)
+      for (auto& [t, d] : c.manuals)
+        if (d == 3) pedalLines.insert(t);
+    {
+      const long bar = song.barTicks ? song.barTicks : 4L * song.div;
+      std::map<int, size_t> onAt;  // channel * 128 + key -> the note-on's index
+      std::map<int, std::vector<double>> starts;  // channel * 128 + key -> its note-ons' times
+      std::map<int, std::vector<double>> lineStarts;  // line -> its note-ons' times (a phrase's end: a rest after it)
+      std::set<int> hwLines;  // (the lines on the Hauptwerk: the melody's)
+      for (const OrganPlanChange& c : p.plan->changes)
+        for (auto& [t, d] : c.manuals)
+          if (d == 0) hwLines.insert(t);
+      int progs2[16] = {};
+      auto onOrgan = [&](int ech) {
+        if (ech == 9) return false;
+        const Instrument* in = forProgram(progs2[ech]);
+        return in && std::strcmp(in->name, "organ-plan") == 0;
+      };
+      for (const Event& e : song.ev) {
+        const int ech = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0xc0) progs2[ech] = e.a;
+        if (kind == 0x90 && e.b > 0 && onOrgan(ech)) {
+          starts[ech * 128 + e.a].push_back(e.t);
+          lineStarts[ech * 1000 + e.track].push_back(e.t);
+        }
+      }
+      std::fill(progs2, progs2 + 16, 0);
+      int shortened = 0, repeats = 0, softened = 0, phraseEnds = 0;
+      const bool baroque = p.plan->pedalDetached;
+      for (size_t i = 0; i < song.ev.size(); ++i) {
+        Event& e = song.ev[i];
+        const int ech = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0xc0) progs2[ech] = e.a;
+        if (!onOrgan(ech)) continue;
+        if (kind == 0x90 && e.b > 0) {
+          onAt[ech * 128 + e.a] = i;
+        } else if (kind == 0x80 || kind == 0x90) {
+          auto it = onAt.find(ech * 128 + e.a);
+          if (it == onAt.end()) continue;
+          const double on = song.ev[it->second].t, dur = e.t - on;
+          const bool pedalNote = pedalLines.count(ech * 1000 + e.track) > 0;
+          if (song.ev[it->second].trill) {  // (a trill's notes legato: unshortened)
+            onAt.erase(it);
+            continue;
+          }
+          // (a long high note played with a softer finger: from G4 to C6, held
+          // from 0.5 s to 2 s; its pallet slower, its attack gentler)
+          if (!pedalNote) {
+            float touch = float(std::clamp((e.a - 67) / 17.0, 0.0, 1.0) * std::clamp((dur - 0.5) / 1.5, 0.0, 1.0));
+            // (a phrase's last note, a rest of 250 ms or more after it in its
+            // line, or the line's last: softer too, the melody's on the
+            // Hauptwerk the most)
+            const auto& ls = lineStarts[ech * 1000 + e.track];
+            const auto nl = std::upper_bound(ls.begin(), ls.end(), on + 1e-6);
+            if (nl == ls.end() || *nl - e.t >= 0.25) {
+              touch = std::max(touch, hwLines.count(ech * 1000 + e.track) ? 0.6f : 0.35f);
+              ++phraseEnds;
+            }
+            song.ev[it->second].touch = touch;
+            softened += touch > 0.2;
+          }
+          // (the next strong beat: a bar's start, or its middle in an even metre)
+          const bool strong = e.tick % bar == 0 || (bar % (2 * song.div) == 0 && e.tick % (bar / 2) == 0);
+          double gap = !baroque ? (pedalNote ? 0.03 : 0.0)
+                       : (pedalNote ? std::clamp(0.25 * dur, 0.06, 0.18) : std::clamp(0.12 * dur, 0.025, 0.09)) * (strong ? 1.6 : 1.0);
+          // (the same key again at once: its pipe would only sound on)
+          const auto& st = starts[ech * 128 + e.a];
+          const auto nx = std::upper_bound(st.begin(), st.end(), on + 1e-6);
+          if (nx != st.end() && *nx - e.t < 0.03) {
+            gap = std::max(gap, baroque ? 0.5 * dur : std::min(0.5 * dur, 0.06));
+            ++repeats;
+          }
+          gap = std::min(gap, 0.6 * dur);
+          if (gap > 0) {
+            e.t -= gap;
+            ++shortened;
+          }
+          onAt.erase(it);
+        }
+      }
+      std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& x, const Event& y) { return x.t < y.t; });
+      std::fprintf(stderr, "    (%s: %d notes shortened, %d of them repeated notes; %d notes with a softer finger, %d of them phrase ends)\n",
+                   baroque ? "toucher ordinaire, the Baroque's articulate legato; the pedal detached"
+                           : "legato absolu, the romantic's: held", shortened, repeats, softened, phraseEnds);
+    }
   }
   if (skipped) std::fprintf(stderr, "  (%d drum notes on keys with nothing built: silent)\n", skipped);
   if (unbuilt) std::fprintf(stderr, "  (%d notes on programs with nothing near built: silent)\n", unbuilt);
@@ -475,6 +772,24 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       for (; next < song.ev.size() && song.ev[next].t < now; ++next) {
         const Event& e = song.ev[next];
         const int ch = e.status & 15, kind = e.status & 0xf0;
+        // A Hammond's planned Leslie: its speed changes from their tick on.
+        for (auto& [id, p] : parts)
+          if (p.hplan)
+            while (p.leslieNext < p.hplan->leslie.size() && p.hplan->leslie[p.leslieNext].first <= long(e.tick)) {
+              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(p.hplan->leslie[p.leslieNext].second ? 2 : 1);
+              ++p.leslieNext;
+            }
+        // An organ's plan: its registrations and manuals from their bar on (before a note at the same tick).
+        for (auto& [id, p] : parts)
+          if (p.plan)
+            while (p.planNext < p.plan->changes.size() && p.plan->changes[p.planNext].tick <= long(e.tick)) {
+              const OrganPlanChange& c = p.plan->changes[p.planNext++];
+              if (auto* op = dynamic_cast<OrganPlayer*>(&p.ens->player(0))) {
+                op->setRegistration(c.registration);
+                op->setSwellOpening(c.swell);
+              }
+              for (auto& [t, d] : c.manuals) p.manualOf[t] = d;
+            }
         if (kind == 0x90 && e.b > 0) {
           lastOn = e.t;
           if (ch != 9) SongClock::get().lastOn[e.a & 127] = e.t;
@@ -491,22 +806,85 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (id < 0 || it == parts.end()) continue;
           noteOwner[ch * 128 + e.a] = id;
           heldKey[ch * 128 + e.a] = pk + it->second.inst->transpose;
+          if (it->second.plan) {  // (an organ by its plan: the note on its track's division)
+            Part& op = it->second;
+            const int line = ch * 1000 + e.track;
+            const int div = op.manualOf.count(line) ? op.manualOf[line] : 0;
+            const int key = pk + op.inst->transpose;
+            if (auto* pl = dynamic_cast<OrganPlayer*>(&op.ens->player(0))) {
+              auto old = op.organKey.find(ch * 128 + e.a);
+              if (old != op.organKey.end()) pl->noteOffManual(old->second.first, old->second.second);
+              pl->noteOnManual(div, key, e.touch);
+              op.organKey[ch * 128 + e.a] = {div, key};
+            }
+            ++op.played;
+            continue;
+          }
+          if (it->second.hplan) {  // (a Hammond by its plan: the note on its division)
+            Part& hp = it->second;
+            auto d = hp.hplan->division.find({ch * 128 + e.a, long(e.tick)});
+            const int div = d != hp.hplan->division.end() ? d->second : HammondModel::kUpper;
+            if (auto* pl = dynamic_cast<HammondPlayer*>(&hp.ens->player(0))) {
+              auto old = hp.hammondDiv.find(ch * 128 + e.a);
+              if (old != hp.hammondDiv.end()) pl->noteOffManual(old->second, e.a);
+              pl->noteOnManual(div, e.a, e.b);
+              hp.hammondDiv[ch * 128 + e.a] = div;
+            }
+            ++hp.played;
+            continue;
+          }
           it->second.ens->noteOn(pk + it->second.inst->transpose, e.b);
           ++it->second.played;
         } else if (kind == 0x80 || kind == 0x90) {
           auto it = noteOwner.find(ch * 128 + e.a);
           if (it == noteOwner.end()) continue;
-          parts[it->second].ens->noteOff(heldKey[ch * 128 + e.a]);
+          Part& np = parts[it->second];
+          if (np.plan) {
+            auto k = np.organKey.find(ch * 128 + e.a);
+            if (k != np.organKey.end()) {
+              if (auto* pl = dynamic_cast<OrganPlayer*>(&np.ens->player(0))) pl->noteOffManual(k->second.first, k->second.second);
+              np.organKey.erase(k);
+            }
+            noteOwner.erase(it);
+            continue;
+          }
+          if (np.hplan) {
+            auto k = np.hammondDiv.find(ch * 128 + e.a);
+            if (k != np.hammondDiv.end()) {
+              if (auto* pl = dynamic_cast<HammondPlayer*>(&np.ens->player(0))) pl->noteOffManual(k->second, e.a);
+              np.hammondDiv.erase(k);
+            }
+            noteOwner.erase(it);
+            continue;
+          }
+          np.ens->noteOff(heldKey[ch * 128 + e.a]);
           noteOwner.erase(it);
         } else if (kind == 0xb0) {
+          // (a Hammond's part hears the controllers of every channel it plays)
+          auto hears = [&](int id, const Part& p) {
+            return id / 128 == ch || (ch != 9 && std::strcmp(p.inst->family, "hammond") == 0 && forProgram(prog[ch]) == p.inst);
+          };
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
-              if (id / 128 == ch) p.ens->setHold(e.b >= 64);
+              if (hears(id, p)) p.ens->setHold(e.b >= 64);
           if (e.a == 7) chVol[ch] = e.b / 127.0;
-          if (e.a == 11) chExpr[ch] = e.b / 127.0;
-          if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo
+          if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Hammond's expression pedal instead
+            bool swell = false;
             for (auto& [id, p] : parts)
-              if (id / 128 == ch && std::strcmp(p.inst->name, "harmonica") == 0) p.ens->all(&Performer::setFlutter, e.b / 127.0);
+              if (hears(id, p) && (std::strcmp(p.inst->family, "organ") == 0 || std::strcmp(p.inst->family, "hammond") == 0)) {
+                if (!p.plan) p.ens->all(&Performer::setBreath, e.b / 127.0 - 0.5);  // (a plan's swell wins)
+                swell = true;
+              }
+            if (!swell) chExpr[ch] = e.b / 127.0;
+          }
+          if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Hammond's Leslie (fast from 64)
+            for (auto& [id, p] : parts)
+              if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || std::strcmp(p.inst->family, "hammond") == 0))
+                p.ens->all(&Performer::setFlutter, e.b / 127.0);
+          if (e.a == 82)  // the Leslie's switch (as the Leslie 2101's default): stop, slow, fast
+            for (auto& [id, p] : parts)
+              if (hears(id, p) && std::strcmp(p.inst->family, "hammond") == 0)
+                if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(e.b < 43 ? 0 : e.b < 86 ? 1 : 2);
           if (e.a == 123 || e.a == 120)  // all notes off
             for (auto& [k, id] : noteOwner)
               if (k / 128 == ch) parts[id].ens->noteOff(heldKey[k]);
