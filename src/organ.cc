@@ -497,7 +497,7 @@ const Regulation kRegulation[] = {
     {"rohrflote8", 7.4f},
     {"mixtur5", 6.2f},
     {"cymbel3", 10.0f},
-    {"trompete8", 29.3f},
+    {"trompete8", 30.3f},
     {"gedackt8", 2.4f},
     {"bourdon16", 6.8f},
     {"flute4", 3.0f},
@@ -506,28 +506,28 @@ const Regulation kRegulation[] = {
     {"terz135", 8.0f},
     {"gamba8", 3.5f},
     {"celeste8", 2.9f},
-    {"fagott16", 44.0f},
-    {"trompette8", 31.8f},
-    {"oboe8", 22.9f},
-    {"clairon4", 32.2f},  // (its treble evened: re-regulated ~1 dB under the Trompette, its middle as before)
+    {"fagott16", 44.8f},
+    {"trompette8", 32.9f},
+    {"oboe8", 24.2f},
+    {"clairon4", 32.5f},  // (its treble evened: re-regulated ~1 dB under the Trompette, its middle as before)
     {"rohrgedackt8", -0.7f},
     {"posoctave4", 0.0f},
     {"gedacktflote4", 1.3f},
     {"sesquialtera", 2.1f},
-    {"cromorne8", 31.2f},
+    {"cromorne8", 31.7f},
     {"subbass16", 8.2f},
     {"octavbass8", 2.0f},
     {"choralbass4", 3.4f},
     {"pedmixtur4", 7.1f},
-    {"posaune16", 34.5f},
+    {"posaune16", 39.0f},
     {"principal8", 0.0f},
     {"principal16", 1.8f},
     {"fluteharm8", 9.8f},
-    {"trompete16", 30.3f},
+    {"trompete16", 33.5f},
     {"untersatz32", 16.7f},
     {"principalbass16", 14.1f},
     {"violonbass16", 10.7f},
-    {"pedtrompete8", 35.1f},
+    {"pedtrompete8", 37.9f},
     {"salicional8", 4.3f},
     {"blockflote4", 8.0f},
     {"swprincipal8", 11.1f},
@@ -539,11 +539,11 @@ const Regulation kRegulation[] = {
     {"quinte113", 3.7f},
     {"sifflote1", 3.7f},
     {"scharf4", 6.2f},
-    {"dulcian16", 37.5f},
-    {"chamade8", 30.1f},
+    {"dulcian16", 38.4f},
+    {"chamade8", 31.2f},
     {"gedacktbass8", 13.2f},
-    {"contraposaune32", 45.0f},
-    {"klarine4", 39.5f}
+    {"contraposaune32", 49.7f},
+    {"klarine4", 39.7f}
 };
 float regulationDb(const char* token) {
   for (const Regulation& r : kRegulation)
@@ -1743,7 +1743,7 @@ void OrganModel::renderEnclosure(int e) {
             const double t = double(L.sounding) - v / (v - L.prev);
             if (L.lastCross >= 0) {
               // (against where it is meant to be now: its just offset too)
-              const double c = 1200 * std::log2(fs_ / (t - L.lastCross) / pp.target) - (ji_ ? jiNow_[pp.key] : 0.0) - climate_[pp.p.reed ? 1 : 0];
+              const double c = 1200 * std::log2(fs_ / (t - L.lastCross) / pp.target) - (ji_ ? jiNow_[pp.key] : 0.0) - climateOf(pp);
               if (std::fabs(c) < 200) {
                 L.sum += c;
                 L.sum2 += c * c;
@@ -1974,10 +1974,75 @@ void OrganModel::climateStep() {
   if (now_ % (kBlock * 512) != 0) return;
   const double u = std::clamp(double(now_) / fs_ / std::max(kSecs, 1.0), 0.0, 1.0);
   const double flue = 1200 * std::log2(std::sqrt((293.15 + kDT * u) / 293.15) * (1 + 0.000035 * kDRH * u));
-  if (std::fabs(flue - climate_[0]) < 0.02) return;
+  double before[16];
+  std::copy(encAir_, encAir_ + 16, before);
+  airStep(double(now_) / fs_);
+  bool moved = std::fabs(flue - climate_[0]) >= 0.02;
+  for (size_t e = 0; e < enc_.size(); ++e) moved |= std::fabs(encAir_[e] - before[e]) * 2.95 >= 0.02;
+  if (!moved) return;
   climate_[0] = flue;
   climate_[1] = kReed * flue;
   for (int i = 0; i < int(pipes_.size()); ++i) retune(i);
+}
+
+// The air events: a new one now and then (on average PJ_ORGAN_AIR_EVERY
+// seconds apart, 180), each a region, a change (0.3 .. 1.5 degrees, warmer or
+// colder), coming on over 15 .. 45 s, held 1 .. 4 min, gone over 2 .. 5 min;
+// summed per enclosure and per nave line.
+void OrganModel::airStep(double t) {
+  static const double kOn = knob("PJ_ORGAN_AIR", 1.0), kEvery = knob("PJ_ORGAN_AIR_EVERY", 180);
+  if (kOn <= 0) return;
+  if (airNext_ < 0) airNext_ = t + kEvery * (0.3 + 0.7 * (0.5 + 0.5 * airRng_.uniform()));
+  if (t >= airNext_) {
+    AirEvent ev;
+    ev.region = int((0.5 + 0.5 * airRng_.uniform()) * 4.999);
+    const double mag = 0.3 + 1.2 * (0.5 + 0.5 * airRng_.uniform());
+    ev.dT = kOn * (airRng_.uniform() < 0 ? -mag : mag);
+    ev.t0 = t;
+    ev.rise = 15 + 30 * (0.5 + 0.5 * airRng_.uniform());
+    ev.hold = 60 + 180 * (0.5 + 0.5 * airRng_.uniform());
+    ev.fall = 120 + 180 * (0.5 + 0.5 * airRng_.uniform());
+    for (int j = 0; j < 8; ++j) {
+      ev.line[j] = int((0.5 + 0.5 * airRng_.uniform()) * (OrganNave::lines() - 0.001));
+      ev.share[j] = 0.3 + 0.7 * (0.5 + 0.5 * airRng_.uniform());
+    }
+    air_.push_back(ev);
+    static const char* kWhere[5] = {"the main case and the Positiv", "the swell boxes", "the left side", "the right side", "the nave"};
+    if (std::getenv("PJ_ORGAN_SAY"))
+      std::fprintf(stderr, "organ: at %.0f s %s air (%+.1f C) reaches %s\n", t, ev.dT > 0 ? "warm" : "cold", ev.dT, kWhere[ev.region]);
+    // (the next, exponentially apart)
+    airNext_ = t - kEvery * std::log(std::max(1e-3, 0.5 + 0.5 * airRng_.uniform()));
+  }
+  std::fill(encAir_, encAir_ + 16, 0.0);
+  std::fill(lineAir_, lineAir_ + 64, 0.0);
+  for (size_t i = 0; i < air_.size();) {
+    const AirEvent& ev = air_[i];
+    const double a = t - ev.t0;
+    double w;
+    if (a < ev.rise) w = 0.5 - 0.5 * std::cos(M_PI * a / ev.rise);
+    else if (a < ev.rise + ev.hold) w = 1;
+    else if (a < ev.rise + ev.hold + ev.fall) w = 0.5 + 0.5 * std::cos(M_PI * (a - ev.rise - ev.hold) / ev.fall);
+    else {
+      air_.erase(air_.begin() + i);
+      continue;
+    }
+    const double d = w * ev.dT;
+    auto add = [&](std::initializer_list<int> es) {
+      for (int e : es) encAir_[e] += d;
+    };
+    switch (ev.region) {
+      case 0: add({kHwC, kHwCis, kFacC, kFacCis, kPosC, kPosCis}); break;
+      case 1: add({kSwellC, kSwellCis}); break;
+      case 2: add({kSwellC, kPosC, kHwC, kFacC, kPedC}); break;
+      case 3: add({kSwellCis, kPosCis, kHwCis, kFacCis, kPedCis}); break;
+      default: break;
+    }
+    // (its part of the nave: a path through warmer air shorter, ~2.5 samples a degree over its share)
+    for (int j = 0; j < 8; ++j) lineAir_[ev.line[j]] -= 2.5 * d * ev.share[j];
+    ++i;
+  }
+  if (naveOn_)
+    for (int k = 0; k < OrganNave::lines(); ++k) late_.setStatic(k, std::clamp(lineAir_[k], -3.0, 3.0));
 }
 
 void OrganModel::renderBlock() {

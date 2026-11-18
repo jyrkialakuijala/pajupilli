@@ -197,6 +197,15 @@ class OrganNave {
 
   // n samples: in, the organ's sound at 1 m (Pa); out (added to): the
   // microphones' l and r (Pa), the pressure at the organ (Pa; null: none).
+  // A line's length moved by a static offset (samples; an air event: a draft,
+  // a warm plume in its part of the church), read fractionally while any is set.
+  void setStatic(int k, double samples) {
+    if (k < 0 || k >= kLines) return;
+    static_[k] = samples;
+    anyStatic_ = false;
+    for (int j = 0; j < kLines; ++j) anyStatic_ |= std::fabs(static_[j]) > 1e-4;
+  }
+  static constexpr int lines() { return kLines; }
   void process(const float* in, int n, float* l, float* r, float* atOrgan) {
     const int mask = ring_ - 1;
     for (int i = 0; i < n; ++i) {
@@ -214,7 +223,7 @@ class OrganNave {
       }
       // The lines' outputs, each through its loss.
       double x[kLines];
-      if (!lens_) {
+      if (!lens_ && !anyStatic_) {
         for (int k = 0; k < kLines; ++k) x[k] = line_[size_t(k) * ring_ + ((pos_ - len_[k]) & mask)];
       } else {
         for (int k = 0; k < kLines; ++k) x[k] = lensRead(k, mask);
@@ -418,7 +427,7 @@ class OrganNave {
     }
     const double u = 0.5 - 0.5 * std::cos(M_PI * lensPh_[k]);
     const double v = lensA_[k] + u * (lensB_[k] - lensA_[k]);
-    const double dly = len_[k] + p_.lensDepth * (1 + v);
+    const double dly = std::max(2.0, len_[k] + p_.lensDepth * (1 + v) + static_[k]);
     const int di = int(dly);
     const double fr = dly - di;
     const float* L = &line_[size_t(k) * ring_];
@@ -443,7 +452,8 @@ class OrganNave {
   std::vector<float> preRing_;
   std::vector<float> ap_[3];
   int apPos_[3] = {};
-  bool lens_ = false;
+  bool lens_ = false, anyStatic_ = false;
+  double static_[kLines] = {};
   float lensA_[kLines] = {}, lensB_[kLines] = {}, lensPh_[kLines] = {}, lensRate_[kLines] = {};
   uint32_t lensSeed_ = 1;
 };

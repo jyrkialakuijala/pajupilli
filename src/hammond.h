@@ -82,6 +82,7 @@ class HammondModel : public Tube {
   void setExpression(double e) { exprTarget_ = e; }  // 0 .. 1 (the pedal)
   void setLeslieFast(bool f) { leslie_.setFast(f); }
   void setLeslieBrake() { leslie_.setBrake(true); }
+  void setLeslieBoost(double b) { leslie_.setBoost(b); }
   bool leslieFast() const { return leslie_.fast(); }
   double hornHz() const { return leslie_.hornHz(); }
   bool asleep() const { return false; }  // (the wheels never stop)
@@ -108,7 +109,8 @@ class HammondModel : public Tube {
   struct Key {
     int div = 0, midi = 0;
     bool down = false;
-    double since = 0;
+    double since = 0, rampClose = 1.5e-4;  // (the contacts' resistance falling as they close, s: the key's speed)
+    int velocity = 64;
     Contact c[9];
     int wheel[9];   // per drawbar (pedal: [0] 16', [1] 8')
   };
@@ -140,7 +142,7 @@ class HammondModel : public Tube {
   void moveDrawbars(double dt);
   double background_[kWheels + 1] = {};
   // Percussion.
-  double percCharge_ = 1, percEnv_ = 0;
+  double percCharge_ = 1, percEnv_ = 0, percTouch_ = 1;
   bool upperHeld_ = false;
   // The scanner.
   std::vector<float> line_;
@@ -174,6 +176,8 @@ class HammondPlayer : public Performer {
   // player's own riding of it stops.
   void setLeslie(int state);
   void setLeslieExternal() { leslieSeen_ = true; }
+  // A plan's nudge of the slow Leslie on a long note (the slow speed x b; 1 back to it).
+  void setLeslieBoost(double b) { m_.setLeslieBoost(b); }
   // (live) K5: the Leslie (stop / slow / fast, as the half-moon switch). K1-K4: the upper
   // manual's drawbars along the tradition's own paths: K1 soft to hard through the classic
   // registrations (each a detent: the whisper of the 8' alone, the ballad 838, the jazz 888, the

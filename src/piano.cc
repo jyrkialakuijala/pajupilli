@@ -244,6 +244,24 @@ void Piano::build() {
   const double hamW = d_.hammerWidth;
   uint32_t rng2 = d_.seed * 2654435761u + 1;  // (the out-of-tune piano's own draws: the others stay as they are)
   auto draw2 = [&]() { rng2 = rng2 * 1664525u + 1013904223u; return (rng2 >> 8) / 16777216.0; };
+  if (d_.tackHard > 0) {
+    // (the tacks: each key's hammer meets one or two of its strings with a metal head, the rest
+    // with softer felt around it; its face uneven, each string met at its own moment; its own draws)
+    uint32_t rng3 = d_.seed * 40503u + 7;
+    auto draw3 = [&]() { rng3 = rng3 * 1664525u + 1013904223u; return (rng3 >> 8) / 16777216.0; };
+    for (int k = 0; k < keys(); ++k) {
+      const int ns = key_[k].ns;
+      const int hit = int(draw3() * ns), two = ns > 2 && draw3() < 0.4 ? (hit + 1 + int(draw3() * (ns - 1))) % ns : -1;
+      const double key = 0.5 + draw3();  // (how well this key's tacks sit)
+      for (int j = 0; j < ns; ++j) {
+        Str& st = str_[key_[k].s0 + j];
+        const bool tacked = j == hit || j == two;
+        st.tack = float(tacked ? d_.tackHard * key * (0.5 + draw3()) : 0);
+        st.hard = float(0.75 + 0.5 * draw3());  // (the felt around the tacks, uneven)
+        st.gap = float(d_.tackGap * draw3());
+      }
+    }
+  }
   for (Str& st : str_) {
     const PianoKey& s = sc[st.key];
     const double b2 = s.b2, b3 = s.b3;
@@ -254,9 +272,35 @@ void Piano::build() {
     const double r = (rng_ >> 8) / 16777216.0;
     const double spread = lerp(d_.unisonCents[0], d_.unisonCents[1], st.key / 87.0) * (0.7 + 0.6 * r);
     double cents = s.strings == 1 ? 0 : s.strings == 2 ? (j == 0 ? -0.5 : 0.5) * spread : (j - 1) * spread;
-    if (d_.honkyCents > 0 && s.strings > 1 && !(s.strings == 3 && j == 1))
-      cents += (draw2() < 0.5 ? -1 : 1) * d_.honkyCents * (0.5 + 0.5 * draw2());
-    if (d_.flatShare > 0 && draw2() < d_.flatShare) cents -= d_.flatMax * draw2();
+    // (an out-of-tune piano: a trichord's outer strings either side of its true middle one, by a
+    // spread growing from the bass (x 0.67) to the treble (x 1.33), each key x 0.6 .. 1.4; the
+    // wound bichords clean)
+    if (d_.honkyCents > 0 && s.strings == 3 && j != 1) {
+      const double reg = 0.67 + 0.66 * std::clamp((st.key - 20) / 60.0, 0.0, 1.0);
+      cents += (j == 0 ? -1 : 1) * d_.honkyCents * reg * (0.6 + 0.8 * draw2());
+    }
+    // (or by hertz, every string of a key its own: the outer ones about honkyHz either side, the
+    // middle one of three a little; the beats about as fast all over the keyboard, capped at 20 c
+    // (PJ_HONKY_CAP: 1.5 Hz is 40 c at C2, sour))
+    if (d_.honkyHz > 0 && s.strings > 1) {
+      const double side = s.strings == 2 ? (j == 0 ? -1 : 1) : j - 1.0;
+      const double hz = (side != 0 ? side * (0.6 + 0.8 * draw2()) : 0.4 * (draw2() - 0.5) * 2 * 0.5) * d_.honkyHz;
+      static const double kCap = knob("PJ_HONKY_CAP", 20.0);
+      cents += std::clamp(1200 * std::log2(1 + hz / s.f1), -kCap, kCap);
+    }
+    // (the treble's strings drift flat too, each its own: uniform 0 .. -1 Hz above middle C,
+    // 0 .. -2 Hz above C5; PJ_HONKY_TREBLEFLAT scales it)
+    if (d_.honkyHz > 0 && st.key + 21 > 60) {
+      static const double kTf = knob("PJ_HONKY_TREBLEFLAT", 1.0);
+      const double hz = (st.key + 21 > 72 ? 2.0 : 1.0) * kTf * draw2();
+      cents += 1200 * std::log2(1 - hz / s.f1);
+    }
+    if (d_.flatShare > 0 && draw2() < d_.flatShare) {
+      // (a string gone flat: by up to flatMax cents, or by about flatHz hertz, x 0.7 .. 1.3,
+      // capped at 40 c)
+      if (d_.flatHz > 0) cents -= std::min(40.0, -1200 * std::log2(1 - std::min(0.5, d_.flatHz * (0.7 + 0.6 * draw2()) / s.f1)));
+      else cents -= d_.flatMax * draw2();
+    }
     // (A support that does not move takes from every mode alike.)
     const double support = nB_ ? 0.0 : s.tension / (s.len * std::max(d_.supportR, 1.0));
     const double supportFc = d_.supportFc;
@@ -505,7 +549,7 @@ void Piano::pluck(Key& k) {
 void Piano::hammer(Key& k) {
   if (k.pluckK > 0) { pluck(k); return; }
   static const float kHyst = float(knob("PJ_PIANO_HYST", 0.25));  // s/m: more force pressing than releasing
-  const float K = k.K * voicing_, p = k.p;
+  const float K0 = k.K * voicing_, p = k.p;
   const float hm = dt_ * dt_ / k.mh;
   float yFree[kMaxStr], F[kMaxStr] = {0, 0, 0};
   for (int j = 0; j < k.ns; ++j) {
@@ -518,13 +562,16 @@ void Piano::hammer(Key& k) {
     for (int i = 0; i < s.n; ++i) y += hc[i] * x[i] + hs[i] * v[i];
     yFree[j] = y;
   }
+  bool touching[kMaxStr];
+  for (int j = 0; j < k.ns; ++j) touching[j] = str_[k.s0 + j].dPrev > 0;
   const float reach = k.eta + dt_ * k.vh;  // the hammer's place a sample on, unopposed
   float total = 0;
   for (int sweep = 0; sweep < 3; ++sweep) {
     for (int j = 0; j < k.ns; ++j) {
       Str& s = str_[k.s0 + j];
       const float others = total - F[j];
-      const float A = s.comply + hm, b = reach - yFree[j] - hm * others;
+      const float A = s.comply + hm, b = reach - s.gap - yFree[j] - hm * others;
+      const float K = K0 * s.hard;
       // d + A f(d) = b, f(d) = K d^p (1 + hyst (d - dPrev) / dt) for d > 0.
       float d = std::max(b, 0.0f), f = 0;
       if (b > 0 && k.nap > 0) {
@@ -562,6 +609,20 @@ void Piano::hammer(Key& k) {
       total += f - F[j];
       F[j] = f;
       if (sweep == 2) s.dPrev = b > 0 ? d : 0;
+    }
+  }
+  // (a tack's metal head meets its string first: a sharp knock, a half sine of tackTime)
+  for (int j = 0; j < k.ns; ++j) {
+    Str& s = str_[k.s0 + j];
+    if (s.tack <= 0) continue;
+    if (!touching[j] && s.dPrev > 0 && k.vh > 0) {
+      s.tickLeft = std::max(2, int(d_.tackTime / dt_ + 0.5));
+      s.tickAmp = std::min(s.tack * k.vh, 4 * s.tack);  // (capped: the head gives at a hard blow)
+      s.tickN = s.tickLeft;
+    }
+    if (s.tickLeft > 0) {
+      F[j] += s.tickAmp * std::sin(float(M_PI) * (s.tickN - s.tickLeft + 0.5f) / s.tickN);
+      --s.tickLeft;
     }
   }
   for (int j = 0; j < k.ns; ++j) {

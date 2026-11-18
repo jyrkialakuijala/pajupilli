@@ -1,5 +1,6 @@
 #include "pianoinst.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -14,19 +15,91 @@ constexpr int kLowest = 21;  // A0
 // The upright (src/upright.cc, when it is built in).
 PianoDesign uprightDesign() __attribute__((weak));
 
-static bool upright(const Instrument& inst) { return std::strcmp(inst.name, "upright-piano") == 0; }
+static bool honkyTonk(const Instrument& inst) { return std::strcmp(inst.name, "honky-tonk") == 0; }
+static bool upright(const Instrument& inst) { return std::strcmp(inst.name, "upright-piano") == 0 || honkyTonk(inst); }
 
 static bool dulcimer(const Instrument& inst) { return std::strcmp(inst.name, "dulcimer") == 0; }
 
 bool grandPiano(const Instrument& inst) { return std::strcmp(inst.name, "grand-piano") == 0 || upright(inst) || dulcimer(inst); }
 
+// The honky-tonk (General MIDI 4; research/piano_variants.md section 3.3-3.4): the upright, every
+// string of a key its own ~1 Hz off (the outer ones of three either side, the middle one a
+// little; both of a bichord; x 0.6-1.4 each, capped at 20 c; PJ_HONKY_HZ; the cents recipe
+// PJ_HONKY_CENTS instead), some strings ~3 Hz flat (15 %, x 0.7-1.3, capped at 40 c: a neglected
+// piano's; PJ_HONKY_FLAT, _FLATHZ), its hammers worn (the strings' grooves flatten and harden the felt: K x 8, the felt
+// law's exponent 0.3 lower (no more: under ~1 the contact is unstable) (F = K x^p with x far under a metre: a lower p is a harder felt), the
+// nap pressed flat, each key's hardness 30 % its own): every blow bright with overtones.
+static PianoDesign honkyTonkDesign(PianoDesign d) {
+  d.name = "honky-tonk";
+  d.honkyCents = knob("PJ_HONKY_CENTS", 0.0);  // (the cents recipe: off)
+  d.honkyHz = knob("PJ_HONKY_HZ", 1.0);        // (each string of a key its own ~1 Hz off)
+  d.flatShare = knob("PJ_HONKY_FLAT", 0.15);
+  d.flatMax = knob("PJ_HONKY_FLATMAX", 25.0);
+  d.flatHz = knob("PJ_HONKY_FLATHZ", 3.0);     // (those strings ~3 Hz flat)
+  d.tackHard = knob("PJ_HONKY_TACK", 5.0);    // (one or two strings of a key met first by metal: N per m/s)
+  d.tackTime = knob("PJ_HONKY_TACKTIME", 3e-4);
+  d.tackGap = knob("PJ_HONKY_TACKGAP", 0.3e-3);  // (the face uneven by up to 0.3 mm)
+  d.seed = 1923;
+  uint32_t rng = 777u;
+  auto normal = [&rng] {
+    rng = rng * 1664525u + 1013904223u;
+    const double a = std::max((rng >> 8) * (1.0 / 16777216.0), 1e-12);
+    rng = rng * 1664525u + 1013904223u;
+    return std::sqrt(-2 * std::log(a)) * std::cos(2 * M_PI * (rng >> 8) * (1.0 / 16777216.0));
+  };
+  static const double kWorn = knob("PJ_HONKY_WORN", 8.0);
+  // (a bar-room upright's bright, metallic voice: the hammers hard and narrow, the strings' highs
+  // ringing longer)
+  static const double kHard = knob("PJ_HONKY_HARD", -0.3), kNarrow = knob("PJ_HONKY_NARROW", 1.0), kRing = knob("PJ_HONKY_RING", 1.0);
+  static const double kNap = knob("PJ_HONKY_NAP", 0.0);
+  d.hammerWidth *= kNarrow;
+  // (no hiss over the top: the strings' modes kept to ~9 kHz, the hard hammers exciting nothing
+  // above; PJ_HONKY_TOP)
+  static const double kTop = knob("PJ_HONKY_TOP", 9000);
+  d.top = std::min(d.top, kTop);
+  d.topTreble = std::min(d.topTreble, kTop);
+  for (int k = 0; k < d.keys; ++k) d.key[k].top = d.key[k].top > 0 ? std::min(d.key[k].top, kTop) : kTop;
+  for (int k = 0; k < d.keys; ++k) {
+    PianoKey& s = d.key[k];
+    if (s.K <= 0) continue;
+    s.K *= kWorn * std::exp(0.3 * normal());
+    s.p += kHard;
+    s.b2 *= kRing;
+    s.b3 *= kRing;
+    s.nap *= kNap;  // (the felt's loose outer layer pressed flat by years of playing)
+  }
+  return d;
+}
+
 static PianoDesign designFor(const Instrument& inst) {
   if (dulcimer(inst)) return dulcimerDesign();
   if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
+  if (honkyTonk(inst) && uprightDesign) return honkyTonkDesign(uprightDesign());
   return upright(inst) && uprightDesign ? uprightDesign() : grandDesign();
 }
 
-PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, designFor(inst)) {}
+PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, designFor(inst)) {
+  if (honkyTonk(inst)) {
+    treble_ = float(std::pow(10.0, knob("PJ_HONKY_TREBLE", 6.0) / 20) - 1);
+    trebleA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_TREBLEHZ", 2000) / inst.fs));
+    air_ = float(std::pow(10.0, knob("PJ_HONKY_AIR", -6.0) / 20) - 1);  // (the top shelved down: no hiss)
+    airA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_AIRHZ", 6000) / inst.fs));
+    box_ = float(knob("PJ_HONKY_BOX", 1.0));
+    boxFb_ = float(knob("PJ_HONKY_BOXFB", 0.65));
+    boxLp_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_BOXLP", 1500) / inst.fs));
+    const double dims[3] = {1.4, 1.2, 0.3};
+    for (int i = 0; i < 3; ++i) boxLen_[i] = std::clamp(int(2 * dims[i] / 343 * inst.fs + 0.5), 2, Box::kMax);
+    const double fc = knob("PJ_HONKY_LP", 7000);
+    if (fc > 0 && fc < 0.45 * inst.fs) {
+      const double w = 2 * M_PI * fc / inst.fs, al = std::sin(w) / (2 * 0.707), a0 = 1 + al;
+      lpB_[0] = lpB_[2] = float((1 - std::cos(w)) / 2 / a0);
+      lpB_[1] = float((1 - std::cos(w)) / a0);
+      lpA_[0] = float(-2 * std::cos(w) / a0);
+      lpA_[1] = float((1 - al) / a0);
+      lpOn_ = true;
+    }
+  }
+}
 
 void PianoModel::resetAir() {
   Tube::resetAir();
@@ -37,9 +110,54 @@ float PianoModel::sample() {
   // (The microphones' pressure, Pa at 0.65 m over the strings: a mezzo-forte
   // middle C peaks near 1 Pa.)
   static const float g = float(knob("PJ_PIANO_GAIN", 1.0 / 6));
-  last_ = g * piano_.sample(float(testDp_));  // (tests: a force on the bridge at middle C)
+  float y = g * piano_.sample(float(testDp_));  // (tests: a force on the bridge at middle C)
   testDp_ = 0;
-  side_.push_back(g * float(outScale()) * piano_.side());
+  float sd = g * float(outScale()) * piano_.side();
+  if (treble_ != 0) {
+    // (the honky-tonk: the bar-room upright with its front off, miked close to the strings: its
+    // highs lifted from ~2 kHz, the top above ~6 kHz shelved down again (a bright piano, no hiss))
+    trebleM_ += trebleA_ * (y - trebleM_);
+    trebleS_ += trebleA_ * (sd - trebleS_);
+    y += treble_ * (y - trebleM_);
+    sd += treble_ * (sd - trebleS_);
+    airM_ += airA_ * (y - airM_);
+    airS_ += airA_ * (sd - airS_);
+    y += air_ * (y - airM_);
+    sd += air_ * (sd - airS_);
+    // (and a gentle 12 dB/octave roll-off from ~7 kHz: the wooden case, no hiss)
+    auto lp = [&](float x, float* z) {
+      const float o = lpB_[0] * x + z[0];
+      z[0] = lpB_[1] * x - lpA_[0] * o + z[1];
+      z[1] = lpB_[2] * x - lpA_[1] * o;
+      return o;
+    };
+    if (lpOn_) {
+      y = lp(y, lpZm_);
+      sd = lp(sd, lpZs_);
+    }
+    // (the closed case: its air rings between the walls, ~1.4 x 1.2 x 0.3 m inside: three
+    // round trips, each losing its highs to the wood and the felt, the boxy sound of an upright
+    // with its lid down)
+    if (box_ > 0) {
+      auto box = [&](float x, Box& b) {
+        float out = 0;
+        for (int i = 0; i < 3; ++i) {
+          const int n = boxLen_[i];
+          float& lpS = b.lp[i];
+          const float d = b.line[i][(b.pos[i] + 1) % n];
+          lpS += boxLp_ * (d - lpS);
+          b.line[i][b.pos[i]] = x + boxFb_ * lpS;
+          b.pos[i] = (b.pos[i] + 1) % n;
+          out += lpS;
+        }
+        return x + box_ * out / 3;
+      };
+      y = box(y, boxM_);
+      sd = box(sd, boxS_);
+    }
+  }
+  last_ = y;
+  side_.push_back(sd);
   return finish(last_);
 }
 

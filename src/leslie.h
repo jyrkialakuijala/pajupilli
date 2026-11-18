@@ -26,6 +26,8 @@ class Leslie {
  public:
   void setup(double fs, uint32_t seed);
   void setFast(bool fast) { fast_ = fast; brake_ = false; }
+  // The slow speed x this (a planned nudge on a long note: 1 none).
+  void setBoost(double b) { boost_ = b; }
   void setBrake(bool on) { brake_ = on; }
   void setDrive(double d) { drive_ = d; }  // the amp's input gain (1: clean at mezzo-forte)
   bool fast() const { return fast_; }
@@ -50,8 +52,10 @@ class Leslie {
   };
   double fs_ = 48000, dt_ = 1 / 48000.0;
   bool fast_ = false, brake_ = false;
+  double boost_ = 1;
   double drive_ = 1, sag_ = 0;
   double hornW_ = 0.8, drumW_ = 0.67, hornPh_ = 0, drumPh_ = 0;
+  double hornI_ = 0, drumI_ = 0;  // (the speed controls' integrals)
   double hornSlow_, hornFast_, drumSlow_, drumFast_;
   // The crossover (2nd order at 800 Hz) and the bands.
   double lp1_[2] = {}, hp1_[2] = {};

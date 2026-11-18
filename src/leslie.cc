@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 #include "knob.h"
 
@@ -121,12 +123,35 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       huntH_ += -huntH_ * cdt / 0.5 + sigma * std::sqrt(2 * cdt / 0.5) * normal();
       huntD_ += -huntD_ * cdt / 0.8 + sigma * 0.7 * std::sqrt(2 * cdt / 0.8) * normal();
     }
-    const double hT = brake_ ? 0 : (fast_ ? hornFast_ : hornSlow_) * (1 + huntH_);
-    const double dT = brake_ ? 0 : (fast_ ? drumFast_ : drumSlow_) * (1 + huntD_);
-    static const double hUp = knob("PJ_LESLIE_HORNUP", 0.5), hDown = knob("PJ_LESLIE_HORNDOWN", 0.8);
-    static const double dUp = knob("PJ_LESLIE_DRUMUP", 3.5), dDown = knob("PJ_LESLIE_DRUMDOWN", 2.5);
-    hornW_ += (hT - hornW_) * dt_ / (hT > hornW_ ? hUp : brake_ ? 1.0 : hDown);
-    drumW_ += (dT - drumW_) * dt_ / (dT > drumW_ ? dUp : brake_ ? 4.0 : dDown);
+    const double hT = brake_ ? 0 : (fast_ ? hornFast_ : hornSlow_ * boost_) * (1 + huntH_);
+    const double dT = brake_ ? 0 : (fast_ ? drumFast_ : drumSlow_ * boost_) * (1 + huntD_);
+    // Each rotor a mass on a belt, its motor's torque set by a slow PI control of its speed: the
+    // error and its integral, the acceleration limited by what the motor can give (the horn 6 Hz
+    // a second, the drum 1.2; no winding up against that limit). Speeding up the motor pulls
+    // (natural frequency: horn 3 rad/s, drum 0.8); slowing down it is the friction and the
+    // coasting, gentler (2 and 0.7); the brake firmer. Damped at 1.8 (PJ_LESLIE_ZETA): it eases
+    // in and settles, barely past its speed (a PI on a mass undershoots more than its damping
+    // says: at 0.85 the horn dipped to 0 on its way down to its slow speed). The horn reaches
+    // its fast speed in ~1 s, the drum in ~4-5 s.
+    static const double zeta = knob("PJ_LESLIE_ZETA", 1.8);
+    auto rotor = [this, zeta = zeta](double& w, double& integ, double target, double wn, double wnDown, double maxAcc) {
+      const bool up = target > w;
+      const double n = up ? wn : wnDown;
+      const double e = target - w, kp = 2 * zeta * n, ki = n * n;
+      double a = kp * e + ki * (integ + e * dt_);
+      const double lim = brake_ && !up ? 2 * maxAcc : maxAcc;
+      const bool limited = std::fabs(a) > lim;
+      a = std::clamp(a, -lim, lim);
+      if (!limited) integ += e * dt_;
+      w = std::max(0.0, w + a * dt_);
+    };
+    static const double hWn = knob("PJ_LESLIE_HORNWN", 3.0), hWnDown = knob("PJ_LESLIE_HORNWNDOWN", 2.0);
+    static const double dWn = knob("PJ_LESLIE_DRUMWN", 0.8), dWnDown = knob("PJ_LESLIE_DRUMWNDOWN", 0.7);
+    static const double hAcc = knob("PJ_LESLIE_HORNACC", 6), dAcc = knob("PJ_LESLIE_DRUMACC", 1.2);
+    rotor(hornW_, hornI_, hT, hWn, hWnDown, hAcc);
+    rotor(drumW_, drumI_, dT, dWn, dWnDown, dAcc);
+    static const bool kLog = std::getenv("PJ_LESLIE_LOG") != nullptr;
+    if (kLog && std::fmod(t_, 0.1) < dt_) std::fprintf(stderr, "leslie t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
     hornPh_ += 2 * M_PI * hornW_ * dt_ * (1 + hornEcc_ * std::cos(hornPh_ + hornEccPh_) + beltEcc_[0] * std::cos(beltPh_[0]));
     drumPh_ += 2 * M_PI * drumW_ * dt_ * (1 + drumEcc_ * std::cos(drumPh_ + drumEccPh_) + beltEcc_[1] * std::cos(beltPh_[1]));
     beltPh_[0] = std::fmod(beltPh_[0] + 2 * M_PI * hornW_ * 2.6 * dt_, 2 * M_PI);

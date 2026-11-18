@@ -281,6 +281,7 @@ struct Part {
   size_t leslieNext = 0;                     // the plan's next Leslie change
   size_t percNext = 0;                       // the plan's next percussion switch
   size_t regNext = 0;                        // the plan's next re-registration
+  size_t boostNext = 0;                      // the plan's next Leslie nudge
   std::map<int, int> hammondChans;           // channel -> its notes (a Hammond playing several)
   int maxPoly = 1, maxHeld = 1, played = 0;  // (voices: notes held at once, their tails counted)
   double vol = 100 / 127.0, expr = 1;
@@ -892,6 +893,19 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         const double toNext = ahead < song.ev.size() ? song.ev[ahead].t - now : 1e9;
         c.pause = heldAll <= 0 && now - lastOn > 2 * c.beatLen && toNext > c.beatLen;
       }
+      // A Hammond's planned Leslie nudges: in the middle of a long note, where no event comes, so
+      // by the clock (their ticks turned to seconds by the tempo map).
+      for (auto& [id, p] : parts)
+        if (p.hplan)
+          while (p.boostNext < p.hplan->leslieBoost.size()) {
+            const double b = double(p.hplan->leslieBoost[p.boostNext].first) / song.div;
+            size_t k = 0;
+            while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
+            const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
+            if (at > now) break;
+            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslieBoost(p.hplan->leslieBoost[p.boostNext].second);
+            ++p.boostNext;
+          }
       for (; next < song.ev.size() && song.ev[next].t < now; ++next) {
         const Event& e = song.ev[next];
         const int ch = e.status & 15, kind = e.status & 0xf0;

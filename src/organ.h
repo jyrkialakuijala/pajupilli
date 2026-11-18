@@ -173,7 +173,30 @@ class OrganModel : public Tube {
   void climateStep();
   void retune(int i) {
     Pipe& pp = pipes_[i];
-    pp.p.tune(pp.baseRatio * std::exp2((jiNow_[pp.key] + climate_[pp.p.reed ? 1 : 0]) / 1200));
+    pp.p.tune(pp.baseRatio * std::exp2((jiNow_[pp.key] + climateOf(pp)) / 1200));
+  }
+  // Air events in the church during the playing (PJ_ORGAN_AIR, on): now and
+  // then a draft or a warm plume reaches one part of it (the main case and the
+  // Positiv, the swell boxes, the left side, the right side, or only the
+  // nave's air), comes on over tens of seconds, stays a few minutes, then
+  // dissipates: the pipes there (their flues ~3 c a degree, their reeds -0.1 of
+  // it) drift against the rest, and some of the nave's paths lengthen or
+  // shorten a sample or so (its reverberation's colour moved), till it goes.
+  struct AirEvent {
+    int region;
+    double dT, t0, rise, hold, fall;
+    int line[8];
+    double share[8];
+  };
+  std::vector<AirEvent> air_;
+  Rng airRng_{0xA1E7u};
+  double airNext_ = -1;
+  double encAir_[16] = {};      // (each enclosure's air: degrees off)
+  double lineAir_[64] = {};     // (each nave line's static offset, samples)
+  void airStep(double t);
+  double climateOf(const Pipe& pp) const {
+    static const double kReed = -0.1;
+    return climate_[pp.p.reed ? 1 : 0] + 2.95 * encAir_[pp.enc] * (pp.p.reed ? kReed : 1.0);
   }
   void writePitchLog() const;
   double moveSecs_ = 0;  // (> 0 while a registration changes: the sliders' time)

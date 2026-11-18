@@ -46,6 +46,8 @@ struct HammondPlan {
   HammondRegistration reg;
   // The Leslie's planned speed changes (tick, fast); empty when the file sets it itself.
   std::vector<std::pair<long, bool>> leslie;
+  // Nudges of the slow Leslie on long held notes (tick, the slow speed x this; 1 back to slow).
+  std::vector<std::pair<long, double>> leslieBoost;
   // The harmonic percussion's planned switches (tick, on): at most two, mostly none (the piece's
   // choice is in reg).
   std::vector<std::pair<long, bool>> percussion;

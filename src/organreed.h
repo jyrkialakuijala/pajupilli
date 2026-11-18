@@ -89,6 +89,12 @@ class ReedPipe {
       const double formant = 1 + v_.formantGain * std::exp(-fo * fo);
       w_[i] = float(std::pow(double(k), v_.bright) * (fk > v_.rollHz ? std::pow(v_.rollHz / fk, 2) : 1.0) * formant);
     }
+    // (the topmost modes' radiation faded out, a raised cosine over the last
+    // six: cut off hard, the last one rang the harmonic above it, a narrow
+    // spike 6-12 dB over its neighbours at ~17 x the pitch: the Posaune's
+    // pipes from B1 up penetrating, where it fell in 1-3 kHz)
+    const int nk = int(k_.size()), taper = std::min(6, nk - 1);
+    for (int j = 0; j < taper; ++j) w_[nk - 1 - j] *= float(0.5 - 0.5 * std::cos(M_PI * (j + 0.5) / (taper + 0.5)));
     inst_ = 0;
     for (size_t i = 0; i < k_.size(); ++i) inst_ += z_[i] * b0_[i];
     const double wt = 2 * M_PI * f * v_.tongueRatio / fs_;

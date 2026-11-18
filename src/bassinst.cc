@@ -44,6 +44,8 @@ extern const Instrument kPlucked[] = {
     {"grand-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // A 121 cm upright (src/upright.cc): its scale and board.
     {"upright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The honky-tonk (General MIDI 4): the upright out of tune, its hammers worn (src/pianoinst.cc).
+    {"honky-tonk", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The Yamaha CP-80 electric grand (src/cp80.cc): A0 .. C8.
     {"electric-grand", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The Hohner Clavinet D6, E7 and C (src/clavinet.cc): F1 .. E6.

@@ -396,6 +396,42 @@ scale and board (Yamaha U1 class; research/piano_variants.md section 3):
   behind the board; the soft pedal moving the hammer rail.
 - **Cost:** about as the grand's with the pedal down.
 
+
+### Honky-tonk piano
+
+`-inst honky-tonk` (GM 4; `src/pianoinst.cc`, `research/piano_variants.md` §3.3-3.4): the upright,
+out of tune as its recipe says.
+- **Every string of a key its own:** about 1 Hz off (`PJ_HONKY_HZ`): the outer strings of three
+  either side, the middle one a little, both strings of a bichord, each ×0.6-1.4, capped at 20 c
+  (`PJ_HONKY_CAP`). The cents recipe, `PJ_HONKY_CENTS`, is there instead if wanted.
+- **The treble drifting flat:** each string above middle C a further uniform 0..−1 Hz, above C5
+  0..−2 Hz (`PJ_HONKY_TREBLEFLAT` scales it).
+- **A neglected piano's bad strings:** 15 % of them about 3 Hz flat (`PJ_HONKY_FLAT`,
+  `_FLATHZ`; ×0.7-1.3, capped at 40 c).
+- **Tacks (or a mandolin rail's rings):** metal between the hammer and the strings, each key its
+  own. On each key one string, or two (40 %), meets the metal first: a short knock (a half sine
+  of 0.3 ms, ~5 N per m/s of the hammer, ×0.5-1.5 per string, ×0.5-1.5 per key how well its tacks
+  sit; capped at a hard blow; `PJ_HONKY_TACK`, `_TACKTIME`). The felt around the tacks is uneven
+  (×0.75-1.25) and the face displaced, each string met up to 0.3 mm later (`PJ_HONKY_TACKGAP`). The
+  attacks' 2-6 kHz differs from key to key by −2 to +9 dB, ~+3 on average; nothing more over 6 kHz.
+- **Worn hammers:** the strings' grooves flatten and harden the felt: K ×8 (`PJ_HONKY_WORN`), the
+  felt law's exponent 0.3 lower (`PJ_HONKY_HARD`; F = K x^p with x far under a metre, so a lower
+  p is harder felt; much lower makes the contact unstable), the loose outer nap pressed flat
+  (`PJ_HONKY_NAP` 0), each key ±30 % its own.
+- **The closed case:** the lid down and the front on, the sound comes out through the cabinet.
+  Its air rings between the walls (~1.4 × 1.2 × 0.3 m inside): three round trips of 8.2, 7.0 and
+  1.75 ms, each fed back ×0.65 through a 1.5 kHz low-pass (the wood and the felt taking the
+  highs), mixed in at 1 (`PJ_HONKY_BOX`, `_BOXFB`, `_BOXLP`). Peaks and dips about 13 dB apart
+  over 100 Hz-4 kHz, no overall tilt, a tail of ~0.1 s: boxy. The strings' highs still come
+  through, lifted 6 dB from ~2 kHz (`PJ_HONKY_TREBLE`, `_TREBLEHZ`). No hiss above: the strings'
+  modes stop at 9 kHz (`PJ_HONKY_TOP`), the top is shelved −6 dB from 6 kHz (`PJ_HONKY_AIR`) and
+  rolled off at 12 dB/octave from 7 kHz (`PJ_HONKY_LP`).
+- **Measured** (a C major chord at velocity 90), against the 200 Hz-1 kHz band, in the attack:
+  2-4 kHz −18 dB, 4-6 kHz −28, 6-10 kHz −36, 10-16 kHz −51.
+
+A held A4 beats at about 2-3 Hz, its level wobbling ~10 dB, at its pitch. The strings meet
+at the bridge, so past ~4 c the unisons no longer lock: every note beats and the aftersound
+goes.
 ### Electric grand (Yamaha CP-80)
 
 `-inst electric-grand` (GM 3), A0 to C8: the CP-80 on the grand's machinery (`src/cp80.*`,
@@ -683,7 +719,9 @@ in turn: a self-sustained loop, float32 at 48 kHz.
   - **Pedal** (two towers at the case's sides, behind the case and the façade: its flues' breath and
     puff low-passed at ~800 Hz and 6 dB softer, `PJ_PEDAL_NOISELP`; the towers' direct sound softened
     above ~2.5 kHz, `PJ_PEDAL_LP`; its reeds on their open chest inside the case, their sound shelved
-    5 dB down above ~300 Hz, `PJ_PEDREED_CASE_DB`, `PJ_PEDREED_CASE_HZ`): `subbass16`, `octavbass8`, `choralbass4`, `pedmixtur4`
+    5 dB down above ~300 Hz, `PJ_PEDREED_CASE_DB`, `PJ_PEDREED_CASE_HZ`; every reed's topmost resonator
+modes fade out over the last six, else the last one rang the harmonic above it, a narrow spike
+6-12 dB over its neighbours at ~17x the pitch: the Posaune from B1 up penetrating): `subbass16`, `octavbass8`, `choralbass4`, `pedmixtur4`
     (2⅔′ 2′ 1⅓′ 1′), `posaune16`, `untersatz32` (stopped, C 16.35 Hz), `principalbass16`, `violonbass16`
     (a string bass), `pedtrompete8`;
   - **the rest of the user's disposition** (beyond the research's 37; all 53 but the unwanted Vox
@@ -896,6 +934,14 @@ pipe's twelfth as gentle as the Gedackt's, each pipe a little its own and each a
 pallet a little more); struck again before its pallet closed, hardly any. `PJ_SMALL_CHIFF_P` / `_F` /
 `_S` (principals, flutes, stopped), `PJ_SMALL_CHIFFTIME`, `PJ_SMALL_CHIFFVAR`, `PJ_SMALL_CHIFFPRESS`.
 
+**Air on the move** (`PJ_ORGAN_AIR`, on): now and then (every ~3 min, `PJ_ORGAN_AIR_EVERY`) a draft or
+a warm plume reaches one part of the church (the main case and the Positiv, the swell boxes, the left
+side, the right side, or only the nave's air), 0.3 .. 1.5 °C warmer or colder, coming on over 15 ..
+45 s, staying 1 .. 4 min, dissipating over 2 .. 5 min: the pipes there drift against the rest (the
+flues ~3 c a degree, the reeds a tenth the other way) and some of the nave's paths lengthen or
+shorten a sample or so, its reverberation's colour shifted till the air settles; `PJ_ORGAN_SAY=1`
+says when.
+
 **The finger:** a softer finger opens a pallet up to 2.5× slower and closes it up to 2× (its puff and
 chiff gentler, ~ the square root of the speed; `PJ_ORGAN_SOFTTOUCH` scales it). Played live: after a
 long melody note (1 s or more, C4 up, within 7 s), a note rising above the previous onset's top is
@@ -1076,6 +1122,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - A hard key closes them within ~0.1 ms, a soft one over ~3 ms, below velocity 20 one by one
     (10-100 ms).
   - Velocity has no other effect.
+- **Velocity is the key's speed:** a hard key slams its nine contacts (each closes within ~0.1 ms,
+  its resistance gone in ~0.12 ms, bouncing up to 3 times): a sharp click. A soft key lays them on
+  (spread over ~3 ms, the resistance falling over ~1 ms, hardly bouncing): a soft one. With all
+  drawbars out the click runs from ~3 dB over the tone (velocity 30) to ~21 dB (127). The
+  percussion is touch-sensitive as on the modern Hammonds: its ping from ~−5 dB under a soft key
+  to full (`PJ_HAMMOND_PERCTOUCH`). In `-play` the velocities also ride the expression pedal where
+  the file has none.
 - **Percussion** (upper): the 2nd or 3rd harmonic, fast (−20 dB in ~0.17 s) or slow, normal or
   soft. It is single-trigger: legato does not strike it again, and a short gap re-arms it only
   part way. The 1' drawbar is silent while it is on.
@@ -1091,7 +1144,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - the drum: fixed below 200 Hz, its scoop turning above;
   - a 40 ms cabinet tail.
 
-  The horn speeds up in ~0.5 s and slows in 0.8 s; the drum takes 3.5 and 2.5 s. The speeds are
+  Each rotor's speed follows a slow PI control, a motor pulling a mass through a belt:
+  - the acceleration is the speed error and its integral, limited to what the motor can give
+    (horn 6 Hz a second, drum 1.2), with no windup against the limit;
+  - gentler going down (friction and coasting) than up;
+  - damped at 1.8 (`PJ_LESLIE_ZETA`): it eases in and barely passes its speed.
+
+  The horn reaches its fast speed in ~0.9 s and its slow one in ~1 s; the drum takes ~4 and ~4.4 s. The speeds are
   0.8/6.7 Hz (horn) and 0.67/5.9 Hz (drum), each cabinet ±3 %. The mod wheel (CC1 ≥ 64) or the
   sustain pedal switches fast/slow, and CC82 (as the Leslie 2101's default) switches stop / slow /
   fast (0-42 / 43-85 / 86-127). Measured at the microphones on a fast C6:
@@ -1210,6 +1269,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     - about one in four (one in two on the rock organ) goes fast in its strongest phrase (the most,
       loudest notes a second between the band's rests), or in two;
     - the choice is drawn from a hash of the notes, so the same file gets the same plan every run.
+
+    - **A nudge on a long note:** on a note held 1.6 s (and two beats) or more alone, with nothing
+      beginning in its middle 60 %, the slow rotors are asked a little faster, 1.6-2.4 x the slow
+      speed (drawn from the notes), from ~45 % of it to ~70 %. Through their slow PI control the
+      horn swells and settles (0.8 → ~1.8 Hz and back) while the drum barely stirs. Only where
+      the plan has the Leslie slow, at most one every 8 s.
+      `PJ_HAMMOND_FASTSHARE` sets the share of pieces with a fast phrase.
 
     Played live, the player rides it by the music's intensity instead.
   - The `PJ_HAMMOND_*` overrides apply over the plan.

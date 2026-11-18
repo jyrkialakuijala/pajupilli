@@ -323,7 +323,8 @@ void HammondModel::schedule(Key& k, int velocity, bool closing) {
     c.n = 0;
     c.next = 0;
     c.t[c.n++] = t;  // closes (or opens)
-    const int bounces = int(r.u() * (closing ? 4 : 2));
+    // (a hard key slams the contacts: more bounces; a soft one lays them on)
+    const int bounces = int(r.u() * (closing ? 0.5 + 3 * v * v : 2));
     double gap = (0.03 + 0.25 * r.u()) * 1e-3, back = (0.02 + 0.08 * r.u()) * 1e-3;
     for (int b = 0; b < bounces && c.n + 2 <= 8; ++b) {
       t += gap;
@@ -335,6 +336,10 @@ void HammondModel::schedule(Key& k, int velocity, bool closing) {
     }
   }
   k.since = 0;
+  // The contact's resistance falling as it closes: at once under a hard key (a sharp click), over
+  // ~1 ms under a soft one (the step on the busbar rounded: a soft click).
+  if (closing) k.rampClose = (0.12 + 0.88 * (1 - v) * (1 - v)) * 1e-3;
+  k.velocity = velocity;
 }
 
 void HammondModel::press(int div, int midi, int velocity) {
@@ -466,7 +471,7 @@ float HammondModel::sample() {
       }
       // The contact's resistance falls over ~0.15 ms as it closes, and breaks at once.
       const double target = c.closed && c.brk <= 0 ? 1 : 0;
-      c.gain += (target - c.gain) * std::min(1.0, dt / (c.closed ? 1.5e-4 : 3e-5));
+      c.gain += (target - c.gain) * std::min(1.0, dt / (c.closed ? k.rampClose : 3e-5));
       if (c.gain > 1e-4 || c.next < c.n) live = true;
       if (c.gain > 1e-6) {
         const int w = k.wheel[j];
@@ -488,11 +493,18 @@ float HammondModel::sample() {
   if (upperDown && !upperHeld_ && reg_.perc) {
     percEnv_ = 0.6 + 0.4 * percCharge_;
     percCharge_ = 0;
+    // (touch-sensitive percussion, as the modern Hammonds offer: the striking key's speed sets the
+    // ping, from ~-5 dB under a soft key to full under a hard one)
+    int vel = 100;
+    for (const Key& k : keys_)
+      if (k.div == kUpper && k.down) vel = std::max(vel == 100 ? 0 : vel, k.velocity);
+    static const double kTouch = knob("PJ_HAMMOND_PERCTOUCH", 1.0);
+    percTouch_ = 1 - kTouch * 0.45 * (1 - std::clamp(vel / 127.0, 0.0, 1.0));
   }
   upperHeld_ = upperDown;
   if (!upperDown) percCharge_ += (1 - percCharge_) * dt / 0.034;
   percEnv_ *= 1 - dt / (reg_.percFast ? 0.375 : 1.55);
-  const double percGain = reg_.perc ? std::clamp((percEnv_ - 0.6) / 0.4, 0.0, 1.0) * (reg_.percSoft ? 0.5 : 1.0) : 0.0;
+  const double percGain = reg_.perc ? std::clamp((percEnv_ - 0.6) / 0.4, 0.0, 1.0) * (reg_.percSoft ? 0.5 : 1.0) * percTouch_ : 0.0;
   double upper = 0, lower = 0, pedal = 0;
   for (int d = 0; d < 9; ++d) {
     upper += gainU_[d] * bus[kUpper][d];

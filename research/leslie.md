@@ -656,3 +656,26 @@ design]:**
 - **Not found:** the rotors' exact offsets, the corner posts' sizes, the louvres' slot count and
   depth. The numbers above are the user's estimates and defaults.
 
+**The rotors' speed by a slow PI control (2026-11-17, the user: "a slow PI controller to switch from
+slow to high speed"):**
+- Each rotor: dω/dt = clamp(Kp e + Ki ∫e, ±a_max), with e the speed error, Kp = 2ζω_n and
+  Ki = ω_n².
+  - The integral is frozen while limited.
+  - ω_n: horn 3 rad/s up, 2 down; drum 0.8 up, 0.7 down.
+  - a_max: horn 6 Hz/s, drum 1.2 Hz/s (the brake 2×).
+  - ζ = 1.8: a PI on a pure inertia overshoots more than ζ suggests. At ζ 0.85 the horn dipped to
+    0 Hz on its way down to 0.82 Hz.
+- **Measured** (slow → fast → slow by CC82):
+  - the horn reaches 90 % of fast in 0.9 s and slow in 1.0 s;
+  - the drum takes 3.9 and 4.4 s;
+  - the horn stays within 0.71..6.72 Hz around 0.82 / 6.6.
+- These replace the first-order time constants (0.5 / 0.8 s, 3.5 / 2.5 s), close to the clones'
+  and to setBfree's ranges (§5).
+- **The planned nudge** (the user: "on long sustained notes, slightly accelerate the slow Leslie
+  rotation and then go back to slow, an impulse of faster rotation around half the long note"):
+  - The slow speed's target is ×1.6-2.4 from 45 % to 70 % of a note held ≥ 1.6 s and ≥ 2 beats,
+    with no onset in its middle 60 %.
+  - Only where the plan has the Leslie slow, 8 s apart at least.
+  - Applied by the clock: a long note has no events in its middle.
+  - **Measured** on a 4 s note: the horn 0.82 → 1.82 Hz and back, the drum 0.66 → 1.37.
+

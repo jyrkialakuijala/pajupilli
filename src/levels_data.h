@@ -53,6 +53,7 @@ constexpr LevelTrim kLevelTrims[] = {
     {"contrabass", 1.3f},
     {"grand-piano", 9.8f},
     {"upright-piano", 6.2f},
+    {"honky-tonk", 5.4f},  // (measured 0.8 dB over the upright: brighter, harder hammers and tacks, in its closed case)
     {"clavinet", -3.5f},
     {"clavinet-e7", -4.0f},
     {"clavinet-c", -9.4f},

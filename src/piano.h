@@ -73,6 +73,12 @@ struct PianoDesign {
   // to flatMax cents.
   double unisonCents[2] = {0.08, 0.03};
   double honkyCents = 0, flatShare = 0, flatMax = 0;
+  double honkyHz = 0;  // (or: every string of a key its own ~this far off, in hertz)
+  double flatHz = 0;   // (the flat strings ~this many hertz flat instead of flatMax cents)
+  // (a tacked hammer or a mandolin rail, each key its own: one or two strings met first by metal,
+  // a knock of ~tackHard N per m/s of the hammer lasting tackTime s, the face uneven by up to
+  // tackGap m)
+  double tackHard = 0, tackGap = 0, tackTime = 1e-4;
   uint32_t seed = 4242;
   // The sideways swing: how far off the vertical the blow sets a string
   // swinging, how far sideways is tuned from up-and-down (cents), and the
@@ -162,6 +168,10 @@ class Piano {
     float tanH;           // the hammer meets it a little off the vertical
     float comply;         // its displacement under the hammer per unit force, one sample on (m/N)
     float dPrev = 0;      // the felt's compression at the last sample (m)
+    float hard = 1, gap = 0;  // (a tacked hammer: this string's felt stiffness x, its face's distance (m))
+    float tack = 0;           // (... its metal's sharp knock: peak force per m/s of the hammer (N s/m))
+    float tickAmp = 0;        // (... the knock under way: its peak (N), samples left)
+    int tickLeft = 0, tickN = 1;
     bool active = false;
   };
   struct Key {

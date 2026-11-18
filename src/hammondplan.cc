@@ -1,5 +1,7 @@
 #include "hammondplan.h"
 
+#include "knob.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -412,7 +414,8 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     const bool rock = instrument == "rock-organ";
     r.leslieFast = false;
     plan.leslie.push_back({first, false});
-    if (draw() < (rock ? 0.5 : 0.25)) {
+    static const double kFastShare = knob("PJ_HAMMOND_FASTSHARE", 0.25);  // (the share of pieces with a fast phrase; the rock organ twice it)
+    if (draw() < std::min(1.0, kFastShare * (rock ? 2 : 1))) {
       // Phrases: spans of notes with no silence of a beat or more in all the lines.
       std::vector<std::pair<long, long>> spans;
       std::vector<const HammondNote*> byOn;
@@ -448,6 +451,39 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       leslieText = b2;
     } else {
       leslieText = "planned: slow throughout";
+    }
+    // A nudge on a long held note: somewhere round its middle the slow rotors are asked a little
+    // faster (1.6-2.4 x), then slow again: the horn swells and settles, the drum barely stirs. On
+    // a note held 1.6 s (and two beats) or more with no other note beginning in its middle 60 %,
+    // where the plan has the Leslie slow; 8 s apart at least.
+    {
+      const double secsPerTick = 60 / std::max(bpm, 20.0) / tpq;
+      std::vector<long> ons;
+      for (const HammondNote& n : notes) ons.push_back(n.on);
+      std::sort(ons.begin(), ons.end());
+      auto fastAt = [&](long t) {
+        bool f = false;
+        for (auto& [tk, fast] : plan.leslie)
+          if (tk <= t) f = fast;
+        return f;
+      };
+      std::vector<const HammondNote*> longs;
+      for (const HammondNote& n : notes)
+        if ((n.off - n.on) * secsPerTick >= 1.6 && n.off - n.on >= 2 * tpq) longs.push_back(&n);
+      std::sort(longs.begin(), longs.end(), [](const HammondNote* a, const HammondNote* b) { return a->on < b->on; });
+      long lastNudge = -1000000000;
+      for (const HammondNote* n : longs) {
+        const long d = n->off - n->on, a = n->on + long(0.2 * d), b = n->on + long(0.8 * d);
+        const auto it = std::upper_bound(ons.begin(), ons.end(), a);
+        if (it != ons.end() && *it < b) continue;  // (something begins in its middle: not held alone)
+        const long t0 = n->on + long(0.45 * d), t1 = n->on + long(0.7 * d);
+        if ((t0 - lastNudge) * secsPerTick < 8 || fastAt(t0) || fastAt(t1)) continue;
+        const double boost = 1.6 + 0.8 * draw();
+        plan.leslieBoost.push_back({t0, boost});
+        plan.leslieBoost.push_back({t1, 1.0});
+        lastNudge = t0;
+      }
+      if (!plan.leslieBoost.empty()) leslieText += ", nudged on " + std::to_string(plan.leslieBoost.size() / 2) + " long note" + (plan.leslieBoost.size() > 2 ? "s" : "");
     }
   }
   char buf[640];

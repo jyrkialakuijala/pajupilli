@@ -1857,8 +1857,10 @@ def organ_stops():
     for d in ('0.02', '0.155', '0.275', '0.395', '0.515', '0.635', '0.755', '0.875', '0.995'):
         ms = []
         for ch in chords[:1] if d == '0.02' else chords:
+            # (in the interval table's tuning: the registrations' levels, not the tuning's; by the spectra a
+            # few unisons beat differently, the 3 chords' level moving a few tenths of a dB)
             run(['-inst', 'organ-crescendo', '-dyn', d, '-seq', ' '.join(f'on {k} 80' for k in ch) + ' wait 4 ' +
-                 ' '.join(f'off {k}' for k in ch) + ' wait 0.1', '-o', wav])
+                 ' '.join(f'off {k}' for k in ch) + ' wait 0.1', '-o', wav], env={'PJ_JI_SPECTRAL': '0'})
             fs, x = wavfile.read(wav)
             x = x.astype(float)[int(0.8 * fs):int(3.9 * fs)]
             ms.append(np.mean(k_weight(x, fs) ** 2))
@@ -1950,6 +1952,7 @@ def hammond():
     import struct
     import numpy as np
     from scipy.io import wavfile
+    from scipy.signal import butter, lfilter
     wav = os.path.join(ROOT, 'tools', '.hammond.wav')
     def render(seq, env=None, inst='hammond'):
         run(['-inst', inst, '-seq', seq, '-o', wav], env=env)
@@ -1996,7 +1999,6 @@ def hammond():
           0.1 < flutter < 1.0 and 0.1 < drift.max() - drift.min() < 2.5 and -75 < floor < -40,
           f'flutter {flutter:.2f} c rms; drift {drift.min():+.2f}..{drift.max():+.2f} c; floor {floor:.0f} dB under a note')
     # The click: above 5 kHz in a press's first 5 ms, louder than the tone, never twice the same.
-    from scipy.signal import butter, lfilter
     seq = ''.join('on 60 100 wait 0.4 off 60 wait 0.2 ' for _ in range(5))
     fs, x = render(seq, {'PJ_HAMMOND_UPPER': '888888888', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
     bb, aa = butter(4, 5000 / (fs / 2), 'high')
@@ -2005,6 +2007,22 @@ def hammond():
     over = [10 * math.log10(np.mean(o ** 2) / (np.mean(h[int((i * 0.6 + 0.2) * fs):int((i * 0.6 + 0.2) * fs) + 240] ** 2) + 1e-15)) for i, o in enumerate(ons)]
     corr = max(abs(np.corrcoef(ons[0], o)[0, 1]) for o in ons[1:])
     check('hammond: the key click, never the same twice', min(over) > 6 and corr < 0.9, f'{min(over):.0f}..{max(over):.0f} dB over the tone; likeness at most {corr:.2f}')
+    # Velocity as the key's speed: a hard key slams the contacts (a sharp, louder click), a soft one
+    # lays them on (a soft click); the percussion's ping by its touch.
+    clicks = []
+    for v in (30, 127):
+        seq_ = ''.join(f'on 60 {v} wait 0.4 off 60 wait 0.2 ' for _ in range(5))
+        fs, x = render(seq_, {'PJ_HAMMOND_UPPER': '888888888', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_DIRT': '0'})
+        hh = lfilter(*butter(4, 5000 / (fs / 2), 'high'), x)
+        clicks.append(np.mean([10 * math.log10(np.mean(hh[int(i * 0.6 * fs):int(i * 0.6 * fs) + 240] ** 2) /
+                                               (np.mean(hh[int((i * 0.6 + 0.2) * fs):int((i * 0.6 + 0.2) * fs) + 240] ** 2) + 1e-15)) for i in range(5)]))
+    pings = []
+    for v in (30, 127):
+        fs, x = render(f'on 60 {v} wait 1 off 60', {'PJ_HAMMOND_PERC': '3f', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
+        pings.append(20 * math.log10(np.abs(lfilter(*butter(2, [700 / (fs / 2), 900 / (fs / 2)], 'band'), x)[:int(0.1 * fs)]).max()))
+    check('hammond: velocity as the key\'s speed (the click, the percussion\'s touch)',
+          clicks[1] - clicks[0] > 6 and 2 < pings[1] - pings[0] < 8,
+          f'click {clicks[0]:.0f} -> {clicks[1]:.0f} dB over the tone; ping {pings[1] - pings[0]:+.1f} dB (velocity 30 -> 127)')
     # Percussion: the 3rd's fast ping; legato does not strike it again.
     fs, x = render('on 60 100 wait 1.5 off 60 wait 0.3 on 62 100 wait 0.5 on 64 100 off 62 wait 1 off 64',
                    {'PJ_HAMMOND_PERC': '3f', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
@@ -2203,6 +2221,57 @@ def hammond():
              piece([('det', 30), ('leg', 2), ('det', 16)])]
     check('hammond: the percussion planned (detached on, legato off, a long legato middle switched, a short one not)',
           plans == ['on (3rd, fast)', 'off', 'on (3rd, fast), off for bars 17-32', 'on (3rd, fast)'], ' | '.join(plans))
+    # The rotors' slow PI speed control: slow to fast at 1 s, back at 6 s (CC82): the horn up in
+    # ~1 s, the drum in ~4 s, both down again, neither far past its speed.
+    ev_ = [(0, [0xC0, 16]), (0, [0xB0, 82, 60]), (0, [0x90, 72, 100]), (1920, [0xB0, 82, 127]), (9600, [0xB0, 82, 60]),
+           (9600, [0x80, 72, 0])]
+    trk_ = b''.join(vlq(d) + bytes(e_) for d, e_ in ev_) + b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 960) + b'MTrk' + struct.pack('>I', len(trk_)) + trk_)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1'})
+    if os.path.exists(wav):
+        os.remove(wav)
+    rows = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
+    def first(col, t0, cond):
+        for row in rows:
+            if row[0] >= t0 and cond(row[col]):
+                return row[0] - t0
+        return 99
+    hu, du = first(1, 1.0, lambda v: v > 0.9 * 6.6), first(2, 1.0, lambda v: v > 0.9 * 5.8)
+    hd, dd = first(1, 6.0, lambda v: v < 1.2), first(2, 6.0, lambda v: v < 0.9)
+    hmax = max(r__[1] for r__ in rows if 1 < r__[0] < 6)
+    hmin = min(r__[1] for r__ in rows if r__[0] > 6)
+    check('hammond: the Leslie\'s rotors by a slow PI control (the horn ~1 s, the drum ~4 s, little overshoot)',
+          0.5 < hu < 1.5 and 2.5 < du < 6 and 0.5 < hd < 2 and 2.5 < dd < 7 and hmax < 7.2 and hmin > 0.4,
+          f'up: horn {hu:.1f} s, drum {du:.1f} s; down: horn {hd:.1f} s, drum {dd:.1f} s; horn {hmin:.2f}..{hmax:.2f} Hz')
+    # A nudge of the slow Leslie in the middle of a long held note (a 4 s D5 at 2..6 s): the horn
+    # swells a little faster around its middle, then slow again.
+    ev_, t = [(0, [0xC0, 16])], 0
+    for m_ in (67, 69, 71, 72):
+        ev_ += [(t, [0x90, m_, 90]), (t + 460, [0x80, m_, 0])]
+        t += 480
+    ev_ += [(t, [0x90, 74, 90]), (t + 8 * 480 - 20, [0x80, 74, 0])]
+    t += 8 * 480
+    for m_ in (72, 71, 69, 67):
+        ev_ += [(t, [0x90, m_, 90]), (t + 460, [0x80, m_, 0])]
+        t += 480
+    ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+    out, last = b'', 0
+    for tk, e_ in ev_:
+        out += vlq(tk - last) + bytes(e_)
+        last = tk
+    out += b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1', 'PJ_HAMMOND_FASTSHARE': '0'})
+    if os.path.exists(wav):
+        os.remove(wav)
+    rows = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
+    peak = max((row_[1], row_[0]) for row_ in rows)
+    after = [row_[1] for row_ in rows if 6.0 <= row_[0] <= 7.0]
+    check('hammond: the slow Leslie nudged on a long note (swells round its middle, slow again)',
+          'nudged on 1 long note' in r_.stderr and 1.3 < peak[0] < 3 and 3.5 < peak[1] < 5.5 and max(after) < 1.0,
+          f'horn up to {peak[0]:.2f} Hz at {peak[1]:.1f} s (the note 2..6 s), back to {max(after):.2f} Hz')
     # The Leslie's own flaws: the horn's wind at speed, the speed relay's click, a loose panel's
     # buzz under a loud bass.
     ev_ = [(0, [0xC0, 16]), (0, [0xB0, 82, 60]), (5760, [0xB0, 82, 127]), (7680, [0x90, 84, 1]), (10, [0x80, 84, 0])]
@@ -2306,6 +2375,60 @@ def hammond():
     os.remove(wav)
     check('real-time margin (hammond: 91 wheels, a five-note chord, the Leslie)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
+
+def honky_tonk():
+    """The honky-tonk (-inst honky-tonk, General MIDI 4; src/pianoinst.cc; research/piano_variants.md
+    3.3-3.4): the upright, every string of a key its own ~1.5 Hz off, worn hammers: a held note's
+    fundamental splits into lines about a hertz or two apart (the upright's is one), at its pitch."""
+    import numpy as np
+    from scipy.io import wavfile
+    wav = os.path.join(ROOT, 'tools', '.honky.wav')
+    width, pitch = {}, 0
+    for inst in ('upright-piano', 'honky-tonk'):
+        ws = []
+        for m in (69, 72):
+            run(['-inst', inst, '-seq', f'on {m} 80 wait 4 off {m}', '-o', wav])
+            fs, x = wavfile.read(wav)
+            os.remove(wav)
+            x = x.astype(float)
+            x = x.mean(1) if x.ndim > 1 else x
+            seg = x[int(0.3 * fs):int(3.8 * fs)]
+            sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 21))
+            f = np.fft.rfftfreq(1 << 21, 1 / fs)
+            f0 = 440 * 2 ** ((m - 69) / 12)
+            w = (f > f0 - 6) & (f < f0 + 6)
+            band = f[w][sp[w] > 0.25 * sp[w].max()]
+            ws.append(band.max() - band.min())
+            if inst == 'honky-tonk' and m == 69:
+                pitch = 1200 * math.log2(f[w][sp[w].argmax()] / f0)
+        width[inst] = np.mean(ws)
+    check('honky-tonk: each string its own (the fundamental split into lines ~1-3 Hz apart), at its pitch',
+          width['honky-tonk'] > 1.0 and width['honky-tonk'] > 2 * width['upright-piano'] and abs(pitch) < 15,
+          f'the fundamental\'s lines over {width["upright-piano"]:.2f} Hz (upright) -> {width["honky-tonk"]:.2f} Hz; A4 {pitch:+.1f} c')
+    # The tacks: each key's hammer meets one or two of its strings with metal first, unevenly: the
+    # attacks' brightness differs from key to key.
+    seq_ = ''.join(f'on {m} 80 wait 0.5 off {m} ' for m in (60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79))
+    def shares(env):
+        run(['-inst', 'honky-tonk', '-seq', seq_, '-o', wav], env=dict(os.environ, **env))
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        x = x.mean(1) if x.ndim > 1 else x
+        out = []
+        for i in range(12):
+            seg = x[int(i * 0.5 * fs):int(i * 0.5 * fs) + int(0.03 * fs)]
+            sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 4096)) ** 2
+            f = np.fft.rfftfreq(4096, 1 / fs)
+            out.append(10 * math.log10(sp[(f > 2000) & (f < 6000)].sum() / sp[(f > 100) & (f < 1000)].sum()))
+        return np.array(out)
+    dk = shares({}) - shares({'PJ_HONKY_TACK': '0', 'PJ_HONKY_TACKGAP': '0'})
+    check('honky-tonk: the tacks (each key\'s attack its own: one or two strings met by metal first)',
+          dk.std() > 2 and dk.mean() > 1,
+          f'attack 2-6 kHz {dk.mean():+.1f} dB on average, key to key sd {dk.std():.1f} dB')
+    for seed in (1, 2, 3):
+        r = run(['-inst', 'honky-tonk', '-fuzz', '10', str(seed)])
+        m = re.search(r'peak ([0-9.e+]+)', r.stdout)
+        check(f'fuzz 10 s (honky-tonk, seed {seed})', r.returncode == 0 and m and float(m.group(1)) < 5, r.stdout.strip())
 
 def scrapers():
     """The guiro, cuica, vibraslap and pea whistle (src/scrapers.cc; research/scrapers_friction.md):
@@ -2598,7 +2721,7 @@ def clap_claves_surdo():
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, upright, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

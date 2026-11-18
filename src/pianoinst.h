@@ -32,6 +32,19 @@ class PianoModel : public Tube {
   void resetAir() override;
 
  private:
+  float treble_ = 0, trebleA_ = 0, trebleM_ = 0, trebleS_ = 0;  // (the honky-tonk's lifted highs)
+  float air_ = 0, airA_ = 0, airM_ = 0, airS_ = 0;              // (... and its top)
+  float lpB_[3] = {}, lpA_[2] = {}, lpZm_[2] = {}, lpZs_[2] = {};  // (... rolled off: no hiss)
+  bool lpOn_ = false;
+  struct Box {  // (the closed case's air: three round trips)
+    static constexpr int kMax = 2048;
+    float line[3][kMax] = {};
+    int pos[3] = {};
+    float lp[3] = {};
+  };
+  Box boxM_, boxS_;
+  float box_ = 0, boxFb_ = 0, boxLp_ = 0;
+  int boxLen_[3] = {2, 2, 2};
   void controlStep() override {}
   float sample() override;
   Piano piano_;
