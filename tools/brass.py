@@ -3,8 +3,9 @@
 src/brass.cc, to design their bores and check the waveguide (./pajupilli -imp):
 the mouthpiece (the cup a volume, the throat and backbore resolved), the bore
 from the throat to the bell, the valve loops added in the cylindrical
-section, the bell's radiation load as in src/bore.cc (Levine-Schwinger at low
-ka: R parallel to the end-correction mass). Prints the input impedance peaks
+section, the bell's radiation load as in src/bore.cc and src/horn.cc (the
+unflanged pipe: the end-correction mass, a resistance and a series R-C side by
+side). Prints the input impedance peaks
 seen by the lips, per valve combination, with the partial number and cents
 against the harmonic series of the open horn's nominal fundamental.
 
@@ -102,9 +103,13 @@ def tube_step(w, L, a, Z):
 
 
 def bell_load(w, a):
+    # The unflanged pipe (Silva et al. 2009: reflection -(1 + 0.167 s) / (1 + 1.393 s + 0.457 s^2),
+    # s = j ka) as src/horn.cc has it: the end correction's mass 0.613 a, a resistance 1.505 rho c / S
+    # (these two are src/bore.cc's low-ka load) and a resistance 2.979 rho c / S in series with the
+    # compliance of 0.125 a of the opening's air, all three side by side.
     S = np.pi * a * a
-    L_r = rho * 0.6133 * a / S; R_r = 1.505 * rho * c / S
-    return 1j * w * L_r * R_r / (R_r + 1j * w * L_r)
+    z0 = rho * c / S; s = 1j * w * a / c
+    return z0 / (1 / (0.6130 * s) + 1 / 1.5052 + 1 / (2.9792 + 1 / (0.12512 * s)))
 
 
 def Zin(spec, f, pressed='', step=2.0, loops=None, slide=0.0):

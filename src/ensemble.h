@@ -67,23 +67,32 @@ class Ensemble {
   // A player setting, for every flute.
   void all(void (Performer::*set)(double), double x) {
     for (Slot& s : f_) (s.v->player().*set)(x);
+    for (Section& k : kids_) k.ens->all(set, x);
   }
   // An instrument's own knob (Performer::setKnob): true if its players took it.
   bool instrumentKnob(int k, double x) {
     bool took = false;
     for (Slot& s : f_) took |= s.v->player().setKnob(k, x);
+    for (Section& c : kids_) took |= c.ens->instrumentKnob(k, x);
     return took;
   }
   // (-play) Let a released note ring out: a new note takes the voice released
   // longest ago; a wind's the one released last if within a minor third (its
   // line keeps to its player). Live keeps its own choice.
-  void setKeepTails(double secs) { keepTails_ = secs; }  // (how long a released note is taken to ring)
+  void setKeepTails(double secs) {
+    keepTails_ = secs;
+    for (Section& k : kids_) k.ens->setKeepTails(secs);
+  }  // (how long a released note is taken to ring)
   // (-play) Velocity is loudness, as a General MIDI player's: each note's
   // voice is turned up or down on its instrument's curve (velocityGainDb), as
   // the listener's gain (the room's air is not). Live keeps the physics alone.
-  void setVelocityGain(bool on) { velGain_ = on; }
+  void setVelocityGain(bool on) {
+    velGain_ = on;
+    for (Section& k : kids_) k.ens->setVelocityGain(on);
+  }
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
+    for (Section& k : kids_) k.ens->setHold(h);
   }
   void render(float* left, float* right, int n);  // 48 kHz, mixed, stereo
   void render(float* out, int n);                 // ... mono
@@ -133,6 +142,34 @@ class Ensemble {
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
   static constexpr double kFresh = 0.25;  // silent this long after a release: a fresh start
   std::vector<Slot> f_;
+  // The orchestra hit (src/orchhit.cc): no voices of its own, but sections (each an ensemble of
+  // one instrument's players) that every key is scored for.
+  struct Section {
+    std::unique_ptr<Ensemble> ens;
+    std::vector<int> offs;  // its notes: semitones from the key
+    int lo, hi;             // ... folded by octaves into this range
+    float gain;
+    bool stops;             // its players stop with the eighth (not the piano, the drum)
+    bool run = false, roll = false;  // a grace run up to its note; a rolled chord
+  };
+  struct HitEvent { double t; int section, pitch, vel; bool on; };
+  struct Hit {
+    int key;
+    double tuttiAt;         // when the chord lands
+    double offAt = -1;      // the key let go early: when the hit ends
+    bool stopped = false;   // the eighth is over
+    std::vector<HitEvent> ev;  // by time
+    size_t next = 0;        // the first not yet played
+  };
+  void initOrchestra(const RoomSpec* room);
+  void hitOn(int key, int velocity);
+  void hitOff(int key, bool all, bool force);
+  void hitRender(float* left, float* right, int n);
+  bool quiet_ = false;  // (a section of the hit: says nothing of its tuning or who plays)
+  std::vector<Section> kids_;
+  std::vector<std::unique_ptr<Calibration>> kidCals_;
+  std::vector<Hit> hits_;
+  std::vector<float> hitL_, hitR_;
   bool mixed_ = false;
   double keepTails_ = 0;
   bool velGain_ = false;

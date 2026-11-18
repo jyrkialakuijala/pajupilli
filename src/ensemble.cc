@@ -64,6 +64,12 @@ Ensemble::Ensemble(const std::vector<Member>& members, bool verbose, const RoomS
 Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose,
                    const RoomSpec* room)
     : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
+  if (std::strcmp(inst.family, "orchestra") == 0) {  // (the orchestra hit: sections, src/orchhit.cc)
+    std::fill(owner_, owner_ + 128, -1);
+    std::fill(pitch_, pitch_ + 128, -1);
+    initOrchestra(room);
+    return;
+  }
   // (A plucked instrument is one voice: its player takes the keys to its strings.)
   init(std::vector<Member>(inst.oneVoice() ? 1 : std::max(1, maxFlutes), Member{&inst, &cal}), room);
 }
@@ -155,6 +161,11 @@ int Ensemble::reverbChannel(const Instrument& in) {
 
 std::string Ensemble::describe() const {
   std::string d;
+  for (const Section& k : kids_) {  // (the orchestra hit: its sections, the first one's room)
+    const std::string kd = k.ens->describe();
+    d += (d.empty() ? "" : ", ") + kd.substr(0, kd.find(';'));
+    if (&k == &kids_.back()) d += kids_[0].ens->describe().substr(std::min(kids_[0].ens->describe().size(), kids_[0].ens->describe().find(';')));
+  }
   for (const Slot& s : f_) d += (d.empty() ? "" : ", ") + s.label;
   if (!mixed_ && f_.size() > 1) d = std::to_string(f_.size()) + " x " + f_[0].label.substr(0, f_[0].label.find(' '));
   static const char* const kChannel[3] = {"small", "main", "gated"};
@@ -369,6 +380,7 @@ int Ensemble::reach(int key) const {
 }
 
 void Ensemble::noteOn(int key, int velocity) {
+  if (!kids_.empty()) { hitOn(key, velocity); return; }
   key = reach(key);
   if (key < 0 || key > 127) return;
   if (owner_[key] >= 0) noteOff(key);
@@ -416,6 +428,7 @@ void Ensemble::noteOn(int key, int velocity) {
 }
 
 void Ensemble::noteOff(int key) {
+  if (!kids_.empty()) { hitOff(std::clamp(key, lo_, hi_), true, false); return; }
   key = reach(key);
   if (key < 0 || key > 127 || owner_[key] < 0) return;
   release(key);
@@ -748,7 +761,7 @@ void Ensemble::retune() {
     s.tunedNote = note[i];
     s.v->player().setTuning(c[i]);
   }
-  if (n > 1 && !heal) {
+  if (n > 1 && !heal && !quiet_) {
     std::fprintf(stderr, "tune:");
     for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.0f", name(note[i]), note[i] / 12 - 1, c[i]);
     if (vp) {  // (its own line: tools/test.py reads the notes on the tune line)
@@ -760,6 +773,7 @@ void Ensemble::retune() {
 }
 
 void Ensemble::render(float* left, float* right, int n) {
+  if (!kids_.empty()) { hitRender(left, right, n); return; }
   // In blocks of Room::kBlock (the room's coupling step), queued.
   for (int done = 0; done < n;) {
     if (qPos_ >= qL_.size()) {
@@ -811,7 +825,7 @@ void Ensemble::block(float* left, float* right, int n) {
     }
     if (who.empty()) who = "none";
     if (who != playing_) {
-      if (who != "none") std::fprintf(stderr, "playing: %s\n", who.c_str());
+      if (who != "none" && !quiet_) std::fprintf(stderr, "playing: %s\n", who.c_str());
       playing_ = who;
     }
   }
@@ -940,6 +954,7 @@ void Ensemble::block(float* left, float* right, int n) {
 int Ensemble::resets() const {
   int r = 0;
   for (const Slot& s : f_) r += s.v->model().resets();
+  for (const Section& k : kids_) r += k.ens->resets();
   return r;
 }
 

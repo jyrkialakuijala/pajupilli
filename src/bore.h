@@ -140,6 +140,11 @@ class Bore {
     classify(i);
   }
   double stretch(int i) const { return stretch_[i]; }
+  // A slide on the move: cells a .. b - 1 go to stretch s with the air in them. Their volume and
+  // mass grow with s, so each cell keeps its charge C p and each interface its flux L u (p and u
+  // x old / new): the energy then goes as 1 / s, as a slowly lengthened pipe's does (E / f is the
+  // invariant). With p and u left as they were it went as s: louder going out, softer coming in.
+  void moveStretch(int a, int b, double st);
   // A valve port: the interface's open share (1 open .. 0 shut). Part open, it
   // is narrower (more mass) and loses the flow's energy (a resistance).
   void setGate(int i, double open) {

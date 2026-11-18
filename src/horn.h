@@ -46,6 +46,10 @@ class Horn : public Tube {
   double lipFlow() const { return u_; }
   double valve(int i) const { return valve_[i].s; }
   double slide() const { return slideNow_; }  // the slide's extension (mm of tube)
+  // The arm had this long (s) since the last note ended: the slide is that far on its way
+  // before the new one speaks (after a rest it is there; without this every tongued note
+  // began while the slide still travelled, a scoop of 50 cents into a note in 7th).
+  void slideAhead(double secs);
 
  private:
   void controlStep() override;
@@ -107,12 +111,16 @@ class Horn : public Tube {
   // output's clock; the difference from the linear wave radiates.
   static constexpr int kNlRing = 256, kNlLook = 48;
   int nlCell_ = -1;
-  double nlK_ = 0, nlD0_ = 0, nlGain_ = 0, nlPrev_ = 0, nlPrev2_ = 0, nlLpA_ = 1, nlLpB_ = 1, nlLp1_ = 0, nlLp2_ = 0;
+  double nlK_ = 0, nlK0_ = 0, nlD0_ = 0, nlGain_ = 0, nlPrev_ = 0, nlPrev2_ = 0, nlLpA_ = 1, nlLpB_ = 1, nlLp1_ = 0, nlLp2_ = 0;
   float nlVal_[kNlRing] = {};
   double nlT_[kNlRing] = {};
   long nlIn_ = 0, nlOut_ = 0;
   double nlMax_ = -1e9;
   double brassy(double pPlus);
+  // The bell's radiation above ka ~ 1 (horn.cc): a resistance and a compliance in series,
+  // beside the bore's own low-ka load at the last cell.
+  int bellCell_ = -1;
+  double bellG_ = 0, bellCk_ = 0, bellPc_ = 0, bellW_ = 0;
 };
 
 }  // namespace pajupilli

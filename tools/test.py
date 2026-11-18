@@ -2023,6 +2023,144 @@ def hammond():
     check('hammond: velocity as the key\'s speed (the click, the percussion\'s touch)',
           clicks[1] - clicks[0] > 6 and 2 < pings[1] - pings[0] < 8,
           f'click {clicks[0]:.0f} -> {clicks[1]:.0f} dB over the tone; ping {pings[1] - pings[0]:+.1f} dB (velocity 30 -> 127)')
+    from scipy.signal import hilbert, sosfiltfilt
+    # The Leslies: four cabinets by default, each its parts off (+-7 %), their speeds the factors
+    # away from simple ratios (the centre 1.172, left 1.081, right 0.953, back 0.827): the second
+    # (left) 0.922 x the first (centre), with the published horn/drum ratio (1.20 on slow).
+    r_ = run(['-inst', 'hammond', '-seq', 'on 60 90 wait 0.3 off 60', '-o', wav], env={'PJ_LESLIE_LOG': '1', 'PJ_LESLIE_LOG2': '1'})
+    os.remove(wav)
+    c1 = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
+    c2 = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie2 t')]
+    sp_, ra_ = c2[0][1] / c1[0][1], c2[0][1] / c2[0][2]
+    check('hammond: several Leslies, each its own (the second 0.92 x the first, the published horn/drum ratio)',
+          0.89 < sp_ < 0.95 and 1.10 < ra_ < 1.30,
+          f'the second\'s horn {sp_:.2f} x the first\'s; its horn/drum {ra_:.2f} (the first\'s {c1[0][1] / c1[0][2]:.2f})')
+    # Each Leslie its own mix of the manuals: the upper mostly in the centre one, the lower in the
+    # left and right, the pedals in the one behind (three tracks: upper 0-2 s, lower 3-5 s, pedals
+    # 6-8 s; each cabinet's input level logged).
+    def vlq_(n):
+        b_ = [n & 0x7f]
+        n >>= 7
+        while n:
+            b_.append(0x80 | (n & 0x7f))
+            n >>= 7
+        return bytes(reversed(b_))
+    def trk(ch, notes):
+        ev2, out2, last2 = [(0, [0xC0 | ch, 16])], b'', 0
+        for st, p_, ln in notes:
+            ev2 += [(st, [0x90 | ch, p_, 90]), (st + ln, [0x80 | ch, p_, 0])]
+        ev2.sort(key=lambda e2: (e2[0], e2[1][0] & 0xf0 == 0x90))
+        for tk, e2 in ev2:
+            out2 += vlq_(tk - last2) + bytes(e2)
+            last2 = tk
+        out2 += b'\x00\xff\x2f\x00'
+        return b'MTrk' + struct.pack('>I', len(out2)) + out2
+    mid_ = os.path.join(ROOT, 'tools', '.hammond_mix.mid')
+    with open(mid_, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 1, 3, 480) + trk(0, [(0, 76, 1920), (7680, 76, 480)]) +
+                 trk(1, [(2880, 60, 1920), (2880, 64, 1920)]) + trk(2, [(5760, 36, 1920)]))
+    r_ = run(['-play', mid_, '-o', wav], env={'PJ_LESLIE_MIXLOG': '1'})
+    os.remove(mid_)
+    if os.path.exists(wav):
+        os.remove(wav)
+    lv = {int(m_.group(1)): [float(v_) for v_ in re.findall(r'(-?[\d.]+) dB', m_.group(2))]
+          for m_ in re.finditer(r'leslie inputs t (\d+):((?: -?[\d.]+ dB)+)', r_.stderr)}
+    ok_ = all(k_ in lv and len(lv[k_]) == 4 for k_ in (2, 5, 8))
+    if ok_:
+        up_, lo_, pe_ = lv[2], lv[5], lv[8]
+        ok_ = (up_[0] > max(up_[1:]) + 10 and min(lo_[1], lo_[2]) > max(lo_[0], lo_[3]) + 10 and abs(lo_[1] - lo_[2]) < 1
+               and pe_[3] > max(pe_[:3]) + 10)
+    check('hammond: each Leslie its own mix (upper: the centre; lower: left and right; pedals: the one behind)', ok_,
+          ' | '.join(f'{n_}: ' + ' '.join(f'{v_:.0f}' for v_ in lv.get(k_, [])) for n_, k_ in (('upper', 2), ('lower', 5), ('pedals', 8))) + ' dB (centre, left, right, back)')
+    # The valve stage: a triode's 2nd-order curve (C4 and E4 held: their difference tone, 68 Hz,
+    # appears only through it).
+    dts = []
+    for v_ in ('0', '1'):
+        run(['-inst', 'hammond', '-seq', 'on 60 100 on 64 100 wait 3 off 60 off 64', '-room', 'dry', '-o', wav],
+            env={'PJ_HAMMOND_UPPER': '008000000', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_PERC': 'off', 'PJ_HAMMOND_VALVE': v_})
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        x = x.mean(1) if x.ndim > 1 else x
+        seg = x[int(0.5 * fs):int(2.5 * fs)]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+        f = np.fft.rfftfreq(len(seg), 1 / fs)
+        pk = lambda fr: sp[(f > fr - 1) & (f < fr + 1)].max()
+        dts.append(20 * math.log10(pk(329.63 - 261.63) / pk(261.63)))
+    check('hammond: the valve stage\'s even-order distortion (C4 + E4: their difference tone)',
+          dts[1] > dts[0] + 15 and dts[1] < -25, f'68 Hz {dts[0]:.0f} dB without, {dts[1]:.0f} dB with the valve')
+    # The machined wheels' overtones: an unfiltered wheel (C3's 8', wheel 25) carries its 2nd, 3rd
+    # and 5th at ~-30..-36 dB; the 5th of middle C beats against the tempered 1 3/5' wheel (E6,
+    # ~14 c sharp of it) at ~10.4 Hz.
+    def wheel_render(m_, upper, extra=None):
+        env_ = {'PJ_HAMMOND_UPPER': upper, 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_PERC': 'off', 'PJ_HAMMOND_DIRT': '0'}
+        env_.update(extra or {})
+        run(['-inst', 'hammond', '-seq', f'on {m_} 100 wait 4 off {m_}', '-room', 'dry', '-o', wav], env=env_)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        return fs, x.mean(1) if x.ndim > 1 else x
+    fs, x = wheel_render(48, '008000000', {'PJ_HAMMOND_BRIGHT': '0'})
+    seg = x[int(0.5 * fs):int(2.5 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+    f = np.fft.rfftfreq(len(seg), 1 / fs)
+    pk = lambda fr: sp[(f > fr * 0.995) & (f < fr * 1.005)].max()
+    f0 = 440 * 2 ** ((48 - 69) / 12)
+    hs = [20 * math.log10(pk(k_ * f0) / pk(f0)) for k_ in (2, 3, 5)]
+    fs, x = wheel_render(60, '008000800')
+    f0 = 440 * 2 ** ((60 - 69) / 12)
+    beat = f0 * 2 ** (28 / 12) - 5 * f0
+    y = sosfiltfilt(butter(4, [5 * f0 * 0.96, f0 * 2 ** (28 / 12) * 1.04], 'band', fs=fs, output='sos'), x)[int(0.5 * fs):int(3.5 * fs)]
+    e_ = np.abs(hilbert(y))
+    e_ = e_ / e_.mean()
+    sp = np.abs(np.fft.rfft((e_ - 1) * np.hanning(len(e_)))) * 4 / len(e_)
+    f = np.fft.rfftfreq(len(e_), 1 / fs)
+    swing = sp[(f > beat - 0.4) & (f < beat + 0.4)].max()
+    check('hammond: the machined wheels\' overtones (and their beating against the tempered drawbars)',
+          all(-42 < h_ < -24 for h_ in hs) and swing > 0.01,
+          f'C3 wheel: 2nd {hs[0]:.0f}, 3rd {hs[1]:.0f}, 5th {hs[2]:.0f} dB; middle C\'s 5th against the 1 3/5\': a {beat:.1f} Hz beat, +-{100 * swing:.1f} %')
+    # Each wheel's own subharmonics: its rotation rate and that rate's harmonics, far under the tone
+    # (C3's wheel 25: 8 teeth, turning 16.35 Hz: lines at 16.35 .. 114.5 Hz, -35..-60 dB).
+    fs, x = wheel_render(48, '008000000', {'PJ_HAMMOND_BRIGHT': '0'})
+    seg = x[int(0.5 * fs):int(3.5 * fs)]
+    sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+    f = np.fft.rfftfreq(len(seg), 1 / fs)
+    f0 = 440 * 2 ** ((48 - 69) / 12)
+    pk = lambda fr: sp[(f > fr - 0.6) & (f < fr + 0.6)].max()
+    subs = [20 * math.log10(pk(k_ * f0 / 8) / pk(f0)) for k_ in range(1, 8)]
+    check('hammond: each wheel\'s subharmonics (its rotation rate and that rate\'s harmonics, far under the tone)',
+          all(-65 < d_ < -30 for d_ in subs),
+          'C3 wheel at 16.35 x 1..7 Hz: ' + ' '.join(f'{d_:.0f}' for d_ in subs) + ' dB')
+    # The two wheels on one shaft (four octaves apart: C2's wheel 13 and C6's 61, C3's 25 and C5's
+    # 73) share its wobble and its drive's errors, and no other shaft does: their level swells and
+    # pitch wobbles move together; C2 and C3 (two shafts of one gear ratio) apart.
+    from scipy.signal import hilbert, sosfiltfilt
+    fm_, am_ = {}, {}
+    for m_ in (36, 84, 48, 72):
+        run(['-inst', 'hammond', '-seq', f'on {m_} 100 wait 6 off {m_}', '-room', 'dry', '-o', wav],
+            env={'PJ_HAMMOND_UPPER': '008000000', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_DIRT': '0', 'PJ_HAMMOND_PERC': 'off',
+                 'PJ_HAMMOND_SUBS': '-200', 'PJ_HAMMOND_VALVE': '0', 'PJ_HAMMOND_MICRO': '-200', 'PJ_HAMMOND_MICROMOD': '0'})
+        # (the subharmonics next to the tone read as a pitch wobble of their own; the valve and its
+        # microphonics modulate every wheel alike: the generator measured alone)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        x = x.astype(float)
+        x = x.mean(1) if x.ndim > 1 else x
+        f0 = 440 * 2 ** ((m_ - 69) / 12)
+        y = sosfiltfilt(butter(2, [f0 * 0.8, f0 * 1.2], 'band', fs=fs, output='sos'), x)[int(1 * fs):int(5.5 * fs)]
+        a_ = hilbert(y)
+        c_ = 1200 * np.log2(np.maximum(np.diff(np.unwrap(np.angle(a_))) * fs / (2 * np.pi), 1) / f0)
+        band_ = butter(2, [2, 40], 'band', fs=fs, output='sos')
+        c_ = sosfiltfilt(butter(2, [18, 22], 'bandstop', fs=fs, output='sos'), sosfiltfilt(band_, c_))  # (the drive shaft's 20 Hz: every wheel's)
+        e_ = np.abs(a_)
+        e_ = sosfiltfilt(band_, e_ / e_.mean())
+        fm_[m_], am_[m_] = c_[fs:-fs][::48], e_[fs:-fs][::48]
+    cc_ = lambda u, w: abs(np.corrcoef(u, w)[0, 1])
+    one = (cc_(am_[36], am_[84]) + cc_(am_[48], am_[72])) / 2, (cc_(fm_[36], fm_[84]) + cc_(fm_[48], fm_[72])) / 2
+    two = cc_(am_[36], am_[48]), cc_(fm_[36], fm_[48])
+    check('hammond: the two wheels on a shaft share its wobble and drive errors (no other shaft does)',
+          one[0] > 0.6 and two[0] < 0.4 and cc_(fm_[36], fm_[84]) > two[1] + 0.2,
+          f'level swell together {one[0]:.2f} on a shaft, {two[0]:.2f} across; pitch wobble C2-C6 {cc_(fm_[36], fm_[84]):.2f} / C2-C3 {two[1]:.2f}')
     # Percussion: the 3rd's fast ping; legato does not strike it again.
     fs, x = render('on 60 100 wait 1.5 off 60 wait 0.3 on 62 100 wait 0.5 on 64 100 off 62 wait 1 off 64',
                    {'PJ_HAMMOND_PERC': '3f', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_LESLIE': 'off'})
@@ -2215,12 +2353,60 @@ def hammond():
     check('hammond: routed to its divisions (one organ), re-registered at the general pauses',
           got_ is not None and got_.groups() == ('20', '0', '10') and parts_ == 1 and reg_ is not None and reg_.group(1) == '2',
           (' '.join(got_.groups()) if got_ else '?') + f' (upper lower pedals), {parts_} organ, ' + (reg_.group(0) if reg_ else 'no re-registration'))
+    # A piano part reinstrumented onto the Hammond: its sustain pedal (CC64) is its damper, not the
+    # Leslie's switch: the Leslie planned, not thrown at every pedal change.
+    ev_ = [(0, [0xC0, 0])]
+    for i in range(32):
+        m_ = [72, 74, 76, 77][i % 4]
+        ev_ += [(i * 480, [0x90, m_, 90]), (i * 480 + 460, [0x80, m_, 0]), (i * 480 + 10, [0xB0, 64, 127]), (i * 480 + 400, [0xB0, 64, 0])]
+    ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+    out, last = b'', 0
+    for tk, e_ in ev_:
+        out += vlq(tk - last) + bytes(e_)
+        last = tk
+    out += b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    r_ = run(['-play', mid, '-reinstrument', 'grand-piano=hammond', '-o', os.devnull])
+    les_ = re.search(r'Leslie (the file\'s|planned[^;]*)', r_.stderr)
+    check('hammond: a reinstrumented piano\'s sustain pedal is not the Leslie\'s switch',
+          les_ is not None and les_.group(1).startswith('planned'), les_.group(0) if les_ else r_.stderr[-200:])
+    # (the jazz 888 with the percussion: its 1' out too, silent while the percussion takes its busbar)
     regs = [low_tune(62), low_tune(48), low_tune(36)]
-    check('hammond: a low tune registered higher (no mud)', regs == ['888000000', '302800000', '203808080'], ' / '.join(regs))
+    check('hammond: a low tune registered higher (no mud)', regs == ['888000008', '302800008', '203808088'], ' / '.join(regs))
     plans = [piece([('det', 24)]), piece([('leg', 24)]), piece([('det', 16), ('leg', 16), ('det', 16)]),
              piece([('det', 30), ('leg', 2), ('det', 16)])]
     check('hammond: the percussion planned (detached on, legato off, a long legato middle switched, a short one not)',
-          plans == ['on (3rd, fast)', 'off', 'on (3rd, fast), off for bars 17-32', 'on (3rd, fast)'], ' | '.join(plans))
+          plans == ['on (3rd, fast, soft)', 'off', 'on (3rd, fast, soft), off for bars 17-32', 'on (3rd, fast, soft)'], ' | '.join(plans))
+    # The lower manual as the percussion's stand-in (008880080): a detached jazz line with the
+    # percussion, the left hand comping chords round C4 over a pedal bass; with the left hand's own
+    # bass (no pedals, chords low) not.
+    def comp(pedals):
+        ev_ = [(0, [0xC0, 0]), (0, [0xC1, 2]), (0, [0xC2, 32])]
+        for i in range(24 * 8):
+            m_ = [72, 74, 76, 79, 77, 74, 72, 71][i % 8]
+            ev_ += [(i * 240, [0x90, m_, 90]), (i * 240 + 180, [0x80, m_, 0])]
+        for b_ in range(48):
+            for p_ in ([60, 64, 67] if b_ % 2 == 0 else [62, 65, 69]) if pedals else ([36, 43, 48] if b_ % 2 == 0 else [38, 45, 50]):
+                ev_ += [(b_ * 960, [0x91, p_, 70]), (b_ * 960 + 900, [0x81, p_, 0])]
+            if pedals:
+                ev_ += [(b_ * 960, [0x92, [36, 43][b_ % 2], 80]), (b_ * 960 + 900, [0x82, [36, 43][b_ % 2], 0])]
+        ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+        out, last = b'', 0
+        for tk, e_ in ev_:
+            out += vlq(tk - last) + bytes(e_)
+            last = tk
+        out += b'\x00\xff\x2f\x00'
+        with open(mid, 'wb') as fh:
+            fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+        r_ = run(['-play', mid, '-reinstrument', 'grand-piano=hammond-upper-manual,electric-grand=hammond-lower-manual,double-bass=hammond-pedal',
+                  '-o', os.devnull])
+        got_ = re.search(r'lower (\d{9})', r_.stderr)
+        return got_.group(1) if got_ else '?', 'stand-in' in r_.stderr
+    a_, b_ = comp(True), comp(False)
+    shape = lambda s_: ''.join('x' if c_ != '0' else '0' for c_ in s_)
+    check('hammond: the lower comping over the pedals on 008880080 (the percussion\'s stand-in), the left hand\'s bass not',
+          a_[1] and shape(a_[0]) == '00xxx00x0' and not b_[1], f'{a_[0]} / {b_[0]}')
     # The rotors' slow PI speed control: slow to fast at 1 s, back at 6 s (CC82): the horn up in
     # ~1 s, the drum in ~4 s, both down again, neither far past its speed.
     ev_ = [(0, [0xC0, 16]), (0, [0xB0, 82, 60]), (0, [0x90, 72, 100]), (1920, [0xB0, 82, 127]), (9600, [0xB0, 82, 60]),
@@ -2228,7 +2414,7 @@ def hammond():
     trk_ = b''.join(vlq(d) + bytes(e_) for d, e_ in ev_) + b'\x00\xff\x2f\x00'
     with open(mid, 'wb') as fh:
         fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 960) + b'MTrk' + struct.pack('>I', len(trk_)) + trk_)
-    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1'})
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1', 'PJ_LESLIE_COUNT': '1'})  # (one cabinet: its plain speeds)
     if os.path.exists(wav):
         os.remove(wav)
     rows = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
@@ -2237,8 +2423,8 @@ def hammond():
             if row[0] >= t0 and cond(row[col]):
                 return row[0] - t0
         return 99
-    hu, du = first(1, 1.0, lambda v: v > 0.9 * 6.6), first(2, 1.0, lambda v: v > 0.9 * 5.8)
-    hd, dd = first(1, 6.0, lambda v: v < 1.2), first(2, 6.0, lambda v: v < 0.9)
+    hu, du = first(1, 1.0, lambda v: v > 0.9 * 6.6), first(2, 1.0, lambda v: v > 0.9 * 4.17)  # (the drum's own motor: 1.6 x slower)
+    hd, dd = first(1, 6.0, lambda v: v < 1.2), first(2, 6.0, lambda v: v < 0.7)
     hmax = max(r__[1] for r__ in rows if 1 < r__[0] < 6)
     hmin = min(r__[1] for r__ in rows if r__[0] > 6)
     check('hammond: the Leslie\'s rotors by a slow PI control (the horn ~1 s, the drum ~4 s, little overshoot)',
@@ -2272,13 +2458,101 @@ def hammond():
     check('hammond: the slow Leslie nudged on a long note (swells round its middle, slow again)',
           'nudged on 1 long note' in r_.stderr and 1.3 < peak[0] < 3 and 3.5 < peak[1] < 5.5 and max(after) < 1.0,
           f'horn up to {peak[0]:.2f} Hz at {peak[1]:.1f} s (the note 2..6 s), back to {max(after):.2f} Hz')
+    # The swell on a long struck chord (C major held 2..8 s), an organist's way: the switch to fast
+    # just before the chord is struck, back to slow in its middle: the horn up, then slow again
+    # within the chord.
+    ev_, t = [(0, [0xC0, 16])], 0
+    for m_ in (67, 69, 71, 72):
+        ev_ += [(t, [0x90, m_, 90]), (t + 460, [0x80, m_, 0])]
+        t += 480
+    for m_ in (60, 64, 67):
+        ev_ += [(t, [0x90, m_, 90]), (t + 12 * 480 - 20, [0x80, m_, 0])]
+    t += 12 * 480
+    for m_ in (72, 71, 69, 67):
+        ev_ += [(t, [0x90, m_, 90]), (t + 460, [0x80, m_, 0])]
+        t += 480
+    ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+    out, last = b'', 0
+    for tk, e_ in ev_:
+        out += vlq(tk - last) + bytes(e_)
+        last = tk
+    out += b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1', 'PJ_HAMMOND_FASTSHARE': '0', 'PJ_HAMMOND_FLICK': '1'})
+    if os.path.exists(wav):
+        os.remove(wav)
+    rows = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
+    peak = max((row_[1], row_[0]) for row_ in rows)
+    end = [row_[1] for row_ in rows if 7.0 <= row_[0] <= 8.0]
+    check('hammond: the fast switch on a long struck chord (just before it, slow again in its middle: the horn swells up and settles)',
+          'flicked fast on 1 held chord' in r_.stderr and 5 < peak[0] < 8 and 2 < peak[1] < 6 and max(end) < 1.2,
+          f'horn up to {peak[0]:.2f} Hz at {peak[1]:.1f} s (the chord 2..8 s), {max(end):.2f} Hz by its end')
+    def write_mid(ev_, tpq=480):
+        ev_ = sorted(ev_, key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+        out, last = b'', 0
+        for tk, e_ in ev_:
+            out += vlq(tk - last) + bytes(e_)
+            last = tk
+        out += b'\x00\xff\x2f\x00'
+        with open(mid, 'wb') as fh:
+            fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, tpq) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    # A trill (D5-E5, 12 notes 0.0625 s apart, all at velocity 80) after a few slow notes: planned
+    # with a rising touch, from about half its velocity to 1.3 x (the key clicks follow the touch:
+    # the velocity check above).
+    ev_, t = [(0, [0xC0, 16])], 0
+    for m_ in (67, 69, 71, 72):
+        ev_ += [(t, [0x90, m_, 80]), (t + 460, [0x80, m_, 0])]
+        t += 480
+    for k_ in range(12):
+        ev_ += [(t, [0x90, 74 + 2 * (k_ & 1), 80]), (t + 58, [0x80, 74 + 2 * (k_ & 1), 0])]
+        t += 60
+    ev_ += [(t, [0x90, 74, 80]), (t + 900, [0x80, 74, 0])]
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav])
+    if os.path.exists(wav):
+        os.remove(wav)
+    m = re.search(r'(\d+) trills? with a rising touch \(the first (\d+) -> (\d+)\)', r_.stderr)
+    check('hammond: a trill planned with a rising touch (its key clicks sharpening)',
+          m is not None and m.group(1) == '1' and 30 <= int(m.group(2)) <= 50 and 95 <= int(m.group(3)) <= 110,
+          m.group(0) if m else 'no trill planned')
+    # Harmonic complexity: dense chords with semitones and tritones and close low intervals plan a
+    # single foundation; plain triads keep the 888.
+    plans = []
+    for chords in (((48, 52, 55, 60), (53, 57, 60, 65), (55, 59, 62, 67)),
+                   ((48, 52, 58, 61, 63), (53, 57, 63, 66, 68), (55, 56, 59, 65, 68))):
+        ev_, t = [(0, [0xC0, 16])], 0
+        for _ in range(4):
+            for c_ in chords:
+                for m_ in c_:
+                    ev_ += [(t, [0x90, m_, 80]), (t + 900, [0x80, m_, 0])]
+                t += 960
+        write_mid(ev_)
+        r_ = run(['-play', mid, '-room', 'dry', '-o', wav])
+        if os.path.exists(wav):
+            os.remove(wav)
+        m = re.search(r'upper (\d{9})', r_.stderr)
+        plans.append((m.group(1) if m else '?', 'single foundation' in r_.stderr))
+    check('hammond: a harmonically complex piece planned on a single foundation (no 16\', 5 1/3\' mud)',
+          not plans[0][1] and plans[1][1] and plans[1][0][:2] == '00',
+          f'triads: upper {plans[0][0]}; clusters: upper {plans[1][0]}')
+    # Online: a low cluster held (C3 D3 Eb3) eases the 16' and 5 1/3' back, its sub-bass falling.
+    fs, x = render('on 48 90 on 50 90 on 51 90 wait 4 off 48 off 50 off 51',
+                   {'PJ_HAMMOND_UPPER': '888000000', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_VIB': 'off'})
+    def sub(a, b):
+        sp = np.abs(np.fft.rfft(x[int(a * fs):int(b * fs)])) ** 2
+        f = np.fft.rfftfreq(int(b * fs) - int(a * fs), 1 / fs)
+        return 10 * math.log10(sp[(f > 40) & (f < 120)].sum() / sp[(f > 40) & (f < 4000)].sum())
+    s0, s1 = sub(0, 0.3), sub(2, 4)
+    check('hammond: muddiness corrected online (a low cluster: the 16\' and 5 1/3\' eased back)',
+          s1 < s0 - 4, f'the sub-bass share {s0:.1f} dB as struck -> {s1:.1f} dB held')
     # The Leslie's own flaws: the horn's wind at speed, the speed relay's click, a loose panel's
     # buzz under a loud bass.
     ev_ = [(0, [0xC0, 16]), (0, [0xB0, 82, 60]), (5760, [0xB0, 82, 127]), (7680, [0x90, 84, 1]), (10, [0x80, 84, 0])]
     trk_ = b''.join(vlq(d) + bytes(e_) for d, e_ in ev_) + b'\x00\xff\x2f\x00'
     with open(mid, 'wb') as fh:
         fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 960) + b'MTrk' + struct.pack('>I', len(trk_)) + trk_)
-    run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_HAMMOND_HUM': '0'})
+    run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_HAMMOND_HUM': '0', 'PJ_LESLIE_RELAY': '40'})  # (the relay at its measured level)
     fs, y = wavfile.read(wav)
     os.remove(wav)
     y = y.astype(float).mean(1)
@@ -2367,13 +2641,151 @@ def hammond():
     check('hammond: the drawbar knobs: K1 through 16 classics, K2 hollow/full, K3 bright, K4 light',
           ok, f'{exact} of 16 stations exact; from the jazz 888: hollow {"".join(map(str, hollow))}, full {"".join(map(str, full))}, '
               f'bright {"".join(map(str, bright))}, light {"".join(map(str, light))}')
+    # The ending (a quick tune, then C major held 6 s at the end): the Leslie switched up as the chord
+    # is struck (fast from ~1 s in) and slow again at 4/5 of it (4.8 s), the rotors still winding down
+    # at the release; the
+    # expression swelled; two drawbars pulled out through it.
+    def tune(ev_, t, n, prog_vel=90, gap=60):
+        for i in range(n):
+            m_ = [72, 74, 76, 79, 77, 74, 72, 71][i % 8]
+            ev_ += [(t, [0x90, m_, prog_vel]), (t + 240 - gap, [0x80, m_, 0])]
+            t += 240
+        return t
+    ev_ = [(0, [0xC0, 16])]
+    t = tune(ev_, 0, 32)
+    for m_ in (60, 64, 67, 72):
+        ev_ += [(t, [0x90, m_, 90]), (t + 12 * 480, [0x80, m_, 0])]
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_LESLIE_LOG': '1', 'PJ_HAMMOND_FASTSHARE': '0', 'PJ_HAMMOND_ENDLESLIE': '1'})
+    if os.path.exists(wav):
+        os.remove(wav)
+    rows = [list(map(float, l_.split()[2::2])) for l_ in r_.stderr.splitlines() if l_.startswith('leslie t')]
+    c0 = 32 * 0.25  # (the chord's start, s)
+    peak = max((row_[1], row_[0]) for row_ in rows if row_[0] >= c0)
+    atEnd = [row_[1] for row_ in rows if c0 + 5.6 <= row_[0] <= c0 + 6.0]
+    m = re.search(r'the ending: ([^;\n]*)', r_.stderr)
+    check('hammond: the ending planned: the Leslie up and winding down, a swell, drawbars out',
+          m is not None and 'the Leslie up and winding down' in m.group(1) and 'a swell' in m.group(1) and '2 drawbars out' in m.group(1)
+          and peak[0] > 3.5 and c0 + 1 < peak[1] < c0 + 5.0 and atEnd and 0.9 < max(atEnd) < peak[0] - 1,
+          (m.group(1) if m else 'no ending') + f'; horn up to {peak[0]:.2f} Hz at {peak[1] - c0:.1f} s into the chord, '
+          f'{max(atEnd) if atEnd else 0:.2f} Hz at its release')
+    # The rock organ's ending with the run switch off (PJ_HAMMOND_DIVE=1): the chord sinking and
+    # fading as the generator coasts down (dry, no Leslie: the wheels' own pitch).
+    ev_ = [(0, [0xC0, 18]), (0, [0xB0, 11, 110])]  # (its own expression: no planned swell)
+    t = tune(ev_, 0, 16)
+    for m_ in (48, 60):
+        ev_ += [(t, [0x90, m_, 100]), (t + 8 * 480, [0x80, m_, 0])]
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-room', 'dry', '-o', wav], env={'PJ_HAMMOND_DIVE': '1', 'PJ_HAMMOND_LESLIE': 'off', 'PJ_HAMMOND_VIB': 'off',
+                                                          'PJ_HAMMOND_UPPER': '008000000', 'PJ_HAMMOND_GLISS': '0'})
+    fs, y = wavfile.read(wav)
+    os.remove(wav)
+    y = y.astype(float)[:, 0]
+    c0 = 16 * 0.25
+    def pitch_lvl(t0):
+        seg = y[int(t0 * fs):int((t0 + 0.25) * fs)] * np.hanning(int(0.25 * fs))
+        sp = np.abs(np.fft.rfft(seg, 1 << 18))
+        hz = np.fft.rfftfreq(1 << 18, 1 / fs)
+        band = (hz > 150) & (hz < 290)
+        k = np.argmax(sp * band)
+        return hz[k], 20 * np.log10(sp[k] + 1e-9)
+    f1, l1 = pitch_lvl(c0 + 0.5)
+    f2, l2 = pitch_lvl(c0 + 3.6)
+    drop = 1200 * math.log2(f1 / f2)
+    check('hammond: the rock organ\'s ending: the run switch off, the chord sinking and fading',
+          'the run switch off' in r_.stderr and 300 < drop < 1200 and l1 - l2 > 1,
+          f'C4 {f1:.1f} Hz -> {f2:.1f} Hz ({drop:.0f} c down) over 1.6 s, {l1 - l2:.1f} dB softer')
+    # Glissandos (the rock organ: a phrase, a short general pause, a phrase): swept up the white
+    # keys into the music resuming; the short pause re-registered by the preset key.
+    ev_ = [(0, [0xC0, 18])]
+    t = tune(ev_, 0, 16)
+    t += 240  # (a pause of 0.5 s: a preset key's)
+    t = tune(ev_, t, 16)
+    t += 1200  # (1.3 s: drawbars pulled)
+    t = tune(ev_, t, 16)
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-o', os.devnull], env={'PJ_HAMMOND_ENDING': '0'})
+    g_ = re.search(r'(a glissando|two glissandos) up the white keys', r_.stderr)
+    k_ = re.search(r're-registered at (\d+) pauses? \((\d+) by the preset key\)', r_.stderr)
+    check('hammond: glissandos into the music resuming (the rock organ); a short pause\'s preset key',
+          g_ is not None and k_ is not None and k_.group(1) == '2' and k_.group(2) == '1',
+          (g_.group(0) if g_ else 'no glissando') + '; ' + (k_.group(0) if k_ else 'no preset key'))
+    # The percussion's touch: a detached jazz line with a legato move into each bar's first note:
+    # those notes detached before (the next pings), the other legato moves left as written.
+    ev_, t = [(0, [0xC0, 16])], 0
+    for i in range(64):
+        m_ = [72, 74, 76, 79, 77, 74, 72, 71][i % 8]
+        legato = i % 8 == 7 or i % 8 == 3  # (into the bar's first note, and into its middle)
+        ev_ += [(t, [0x90, m_, 90]), (t + (260 if legato else 180), [0x80, m_, 0])]
+        t += 240
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-o', os.devnull], env={'PJ_HAMMOND_ENDING': '0'})
+    d_ = re.search(r'(\d+) accents? detached to strike the percussion', r_.stderr)
+    check('hammond: the percussion\'s touch: legato into the bar\'s first note detached (the next pings)',
+          'percussion on (3rd, fast, soft)' in r_.stderr and d_ is not None and 4 <= int(d_.group(1)) <= 8,
+          d_.group(0) if d_ else 'none detached')
+    # The vibrato tabs: three staves in counterpoint (a single line in each, plain harmony) played
+    # straight; a lower manual carrying the bass without a pedal line, its tab off.
+    tu, tl, tp = [], [], []
+    for i in range(48):
+        tu += [(i * 240, [0x90, [72, 74, 76, 77, 79, 77, 76, 74][i % 8], 90]), (i * 240 + 220, [0x80, [72, 74, 76, 77, 79, 77, 76, 74][i % 8], 0])]
+        if i % 2 == 0:
+            n_ = [60, 59, 57, 55][(i // 2) % 4]
+            tl += [(i * 240, [0x90, n_, 80]), (i * 240 + 460, [0x80, n_, 0])]
+        if i % 4 == 0:
+            n_ = [36, 43, 41, 43][(i // 4) % 4]
+            tp += [(i * 240, [0x90, n_, 80]), (i * 240 + 940, [0x80, n_, 0])]
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 1, 4, 480) + track([(0, [0xC0, 16])]) + track(tu) + track(tl) + track(tp))
+    r_ = run(['-play', mid, '-o', os.devnull], env={'PJ_HAMMOND_ENDING': '0'})
+    straight = 'the vibrato off (counterpoint' in r_.stderr and 'vibrato C3 (tabs off)' in r_.stderr
+    ev_ = [(0, [0xC0, 16])]
+    for i in range(32):
+        m_ = [72, 74, 76, 77][i % 4]
+        ev_ += [(i * 480, [0x90, m_, 90]), (i * 480 + 460, [0x80, m_, 0])]
+        if i % 2 == 0:  # (the left hand: a bass note with the tune, a chord off the beat)
+            b_ = [48, 50, 52, 50][(i // 2) % 4]
+            ev_ += [(i * 480, [0x90, b_, 80]), (i * 480 + 470, [0x80, b_, 0])]
+        else:
+            for c_ in (55, 59):
+                ev_ += [(i * 480, [0x90, c_, 70]), (i * 480 + 460, [0x80, c_, 0])]
+    write_mid(ev_)
+    r_ = run(['-play', mid, '-o', os.devnull], env={'PJ_HAMMOND_ENDING': '0'})
+    bass = re.search(r'the lower\'s vibrato off|vibrato C3 lower only|vibrato C3 upper only', r_.stderr)
+    check('hammond: the vibrato tabs planned (counterpoint straight; the lower carrying the bass without it)',
+          straight and 'the lower\'s vibrato off' in r_.stderr and 'C3 upper only' in r_.stderr,
+          f'counterpoint {"straight" if straight else "not straight"}; ' + (bass.group(0) if bass else 'the lower\'s tab on'))
+    # The horn's own response (a fixed filter: its flare's cutoff, its mouth's reflection's ripple,
+    # its driver's top): a tone on the 8' alone through the slow Leslie, with it against without it
+    # (PJ_LESLIE_HORNEQ=0): +3 dB at the first ripple's peak (B5), under it by the dip (F6), nothing
+    # at C5 (the drum's).
+    def horn_db(k, eq):
+        run(['-inst', 'hammond', '-room', 'dry', '-seq', f'on {k} 100 wait 4 off {k}', '-o', wav],
+            env={'PJ_LESLIE_HORNEQ': eq, 'PJ_HAMMOND_UPPER': '008000000', 'PJ_HAMMOND_VIB': 'off', 'PJ_HAMMOND_PERC': 'off',
+                 'PJ_HAMMOND_LESLIE': 'slow'})
+        fs_, y_ = wavfile.read(wav)
+        os.remove(wav)
+        y_ = y_.astype(float)
+        y_ = y_[:, 0] if y_.ndim > 1 else y_
+        a_ = y_[int(0.8 * fs_):int(3.8 * fs_)]
+        sp = np.abs(np.fft.rfft(a_ * np.hanning(len(a_)))) ** 2
+        hz = np.fft.rfftfreq(len(a_), 1 / fs_)
+        f_ = 440 * 2 ** ((k - 69) / 12)
+        return 10 * math.log10(sp[(hz > 0.97 * f_) & (hz < 1.03 * f_)].sum() + 1e-20)
+    resp = {k: horn_db(k, '1') - horn_db(k, '0') for k in (72, 83, 89)}
+    check('hammond: the Leslie horn\'s own response (its cutoff, its mouth\'s ripple)',
+          abs(resp[72]) < 1 and 2 < resp[83] < 4.5 and resp[83] - resp[89] > 2.5,
+          ', '.join(f'{440 * 2 ** ((k - 69) / 12):.0f} Hz {v:+.1f} dB' for k, v in resp.items()))
     r = run(['-inst', 'hammond', '-fuzz', '10', '1'])
     check('fuzz 10 s (hammond)', r.returncode == 0, r.stdout.strip())
     seq = 'on 48 100 on 60 100 on 64 100 on 67 100 on 72 100 wait 10 off 48 off 60 off 64 off 67 off 72'
-    base = cpu_time(['-inst', 'hammond', '-seq', 'wait 0.01', '-o', wav])
-    ns = (cpu_time(['-inst', 'hammond', '-seq', seq, '-o', wav]) - base) / (10 * 48000) * 1e9
-    os.remove(wav)
-    check('real-time margin (hammond: 91 wheels, a five-note chord, the Leslie)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    for count, limit in (('1', 2500), ('4', 5000)):  # (one Leslie; the four of the default)
+        e_ = dict(os.environ, PJ_LESLIE_COUNT=count)
+        base = cpu_time(['-inst', 'hammond', '-seq', 'wait 0.01', '-o', wav], env=e_)
+        ns = (cpu_time(['-inst', 'hammond', '-seq', seq, '-o', wav], env=e_) - base) / (10 * 48000) * 1e9
+        os.remove(wav)
+        check(f'real-time margin (hammond: 91 wheels, a five-note chord, {count} Leslie{"s" if count != "1" else ""})', ns < limit,
+              f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
 def honky_tonk():

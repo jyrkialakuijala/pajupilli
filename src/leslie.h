@@ -24,7 +24,12 @@ namespace pajupilli {
 
 class Leslie {
  public:
-  void setup(double fs, uint32_t seed);
+  // spread: this cabinet's parts off their nominal values by up to this share each (0: as built;
+  // two cabinets side by side: ~0.07), drawn from the seed.
+  // speed: all its speeds x this; ratioSlow, ratioFast: the horn's speed over the drum's on chorale
+  // and on tremolo (0: PJ_LESLIE_RATIO, 1.6).
+  void setup(double fs, uint32_t seed, double spread = 0, bool log = true, double speed = 1, double ratioSlow = 0,
+             double ratioFast = 0);
   void setFast(bool fast) { fast_ = fast; brake_ = false; }
   // The slow speed x this (a planned nudge on a long note: 1 none).
   void setBoost(double b) { boost_ = b; }
@@ -57,9 +62,14 @@ class Leslie {
   double hornW_ = 0.8, drumW_ = 0.67, hornPh_ = 0, drumPh_ = 0;
   double hornI_ = 0, drumI_ = 0;  // (the speed controls' integrals)
   double hornSlow_, hornFast_, drumSlow_, drumFast_;
+  double hornR_ = 0.17, drumR_ = 0.20, accH_ = 1, accD_ = 1;  // (the rotors' radii; their motors' strength x)
+  bool log_ = true;
   // The crossover (2nd order at 800 Hz) and the bands.
   double lp1_[2] = {}, hp1_[2] = {};
   double xa_[3], xb_[3], xhb_[3];  // (the low-pass's numerator, the shared denominator, the high-pass's numerator)
+  // The horn's own response (its cutoff, its mouth's ripple, its driver's top): fixed sections.
+  static constexpr int kHornEq = 6;
+  double hornEqB_[kHornEq][3] = {}, hornEqA_[kHornEq][3] = {}, hornEqS_[kHornEq][2] = {};
   double hornLo_ = 0, hornMid_ = 0, aLo_, aMid_;
   double drumLo_ = 0, aDrum_;
   Ring horn_[3], drum_;  // the horn's three bands, the drum's turning part

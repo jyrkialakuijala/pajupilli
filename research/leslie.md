@@ -137,7 +137,10 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
 | setBfree | 423.36 rpm = 7.06 Hz | 40.32 rpm = 0.67 Hz | 357.3 rpm = 5.96 Hz | 36.0 rpm = 0.60 Hz | **[web, SBF]** design |
 | Magazine | ~7.5 Hz | ~0.5 Hz | | | **[web, muzines]** |
 
-- **[design] Defaults:** horn 6.7 / 0.80 Hz, drum 5.9 / 0.67 Hz. The drum's fast speed varies most
+- **[design] Defaults:** horn 6.7 / 0.80 Hz, drum 1.6 × slower, 4.2 / 0.50 Hz (2026-11-18, the
+  user: "they have different motors, and the high frequency speaker can rotate perhaps 1.6 x as
+  fast"; the measured units above are ~1.17 ×: `PJ_LESLIE_RATIO=1.17`). The rotors turn opposite
+  ways (the user), the drum's angle mirrored. The drum's fast speed varies most
   between units (342-396 rpm). The horn speed depends on the pulley step (three choices) and belt
   tension **[paper, Henricksen; web]**.
 - **The speeds are only roughly mains-locked.** Shaded-pole motors run at a load-dependent slip
@@ -426,7 +429,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 | Group | Parameter | Default | Range / option |
 |---|---|---|---|
 | Speeds | horn fast / slow | 6.67 / 0.80 Hz | ±3 % per cabinet; pulley step 3 choices (±8 %) |
-| | drum fast / slow | 5.90 / 0.67 Hz | 5.6-6.6 / 0.5-0.8 Hz |
+| | drum fast / slow | 4.17 / 0.50 Hz (horn / 1.6) | 5.6-6.6 / 0.5-0.8 Hz measured |
 | Mechanics | horn τ up / down | 0.5 / 0.8 s | 0.16-4 s ("belt age") |
 | | drum τ up / down | 3.5 / 2.5 s | 1.4-12 s |
 | | brake | off | horn 3 s, drum 12 s to stop; stop angle |
@@ -678,4 +681,9 @@ slow to high speed"):**
   - Only where the plan has the Leslie slow, 8 s apart at least.
   - Applied by the clock: a long note has no events in its middle.
   - **Measured** on a 4 s note: the horn 0.82 → 1.82 Hz and back, the drum 0.66 → 1.37.
+- **The planned flick** (the user: "on long held chords, flick the fast speed on for a bit and go
+  back to slow before the fast speed has been achieved"):
+  - On ≥ 3 notes held unchanged ≥ 2.5 s: fast for 0.35-0.75 s from 15-45 % into the chord.
+  - About 2 in 3 such chords, 10 s apart, only where the plan is slow; not also nudged.
+  - **Measured** on a 6 s chord: the horn 0.8 → 3.1 Hz (fast is 6.6) and back to 0.8 Hz by its end.
 

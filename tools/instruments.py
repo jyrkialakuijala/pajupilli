@@ -221,7 +221,7 @@ def sax(name, s, transpose, fs, reed, gain, title, top=None):
 # vents. Bore after Nederveen 1969 / Almeida et al. 2007 (the oboe reed).
 
 def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3..C#6', reed=None, family='oboe'):
-    v2 = reed is None  # the oboe's own geometry (the English horn keeps the one it was scaled from)
+    v2 = True  # (the first fit's geometry, v2 False: kept for reference)
     names = ['oct2', 'oct1', 'C#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4',
              'C#4', 'C4', 'B3']
     fingers = {'C5', 'B4', 'A4', 'G4', 'F#4', 'E4'}
@@ -287,20 +287,28 @@ def oboe(name='oboe', s=1.0, transpose=0, fs=48000, gain=0.35, title='Oboe, Bb3.
                 extra=[('top', 2.4, 0.6, 4.0), ('staple', 72.0, 30.0, 110.0)] if v2 else [('top', 2.4, 1.2, 4.0)],
                 doc="""A narrow cone and a double reed; octave vents for the second register,
                 the third register by search among vented fingerings.""",
-                reed=reed or dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.6, sr=9e-5, psi=0, sd=4.5e-6,
-                                  press=5000, pressHi=7000, vib=0))
+                reed=reed or dict(width=7e-3, h0=0.25e-3, k=4.8e7, fr=3000, qr=0.9, sr=9e-5, psi=0, sd=4.5e-6,
+                                  press=5000, pressHi=7000, vib=0, meetAt=0.75, roll=0.5, earStart=0.15))
 
 
 # English horn (cor anglais) in F, written Bb3..C#6, sounding a fifth lower:
-# the oboe x 1.5 (tools/design.py -scale oboe english-horn 1.5; the real one
-# is close to it, with a bulb bell, not modelled: a plain flare). Its reed:
-# larger and softer, its resonance lower; its compliance sr / k (part of the
-# cone's apex volume) a little over 1.5^3 of the oboe's (at 1.5^3, with fr
-# 2000 Hz, the low notes played 40-80 c sharp with the lips at their loosest).
+# the oboe's geometry x 1.5, fitted on its own (the real one is close to it,
+# with a bulb bell, not modelled: a plain flare). Its reed is the oboe's
+# scaled with the bore: the resonance / 1.5, the same damping and blades
+# meeting, and the compliance sr / k x 1.5^3 (it is part of the cone's apex
+# volume: with less, 4.2e-12 against 6.3e-12 m^3/Pa, the registers could not
+# be brought in line: the fit's rms 23 c, the second register 20..105 c
+# sharp of the first, notes falling into the wrong register; with it 4 c).
+# The slit: wider and softer than the oboe's, the closing pressure 9.6 kPa
+# (the oboe's 12), blown a little gentler. The player sets the column ringing
+# at the start (prime) and listens 0.15 s into a note before tuning it
+# (earStart: chasing the attack's flat start sent D#4 and F5 to another
+# register).
 
 def english_horn():
     return oboe('english-horn', 1.5, -7, 48000, 0.4, 'English horn in F, written Bb3..C#6', family='oboe',
-                reed=dict(width=8e-3, h0=0.3e-3, k=3.2e7, fr=1700, qr=0.3, sr=1.0e-4, psi=0, sd=1.0e-5, press=4000, pressHi=5500, vib=0))
+                reed=dict(width=8e-3, h0=0.4e-3, k=2.4e7, fr=2000, qr=0.9, sr=1.5e-4, psi=0, sd=1.0e-5, press=4000,
+                          pressHi=5500, vib=0, meetAt=0.75, roll=0.5, prime=1e-4, earStart=0.15))
 
 
 # ---------------------------------------------------------------------------

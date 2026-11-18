@@ -16,6 +16,7 @@
 extern char** environ;
 
 #include "analysis.h"
+#include "knob.h"
 #include "voice.h"
 
 namespace pajupilli {
@@ -26,13 +27,24 @@ constexpr int kFs = 48000;  // Voice output
 // Plays the note from silence; returns the error in cents (NAN if it sounds in
 // the wrong register or not at all). wobble: level peak-to-peak / mean over the
 // settled part (a pulsing, two-frequency state is not a usable note).
+// tol: how far off (cents) still counts as the note (a reed has states a
+// semitone flat of the note that are not it). keyed: the dynamics from the
+// key's velocity, as a keyboard or a MIDI file plays it (a harder key is also
+// a harder attack: the tongue, the accent, the fingers), not from the breath
+// control alone.
 double tryNote(const Instrument& inst, int midi, double cover, double press, double a4, double dyn = 0.5,
-               double jet = 1, double* wobble = nullptr) {
+               double jet = 1, double* wobble = nullptr, double tol = 150, bool keyed = false) {
   Voice v(inst);
   Performer& pl = v.player();
   pl.coverTrim[midi] = pl.coverLoTrim[midi] = pl.coverHiTrim[midi] = cover;
   pl.pressTrim[midi] = press;
   pl.jetTrim[midi] = jet;
+  int vel = 64;
+  if (keyed) {
+    static const double kVelDyn = knob("PJ_VELDYN", 0.35);
+    vel = std::clamp(int(std::lround(64 + 63 * (dyn - 0.5) / kVelDyn)), 1, 127);
+    dyn -= kVelDyn * (vel - 64) / 63.0;
+  }
   pl.setDynamics(dyn);
   pl.setWander(0);  // learn on a steady player
   // Brass: learn the lips' own setting, not one the ear keeps correcting (the
@@ -44,7 +56,7 @@ double tryNote(const Instrument& inst, int midi, double cover, double press, dou
   const double slow = std::max(1.0, 261.6 / f0) * (inst.lip() ? 1.6 : 1.0);
   const int n = int((wobble ? 0.5 : 0.35) * slow * kFs);
   std::vector<float> x(n);
-  pl.noteOn(midi, 64);
+  pl.noteOn(midi, vel);
   v.render(x.data(), n);
   const int a = wobble ? int(0.2 * slow * kFs) : n / 2;
   if (rms(x.data() + a, n - a) < 1e-3) return NAN;
@@ -63,7 +75,7 @@ double tryNote(const Instrument& inst, int midi, double cover, double press, dou
     }
     *wobble = k ? (lmax - lmin) / (lm / k) : 1;
   }
-  return std::fabs(c) < 150 && clarity > 0.6 ? c : NAN;
+  return std::fabs(c) < tol && clarity > 0.6 ? c : NAN;
 }
 
 constexpr double kSteady = 0.2;  // level wobble above this: not a usable state
@@ -106,17 +118,18 @@ static void coverRange(const Instrument& inst, int m, double* cmin, double* cmax
   *cmax = (base + mm) / base;
 }
 
-static double bisectCover(const Instrument& inst, int m, double p, double dyn, double jet, double a4, double x0, double* cover) {
+static double bisectCover(const Instrument& inst, int m, double p, double dyn, double jet, double a4, double x0, double* cover,
+                          double tol = 150) {
   double cmin, cmax;
   coverRange(inst, m, &cmin, &cmax);
-  double xg = x0, c = tryNote(inst, m, std::exp(x0), p, a4, dyn, jet);
+  double xg = x0, c = tryNote(inst, m, std::exp(x0), p, a4, dyn, jet, nullptr, tol);
   // Not in its register from there: try the rest of the player's range
   // (a duct's pitch climbs steeply with the breath; a reed's lips).
   // (The flute family keeps its calibration: they start in their register.)
   for (int k = 0; k < 6 && std::isnan(c) && inst.design; ++k) {
     const double u = (k + 0.5) / 6;
     xg = std::log(cmin) + u * (std::log(cmax) - std::log(cmin));
-    c = tryNote(inst, m, std::exp(xg), p, a4, dyn, jet);
+    c = tryNote(inst, m, std::exp(xg), p, a4, dyn, jet, nullptr, tol);
   }
   if (std::isnan(c)) return NAN;
   x0 = xg;
@@ -124,7 +137,7 @@ static double bisectCover(const Instrument& inst, int m, double p, double dyn, d
   for (int it = 0; it < 10 && std::fabs(bc) > 2; ++it) {
     if (c > 0) b = xg; else a = xg;
     const double x = 0.5 * (a + b);
-    const double cx = tryNote(inst, m, std::exp(x), p, a4, dyn, jet);
+    const double cx = tryNote(inst, m, std::exp(x), p, a4, dyn, jet, nullptr, tol);
     if (std::isnan(cx)) {  // lost the register: x is a limit
       if (x < xg) a = x; else b = x;
       continue;
@@ -370,6 +383,97 @@ static void calibrateLipNote(const Instrument& inst, int m, double a4, Calibrati
   cal->coverHi[m] = hi > 0.5 ? std::exp(cm + (std::log(cvHi) - cm) * (kCalDynHi - 0.5) / (hi - 0.5)) : bestCover;
 }
 
+
+// A reed's dynamics, soft and loud of mezzo-forte: how far the note holds, and
+// how the lips go with the breath. Beside its note a reed has other states
+// the same fingering and breath can fall into: its octave, and one about a
+// semitone flat (seen on the oboe and the English horn between mezzo-forte
+// and forte); neither is the note (kTol). The lips follow a line in the
+// dynamics (Performer::coverAt): the walk outwards, re-tuning the lips where
+// the note is lost or out of tune, proposes slopes for that line; each is then
+// played at every step the way the player will play it, and the one that
+// reaches furthest (then: best in tune) is kept.
+// One setting of the lips and the breath at dynamics d, as the player will
+// play it: from the breath control and from the key (the attack decides which
+// state a reed falls into), the lips a little tighter and a little looser
+// than meant (the player wanders by +-4 %; a setting at the edge of the
+// note's state is not a usable one: the oboe's C4 fell into its octave on
+// every third attack). The largest error, NAN if any of them is not the note
+// or unsteady.
+constexpr double kReedTol = 25, kReedLips = 1.05;
+static double playReed(const Instrument& inst, int m, double a4, double cv, double press, double d) {
+  double worst = 0;
+  for (int k = 0; k < 4; ++k) {
+    double wob = 1;
+    const double c = tryNote(inst, m, k & 1 ? cv * kReedLips : cv / kReedLips, press, a4, d, 1, &wob, kReedTol + 10, k >= 2);
+    if (std::isnan(c) || wob > kSteady) return NAN;
+    if (std::fabs(c) > std::fabs(worst)) worst = c;
+  }
+  return worst;
+}
+
+static void reedRange(const Instrument& inst, int m, double a4, double best, double press, Calibration* cal) {
+  constexpr double kTol = kReedTol;
+  auto limit = [best](double cv) { return std::clamp(cv, 0.75 * best, 1.35 * best); };
+  for (int side = 0; side < 2; ++side) {
+    const double sg = side ? 1 : -1;
+    // The lips at dynamics d on a line of slope s (as coverAt has them: no
+    // further beyond kCalDynHi, or below 0.15).
+    auto coverOn = [&](double s, double d) {
+      return limit(best * std::exp(s * (std::clamp(d, 0.15, kCalDynHi) - 0.5)));
+    };
+    auto play = [&](double cv, double d) {
+      return playReed(inst, m, a4, cv, press, d);
+    };
+    std::vector<double> slopes{0};
+    double cv = best;
+    for (int k = 1; k <= 5; ++k) {
+      const double d = std::clamp(0.5 + sg * 0.1 * k, 0.0, 1.0);
+      double c = play(cv, d);
+      if (std::isnan(c) || std::fabs(c) > 10) {
+        double x = cv;
+        c = bisectCover(inst, m, press, d, 1, a4, std::log(cv), &x, kTol);
+        if (std::isnan(c) || std::fabs(c) > 15) break;
+        cv = limit(x);
+      }
+      // (No steeper than the lips move for the dynamics: x1.4 over the range.)
+      const double s = std::clamp((std::log(cv) - std::log(best)) / (std::clamp(d, 0.15, kCalDynHi) - 0.5), -1.0, 1.0);
+      bool seen = false;
+      for (double q : slopes) seen |= std::fabs(q - s) < 0.05;
+      if (!seen) slopes.push_back(s);
+    }
+    double bestReach = 0.5, bestWorst = 1e9, bestSlope = 0;
+    for (double s : slopes) {
+      double reach = 0.5, worst = 0;
+      // (In steps of 0.05: the oboe's F4 held at 0.6 and at 0.7 and fell
+      // into the flat state's octave between them.)
+      for (int k = 1; k <= 10; ++k) {
+        const double d = std::clamp(0.5 + sg * 0.05 * k, 0.0, 1.0);
+        const double c = play(coverOn(s, d), d);
+        if (std::isnan(c)) break;
+        reach = d;
+        worst = std::max(worst, std::fabs(c));
+      }
+      const bool further = side ? reach > bestReach + 1e-9 : reach < bestReach - 1e-9;
+      if (further || (std::fabs(reach - bestReach) < 1e-9 && worst < bestWorst)) {
+        bestReach = reach;
+        bestWorst = worst;
+        bestSlope = s;
+      }
+    }
+    if (std::getenv("PJ_CALDEBUG"))
+      std::fprintf(stderr, "  %d %s: %zu slopes, slope %+.2f reaches %.1f (worst %.0f c)\n", m, side ? "loud" : "soft",
+                   slopes.size(), bestSlope, bestReach, bestWorst);
+    if (side) {
+      cal->dynHi[m] = bestReach >= 1 ? 1.0 : std::max(0.5, bestReach - 0.05);
+      cal->coverHi[m] = coverOn(bestSlope, kCalDynHi);
+    } else {
+      cal->dynLo[m] = bestReach > 0 ? std::min(0.5, bestReach + 0.05) : 0.0;
+      cal->coverLo[m] = coverOn(bestSlope, std::max(cal->dynLo[m], 0.15));
+    }
+  }
+}
+
 // One note: for each breath pressure that sounds the right register, bisect
 // the coverage; keep the best. Gentler breath also flattens, so pressure is the
 // second tuning control. Then: the softest dynamics that still holds the
@@ -394,7 +498,7 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   static const double kReedPress[] = {1.0, 0.85, 1.15, 0.7, 1.3}, kReedHard[] = {0.6, 1.45};
   const bool lips = inst.kind == Kind::kFlute || inst.kind == Kind::kEndBlown;
   const int nJets = lips ? 8 : 1;
-  auto search = [&](const double* ps, int np) {
+  auto search = [&](const double* ps, int np, bool robust = false) {
     for (int ij = 0; ij < nJets; ++ij) {
       const double jet = kJets[ij];
       double jAbs = 1e9, jCover = 1, jPress = 1, jC = NAN;
@@ -404,6 +508,7 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
         const double bc = bisectCover(inst, m, p, 0.5, jet, a4, 0, &cv);
         if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d jet %.2f press %.2f: %+.0f c cover %.2f\n", m, jet, p, bc, cv);
         if (std::isnan(bc)) continue;
+        if (robust && std::isnan(playReed(inst, m, a4, cv, p, 0.5))) continue;
         if (std::fabs(bc) < jAbs) { jAbs = std::fabs(bc); jCover = cv; jPress = p; jC = bc; }
         if (jAbs < 3) break;
       }
@@ -421,7 +526,11 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   if (inst.kind == Kind::kDuct) {
     search(kPress, 1);
   } else if (inst.reed() || inst.lip()) {
-    search(kReedPress, 5);
+    // (A reed: first a setting that holds against the player's wander and
+    // from the key, at each breath; failing that, any that sounds.)
+    const bool reed = inst.reed() && !std::getenv("PJ_CALOLDREED");
+    if (reed) search(kReedPress, 5, true);
+    if (!(bestWob < kSteady && bestAbs <= 10)) search(kReedPress, 5);
     if (!(bestWob < kSteady && bestAbs <= 10)) search(kReedHard, 2);
   } else {
     search(kPress, 5);
@@ -433,6 +542,10 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   cal->jet[m] = bestJet;
   cal->cents[m] = float(bestC);
   cal->ok[m] = true;
+  if (inst.reed() && !std::getenv("PJ_CALOLDREED")) {
+    reedRange(inst, m, a4, bestCover, bestPress, cal);
+    return;
+  }
   // Softest dynamics: every step from there up to mezzo-forte must hold the
   // register and be steady; a little margin for slurs.
   double floor = 0.5;

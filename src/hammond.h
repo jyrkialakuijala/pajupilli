@@ -31,6 +31,7 @@
 #pragma once
 
 #include <array>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -56,9 +57,12 @@ struct HammondRegistration {
 };
 // The lower manual for an upper (the accompaniment: softer, darker, of the same family).
 // extraSofter: steps more (a file whose accompaniment is written quieter than its tune).
-std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter = 0);
+std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter = 0, double clarity = 0);
+// The lower manual as the percussion's stand-in, 008880080 at low's level (the planner's, when the
+// percussion is on and the left hand comps above the pedals' bass).
+std::array<double, 9> hammondLowerPercussive(const std::array<double, 9>& low);
 // The pedals' two drawbars for an upper (16' by its loudness, 8' by its brightness).
-std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper);
+std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper, double clarity = 0);
 // The General MIDI program's registration (by the instrument's name).
 HammondRegistration hammondPreset(const std::string& name);
 // The PJ_HAMMOND_* overrides (tests, by hand), over a preset or a plan's choice.
@@ -77,14 +81,19 @@ class HammondModel : public Tube {
   void setLowerGoal(const std::array<double, 9>& bars);
   void setPedalGoal(const std::array<double, 2>& bars);
   void placeDrawbars();  // (the sliders at their goals at once: a registration set before playing)
+  void snap(int div);    // (one division's sliders at their goals at once: a preset key)
+  // The run switch: off, the generator coasts down (the pitch sinking, the sound fading with it).
+  void setRun(bool on) { run_ = on; }
+  double speed() const { return speed_; }
   double drawbar(int div, int d) const { return pos_[div][d]; }  // (where a slider stands now)
   const HammondRegistration& registration() const { return reg_; }
   void setExpression(double e) { exprTarget_ = e; }  // 0 .. 1 (the pedal)
-  void setLeslieFast(bool f) { leslie_.setFast(f); }
-  void setLeslieBrake() { leslie_.setBrake(true); }
-  void setLeslieBoost(double b) { leslie_.setBoost(b); }
-  bool leslieFast() const { return leslie_.fast(); }
-  double hornHz() const { return leslie_.hornHz(); }
+  void setLeslieFast(bool f) { for (Cab& c : cab_) c.les.setFast(f); }
+  void setLeslieBrake() { for (Cab& c : cab_) c.les.setBrake(true); }
+  void setLeslieBoost(double b) { for (Cab& c : cab_) c.les.setBoost(b); }
+  void setThin(double t) { thin_ = t; }  // (a trill: the manuals toward their 8' and 4' alone, 0..1)
+  bool leslieFast() const { return cab_[0].les.fast(); }
+  double hornHz() const { return cab_[0].les.hornHz(); }
   bool asleep() const { return false; }  // (the wheels never stop)
   double testResponse() const override { return last_; }
   const float* takeSide(int n) override;
@@ -127,6 +136,8 @@ class HammondModel : public Tube {
   // control rate.
   double flX_[kWheels + 1] = {}, flV_[kWheels + 1] = {}, flW_[kWheels + 1] = {}, flQ_[kWheels + 1] = {}, flG_[kWheels + 1] = {};
   int32_t flOff_[kWheels + 1] = {};
+  int shaftOf_[kWheels + 1] = {};          // (each wheel's assembly: the lower wheel on its shaft)
+  uint32_t shaftOff_[kWheels + 1] = {};    // (each shaft's angle when the motor started)
   int ctl_ = 0;
   double mains_ = 0;  // the grid's drift (relative speed)
   // The generator's loading: each wheel's voltage sags a little with the contacts it feeds.
@@ -137,6 +148,17 @@ class HammondModel : public Tube {
   double gainU_[9] = {}, gainL_[9] = {}, gainP_[2] = {};
   // The drawbars as sliders: where each is going, where it is, its control's integral.
   double goal_[3][9] = {}, pos_[3][9] = {}, integ_[3][9] = {};
+  double mud_ = 0;  // (the low clusters held now, 0..1: the player easing the 16' and 5 1/3' back)
+  double mudLevel() const;
+  // (the lower manual crowding the pedals, 0..1, smoothed over seconds: its own 16' and 5 1/3'
+  // eased back a little, gradually)
+  double crowd_ = 0, crowdT_ = 0, thin_ = 0, thinNow_ = 0;
+  // (the lower manual carrying the bass, the pedals resting: its low presses a second (decaying),
+  // when the pedals last played, and how far its overtones are drawn out for definition, 0..1)
+  double lowRate_ = 0, lastPedal_ = -1e9, bass_ = 0;
+  double crowdLevel() const;
+  double upCrowd_ = 0, upCrowdT_ = 0;  // (the upper manual low over the others, the same way)
+  double upperCrowdLevel() const;
   bool placed_ = false;
   void drawbarGains();
   void moveDrawbars(double dt);
@@ -147,16 +169,38 @@ class HammondModel : public Tube {
   // The scanner.
   std::vector<float> line_;
   int linePos_ = 0;
-  double scanPh_ = 0, lineLp_ = 0;
+  double scanPh_ = 0, lineLp_ = 0, lineLpL_ = 0;
+  std::vector<float> lineL_;  // (the lower manual's own line under the scanner)
+  // (each Leslie's channel of the console's amplification: the expression's bass shelf, the tone,
+  // the valve's bias)
+  struct Chan { double shelf = 0, tone = 0, dc = 0; };
+  Chan chan_[4];
   // The preamp and the pedal.
   double expr_ = 0.8, exprTarget_ = 0.8, shelf_ = 0, tone_ = 0;
+  double valveDc_ = 0, microZ_[4] = {};  // (the valve stage's bias drift; the microphonics' resonance)
+  std::vector<float> microRing_;
+  int microPos_ = 0;
   double t_ = 0;
-  Leslie leslie_;
+  bool run_ = true;
+  double speed_ = 1;  // (the generator's speed, relative)
+  // The Leslie cabinets (four by default, PJ_LESLIE_COUNT): each its own parts (~7 % off nominal),
+  // its own place and facing in the room, its own paths from its rays to the listener's pair.
+  struct Cab {
+    Leslie les;
+    double x = 0, y = 0, rot = 0;            // (its place, m: x toward the listener; its facing, rad)
+    std::vector<float> ring[Leslie::kRays];  // (its rays, delayed to the paths)
+    // Per path (direct, left wall, right wall, back wall, back-left, back-right corners, the floor)
+    // and microphone: the delay (samples), and the two rays leaving toward it with their gains.
+    int dly[7][2] = {}, ray[7][2][2] = {};
+    double g[7][2][2] = {};
+    double mix[3] = {1, 1, 1};  // (the upper's, the lower's and the pedals' gains into it)
+  };
+  std::vector<Cab> cab_;
+  void placeCabinets();
   uint32_t rng_ = 1;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
   bool roomMics_ = true, inRoom_ = false;
-  std::vector<float> rayRing_[Leslie::kRays];
   int rayPos_ = 0;
   std::vector<float> earlyL_, earlyR_;
 };
@@ -176,8 +220,16 @@ class HammondPlayer : public Performer {
   // player's own riding of it stops.
   void setLeslie(int state);
   void setLeslieExternal() { leslieSeen_ = true; }
+  // The lower manual's vibrato tab (a plan's switch).
+  void setLowerVibrato(bool on) {
+    HammondRegistration r = m_.registration();
+    r.vibLower = on;
+    r.leslieFast = leslieFast_;
+    m_.setRegistration(r);
+  }
   // A plan's nudge of the slow Leslie on a long note (the slow speed x b; 1 back to it).
   void setLeslieBoost(double b) { m_.setLeslieBoost(b); }
+  void setThin(double t) { m_.setThin(t); }
   // (live) K5: the Leslie (stop / slow / fast, as the half-moon switch). K1-K4: the upper
   // manual's drawbars along the tradition's own paths: K1 soft to hard through the classic
   // registrations (each a detent: the whisper of the 8' alone, the ballad 838, the jazz 888, the
@@ -189,18 +241,31 @@ class HammondPlayer : public Performer {
   static std::array<double, 9> drawbarsAt(const double k[4], const char** classic);
   // A plan's re-registration: the upper's drawbars (the sliders glide there); the lower manual and
   // pedals follow (lowerExtra: the lower's extra softness, steps).
-  void setUpper(const std::array<int, 9>& upper, double lowerExtra) {
+  // instant: by a preset key (the B), not the drawbars' glide: the upper manual's sound changes at
+  // once (the lower manual and pedals still glide after it).
+  // lowerPerc: the lower manual on the percussion's stand-in (hammondLowerPercussive).
+  void setUpper(const std::array<int, 9>& upper, double lowerExtra, double clarity = 0, bool instant = false, bool lowerPerc = false) {
     HammondRegistration r = m_.registration();
     std::array<double, 9> up{};
     for (int d = 0; d < 9; ++d) { up[d] = upper[d]; r.upper[d] = upper[d]; }
-    const std::array<double, 9> low = hammondLowerFor(up, lowerExtra);
-    const std::array<double, 2> ped = hammondPedalFor(up);
+    std::array<double, 9> low = hammondLowerFor(up, lowerExtra, clarity);
+    if (lowerPerc) low = hammondLowerPercussive(low);
+    std::array<double, 2> ped = hammondPedalFor(up, clarity);
+    // (set by hand, PJ_HAMMOND_LOWER / _PEDAL: kept through the re-registrations)
+    if (std::getenv("PJ_HAMMOND_LOWER"))
+      for (int d = 0; d < 9; ++d) low[d] = r.lower[d];
+    if (std::getenv("PJ_HAMMOND_PEDAL")) ped = {double(r.pedal[0]), double(r.pedal[1])};
     r.leslieFast = leslieFast_;
     m_.setRegistration(r);
     m_.setUpperGoal(up);
     m_.setLowerGoal(low);
     m_.setPedalGoal(ped);
+    if (instant) m_.snap(HammondModel::kUpper);
   }
+  // A plan's shape of the expression pedal over its own riding (x it: 1 as ridden; the final
+  // chord's swell or closing).
+  void setExprShape(double f) { exprShape_ = f; }
+  void setRun(bool on) { m_.setRun(on); }
   // The harmonic percussion's tab (a plan's switch during the piece).
   void setPercussion(bool on) {
     HammondRegistration r = m_.registration();
@@ -225,6 +290,7 @@ class HammondPlayer : public Performer {
   double knobs_[4] = {-1, -1, -1, -1};  // (the drawbar knobs' last positions; -1: not yet moved)
   double printed_[9] = {-9, -9, -9, -9, -9, -9, -9, -9, -9};
   const char* lastName_ = "";
+  double exprShape_ = 1;
   double velSmooth_ = 90, rate_ = 0, sinceSwitch_ = 1e9, sinceNote_ = 1e9, intensity_ = 0, usual_ = 2;
   bool leslieFast_ = false;
   uint32_t rng_ = 777;

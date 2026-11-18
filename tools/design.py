@@ -395,7 +395,9 @@ def emit(results):
         reed = (f"{{{r.get('width', 0):g}, {r.get('h0', 0):g}, {r.get('k', 0):g}, {r.get('fr', 0):g}, "
                 f"{r.get('qr', 0):g}, {r.get('sr', 0):g}, {r.get('psi', 0):g}, {r.get('sd', 0):g}, "
                 f"{r.get('press', 0):g}, {r.get('pressHi', 0):g}, {r.get('vib', 0):g}, "
-                f"{r.get('meetAt', 1):g}, {r.get('contact', 0):g}}}")
+                f"{r.get('meetAt', 1):g}, {r.get('contact', 0):g}"
+                + (f", {r.get('roll', 1):g}, {r.get('prime', 0):g}, {r.get('earStart', 0):g}}}"
+                   if any(k in r for k in ('roll', 'prime', 'earStart')) else '}'))
         jet = (f"{{{j.get('h', 0):g}, {j.get('width', 0):g}, {j.get('w', 0):g}, {j.get('window', 0):g}, "
                f"{j.get('chimney', 0):g}, {j.get('channel', 0):g}, {j.get('y0', 0):g}, {j.get('press', 0):g}, "
                f"{j.get('pressHi', 0):g}}}")

@@ -148,6 +148,29 @@ void Bore::buildU() {
   }
 }
 
+void Bore::moveStretch(int a, int b, double st) {
+  if (b <= a || stretch_[a] == st) return;
+  auto iface = [&](int i) { return 0.5 * (stretch_[i] + stretch_[i + 1 < kCells ? i + 1 : i]); };
+  double was[kCells];
+  for (int i = a - 1; i < b; ++i) was[i] = iface(i);
+  float* p = s.p();
+  for (int i = a; i < b; ++i) {
+    // (The cell's own volume is what stretches: a lumped extra volume stays.)
+    const double c0 = compliance(i);
+    stretch_[i] = st;
+    p[i] *= float(c0 / compliance(i));
+    buildNode(i);
+    classify(i);
+  }
+  float* u = s.u();
+  for (int i = a - 1; i < b; ++i) {
+    const float r = float(was[i] / iface(i));
+    u[i] *= r;
+    for (int j = 0; j < kLossSections; ++j) s.psi[j][i] *= r;
+  }
+  dirtyU_ = true;
+}
+
 double Bore::compliance(int cell) const {
   return (area_[cell] * dx_ * stretch_[cell] + branch_[cell].vol + cellVol_[cell]) / (kRho * kC * kC);
 }

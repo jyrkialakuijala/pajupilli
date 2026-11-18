@@ -39,6 +39,7 @@ const char* const kDivName[4] = {"Hauptwerk", "Schwellwerk", "Positiv", "Pedal"}
 struct TrackStats {
   int track = 0, n = 0, lo = 127, hi = 0, poly = 0;
   double mean = 0, overPedal = 0;  // (the share of its notes above the pedal's compass)
+  double twoShare = 0;             // (the share of its time with two notes or more held)
 };
 
 }  // namespace
@@ -105,7 +106,14 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
       }
     std::sort(ev.begin(), ev.end(), [](auto& a, auto& b) { return a.first != b.first ? a.first < b.first : a.second < b.second; });
     int cur = 0;
-    for (auto& e : ev) s.poly = std::max(s.poly, cur += e.second);
+    long multi = 0, last = ev.empty() ? 0 : ev.front().first;
+    for (auto& e : ev) {
+      if (cur >= 2) multi += e.first - last;
+      last = e.first;
+      s.poly = std::max(s.poly, cur += e.second);
+    }
+    const long span = ev.empty() ? 1 : std::max(1L, ev.back().first - ev.front().first);
+    s.twoShare = double(multi) / span;
   }
   // The pedal: the lowest track, within the compass, one voice (or two),
   // clearly under the rest.
@@ -127,12 +135,16 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
   std::vector<int> upper;
   for (auto it = byMean.rbegin(); it != byMean.rend(); ++it)
     if (it->track != pedal) upper.push_back(it->track);  // (highest first)
-  // A trio: two one-voice upper tracks sharing a range.
+  // A trio: two one-voice upper tracks sharing a range. (One voice: a rare double note, a held
+  // note under the next, under 2 % of its time, does not make it two: BWV 530's left hand holds two
+  // for one note in 910, and the trio sonata went to the organo pleno, its fast pedal line on the
+  // Principal 16' and the Posaune.)
   bool trio = false;
   if (pedal >= 0 && upper.size() == 2) {
     const TrackStats &a = st[upper[0]], &b = st[upper[1]];
     const int overlap = std::min(a.hi, b.hi) - std::max(a.lo, b.lo);
-    trio = a.poly == 1 && b.poly == 1 && overlap >= 0.5 * std::min(a.hi - a.lo, b.hi - b.lo);
+    auto oneVoice = [](const TrackStats& t) { return t.poly == 1 || (t.poly == 2 && t.twoShare < 0.02); };
+    trio = oneVoice(a) && oneVoice(b) && overlap >= 0.5 * std::min(a.hi - a.lo, b.hi - b.lo);
   }
   char buf[1024];
   std::snprintf(buf, sizeof buf, "organ plan: %zu tracks; pedal: %s%s\n", st.size(),

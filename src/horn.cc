@@ -119,7 +119,7 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
   if (lp_.nlLen > 0) {
     nlCell_ = std::clamp(int(lp_.nlX * 1e-3 / dx), 1, bore_.footCell() - 1);
     // A simple wave's sample at pressure p+ arrives earlier by L beta p+ / (rho c^3) (in samples x fs).
-    nlK_ = knob("PJ_BRASSY", 1) * lp_.nlLen * 1.2 / (kRho * kC * kC * kC) * fs_;
+    nlK_ = nlK0_ = knob("PJ_BRASSY", 1) * lp_.nlLen * 1.2 / (kRho * kC * kC * kC) * fs_;
     // The linear wave's time from here to the bell (to line up with it).
     nlD0_ = (d.end * 1e-3 - (nlCell_ + 0.5) * dx) / kC * fs_;
     // Above the bell's cut-off the wave passes out whole: its flow grows as
@@ -130,7 +130,25 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
     nlLpB_ = 1 - std::exp(-2 * M_PI * std::min(8000.0, 0.3 * fs_) / fs_);
   }
   bore_.update();
-  addRadiators(false, 0);
+  // The bell's radiation load. The bore's own (bore.cc) is Levine-Schwinger at low ka: the end
+  // correction's mass 0.6133 a beside a resistance 1.505 rho c / S. Right for a flute's foot
+  // (ka = 1 at 5.7 kHz), but above ka ~ 2 it tends to 1.505 rho c / S, not rho c / S: a wide
+  // bell (a trombone's: ka = 1 at 510 Hz) reflected 20 % of what should all go out. Silva et
+  // al. 2009 fit the unflanged pipe's reflection as -(1 + 0.167 s) / (1 + 1.393 s + 0.457 s^2),
+  // s = j ka; as a circuit that is exactly the same mass and resistance (0.613 a, 1.505) with
+  // a third branch beside them: 2.979 rho c / S in series with the compliance of 0.125 a of
+  // the opening's air. That branch is solved here (the pressure of the last cell, trapezoidal
+  // in its own state), its flow taken from the cell after the step and radiated with the rest.
+  // The resonances the bores are fitted to move < 1 cent; partials 13..16 by up to +7 cents
+  // and -1 dB (tools/brass.py has the same load).
+  if (bore_.branch(bore_.footCell()).g > 0) {
+    bellCell_ = bore_.footCell();
+    const double s = bore_.area(bellCell_), a = std::sqrt(s / M_PI);
+    const double r2 = 2.9792 * kRho * kC / s, c2 = 0.12512 * a * s / (kRho * kC * kC);
+    bellG_ = 1 / (r2 + 0.5 / (fs_ * c2));
+    bellCk_ = 1 / (fs_ * c2);
+  }
+  addRadiators(bellCell_ >= 0, d.end * 1e-3);  // (the branch's flow: Tube's "window" radiator, at the bell)
   target_.tongue = 0;
   target_.lung = 0;
   target_.reed = 200;
@@ -155,8 +173,11 @@ void Horn::setValveCoefs(Valve& v) {
 void Horn::setHoles(const char* pattern, double fingerSpeed) {
   fingerSpeed = std::clamp(fingerSpeed, 0.25, 4.0);
   if (lp_.slide && ((*pattern >= '1' && *pattern <= '7') || (*pattern >= 'A' && *pattern <= 'G'))) {
-    // The slide: a quick arm, ~60 ms from 1st to 7th, a little longer the
-    // further it goes; a glide: the player's own time (a glissando).
+    // The slide while the note sounds (a slur: the arm hurries, research/trombone.md
+    // 6: <= 40..60 ms; the lips retune at once, and at an arm's unhurried 150 ms for
+    // the whole reach the note fell 250 cents under a down-slur while the bore
+    // lagged): ~50 ms to the next position, 90 ms from 1st to 7th. After a rest the
+    // arm has had its time (slideAhead). A glide: the player's own time (a glissando).
     // '1'..'7': the positions; 'A'..'G': the same with the trigger's loop in
     // (the positions further apart).
     // A shaded position: "+12" after the valves, mm of tube more (or less).
@@ -240,6 +261,7 @@ void Horn::resetAir() {
   }
   out_.x = out_.v = in_.x = in_.v = 0;
   dp_ = u_ = pm_ = 0;
+  bellPc_ = bellW_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
   nlIn_ = nlOut_ = 0;
   nlMax_ = -1e9;
@@ -264,11 +286,19 @@ bool Horn::still(const Bore& b, double area) {
   return true;
 }
 
+void Horn::slideAhead(double secs) {
+  if (!lp_.slide || slideT_ >= 1 || secs <= 0) return;
+  slideT_ = std::min(1.0, slideT_ + secs / slideDur_);
+  setSlide(slideFrom_ + (slideTo_ - slideFrom_) * smoothstep(slideT_));
+  bore_.update();
+}
+
 void Horn::setSlide(double mm) {
   slideNow_ = mm;
   if (slideB_ <= slideA_) return;
-  const double st = 1 + mm * 1e-3 / slideLen_;
-  for (int i = slideA_; i < slideB_; ++i) bore_.setStretch(i, st);
+  bore_.moveStretch(slideA_, slideB_, 1 + mm * 1e-3 / slideLen_);
+  // The slide's tube is more of the narrow bore for the wave to steepen in (7th: 1.2 m more).
+  if (lp_.nlLen > 0) nlK_ = nlK0_ * (lp_.nlLen + mm * 1e-3) / lp_.nlLen;
 }
 
 // Burgers without dispersion: each sample of the outgoing wave travels at
@@ -393,6 +423,12 @@ float Horn::sample() {
     v.loop->inject(v.n - 1, v.w2);
     bore_.inject(v.a + 1, -v.w2);
   }
+  if (bellCell_ >= 0) {
+    const double w = bellG_ * (p[bellCell_] - bellPc_);
+    bellPc_ += bellCk_ * w;
+    bore_.inject(bellCell_, float(w));
+    bellW_ = w;
+  }
   // --- The cup with the lips' flow (trapezoidal, the square root in closed form).
   const double c = bore_.compliance(ec_), beta = 0.5 * dt / c;
   const double ur = kSweep_ * lp_.sr * out_.v;  // the lips moving out push air into the cup
@@ -412,7 +448,7 @@ float Horn::sample() {
   p[ec_] = float(2 * pmid - pOld);
   u_ = u + un;
   dp_ = pm_ - pmid;
-  float y = radiate(0);
+  float y = radiate(bellW_);
   if (nlCell_ >= 0) {
     const float* pb = bore_.s.p();
     const float* ub = bore_.s.u();

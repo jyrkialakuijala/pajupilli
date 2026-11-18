@@ -72,6 +72,11 @@ struct ReedParams {
   // flow at its pitch into the mouthpiece; 0: none). The note then speaks in
   // its register at once, not after the reed has found it.
   double prime = 0;
+  // The ear: how long into a note the player listens before tuning it with
+  // the lips (s). A reed's attack starts flat of the note and settles within
+  // ~0.1 s by itself; lips that chase it from the first periods tighten past
+  // the note's state into its octave.
+  double earStart = 0;
 };
 
 // A duct or the lips at an open end: the jet and the window it crosses.

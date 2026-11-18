@@ -827,7 +827,8 @@ moves the zones' borders, `PJ_ORGAN_PEDAL_UP` the pedal's transposition.
 **Playing by manuals, a piece's registration plan** (`src/organplan.h`): from an organ part's notes by
 track, made by rules (no tables per piece): the pedal is the lowest track staying in the pedal's
 compass, mostly one voice, clearly under the rest; a trio (two one-voice upper tracks crossing in one
-range) gets the right hand on the Hauptwerk and the left on the Positiv, contrasting colours as strong,
+range; a rare double note, under 2 % of a track's time, still one voice: BWV 530's left hand holds two
+once) gets the right hand on the Hauptwerk and the left on the Positiv, contrasting colours as strong,
 one registration; otherwise
 the hands play the Hauptwerk and each large part (the tempo's big changes: a passacaglia and its
 fugue) builds from mp (or f) to fff in 8-bar phrases, a step at a time, nudged by its texture; where
@@ -850,7 +851,13 @@ Posaune; a step more at each new section), a long contrapuntal one (built up phr
 sections are the tempo's changes and the general pauses (each a little more than the last, a clearly
 slower one less). Each division keeps its own stops (no couplers but the grand chœur's), so each line
 has its own colour. The pedal is detached in the Baroque styles (a quarter of each note given to
-silence, 60-180 ms, more before a strong beat), held in the romantic ones.
+silence, 60-180 ms, more before a strong beat), held in the romantic ones. But a pedal note always
+sounds its big pipes' speech and 0.1 s more (~0.26 s at 16′ D; written shorter, all of it but 25 ms):
+a cold 16′ Principal's fundamental reaches −10 dB only after ~140 ms and −6 dB after ~200 ms, so a
+quick line detached by a quarter (0.14-0.18 s sounding) spoke or not by a few ms, a note struck
+cold nearly without its fundamental and one struck while its pipe still rang (its key released
+under 0.3 s before: ~+10 dB) with it: some notes penetrating, others missing. Organists detach the
+pedal less in quick passages.
 
 **Tuning by the spectra** (on; `PJ_JI_SPECTRAL=0`: the interval table above alone): each
 key's spectrum from its sounding pipes' modelled partials (each pipe's harmonics as its model sounds them
@@ -1093,10 +1100,45 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   the same whenever it is begun. Each wheel is a table of one revolution of its own pickup's
   voltage: its teeth (2-192), a few harmonics (the bottom octave's "complex" wheels rich in odd
   ones), the tuned filters of wheels 49-91, and its flaws:
-  - eccentricity and ovality, a swell once a revolution: sidebands at the rotation rate,
-    ~−30 dB;
+  - eccentricity and ovality, working through the gap: they carry the teeth nearer the pickup's
+    pole piece and away once (and twice) a turn, and the coupling falls with the gap, never to
+    nothing: the fundamental's as (1 + Δgap)^−2, steeper closing than opening; the overtones'
+    finer fields fall off faster, (1 + Δgap)^−(2 + 1.6 (j − 1)), so the colour breathes with the
+    level. Sidebands at the rotation rate, ~−30 dB;
+  - **its own subharmonics:** the wheel's rotation rate (16.35-30.86 Hz by its gear) and that
+    rate's harmonics up to 3 × its teeth (8-48 of them), its own levels (~1/k, ±3 dB) and phases,
+    ~−40 dB under the tone together (`PJ_HAMMOND_SUBS`, dB); the tone's own harmonics left out,
+    the wheel's filter (49-91) on them as on the rest. C3's wheel (8 teeth): lines at 16.35,
+    32.7 ... 114.5 Hz, −38 to −59 dB; the filtered wheels keep little of them. Those next to the
+    tone (the tone ± the rotation rate) also read as a slight pitch wobble of the wheel's own;
   - a sub-octave line under the 2- and 4-tooth wheels;
   - each tooth a little off in place and depth, and the wheel's own level.
+  - **its machined teeth's overtones:** never a perfect sine, each wheel's tooth profile its own,
+    up to the 7th harmonic: the 2nd and 3rd ~−30 dB, the 5th ~−34, the 4th, 6th and 7th lower,
+    ±4 dB per wheel (`PJ_HAMMOND_WHEELHARM`, dB). The tuned filters of wheels 49-91 take most of
+    them off the high wheels (C5: −46 to −72 dB). Being exact multiples of their wheel, they beat
+    against the tempered wheels of the drawbars above: the 1⅗' wheel ~14 c sharp of the 5th, the
+    2⅔' ~2 c narrow of the 3rd. Middle C on 008000800 beats at 10.4 Hz (±2.8 % of the 1⅗' band's
+    level), C3 at 5.2 Hz: the full registrations' slightly dissonant brilliance. Measured on C3's
+    unfiltered wheel: 2nd −34, 3rd −36, 4th −41, 5th −31, 6th −48, 7th −43 dB (were ≤ −68).
+  - **the valve preamp:** a single-ended triode's 2nd-order curve (`PJ_HAMMOND_VALVE`): even
+    harmonics and difference tones growing with the level (C4 + E4 on the 8': their 68 Hz
+    difference tone −34 dB, −50 without). Its **microphonics:** the console's valves hear the
+    Leslies (~2 m, 6 ms); the electrodes (a mass on a spring, resonant at ~3.3 kHz, Q 8) shaken by
+    the swirling sound modulate the stage's gain (~0.5 %, `PJ_HAMMOND_MICROMOD`) and add a little
+    of it (~40 dB under the signal, `PJ_HAMMOND_MICRO`): a faint loop through the turning
+    speakers. At these settings the brightness changes little (+0.5 dB at 1-2 kHz on a 888
+    chord); `PJ_HAMMOND_VALVE=3` gives +3.5 dB, at the cost of the key clicks on full
+    registrations (the distortion's highs mask them);
+  - **its shaft's, shared with exactly one other wheel:** the generator's 48 assemblies each carry
+    two wheels four octaves apart (1-36 with 49-84, 42-48 with 85-91; 37-41 ride alone). A
+    bent shaft swells both wheels' levels together once a turn. Its driven gear's runout and
+    ovality sway its speed once and twice a turn (its angle up to ~1e-3 rad off: ~1 c of
+    vibrato at the rotation rate, `PJ_HAMMOND_SHAFT`). Its torsional flutter on its coupling and
+    its starting angle are shared too, while each wheel keeps its own eccentricity, teeth and
+    filter. Measured: C2 and C6 (wheels 13 and 61, one shaft) swell together (correlation 0.93),
+    their pitch wobbles 0.30 (each wheel's own overtones breathing too); C2 and C3 (two shafts of
+    the C ratio) 0.12 and 0.19.
 
   The organ's serial number (`PJ_HAMMOND_SERIAL`) draws the flaws, and `PJ_HAMMOND_AGE` scales them
   (1: a used organ). The shaft's 20 Hz wobble and the motor's 120 Hz pulses ripple every wheel
@@ -1150,8 +1192,47 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - gentler going down (friction and coasting) than up;
   - damped at 1.8 (`PJ_LESLIE_ZETA`): it eases in and barely passes its speed.
 
-  The horn reaches its fast speed in ~0.9 s and its slow one in ~1 s; the drum takes ~4 and ~4.4 s. The speeds are
-  0.8/6.7 Hz (horn) and 0.67/5.9 Hz (drum), each cabinet ±3 %. The mod wheel (CC1 ≥ 64) or the
+  The horn, lighter on its own motor, reacts faster: it reaches its fast speed in ~0.9 s and its
+  slow one in ~1 s; the drum takes ~2.8 and ~3.1 s. The speeds are 0.8/6.7 Hz (horn) and the drum
+  1.6 × slower, 0.5/4.2 Hz (`PJ_LESLIE_RATIO`; the published 122 measurements give ~1.17 ×,
+  0.67/5.7 Hz: `PJ_LESLIE_RATIO=1.17`), each cabinet ±3 %. The two rotors turn opposite ways, the
+  horn counter-clockwise seen from above, the drum clockwise, so their Doppler swings and beams
+  sweep against each other (measured: the drum's left/right phase flips, +160° → −164°, the
+  horn's unchanged; `PJ_LESLIE_SAMEWAY=1` turns both one way).
+
+  **Four Leslies** by default (`PJ_LESLIE_COUNT`, 1-4), each its own:
+  - its parts off nominal, each up to ±7 % (`PJ_LESLIE_SPREAD`): the motors' strength, the
+    crossover, the horn's and the drum's radii, the cabinet's inner reverberation; its own
+    flaws (eccentricities, belts, rattle) from its own serial;
+  - its speeds, exactly (the ±3 % of a lone cabinet's pulleys would undo the choice): four
+    factors whose every cross ratio stays furthest from the fractions up to N/11
+    (`tools/leslie_ratios.py --four --q 11`): none within 1.2 % of a fraction over 1-5 (1.230
+    is 1.6 % from 5/4, 1.307 2.0 % from 4/3, 1.418 1.2 % from 7/5), the closest misses
+    0.6-0.9 % from 8/7, 10/7, 11/9, 13/10, 12/11; scaled to centre on the usual speeds (the
+    cross ratios unchanged) (`PJ_LESLIE_SPEEDS`);
+  - its manuals, its place and its speed (`PJ_LESLIE_MIX`, shares of upper, lower, pedals):
+    | Leslie | place | upper | lower | pedals | speed |
+    |---|---|---|---|---|---|
+    | centre | in front | 75 % | 12.5 % | 12.5 % | × 1.172 (the fastest), horn/drum 1.6 |
+    | left | 2 m left, turned 25° | 12.5 % | 75 % | 12.5 % | × 1.081 |
+    | right | 2 m right, turned −25° | 12.5 % | 75 % | 12.5 % | × 0.953 |
+    | back | 5 m behind | 12.5 % | 12.5 % | 75 % | × 0.827 |
+
+    (the three others with the published 122's horn/drum ratios, 1.20 on slow, 1.17 on fast).
+    Each manual's shares are scaled so its whole power over the four is as before: the balance
+    kept. Each Leslie has its own channel of the console's amplification (the expression's bass,
+    the tone, the valve stage, its overload): each amplifier distorts its own mix. The back wall
+    stands 1.5 m behind the rearmost cabinet. Measured (each cabinet's input): an upper note
+    −19 dB in the centre, −34 in the others; a lower one −20 left and right, −36 in the others;
+    a pedal −25 behind, −40 in the others. Each path from a cabinet to the listener (direct, the
+    side walls, the back wall, its corners, the floor) is fed by the two rays leaving it toward
+    it (60° apart, blended).
+
+  Each is fed down (two: ~5 dB, four: ~8 dB), so that together they are as loud as one
+  (measured: −20.1 to −20.2 LUFS for one, two or four). Four cost ~20 % of a core (one: 8 %).
+  `tools/leslie_ratios.py` searches speed sets whose every cross ratio stays away from small
+  whole-number ratios (up to N/17, the simpler the fraction the wider the berth; the closest miss
+  decides). The mod wheel (CC1 ≥ 64) or the
   sustain pedal switches fast/slow, and CC82 (as the Leslie 2101's default) switches stop / slow /
   fast (0-42 / 43-85 / 86-127). Measured at the microphones on a fast C6:
   - the Doppler: −39..+44 c;
@@ -1196,6 +1277,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - **The close microphones** are at the compartment's sides (±80°, 0.65 m), in front of the
     louvres, as players mike it.
   - Knobs: `PJ_LESLIE_INSIDE` (the reflections), `_POST`, `_MIDPOST` (the posts' reach).
+  - **The horn's own response** on its axis, a fixed filter (the driver is driven: nothing in its
+    bell plays back on the organ, so no wave is simulated there, only its effect): the flare's
+    cutoff (~650 Hz, 12 dB an octave, a little hump at it), the mouth's reflection's ripple
+    (+3 dB at 1 kHz, −2.5 at 1.45, +2 at 1.95, −1.5 at 2.6 kHz, fading as the mouth radiates
+    better), the driver's top from ~7 kHz; each cabinet ±4 % in frequency. Through the slow Leslie
+    a B5 +3 dB, an F6 −0.6 dB, a C5 unchanged (the drum's). `PJ_LESLIE_HORNEQ` scales the ripple
+    (0: flat).
 
   **Each cabinet's own flaws** (seeded by the organ's serial; `PJ_LESLIE_AGE` scales them,
   `PJ_LESLIE_NOISE` the machinery's sounds):
@@ -1211,7 +1299,8 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - **A loose panel:** a 150-220 Hz resonance driven by the deep bass, which buzzes past its
     clearance (`PJ_LESLIE_RATTLEGAP`) under a loud bass: ~33 dB under the chord's own highs.
   - **The machinery:** the running motor's 120 Hz hum and its 28.75 Hz rumble, the amp's hum, and
-    the speed relay's click when the switch moves.
+    the speed relay's click when the switch moves (40 dB under its measured level, practically
+    silent; `PJ_LESLIE_RELAY`, dB over that, brings it back).
   - **The crossover** a few % off 800 Hz (aged capacitors). **The microphones** never quite
     symmetric (±4°, ±3 cm).
 - **Registrations:**
@@ -1234,7 +1323,8 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     - a tune keeps its manual while it moves by steps.
   - **The drawbars** from the piece's character:
     - quick and linear: the jazz 888 with the 3rd percussion;
-    - slow: a ballad's 838/808 with C3;
+    - slow: a ballad's 838/808 with C1 (clean: a slight movement that blurs neither the line nor
+      the attack);
     - chordal: a fuller 888800000;
     - the program sets rock and percussive.
   - **A 4' melody:** a tune within a fourth above its accompaniment (in its range), or alone and low (mean under E3),
@@ -1263,8 +1353,58 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     - One choice for the piece. A single 8-bar-or-longer stretch covering a quarter of the piece
       that clearly asks the other way switches it there and back: at most two changes, mostly none.
     - The percussive organ (GM 18) keeps it throughout.
+    - The jazz setting is Jimmy Smith's: 3rd, fast, **soft** (the ping without the normal setting's
+      drop of the whole manual). A ballad's tune of single, spaced notes (mostly detached, 0.4-2.5 a
+      second, mean over G4) gets the 2nd, slow, soft: a bell under each note.
+    - **The touch chooses the ping:** single-trigger, it strikes only after every upper key has
+      been up (~35 ms to charge). Where it is on, a legato move into a bar's first note (4/4
+      assumed) or a clearly louder note (+12) is detached: the note before let go 45 ms early, at
+      most one every 1.5 s, never while another upper key is held. The other legato moves stay as
+      written, without the ping (`PJ_HAMMOND_DETACH=0`: none).
+    - **The jazz upper with the percussion is 888000008:** the 1' is silent while the percussion
+      is on (its busbar taken for the ping) and comes in where the percussion is switched off.
+    - **The lower manual as the percussion's stand-in:** an organist's trick: "if you are not
+      playing left hand bass and need an extra octave of percussion-like sound, set your lower
+      manual drawbars to 008880080". With the percussion on (3rd, fast) for the whole piece and
+      the left hand comping (mostly chords) above the bass (the pedals carry it, or the lower's
+      notes average above G3), the lower manual gets 008880080's shape at its planned level,
+      e.g. 005550050 (`PJ_HAMMOND_LOWERPERC=0`: never). With the left hand's own bass it keeps
+      its derived registration (jazz: ~748, the classic 838/848).
+    - **The lower's vibrato off under a fast Leslie:** C3 on the lower manual under fast rotors
+      smears the accompaniment. Through each planned fast phrase its vibrato tab is off (dry,
+      tight comping under the upper's C3) and back on after.
+  - **The vibrato tabs:** C3 on both manuals by default. Counterpoint (a moving pedal line, the
+    lower manual a single line of its own, plain harmony under 0.3, not chordal) is played straight,
+    both tabs off, the lines clear as on a pipe organ (BWV 525, 537, 541). A lower manual carrying the
+    bass itself (no pedal line, its single notes under F3) has its tab off, the bass tight, as trio
+    organists play the left hand's line. The plan prints `vibrato C3 upper only` / `(tabs off)`.
+  - **Preset keys:** a re-registration at a pause shorter than 0.7 s (`PJ_HAMMOND_PRESETKEY`, s) is
+    made by the B preset key, the upper manual's new registration at once; at longer pauses the
+    drawbars are pulled and glide as before.
+  - **The ending,** on a final chord (the notes sounding at the end, from the last of them begun; its
+    length by the tempo map, a ritardando included) of 1.5 s or more (`PJ_HAMMOND_ENDING=0`: none):
+    - the Leslie (when planned), on four in five such chords of 2 s or more
+      (`PJ_HAMMOND_ENDLESLIE`): fast at 12 % of it, slow again at 80 %, the rotors still winding
+      down when it is let go; already fast, slow at 35 %;
+    - the expression pedal (when the file has no CC11): a ballad's closing from 30 % of the chord to
+      the end (to 0.6 of the pedal, ~−12 dB); otherwise the swell, the chord struck, eased back to
+      0.85 and opened past where it was (1.2) by 75 %;
+    - two more drawbars pulled out through it (the next of the pauses' order), the chord opening up:
+      not a ballad, not on harmony thinned to one foundation;
+    - the rock organ, on one ending in two (`PJ_HAMMOND_DIVE`): **the run switch off** half way
+      through it. The generator coasts down on its inertia (`PJ_HAMMOND_COAST`, 4 s), its pitch
+      sinking and its voltage falling with its speed, the scanner slowing with it: a held C4 falls
+      ~750 c in 1.6 s.
+  - **Glissandos:** the palm swept up the white keys from an octave and a bit under the note into it
+    (0.16-0.26 s, each key held into the next, the last let go just before so the percussion strikes
+    the note). Into the first note of a planned fast phrase (jazz, rock, full, percussive), and on
+    the rock organ or a full chordal piece into the music resuming after a re-registering pause (the
+    later ones first) or into the final chord. Only where the upper manual is free for the sweep, not
+    on complex harmony (0.3 or more) nor in a ballad; at most two (`PJ_HAMMOND_GLISS`).
   - **The expression:** with no CC11 in the file it follows the velocities (slowly, as a foot).
-  - **The Leslie:** the file's own if it sends CC1, CC64 or CC82. Otherwise it is planned:
+  - **The Leslie:** the file's own if it sends CC82, or CC1 or CC64 on a channel it wrote for a
+    Hammond (a reinstrumented piano's sustain pedal is its damper, not the Leslie's switch: ignored
+    on the organ). Otherwise it is planned:
     - most pieces stay slow throughout;
     - about one in four (one in two on the rock organ) goes fast in its strongest phrase (the most,
       loudest notes a second between the band's rests), or in two;
@@ -1275,6 +1415,53 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       speed (drawn from the notes), from ~45 % of it to ~70 %. Through their slow PI control the
       horn swells and settles (0.8 → ~1.8 Hz and back) while the drum barely stirs. Only where
       the plan has the Leslie slow, at most one every 8 s.
+    - **Trills with a rising touch:** a line alternating between two neighbouring notes (a
+      semitone or a tone), six notes or more each within 0.2 s (or four within 0.1 s), is played
+      from about half its velocity up to 1.3 × (at most 127): the contacts struck ever harder, the
+      key clicks sharpening through it (`PJ_HAMMOND_TRILL`; BWV 537 and 525 have seven each).
+    - **Harmonic complexity:** at every onset, over what sounds then: the pitch classes beyond a
+      triad, a semitone or tritone among them, a second or third under C4 (0..1; Bach's chorales
+      ~0.2, jazz standards 0.3-0.45). From 0.25 the 16' and 5 1/3' fade, from 0.4 the upper is a
+      single foundation, 008300000 (or 000800000 when its tune is low): complex harmony on the
+      888's sub-octave and fifth is mud (`PJ_HAMMOND_COMPLEX`).
+    - **Clarity for the lower manual and pedals:** a pedal line (more for a busy, walking or
+      contrapuntal one) and rich harmony ease the lower's 16' and 5 1/3' back and put the pedals on
+      less 16', more 8' (`PJ_HAMMOND_CLARITY`). BWV 537 (`-reinstrument organ=hammond`): lower
+      637000000 → 428000000, pedals 82 → 63.
+    - **Trills thinned:** from a planned trill's start the manuals' drawbars other than the 8' and
+      4' glide down by up to 80 % (888000000 → ~228000000), back after it (`PJ_HAMMOND_TRILLTHIN`):
+      a trill on a thick registration is a blur.
+    - **The lower manual crowding the pedals:** its held notes low (under C4) and close above the
+      pedal note (within an octave and a half), where its 16' doubles its line into the pedals'
+      register: its 16' and 5 1/3' eased back (up to 75 / 70 %), followed over ~0.8 s rising,
+      ~3 s falling, slight and gradual (`PJ_HAMMOND_CROWD`). BWV 537 at 1:45-1:51: the lower's 16'
+      ~4 → ~2.3.
+    - **The upper manual low over the others:** its notes under G4 and close above the lower's or
+      the pedals' (within an octave), where its 16' doubles its line onto theirs: its 16' and
+      5 1/3' eased back (up to 75 / 70 %), its 4' up 1.5 steps, as gradually. BWV 537 at
+      1:40-1:53: the upper's 16' and 5 1/3' 8 → ~4.5.
+    - **The lower manual carrying the bass line:** the pedals resting over a second and its low
+      notes moving (over ~1.5 a second): its 4', 2 2/3' and 2' drawn out (up to 3, 2, 2 steps) for
+      the line's definition, over ~0.8 s, back over ~2 s (`PJ_HAMMOND_BASSLINE`). BWV 537
+      4:17-4:30. `PJ_HAMMOND_MUDLOG=1` prints all these corrections every second.
+    - **Muddiness corrected online:** while playing, close intervals held low on the manuals (a
+      second under C4, a third under C3) and a pedal note with manual notes close above it under
+      C3 ease the manuals' 16' and 5 1/3' back (up to 70 / 80 %), the pedal's 16' (up to 50 %), and
+      give the 4' a little more; the sliders glide there in ~0.3 s and back in ~1.5 s when it
+      clears (`PJ_HAMMOND_MUD`). A held C3-D3-E♭3 on 888: its sub-bass −5 → −13 dB of the sound.
+    - **The fast switch on a long held chord:** where three notes or more are held unchanged for
+      2.5 s or more (nothing begins or ends). Where the chord is struck there, an organist's way:
+      "I switch to fast just before I hit the note and switch back to slow in the middle of the
+      note". The switch goes to fast 0.1-0.3 s before the chord and back to slow at 40-60 % of it:
+      the horn swells up to speed and settles, the drum half way. A chord whose notes began at
+      different times gets the short flick inside it instead: fast for 0.35-0.75 s in its first
+      half, back before the rotors get there. About two in three such chords
+      (`PJ_HAMMOND_FLICK` 0.65), half as many in a slow part (under a moment a second over the
+      10 s around it: "sometimes I leave it on slow over a slow part or a long note just to have
+      that clear sound"). 10 s apart at least, only where the plan has the Leslie slow; such a
+      chord is not nudged too. Measured on a struck 6 s chord: the horn 0.8 → 7.9 Hz and back to
+      0.9 Hz before it ends. The plan's speed changes are applied
+      by the clock, as the nudges are: a held chord has no events to carry them.
       `PJ_HAMMOND_FASTSHARE` sets the share of pieces with a fast phrase.
 
     Played live, the player rides it by the music's intensity instead.
@@ -1291,7 +1478,10 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       share of the upper's, then a step less (`PJ_HAMMOND_LOWER_SOFTER`, 1 ≈ 3 dB). The shares are
       16' 0.85, 5⅓' 0.45, 8' 1, 4' 0.55, 2⅔' 0.45, and the top 0.3 down to 0.15. So the jazz
       888000000 gets ~637000000 below it, close to the classic 838, and full organ a mellow
-      tapering 6.3.7.3.3.1.1.1.0. `-play`'s plans derive their lower manual the same way.
+      tapering 6.3.7.3.3.1.1.1.0. `-play`'s plans derive their lower manual the same way. Under
+      a pedal bass (the plan's clarity) the 5⅓' eases further, toward another organist's
+      favourite, 888000000 over 808000000 with pedals 80. A lower or pedal set by hand
+      (`PJ_HAMMOND_LOWER`, `_PEDAL`) is kept through the plan's re-registrations.
     - **The pedals follow too** (their two drawbars): the 16' by the upper's loudness, the 8' by
       its brightness (the share of its 4' and above). Round registrations get the simple pedal,
       bright ones a brighter one: whisper 5.7/1.5, ballad 7/1.5, jazz 8/1.5, gospel 8/3.5, full
@@ -1737,7 +1927,9 @@ sounds every key (the CP-80, the plucks) gets the stroke that sounds that loud i
 file played hot throughout (its median velocity over 96: a sequencer's default) is scaled
 down together until the median is 96 (`PJ_PLAY_VELMEDIAN`). Playing starts once 10 s are rendered
 (`PJ_PLAY_LEAD`, s), and should the rendering fall behind (a song heavier than real time), it
-waits for 10 s again, never longer; a file is scaled to
+waits for 10 s again, never longer. While playing it prints the time heard every 5 s (`0:05`,
+`0:10` ...; what the audio device still holds taken off), so a muddy or otherwise bad moment
+can be named (`PJ_PLAY_TICK`, s; 0 for none). A file is scaled to
 its peak, a stream passes a soft knee over 0.9. Schubert's piano (8 min) renders at about
 3× real time. The parts render side by side on up to 16 threads (`PJ_PLAY_THREADS`; the synth
 circuits together, as they share a board) and mix in their usual order, so the result is the

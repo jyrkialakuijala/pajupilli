@@ -40,7 +40,9 @@ double HammondModel::wheelHz(int n) { return 20 * kRatio[gearOf(n)] * teethOf(n)
 // accompaniment, from the same family but softer and darker, as organists derive it. Each drawbar
 // keeps a share of the upper's (the foundation all of it, the 5 1/3' half: less buzz under the
 // tune; the top little), then a step less (~3 dB under).
-std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter) {
+std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter, double clarity) {
+  // (the 5 1/3' half: the jazz organist's lower for bass and comping under 888 is 838 or 848; under
+  // a pedal bass the clarity below eases it toward another's favourite, 808000000)
   static const double kKeep[9] = {0.85, 0.45, 1.0, 0.55, 0.45, 0.3, 0.25, 0.2, 0.15};
   static const double kSofter = knob("PJ_HAMMOND_LOWER_SOFTER", 1.0);  // (steps)
   std::array<double, 9> lower{};
@@ -48,13 +50,31 @@ std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double
     lower[d] = std::clamp(upper[d] * kKeep[d] - (upper[d] > 0 ? kSofter + extraSofter : 0), 0.0, 8.0);
   // (never silenced: the 8' stays at least a whisper where the upper has one)
   if (upper[2] > 0) lower[2] = std::max(lower[2], std::min(2.0, upper[2]));
+  // (clarity: where the pedals carry the bass, under counterpoint or rich harmony, the lower's own
+  // sub-octave and fifth are eased back: no doubled bass an octave down, no mud)
+  lower[0] *= 1 - 0.6 * clarity;
+  lower[1] *= 1 - 0.5 * clarity;
   return lower;
+}
+
+// The lower manual as a percussion's stand-in (008880080: the 8', 4', 2 2/3' and 1 1/3'; no
+// sub-octave, no fifth below): a sharp, bright attack an octave of percussion-like sound where the
+// left hand does not play the bass (the B-3 has the percussion on the upper manual alone). At the
+// level of the lower registration it replaces (low: its whole loudness, 3 dB a step).
+std::array<double, 9> hammondLowerPercussive(const std::array<double, 9>& low) {
+  auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
+  double g = 0;
+  for (double x : low) g += gain(x);
+  const double each = g / 4;  // (four drawbars share it)
+  const double v = each >= std::pow(10.0, -21.0 / 20) ? 8 + 20.0 / 3 * std::log10(each) : each / std::pow(10.0, -21.0 / 20);
+  const double b = std::clamp(v, 0.0, 8.0);
+  return {0, 0, b, b, b, 0, 0, b, 0};
 }
 
 // The pedals for an upper manual (its two drawbars, 16' and 8'): how loud the upper is sets the
 // 16' (a whisper over a booming pedal would be wrong), how bright it is the 8' (round registrations
 // want the simple 16', bright ones a brighter pedal).
-std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper) {
+std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper, double clarity) {
   auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
   double all = 0, high = 0;
   for (int d = 0; d < 9; ++d) {
@@ -63,7 +83,9 @@ std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper) {
   }
   const double loud = std::clamp(all / 3, 0.0, 1.0);          // (three drawbars out full: as loud as a pedal wants)
   const double bright = all > 0 ? high / all : 0;             // (the share of the 4' and above)
-  return {std::clamp(4.5 + 3.5 * loud, 0.0, 8.0), std::clamp(1.5 + 8 * bright, 0.0, 8.0)};
+  // (clarity: a moving pedal line under counterpoint or rich harmony on less 16', more 8': its
+  // notes defined, not a boom)
+  return {std::clamp(4.5 + 3.5 * loud - 3 * clarity, 0.0, 8.0), std::clamp(1.5 + 8 * bright + 3 * clarity, 0.0, 8.0)};
 }
 
 std::string HammondRegistration::text() const {
@@ -73,7 +95,10 @@ std::string HammondRegistration::text() const {
   std::snprintf(buf, sizeof buf, "upper %s, lower %s, pedal %s, percussion %s, vibrato %s, Leslie %s, drive %.1f",
                 bars(upper.data(), 9).c_str(), bars(lower.data(), 9).c_str(), bars(pedal.data(), 2).c_str(),
                 perc ? (std::string(percThird ? "3rd" : "2nd") + (percFast ? " fast" : " slow") + (percSoft ? " soft" : "")).c_str() : "off",
-                kVib[std::clamp(vibrato, 0, 6)], leslieFast ? "fast" : "slow", drive);
+                (std::string(kVib[std::clamp(vibrato, 0, 6)]) +
+                 (vibrato > 0 && vibUpper != vibLower ? (vibUpper ? " upper only" : " lower only") : vibrato > 0 && !vibUpper ? " (tabs off)" : ""))
+                    .c_str(),
+                leslieFast ? "fast" : "slow", drive);
   return buf;
 }
 
@@ -141,12 +166,24 @@ HammondModel::HammondModel(const Instrument& inst) : Tube(inst) {
   for (int n = 1; n <= kWheels; ++n) {
     gearOf_[n] = gearOf(n);
     partner_[n] = n <= 36 ? n + 48 : n <= 41 ? 0 : n <= 48 ? n + 43 : n <= 84 ? n - 48 : n - 43;
+    // (its assembly: the two wheels on one shaft, four octaves apart (1-36 with 49-84, 42-48 with
+    // 85-91; 37-41 alone), named by the lower; they and no others share its errors)
+    shaftOf_[n] = partner_[n] && partner_[n] < n ? partner_[n] : n;
     const int T = teethOf(n);
     int N = 1024;
     while (N < 32 * T) N <<= 1;
     Rng r{serial * 31337u + uint32_t(n) * 2246822519u};
     // The wheel's eccentricity and ovality: its tone swells and fades once a revolution.
-    const double ma = age * 0.05 * (0.3 + std::fabs(r.n())), pa = 2 * M_PI * r.u();
+    const double ma = age * 0.035 * (0.3 + std::fabs(r.n())), pa = 2 * M_PI * r.u();
+    // The shaft's own (both its wheels alike, no other shaft): bent, its wheels' gap to their
+    // pickups swelling and closing once a turn; its driven gear's runout and ovality, the shaft
+    // turning a little fast and slow once and twice a turn (its angle off by up to ~1e-3 rad:
+    // ~1 c of vibrato at the rotation rate); where it stood when the motor started.
+    Rng rs{serial * 15485863u + uint32_t(shaftOf_[n]) * 2654435761u};
+    const double msh = age * 0.03 * (0.3 + std::fabs(rs.n())), psh = 2 * M_PI * rs.u();
+    const double de1 = knob("PJ_HAMMOND_SHAFT", 1.0) * age * 6e-4 * std::fabs(rs.n()), pe1 = 2 * M_PI * rs.u();
+    const double de2 = 0.4 * de1 * rs.u(), pe2 = 2 * M_PI * rs.u();
+    shaftOff_[shaftOf_[n]] = uint32_t(rs.u() * 4294967296.0);
     const double mo = 0.3 * ma * r.u(), po = 2 * M_PI * r.u();
     // The slow flux of the off-centre wheel itself: a line at the rotation rate (the 2- and
     // 4-tooth wheels' sub-octaves).
@@ -158,38 +195,83 @@ HammondModel::HammondModel(const Instrument& inst) : Tube(inst) {
       dep[k] = age * 0.006 * r.n();
     }
     // Its harmonics: the 2-tooth "complex" wheels shaped for odd ones; the others near sines.
-    double h[6] = {0, 1, 0, 0, 0, 0}, ph[6] = {};
+    // (the machined teeth: never a perfect sine, each wheel's profile its own (cutter wear, the
+    // tooth's flanks, the pickup's tip): overtones to the 7th, ~-30 dB for the 2nd and 3rd, the 5th
+    // ~-34 (a "tonewheel geometry" 5th of ~-32 dB, Reid), +-4 dB each wheel. Exact multiples of the
+    // wheel, they beat against the tempered wheels of the drawbars above (the 2 2/3' ~2 c narrow of
+    // the 3rd, the 1 3/5' ~14 c sharp of the 5th): the full registrations' dissonant brilliance.
+    // PJ_HAMMOND_WHEELHARM: dB on all of them)
+    double h[8] = {0, 1, 0, 0, 0, 0, 0, 0}, ph[8] = {};
+    static const double kHarm = knob("PJ_HAMMOND_WHEELHARM", 0.0);
+    static const double kLevel[8] = {0, 0, -30, -30, -42, -34, -48, -45};
     if (n <= 12) {
-      h[2] = 0.02; h[3] = 0.25; h[5] = 0.08;
+      h[2] = 0.02; h[3] = 0.25; h[5] = 0.08; h[7] = 0.03;
     } else {
-      h[2] = std::pow(10.0, -35 / 20.0) * (1 + 0.3 * r.n());
-      h[3] = std::pow(10.0, -38 / 20.0) * (1 + 0.3 * r.n());
+      for (int k = 2; k < 8; ++k) h[k] = std::pow(10.0, (kLevel[k] + kHarm + 4 * r.n()) / 20);
     }
-    for (int k = 2; k < 6; ++k) ph[k] = 2 * M_PI * r.u();
+    for (int k = 2; k < 8; ++k) ph[k] = 2 * M_PI * r.u();
     // The tuned filter of wheels 49-91 (a capacitor and transformer per wheel), aged capacitors
     // tuning it lower.
+    double detune = 1;
+    const double q = 4;
     if (n >= 49) {
-      const double q = 4, detune = 1 / std::sqrt(knob("PJ_HAMMOND_CAPS", 1.0) * (1 + 0.1 * age * std::fabs(r.n())));
-      for (int k = 1; k < 6; ++k) {
+      detune = 1 / std::sqrt(knob("PJ_HAMMOND_CAPS", 1.0) * (1 + 0.1 * age * std::fabs(r.n())));
+      for (int k = 1; k < 8; ++k) {
         const double x = k / detune;
         h[k] /= std::sqrt(1 + q * q * (x - 1 / x) * (x - 1 / x));
+      }
+    }
+    // Its subharmonics: the wheel's own set, from its rotation rate up through that rate's
+    // harmonics (the magnet's and the wheel's irregularities over one turn: a periodic signal of one
+    // revolution), up to 3 x its teeth (8 .. 48); its own levels (~1/k, +-3 dB) and phases, together
+    // ~-40 dB under the tone (x age; PJ_HAMMOND_SUBS, dB); the tone's own harmonics (multiples of
+    // the teeth) left out; through the wheel's filter (49-91) as the rest.
+    const int kSubs = std::clamp(3 * T, 8, 48);
+    std::vector<double> sa(kSubs + 1, 0.0), sp(kSubs + 1, 0.0);
+    {
+      static const double kSubDb = knob("PJ_HAMMOND_SUBS", -40.0);
+      Rng rsub{serial * 92821u + uint32_t(n) * 3266489917u};
+      double e2 = 0;
+      for (int k = 1; k <= kSubs; ++k) {
+        if (k % T == 0) continue;
+        sa[k] = std::pow(10.0, 3 * rsub.n() / 20) / k;
+        sp[k] = 2 * M_PI * rsub.u();
+        e2 += sa[k] * sa[k];
+      }
+      const double total = age * std::pow(10.0, kSubDb / 20) * h[1] / std::sqrt(std::max(e2, 1e-12));
+      for (int k = 1; k <= kSubs; ++k) {
+        sa[k] *= total;
+        if (n >= 49) {
+          const double x = double(k) / T / detune;
+          sa[k] /= std::sqrt(1 + q * q * (x - 1 / x) * (x - 1 / x));
+        }
       }
     }
     const double level = std::pow(10.0, 0.8 * age * r.n() / 20) / std::max(h[1], 1e-6);
     std::vector<float>& t = table_[n];
     t.resize(N);
     for (int i = 0; i < N; ++i) {
-      const double phi = 2 * M_PI * i / N, u = double(i) * T / N;
+      const double phi = 2 * M_PI * i / N;
+      const double u = (phi + de1 * std::sin(phi + pe1) + de2 * std::sin(2 * phi + pe2)) * T / (2 * M_PI);
       const int k = int(u) % T, k1 = (k + 1) % T;
       const double w = 0.5 * (1 - std::cos(M_PI * (u - std::floor(u))));
       const double th = 2 * M_PI * u + pos[k] + (pos[k1] - pos[k]) * w;
-      const double am = 1 + ma * std::cos(phi - pa) + mo * std::cos(2 * phi - po) + dep[k] + (dep[k1] - dep[k]) * w;
+      // The wobble works through the gap: the wheel's own eccentricity and ovality and its shaft's
+      // bend carry the teeth nearer the pickup's pole piece and away from it once (and twice) a
+      // turn. The coupling falls with the gap, never to nothing: the fundamental's as (1 + dg)^-2
+      // (dg the gap's change over its rest gap), steeper closing than opening; the overtones'
+      // finer field patterns fall off faster with distance, (1 + dg)^-(2 + 1.6 (j - 1)), so the
+      // tone's colour breathes with its level. The tooth's own depth error on top.
+      const double dg = -0.5 * (ma * std::cos(phi - pa) + msh * std::cos(phi - psh) + mo * std::cos(2 * phi - po));
+      const double g = std::max(1 + dg, 0.3);
+      const double depth = 1 + dep[k] + (dep[k1] - dep[k]) * w;
       double v = 0;
-      // (where the off-centre wheel runs closer, the flux bends more: its harmonics swell more
-      // than its fundamental, once a revolution: the tone's colour breathes, not only its level)
-      const double near = ma * std::cos(phi - pa);
-      for (int j = 1; j < 6; ++j) v += h[j] * (1 + 0.8 * (j - 1) * near) * std::sin(j * th + ph[j]);
-      t[i] = float(level * (am * v + dr * std::sin(phi - pd)));
+      for (int j = 1; j < 8; ++j) v += h[j] * std::pow(g, -(2 + 1.6 * (j - 1))) * std::sin(j * th + ph[j]);
+      v *= depth;
+      double sub = 0;
+      for (int k = 1; k <= kSubs; ++k)
+        if (sa[k] != 0) sub += sa[k] * std::sin(k * phi + sp[k]);
+      t[i] = float(level * (v + dr * std::sin(phi - pd) + sub));
     }
     // The whole generator's whisper (the pickups hear their neighbours: ~-70 dB each).
     background_[n] = std::pow(10.0, (-70 + 6 * r.n()) / 20) * (r.u() < 0.5 ? -1 : 1);
@@ -216,11 +298,57 @@ HammondModel::HammondModel(const Instrument& inst) : Tube(inst) {
     }
     flRng_ = serial * 6007u + 3u;
   }
+  microRing_.assign(size_t(0.02 * fs) + 8, 0.0f);
   // The scanner's line (~0.8 ms).
   line_.assign(256, 0.0f);
-  leslie_.setup(fs, serial);
+  lineL_.assign(256, 0.0f);
+  {
+    // The cabinets (PJ_LESLIE_COUNT, 1-4; 4): each its parts off nominal (+-7 %, PJ_LESLIE_SPREAD),
+    // its own speed and horn-to-drum ratio, its own place and facing in the room. Their speeds
+    // (tools/leslie_ratios.py --four --q 11: four factors whose every cross ratio stays furthest
+    // from the fractions up to N/11, the simple ones the most: none within 1.2 % of one over 1 .. 5,
+    // the closest misses 0.6-0.9 % from 8/7, 10/7, 11/9, 13/10, 12/11; scaled to centre on the
+    // usual speeds, which keeps every cross ratio):
+    //   1: x 1.081, the model's own horn/drum (1.6), a little left, turned 15 degrees left;
+    //   2: x 0.953, the published 122's ratios (1.20 on slow, 1.17 on fast), right and back,
+    //      turned 30 degrees right;
+    //   3: x 0.827, published ratios, by the left wall, further back, turned 40 left;
+    //   4: x 1.172, published ratios, toward the right wall, turned 50 degrees right.
+    // PJ_LESLIE_SPEEDS="a,b,c,d" sets them. One cabinet: as built (no spread, x 1), where it
+    // always stood.
+    static const int kCount = std::clamp(int(knob("PJ_LESLIE_COUNT", 4)), 1, 4);
+    static const double kSpread = knob("PJ_LESLIE_SPREAD", 0.07);
+    double speed[4] = {1.1724, 1.0811, 0.9534, 0.8271};
+    if (const char* e = std::getenv("PJ_LESLIE_SPEEDS")) std::sscanf(e, "%lf,%lf,%lf,%lf", &speed[0], &speed[1], &speed[2], &speed[3]);
+    if (kCount == 1) speed[0] = 1;
+    // (x toward the listener, y to the left, m; the facing, degrees)
+    const double place[4][3] = {{0, 0, 0}, {0.3, 2.0, 25}, {0.3, -2.0, -25}, {-5.0, 0.3, 10}};
+    // Which manuals each plays (upper, lower, pedals): the centre's the upper (75 %, the others
+    // 12.5 % each), the left and right the lower, the one 5 m behind the pedals
+    // (PJ_LESLIE_MIX="u,l,p;u,l,p;u,l,p;u,l,p"). Each manual's shares scaled so its whole power over
+    // the cabinets is as it would be in all of them alike: the balance kept.
+    double mix[4][3] = {{0.75, 0.125, 0.125}, {0.125, 0.75, 0.125}, {0.125, 0.75, 0.125}, {0.125, 0.125, 0.75}};
+    if (const char* e = std::getenv("PJ_LESLIE_MIX"))
+      std::sscanf(e, "%lf,%lf,%lf;%lf,%lf,%lf;%lf,%lf,%lf;%lf,%lf,%lf", &mix[0][0], &mix[0][1], &mix[0][2], &mix[1][0], &mix[1][1],
+                  &mix[1][2], &mix[2][0], &mix[2][1], &mix[2][2], &mix[3][0], &mix[3][1], &mix[3][2]);
+    cab_.resize(kCount);
+    for (int c = 0; c < kCount; ++c) {
+      cab_[c].les.setup(fs, serial + 7919u * c, kCount > 1 ? kSpread : 0.0, c == 0, speed[c], c ? 1.20 : 0.0, c ? 1.17 : 0.0);
+      for (auto& ring : cab_[c].ring) ring.assign(2048, 0.0f);
+      if (kCount > 1) {
+        cab_[c].x = place[c][0];
+        cab_[c].y = place[c][1];
+        cab_[c].rot = place[c][2] * M_PI / 180;
+      }
+    }
+    for (int m = 0; m < 3; ++m) {
+      double e2 = 0;
+      for (int c = 0; c < kCount; ++c) e2 += mix[c][m] * mix[c][m];
+      for (int c = 0; c < kCount; ++c) cab_[c].mix[m] = e2 > 0 ? mix[c][m] * std::sqrt(kCount / e2) : 1;
+    }
+    placeCabinets();
+  }
   roomMics_ = std::getenv("PJ_LESLIE_MICS") == nullptr || std::string(std::getenv("PJ_LESLIE_MICS")) != "close";
-  for (auto& ring : rayRing_) ring.assign(2048, 0.0f);
   setRegistration(hammondPreset(inst.name));
 }
 
@@ -240,8 +368,10 @@ void HammondModel::setRegistration(const HammondRegistration& r) {
     placed_ = true;
     drawbarGains();
   }
-  leslie_.setFast(r.leslieFast);
-  leslie_.setDrive(r.drive);
+  for (Cab& c : cab_) {
+    c.les.setFast(r.leslieFast);
+    c.les.setDrive(r.drive);
+  }
 }
 
 void HammondModel::setLowerGoal(const std::array<double, 9>& bars) {
@@ -258,6 +388,14 @@ void HammondModel::placeDrawbars() {
       pos_[v][d] = goal_[v][d];
       integ_[v][d] = 0;
     }
+  drawbarGains();
+}
+
+void HammondModel::snap(int div) {
+  for (int d = 0; d < 9; ++d) {
+    pos_[div][d] = goal_[div][d];
+    integ_[div][d] = 0;
+  }
   drawbarGains();
 }
 
@@ -281,13 +419,136 @@ void HammondModel::drawbarGains() {
 // Each drawbar a slider pulled by a hand: a PI control of its speed (the error's proportion and
 // its integral), limited to a hand's top speed, stopped by the slider's ends (no winding up
 // against them): it glides to its goal, a touch past it now and then, never in steps.
+// The mud in what is held now: close intervals low on the manuals (a second under C4, worse the
+// lower; a third under C3), where the 16' and 5 1/3' pile their low partials together. 0..1.
+double HammondModel::mudLevel() const {
+  int m[32], n = 0;
+  double mud = 0;
+  int ped = 1000;
+  for (const Key& k : keys_) {
+    if (k.down && k.div != kPedal && n < 32) m[n++] = k.midi;
+    if (k.down && k.div == kPedal) ped = std::min(ped, k.midi);
+  }
+  // (a pedal note under low manual notes close above it, within a fifth under C3: the pedal's 16'
+  // and the manuals' subs crowd one octave)
+  if (ped < 1000)
+    for (int i = 0; i < n; ++i)
+      if (m[i] < 48 && m[i] - ped >= 0 && m[i] - ped <= 7) mud += 0.5 * std::clamp((48 - m[i]) / 12.0, 0.2, 1.0);
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j) {
+      const int lo = std::min(m[i], m[j]), iv = m[j] - m[i];
+      if (iv <= 0) continue;
+      if (iv <= 2) mud += std::clamp((60 - lo) / 18.0, 0.0, 1.0) * (iv == 1 ? 1.0 : 0.7);
+      else if (iv <= 4) mud += std::clamp((48 - lo) / 12.0, 0.0, 1.0) * 0.4;
+    }
+  return std::clamp(mud / 1.5, 0.0, 1.0);
+}
+
+// The lower manual crowding the pedals: its held notes low (under C4, the lower the more) and
+// close above the pedal note under them (within an octave and a half), where its 16' doubles its
+// line an octave down into the pedals' register. 0..1.
+double HammondModel::crowdLevel() const {
+  int ped = 1000;
+  for (const Key& k : keys_)
+    if (k.down && k.div == kPedal) ped = std::min(ped, k.midi);
+  double c = 0;
+  int n = 0;
+  for (const Key& k : keys_)
+    if (k.down && k.div == kLower) {
+      double w = std::clamp((60 - k.midi) / 14.0, 0.0, 1.0);
+      if (ped < 1000) w *= 0.5 + 0.5 * std::clamp((18 - (k.midi - ped)) / 12.0, 0.0, 1.0);
+      else w *= 0.5;
+      c = std::max(c, w);
+      ++n;
+    }
+  return std::clamp(c * (n > 1 ? 1.2 : 1.0), 0.0, 1.0);
+}
+
+// The upper manual crowding the voices under it: its held notes low (under G4, the lower the more)
+// and close above the lower manual's or the pedals' notes (within an octave), where its 16' doubles
+// its line an octave down onto theirs. 0..1.
+double HammondModel::upperCrowdLevel() const {
+  int below = -1000;
+  for (const Key& k : keys_)
+    if (k.down && k.div != kUpper) below = std::max(below, k.midi);
+  double c = 0;
+  for (const Key& k : keys_)
+    if (k.down && k.div == kUpper) {
+      double w = std::clamp((67 - k.midi) / 12.0, 0.0, 1.0);
+      w *= below > -1000 ? 0.4 + 0.6 * std::clamp((12 - (k.midi - below)) / 8.0, 0.0, 1.0) : 0.3;
+      c = std::max(c, w);
+    }
+  return c;
+}
+
 void HammondModel::moveDrawbars(double dt) {
   static const double kP = knob("PJ_HAMMOND_DRAWBAR_KP", 8), kI = knob("PJ_HAMMOND_DRAWBAR_KI", 20);
   static const double kMax = knob("PJ_HAMMOND_DRAWBAR_SPEED", 16);  // (steps a second)
+  // (online: where low clusters are held, the player eases the manuals' 16' and 5 1/3' back (up to
+  // 70 % and 80 %) and gives the 4' a little more for clarity; quick to react (~0.3 s), slow to
+  // restore (~1.5 s); PJ_HAMMOND_MUD scales it, 0 off)
+  static const double kMud = knob("PJ_HAMMOND_MUD", 1.0);
+  if (kMud > 0) {
+    const double want = kMud * mudLevel();
+    mud_ += (want - mud_) * std::min(1.0, dt / (want > mud_ ? 0.3 : 1.5));
+  }
+  // (the lower manual crowding the pedals: its 16' and 5 1/3' eased back a little, gradually: the
+  // crowding's measure followed over ~1.5 s rising, ~3 s falling (counterpoint changes its held
+  // notes every beat), its effect over ~1 s more by the sliders; up to 75 % and 70 %;
+  // PJ_HAMMOND_CROWD scales it, 0 off)
+  thinNow_ += (thin_ - thinNow_) * std::min(1.0, dt / 0.3);
+  // (the lower manual carrying a moving bass line, the pedals resting over a second: its 4',
+  // 2 2/3' and 2' drawn out (up to 3, 2 and 2 steps) for the line's definition, over ~0.8 s, back
+  // over ~2 s once the pedals return or it stops moving; PJ_HAMMOND_BASSLINE scales it, 0 off)
+  {
+    static const double kBass = knob("PJ_HAMMOND_BASSLINE", 1.0);
+    lowRate_ *= std::exp(-dt / 1.0);
+    for (const Key& k : keys_)
+      if (k.down && k.div == kPedal) lastPedal_ = t_;
+    const double want = t_ - lastPedal_ > 1.0 ? kBass * std::clamp((lowRate_ - 1.5) / 3.0, 0.0, 1.0) : 0.0;
+    bass_ += (want - bass_) * std::min(1.0, dt / (want > bass_ ? 0.8 : 2.0));
+  }
+  static const double kCrowd = knob("PJ_HAMMOND_CROWD", 1.0);
+  if (kCrowd > 0) {
+    const double want = kCrowd * crowdLevel();
+    crowdT_ += (want - crowdT_) * std::min(1.0, dt / (want > crowdT_ ? 0.8 : 3.0));
+    crowd_ += (crowdT_ - crowd_) * std::min(1.0, dt / 1.0);
+    // (the upper manual's own, the same way)
+    const double wantU = kCrowd * upperCrowdLevel();
+    upCrowdT_ += (wantU - upCrowdT_) * std::min(1.0, dt / (wantU > upCrowdT_ ? 0.8 : 3.0));
+    upCrowd_ += (upCrowdT_ - upCrowd_) * std::min(1.0, dt / 1.0);
+    static const bool kLog = std::getenv("PJ_HAMMOND_MUDLOG") != nullptr;
+    static double logT = 0;
+    if (kLog && (logT += dt) >= 1) {
+      logT -= 1;
+      std::fprintf(stderr, "mud t %.0f crowd %.2f upper crowd %.2f clusters %.2f trill %.2f bassline %.2f lower 16' %.1f upper %.1f%.1f%.1f\n", t_, crowd_, upCrowd_, mud_, thinNow_, bass_, pos_[kLower][0], pos_[kUpper][0], pos_[kUpper][1], pos_[kUpper][2]);
+    }
+  }
   bool moving = false;
   for (int v = 0; v < 3; ++v)
     for (int d = 0; d < (v == kPedal ? 2 : 9); ++d) {
-      const double e = goal_[v][d] - pos_[v][d];
+      double goal = goal_[v][d];
+      if (v != kPedal && thinNow_ > 1e-3 && d != 2 && d != 3) goal *= 1 - 0.8 * thinNow_;  // (a trill: the 8' and 4' kept)
+      if (v == kUpper && upCrowd_ > 1e-3) {  // (the upper low over the others: its 16' and 5 1/3' eased, a little more 4')
+        if (d == 0) goal *= 1 - 0.75 * upCrowd_;
+        if (d == 1) goal *= 1 - 0.7 * upCrowd_;
+        if (d == 3) goal = std::min(8.0, goal + 1.5 * upCrowd_);
+      }
+      if (v == kLower && bass_ > 1e-3) {
+        if (d == 3) goal = std::min(8.0, goal + 3 * bass_);
+        if (d == 4 || d == 5) goal = std::min(8.0, goal + 2 * bass_);
+      }
+      if (v == kLower && crowd_ > 1e-3) {
+        if (d == 0) goal *= 1 - 0.75 * crowd_;
+        if (d == 1) goal *= 1 - 0.7 * crowd_;
+      }
+      if (v == kPedal && d == 0 && mud_ > 1e-3) goal *= 1 - 0.5 * std::min(mud_, 1.0);  // (the pedal's 16' too)
+      if (v != kPedal && mud_ > 1e-3) {
+        if (d == 0) goal *= 1 - 0.7 * std::min(mud_, 1.0);
+        if (d == 1) goal *= 1 - 0.8 * std::min(mud_, 1.0);
+        if (d == 3 && goal_[v][2] > 0) goal = std::min(8.0, goal + 1.5 * std::min(mud_, 1.0));
+      }
+      const double e = goal - pos_[v][d];
       if (std::fabs(e) < 1e-4 && std::fabs(integ_[v][d]) < 1e-4) continue;
       moving = true;
       double u = kP * e + kI * (integ_[v][d] + e * dt);
@@ -375,6 +636,8 @@ void HammondModel::press(int div, int midi, int velocity) {
   }
   schedule(k, velocity, true);
   keys_.push_back(k);
+  if (div == kLower && midi < 57) lowRate_ += 1;
+  if (div == kPedal) lastPedal_ = t_;
 }
 
 void HammondModel::release(int div, int midi) {
@@ -420,22 +683,24 @@ float HammondModel::sample() {
     mains_ += -mains_ * cdt / 20 + kMains * 3e-4 * std::sqrt(2 * cdt / 20) * noise();
     const double common = noise();
     for (int n = 1; n <= kWheels; ++n) {
+      if (shaftOf_[n] != n) continue;  // (the shaft's flutter: its second wheel turns with it)
       const double e = (0.6 * common + 0.8 * noise()) / std::sqrt(cdt);
       const double a = e - flW_[n] / flQ_[n] * flV_[n] - flW_[n] * flW_[n] * flX_[n];
       flV_[n] += a * cdt;
       flX_[n] += flV_[n] * cdt;
       flOff_[n] = int32_t(flG_[n] * flX_[n] * 4294967296.0);
     }
+    for (int n = 1; n <= kWheels; ++n) flOff_[n] = flOff_[shaftOf_[n]];
   }
   int32_t off[12];
   for (int g = 0; g < 12; ++g) {
-    phase_[g] += inc_[g] + int32_t(double(inc_[g]) * mains_);
+    phase_[g] += speed_ == 1 ? inc_[g] + int32_t(double(inc_[g]) * mains_) : uint32_t(double(inc_[g]) * (1 + mains_) * speed_);
     off[g] = int32_t(turnsPerSec_[g] * wob * 4294967296.0);
   }
   double bg = 0;
   for (int n = 1; n <= kWheels; ++n) {
     const std::vector<float>& t = table_[n];
-    const uint32_t p = phase_[gearOf_[n]] + uint32_t(off[gearOf_[n]]) + uint32_t(flOff_[n]);
+    const uint32_t p = phase_[gearOf_[n]] + uint32_t(off[gearOf_[n]]) + shaftOff_[shaftOf_[n]] + uint32_t(flOff_[n]);
     const int bits = 31 - __builtin_clz(unsigned(t.size()));
     const uint32_t i = p >> (32 - bits), mask = uint32_t(t.size()) - 1;
     const float f = float(p << bits) * (1.0f / 4294967296.0f);
@@ -513,13 +778,12 @@ float HammondModel::sample() {
   if (reg_.perc && !reg_.percSoft) upper *= 0.7;  // (the normal percussion drops the manual a little)
   upper += 1.4 * percGain * percBus;
   pedal = gainP_[0] * bus[kPedal][0] + gainP_[1] * bus[kPedal][1];
-  // The scanner: a delay line read back and forth (6.87 Hz) by the rotating capacitor.
-  const double vin = (reg_.vibUpper ? upper : 0) + (reg_.vibLower ? lower : 0);
-  const double dry = upper + lower - vin;
-  double vout = vin;
+  // The scanner: a delay line read back and forth (6.87 Hz) by the rotating capacitor; the upper's
+  // and the lower's each their own line under the one scanner (so each manual's signal stays its
+  // own for the Leslies it feeds).
+  double U = upper, L = lower;
   if (reg_.vibrato > 0) {
-    line_[linePos_] = float(vin);
-    scanPh_ += 6.867 * (1 + mains_) * dt;  // (its synchronous motor follows the grid too)
+    scanPh_ += 6.867 * (1 + mains_) * speed_ * dt;  // (its synchronous motor follows the grid too)
     if (scanPh_ > 1) scanPh_ -= 1;
     const double tri = scanPh_ < 0.5 ? 2 * scanPh_ : 2 - 2 * scanPh_;
     static const double kDepth[4] = {0, 1.0 / 3, 0.5, 1};
@@ -528,80 +792,145 @@ float HammondModel::sample() {
     const int i = int(std::floor(rp));
     const double f = rp - i;
     const int m = int(line_.size()) - 1;
-    const double wet = line_[i & m] + (line_[(i + 1) & m] - line_[i & m]) * f;
-    lineLp_ += (1 - std::exp(-2 * M_PI * 7000 / fs)) * (wet - lineLp_);
+    auto scan = [&](std::vector<float>& line, double& lp, double in) {
+      line[linePos_] = float(in);
+      const double wet = line[i & m] + (line[(i + 1) & m] - line[i & m]) * f;
+      lp += (1 - std::exp(-2 * M_PI * 7000 / fs)) * (wet - lp);
+      return reg_.vibrato >= 4 ? 0.7 * (in + lp) : lp;
+    };
+    if (reg_.vibUpper) U = scan(line_, lineLp_, upper);
+    if (reg_.vibLower) L = scan(lineL_, lineLpL_, lower);
     linePos_ = (linePos_ + 1) & m;
-    vout = reg_.vibrato >= 4 ? 0.7 * (vin + lineLp_) : lineLp_;
   }
   // The power supply's hum (the mains and its harmonics through the preamp's grounds) under it all.
   static const double kHum = knob("PJ_HAMMOND_HUM", 1.0) * 3e-4;
   const double hum = kHum * (std::sin(2 * M_PI * 60 * t_) + 0.5 * std::sin(2 * M_PI * 120 * t_ + 1) + 0.3 * std::sin(2 * M_PI * 180 * t_ + 2));
-  double x = dry + vout + pedal + bg + hum;
+  // The run switch: off, the generator coasts down on its own inertia, its pitch sinking and its
+  // voltage falling with its speed (the wheels' pickups); on again, the synchronous motor pulls it
+  // back up within a few tenths of a second (PJ_HAMMOND_COAST: the coasting's time constant, s).
+  if (!run_ || speed_ != 1) {
+    static const double kCoast = knob("PJ_HAMMOND_COAST", 4.0);
+    if (run_) speed_ += (1 - speed_) * dt / 0.3;
+    else speed_ *= 1 - dt / kCoast;
+    if (run_ && speed_ > 0.9999) speed_ = 1;
+  }
   // The preamp: the expression pedal (~35 dB, the bass held up as it closes), the tube's soft knee.
   expr_ += (exprTarget_ - expr_) * dt / 0.03;
-  shelf_ += (1 - std::exp(-2 * M_PI * 250 / fs)) * (x - shelf_);
   const double g = std::pow(10.0, -35 * std::pow(1 - std::clamp(expr_, 0.0, 1.0), 1.3) / 20);
-  // (the B+ ripple: 120 Hz, a fifth of a percent, on the gain)
-  double y = g * (x + 1.2 * (1 - expr_) * shelf_) * kConsole * (1 + 0.002 * std::sin(2 * M_PI * 120 * t_));
-  // The preamp's tone: the mids and highs 3 dB up (above ~1 kHz, a first-order shelf:
-  // PJ_HAMMOND_BRIGHT dB; by ear, the user's: it was a little dark).
+  const double ripple = 1 + 0.002 * std::sin(2 * M_PI * 120 * t_);  // (the B+ ripple: 120 Hz, a fifth of a percent)
+  // Microphonics: the console's valves hear the room. The Leslies' sound reaching the console
+  // (~2 m: ~6 ms) shakes the valves' electrodes (a mass on a spring: flat below its resonance of a
+  // few kHz, Q ~8, peaking there). Moving the grid against the cathode, it modulates the stage's
+  // gain (~1 % at playing levels, PJ_HAMMOND_MICROMOD): the organ's signal multiplied by the
+  // turning speakers' sound, sidebands moving with the rotors; and it adds a little of it, ~40 dB
+  // down (PJ_HAMMOND_MICRO, dB). A faint loop through the Leslies (its gain far under 1).
+  double micro = 0, vib = 0;
   {
-    static const double kGain = std::pow(10.0, knob("PJ_HAMMOND_BRIGHT", 3.0) / 20) - 1;
-    static const double kA = 1 - std::exp(-2 * M_PI * 1000 / fs);
-    tone_ += kA * (y - tone_);
-    y += kGain * (y - tone_);
+    static const double kMicro = std::pow(10.0, knob("PJ_HAMMOND_MICRO", -22) / 20);  // (of what they hear: ~40 dB under the signal)
+    static const double w0 = 2 * M_PI * knob("PJ_HAMMOND_MICROHZ", 3300) / fs, q = 8;
+    static const double al = std::sin(w0) / (2 * q), a0 = 1 + al, cw = std::cos(w0);
+    static const double lb0 = (1 - cw) / 2 / a0, lb1 = (1 - cw) / a0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
+    const int len = int(microRing_.size());
+    const double heard = microRing_[(microPos_ - int(0.006 * fs) + len) % len];
+    vib = lb0 * heard + lb1 * microZ_[0] + lb0 * microZ_[1] - a1 * microZ_[2] - a2 * microZ_[3];  // (the electrode's displacement)
+    microZ_[1] = microZ_[0];
+    microZ_[0] = heard;
+    microZ_[3] = microZ_[2];
+    microZ_[2] = vib;
+    micro = kMicro * vib;
   }
-  y = std::tanh(1.5 * y) / 1.5;
+  // Each Leslie its own mix of the manuals (mix_: placeCabinets), through its own channel of the
+  // console's amplification (the expression's bass, the tone, the valve stage, its overload): each
+  // cabinet's amplifier distorts its own mix. One Leslie (or none): all of each.
+  float rays[4][Leslie::kRays];
+  const int nc = reg_.leslie ? int(cab_.size()) : 1;
+  // (several cabinets: each fed the organ down, together as loud as one: their low ends add in
+  // phase in the room, more than unrelated sounds would; measured)
+  static const float kShare[5] = {1, 1, float(knob("PJ_LESLIE_TWOGAIN", 0.54)), 0.37f, float(knob("PJ_LESLIE_FOURGAIN", 0.38))};
+  const float share = kShare[nc];
+  static const double kGain = std::pow(10.0, knob("PJ_HAMMOND_BRIGHT", 3.0) / 20) - 1;  // (the tone: the mids and highs up)
+  static const double kA = 1 - std::exp(-2 * M_PI * 1000 / fs), kShelfA = 1 - std::exp(-2 * M_PI * 250 / fs);
+  static const double kValve = knob("PJ_HAMMOND_VALVE", 1.0) * 0.45;
+  static const double kMod = knob("PJ_HAMMOND_MICROMOD", 0.6);  // (the valves hear ~1/8 of the signal: ~1 % of gain)
   rng_ = rng_ * 1664525u + 1013904223u;
-  y += 2e-6 * ((rng_ >> 8) * (2.0 / 16777216.0) - 1);  // (the preamp's hiss)
-  float l = float(y * 8), r = l;  // (dry: the console's line, as a tone cabinet would play it)
-  float rays[Leslie::kRays];
-  for (float& v : rays) v = l;
-  if (reg_.leslie) leslie_.process(float(y), l, r, inRoom_ ? rays : nullptr);
+  const double hiss = 2e-6 * ((rng_ >> 8) * (2.0 / 16777216.0) - 1);  // (the preamp's hiss)
+  double y = 0, yc[4];
+  float l = 0, r = 0;
+  for (int c = 0; c < nc; ++c) {
+    const double* w = nc > 1 ? cab_[c].mix : nullptr;
+    const double x = ((w ? w[0] * U + w[1] * L + w[2] * pedal : U + L + pedal) + bg) * speed_ + hum;
+    Chan& ch = chan_[c];
+    ch.shelf += kShelfA * (x - ch.shelf);
+    double v = g * (x + 1.2 * (1 - expr_) * ch.shelf) * kConsole * ripple + micro;
+    // The preamp's tone: the mids and highs 3 dB up (above ~1 kHz, a first-order shelf:
+    // PJ_HAMMOND_BRIGHT dB; by ear, the user's: it was a little dark).
+    ch.tone += kA * (v - ch.tone);
+    v += kGain * (v - ch.tone);
+    // The valve stage: a single-ended triode bends one way more than the other, its 2nd harmonic
+    // growing with the level (PJ_HAMMOND_VALVE); the grid shaken against the cathode by the room's
+    // sound (the gain moving with it); then its overload.
+    v *= 1 + kMod * vib;
+    v += kValve * v * v;
+    ch.dc += (1 - std::exp(-2 * M_PI * 8 / fs)) * (v - ch.dc);
+    v -= ch.dc;
+    v = std::tanh(1.5 * v) / 1.5 + hiss;
+    yc[c] = v;
+    y += v / nc;
+    static const bool kMixLog = std::getenv("PJ_LESLIE_MIXLOG") != nullptr;  // (each cabinet's input level, every second)
+    if (kMixLog) {
+      static double e[4] = {};
+      e[c] += v * v;
+      if (c == nc - 1 && std::fmod(t_, 1.0) < dt) {
+        std::fprintf(stderr, "leslie inputs t %.0f:", t_);
+        for (int k = 0; k < nc; ++k) std::fprintf(stderr, " %.1f dB", 10 * std::log10(e[k] * dt + 1e-20)), e[k] = 0;
+        std::fprintf(stderr, "\n");
+      }
+    }
+  }
+  const float console = float(y * 8);  // (dry: the console's line, as a tone cabinet would play it)
+  if (reg_.leslie) {
+    for (int c = 0; c < nc; ++c) {
+      float cl = console, cr = console;
+      cab_[c].les.process(float(yc[c]) * share, cl, cr, inRoom_ ? rays[c] : nullptr);
+      l += cl;
+      r += cr;
+    }
+  } else {
+    l = r = console;
+    for (float& v : rays[0]) v = console;
+  }
+  {  // (what the console's valves hear, in the console's units: in the room the Leslies' rays)
+    double h = 0.5 * (l + r) / 8;
+    if (inRoom_ && reg_.leslie) {
+      h = 0;
+      for (int c = 0; c < nc; ++c)
+        for (int k = 0; k < Leslie::kRays; ++k) h += rays[c][k];
+      h /= 8.0 * Leslie::kRays * share * nc;
+    }
+    microRing_[microPos_] = float(h);
+  }
+  microPos_ = (microPos_ + 1) % int(microRing_.size());
   if (inRoom_) {
     // The rays into the room: the listener's microphones, a pair 2 m apart aimed out to the
-    // sides, D m in front of the cabinet (PJ_LESLIE_LISTENER, 4: past a hall's critical distance,
-    // more room than cabinet), each hearing every ray by its own path (image sources): the front
-    // ray directly and off the floor, the side rays off the side walls (4 m off), the rear ones
-    // off the corners and the back wall (1.5 m behind the cabinet). Each path its own delay and
-    // 1/r, each wall taking a quarter: the two microphones hear the swirl differently, as ears in
-    // a room do. The room's late field is fed the rays' mean (all round: its level steady).
-    static const double kD = knob("PJ_LESLIE_LISTENER", 4.0), kC = 343, kW = 4.0, kB = 1.5, kH = 1.0;
-    static double path[Leslie::kRays + 1][2], gain[Leslie::kRays + 1][2];
-    static bool init = false;
-    if (!init) {
-      for (int m = 0; m < 2; ++m) {
-        const double my = m == 0 ? 1 : -1;  // (the left microphone on the cabinet's left: +y)
-        auto set = [&](int k, double ix, double iy, double refl, double aim) {
-          const double dist = std::hypot(kD - ix, my - iy);
-          // (a microphone aimed out to its side, 55 degrees: between omni and cardioid)
-          const double ang = std::atan2(iy - my, ix - kD) - (m == 0 ? 1 : -1) * 55 * M_PI / 180 - M_PI;
-          path[k][m] = dist;
-          gain[k][m] = refl * aim * (0.6 + 0.4 * std::cos(ang)) / dist;
-        };
-        set(0, 0, 0, 1.0, 1);                      // the front ray: direct
-        set(1, 0, 2 * kW, 0.75, 1);                // +60: off the left wall
-        set(2, 0, -2 * kW, 0.75, 1);               // -60: off the right wall
-        set(3, -2 * kB, 2 * kW, 0.56, 1);          // +120: off the back wall and the left
-        set(4, -2 * kB, -2 * kW, 0.56, 1);         // -120: off the back wall and the right
-        set(5, -2 * kB, 0, 0.75, 1);               // 180: off the back wall
-        path[6][m] = std::hypot(kD, 2 * kH);       // the front ray off the floor
-        gain[6][m] = 0.6 * 0.8 / path[6][m];
-      }
-      init = true;
-    }
+    // sides, D m in front of the cabinets (PJ_LESLIE_LISTENER, 4: past a hall's critical
+    // distance), each hearing every cabinet's rays by their own paths (image sources: directly and
+    // off the floor, the side walls 4 m off, the back wall 1.5 m behind, its corners), each path
+    // fed by the rays leaving the cabinet toward it (placeCabinets). Each microphone hears each
+    // cabinet's swirl its own way, as ears in a room do. The room's late field is fed the rays'
+    // mean (all round: its level steady).
     double el = 0, er = 0, mean = 0;
-    const int len = int(rayRing_[0].size()), mask = len - 1;
-    for (int k = 0; k < Leslie::kRays; ++k) {
-      rayRing_[k][rayPos_] = rays[k];
-      mean += rays[k];
-    }
-    for (int k = 0; k <= Leslie::kRays; ++k) {
-      const int ray = k == Leslie::kRays ? 0 : k;
-      for (int m = 0; m < 2; ++m) {
-        const int dly = std::min(int(path[k][m] / kC * fs_), len - 1);
-        (m == 0 ? el : er) += gain[k][m] * rayRing_[ray][(rayPos_ - dly) & mask];
+    const int len = int(cab_[0].ring[0].size()), mask = len - 1;
+    for (int c = 0; c < nc; ++c) {
+      Cab& cb = cab_[c];
+      for (int k = 0; k < Leslie::kRays; ++k) {
+        cb.ring[k][rayPos_] = rays[c][k];
+        mean += rays[c][k];
       }
+      for (int p = 0; p < 7; ++p)
+        for (int m = 0; m < 2; ++m) {
+          const int at = (rayPos_ - cb.dly[p][m]) & mask;
+          (m == 0 ? el : er) += cb.g[p][m][0] * cb.ring[cb.ray[p][m][0]][at] + cb.g[p][m][1] * cb.ring[cb.ray[p][m][1]][at];
+        }
     }
     rayPos_ = (rayPos_ + 1) & mask;
     earlyL_.push_back(float(kOut * el * outScale()));
@@ -613,6 +942,55 @@ float HammondModel::sample() {
     side_.push_back(float(outScale() * kOut * 0.5 * (l - r)));
   }
   return finish(last_);
+}
+
+// Each cabinet's paths to the listener's microphones (2 m apart, aimed 55 degrees out to their
+// sides, D m in front): for each image of the cabinet (the walls 4 m either side, the back wall 1.5
+// m behind, its corners, the floor 1 m down), the direction leaving the cabinet toward it (the
+// path to the microphone, mirrored back by its walls), in the cabinet's own frame (its facing):
+// the two rays either side of it blended (they are 60 degrees apart). (One cabinet at the origin
+// facing the listener: the paths as before, but each now fed by the rays toward it, the direct one
+// mostly the front ray with a little of the +-60 ones, not the front ray alone.)
+void HammondModel::placeCabinets() {
+  static const double kD = knob("PJ_LESLIE_LISTENER", 4.0), kC = 343, kW = 4.0, kH = 1.0;
+  // (the back wall 1.5 m behind the rearmost cabinet)
+  double kB = 1.5;
+  for (const Cab& cb : cab_) kB = std::max(kB, 1.5 - cb.x);
+  static const double kRefl[7] = {1.0, 0.75, 0.75, 0.75, 0.56, 0.56, 0.6 * 0.8};
+  // (the rays' angles in order round the cabinet, -180 .. 180, and which ray each is)
+  static const double kAng[7] = {-180, -120, -60, 0, 60, 120, 180};
+  static const int kRay[7] = {5, 4, 2, 0, 1, 3, 5};
+  const int len = int(cab_[0].ring[0].size());
+  for (Cab& cb : cab_)
+    for (int m = 0; m < 2; ++m) {
+      const double mx = kD, my = m == 0 ? 1 : -1;
+      for (int p = 0; p < 7; ++p) {
+        // the image: mirrored in y (side walls), in x (the back wall), both (corners)
+        const bool fy = p == 1 || p == 2 || p == 4 || p == 5, fx = p == 3 || p == 4 || p == 5;
+        const double wy = (p == 1 || p == 4) ? kW : -kW;
+        const double ix = fx ? -2 * kB - cb.x : cb.x, iy = fy ? 2 * wy - cb.y : cb.y;
+        double vx = mx - ix, vy = my - iy;
+        const double flat = std::hypot(vx, vy);
+        const double dist = p == 6 ? std::hypot(flat, 2 * kH) : flat;
+        // (the microphone aimed out to its side: between omni and cardioid)
+        const double arrive = std::atan2(iy - my, ix - mx) - (m == 0 ? 1 : -1) * 55 * M_PI / 180 - M_PI;
+        const double aim = 0.6 + 0.4 * std::cos(arrive);
+        // (the direction the sound leaves the cabinet: the path mirrored back by its walls)
+        if (fy) vy = -vy;
+        if (fx) vx = -vx;
+        double a = (std::atan2(vy, vx) - cb.rot) * 180 / M_PI;
+        a = std::remainder(a, 360.0);
+        int seg = 0;
+        while (seg < 5 && a > kAng[seg + 1]) ++seg;
+        const double w = std::clamp((a - kAng[seg]) / 60, 0.0, 1.0);
+        const double gain = kRefl[p] * aim / dist;
+        cb.dly[p][m] = std::min(int(dist / kC * fs_), len - 1);
+        cb.ray[p][m][0] = kRay[seg];
+        cb.ray[p][m][1] = kRay[seg + 1];
+        cb.g[p][m][0] = gain * (1 - w);
+        cb.g[p][m][1] = gain * w;
+      }
+    }
 }
 
 // (called by the room each block: from then on the Leslie radiates into it)
@@ -705,8 +1083,8 @@ void HammondPlayer::ride(double dt) {
     m_.setLeslieFast(leslieFast_);
   }
   lastFlutter_ = flutter_;
-  if (exprSeen_) m_.setExpression(std::clamp(0.5 + breathCtl_, 0.0, 1.0));
-  else m_.setExpression(std::clamp(0.45 + 0.55 * (velSmooth_ - 20) / 107, 0.35, 1.0));
+  if (exprSeen_) m_.setExpression(std::clamp(exprShape_ * (0.5 + breathCtl_), 0.0, 1.0));
+  else m_.setExpression(std::clamp(exprShape_ * std::clamp(0.45 + 0.55 * (velSmooth_ - 20) / 107, 0.35, 1.0), 0.0, 1.0));
   // The intensity: notes a second, weighted by loudness, over ~2 s; the piece's usual over ~20 s.
   sinceSwitch_ += dt;
   sinceNote_ += dt;

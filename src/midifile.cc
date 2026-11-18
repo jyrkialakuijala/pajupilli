@@ -20,6 +20,7 @@
 #include <set>
 #include <memory>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "analysis.h"
@@ -232,6 +233,16 @@ const Instrument* forProgram(int prog) {
 // (an instrument of the Hammond family: all of a file's join one organ)
 bool isHammond(const Instrument* in) { return in && std::strcmp(in->family, "hammond") == 0; }
 
+// (the file's own program a Hammond, before -reinstrument: its sustain pedal and mod wheel are the
+// Leslie's switch; a piano's or a lead's reinstrumented onto the organ are its damper and its
+// vibrato, nothing on a Hammond)
+bool fileHammond(int prog) {
+  for (const char* nm : kGm[prog & 127])
+    if (nm)
+      if (const Instrument* in = findInstrument(nm)) return isHammond(in);
+  return false;
+}
+
 }  // namespace
 
 static int gPlayTranspose = 0;
@@ -279,9 +290,17 @@ struct Part {
   std::unique_ptr<HammondPlan> hplan;
   std::map<int, int> hammondDiv;             // channel * 128 + key -> division (held notes)
   size_t leslieNext = 0;                     // the plan's next Leslie change
+  size_t lvibNext = 0;                       // the plan's next lower vibrato tab switch
   size_t percNext = 0;                       // the plan's next percussion switch
   size_t regNext = 0;                        // the plan's next re-registration
   size_t boostNext = 0;                      // the plan's next Leslie nudge
+  size_t thinNext = 0;                       // the plan's next trill thinning
+  size_t runNext = 0, swellNext = 0;         // the plan's next run switch, expression shape point
+  // The plan's added notes (a glissando's) as events (tick, on, pitch, velocity, division), and
+  // the next of them; the notes let go early for the percussion (tick, channel * 128 + key).
+  std::vector<std::tuple<long, int, int, int, int>> hx;
+  size_t hxNext = 0;
+  std::vector<std::pair<long, int>> hrel;
   std::map<int, int> hammondChans;           // channel -> its notes (a Hammond playing several)
   int maxPoly = 1, maxHeld = 1, played = 0;  // (voices: notes held at once, their tails counted)
   double vol = 100 / 127.0, expr = 1;
@@ -580,18 +599,31 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
     }
     // Does the file set the Leslie itself (the mod wheel, the sustain pedal, CC82)?
-    bool fileLeslie = false;
+    bool fileLeslie = false, fileExpr = false;
     {
       int pg[16] = {};
       for (const Event& e : song.ev) {
         const int ech = e.status & 15, kind = e.status & 0xf0;
         if (kind == 0xc0) pg[ech] = e.a;
-        if (kind == 0xb0 && ech != 9 && isHammond(forProgram(pg[ech])) && (e.a == 1 || e.a == 64 || e.a == 82)) fileLeslie = true;
+        if (kind == 0xb0 && ech != 9 && isHammond(forProgram(pg[ech])) && (e.a == 82 || ((e.a == 1 || e.a == 64) && fileHammond(pg[ech]))))
+          fileLeslie = true;
+        if (kind == 0xb0 && ech != 9 && isHammond(forProgram(pg[ech])) && e.a == 11) fileExpr = true;
       }
     }
     for (const HammondNote& n : notes) ++p.hammondChans[n.ch];
     const double bpm = song.tempo.empty() ? 120 : 60 / song.tempo[0].len;
-    p.hplan.reset(new HammondPlan(planHammond(notes, song.div, bpm, p.inst->name, fileLeslie)));
+    auto secondsAt = [&song](long tick) {
+      const double b = double(tick) / song.div;
+      size_t k = 0;
+      while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
+      return song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
+    };
+    p.hplan.reset(new HammondPlan(planHammond(notes, song.div, bpm, p.inst->name, fileLeslie, fileExpr, secondsAt)));
+    for (const HammondPlan::Extra& x : p.hplan->extra) {
+      p.hx.push_back({x.on, 1, x.pitch, x.vel, x.div});
+      p.hx.push_back({x.off, 0, x.pitch, 0, x.div});
+    }
+    std::sort(p.hx.begin(), p.hx.end());  // (at one tick, a release before a press)
     std::string sum = p.hplan->summary;
     for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
     std::fprintf(stderr, "    %s", sum.c_str());
@@ -779,10 +811,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           // C, ~ (262 / f)^0.6 longer below, to ~200 ms at 16' C; an organist
           // anticipates part of it, the pedal half the difference, a manual's
           // bass less, at most 60 ms: PJ_PLAY_BASS_LEAD scales it)
+          double speech = 0, ledBy = 0;  // (its pipes' speech, s; how far it was played ahead)
           {
             static const double kLead = std::getenv("PJ_PLAY_BASS_LEAD") ? std::atof(std::getenv("PJ_PLAY_BASS_LEAD")) : 1.0;
             const double f = 440 * std::exp2((e.a - 69) / 12.0) * (pedalNote ? 0.5 : 1.0);  // (its sounding pitch: the pedal's 16')
-            const double speech = 0.075 * std::pow(262 / f, 0.6);
+            speech = 0.075 * std::pow(262 / f, 0.6);
             // (into silence half of it: no pulse to keep ahead of, nothing to sound with)
             const double lead = std::min(0.06, kLead * (pedalNote ? 0.5 : 0.3) * std::max(0.0, speech - 0.075)) *
                                 (fromSilence.count(it->second) ? 0.5 : 1.0);
@@ -792,6 +825,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             const double room = lo == lastOff.end() ? lead : std::max(0.0, on - lo->second - 0.005);
             if (std::min(lead, room) > 0.002) {
               song.ev[it->second].t = std::max(0.0, on - std::min(lead, room));
+              ledBy = on - song.ev[it->second].t;
               ++led;
             }
           }
@@ -821,6 +855,15 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             ++repeats;
           }
           gap = std::min(gap, 0.6 * dur);
+          // (a pedal note sounds at least its big pipes' speech and 0.1 s more, or, written shorter,
+          // all but 25 ms: a 16' Principal's fundamental takes ~0.2 s to reach -6 dB, so a fast line
+          // detached by a quarter would speak or not by a few ms, its notes struck cold nearly
+          // without their fundamental, those struck again while their pipe still rang with it: the
+          // organist detaches the pedal less in quick passages. Not for a repeated note.)
+          if (pedalNote && baroque && !(nx != st.end() && *nx - e.t < 0.03)) {
+            const double need = std::min(dur + ledBy - 0.025, speech + 0.1);
+            gap = std::max(0.0, std::min(gap, dur + ledBy - need));
+          }
           if (gap > 0) {
             e.t -= gap;
             ++shortened;
@@ -895,8 +938,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
       // A Hammond's planned Leslie nudges: in the middle of a long note, where no event comes, so
       // by the clock (their ticks turned to seconds by the tempo map).
-      for (auto& [id, p] : parts)
-        if (p.hplan)
+      for (auto& [id, p] : parts) {
+        if (!p.hplan) continue;
           while (p.boostNext < p.hplan->leslieBoost.size()) {
             const double b = double(p.hplan->leslieBoost[p.boostNext].first) / song.div;
             size_t k = 0;
@@ -906,6 +949,79 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslieBoost(p.hplan->leslieBoost[p.boostNext].second);
             ++p.boostNext;
           }
+          while (p.thinNext < p.hplan->thin.size()) {  // (a trill's thinned registration, by the clock)
+            const double b = double(p.hplan->thin[p.thinNext].first) / song.div;
+            size_t k = 0;
+            while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
+            const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
+            if (at > now) break;
+            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setThin(p.hplan->thin[p.thinNext].second);
+            ++p.thinNext;
+          }
+          // (the tick's time by the tempo map)
+          auto when = [&](long tick) {
+            const double b = double(tick) / song.div;
+            size_t k = 0;
+            while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
+            return song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
+          };
+          auto* hpl = dynamic_cast<HammondPlayer*>(&p.ens->player(0));
+          // The re-registrations (inside a held final chord too, no event to carry them).
+          while (p.regNext < p.hplan->upperChanges.size() && when(p.hplan->upperChanges[p.regNext].first) <= now) {
+            if (hpl)
+              hpl->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra, p.hplan->clarity,
+                            p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerPerc);
+            ++p.regNext;
+          }
+          // The run switch.
+          while (p.runNext < p.hplan->run.size() && when(p.hplan->run[p.runNext].first) <= now) {
+            if (hpl) hpl->setRun(p.hplan->run[p.runNext].second);
+            ++p.runNext;
+          }
+          // The expression pedal's planned shape: linear between its points (1 before the first).
+          if (hpl && !p.hplan->swell.empty()) {
+            const auto& sw = p.hplan->swell;
+            while (p.swellNext < sw.size() && when(sw[p.swellNext].first) <= now) ++p.swellNext;
+            double f = 1;
+            if (p.swellNext >= sw.size()) f = sw.back().second;
+            else if (p.swellNext > 0) {
+              const double a = when(sw[p.swellNext - 1].first), b = when(sw[p.swellNext].first);
+              const double x = b > a ? (now - a) / (b - a) : 1;
+              f = sw[p.swellNext - 1].second + (sw[p.swellNext].second - sw[p.swellNext - 1].second) * std::clamp(x, 0.0, 1.0);
+            }
+            hpl->setExprShape(f);
+          }
+          // Notes let go early (the percussion re-armed for the next).
+          for (size_t r = 0; r < p.hrel.size();) {
+            if (when(p.hrel[r].first) > now) { ++r; continue; }
+            auto k = p.hammondDiv.find(p.hrel[r].second);
+            if (k != p.hammondDiv.end()) {
+              if (hpl) hpl->noteOffManual(k->second, p.hrel[r].second & 127);
+              p.hammondDiv.erase(k);
+            }
+            p.hrel.erase(p.hrel.begin() + r);
+          }
+          // The glissandos' keys.
+          while (p.hxNext < p.hx.size() && when(std::get<0>(p.hx[p.hxNext])) <= now) {
+            const auto& [tk, on, key, vel, div] = p.hx[p.hxNext];
+            if (hpl) {
+              if (on) hpl->noteOnManual(div, key, vel);
+              else hpl->noteOffManual(div, key);
+            }
+            ++p.hxNext;
+          }
+          // (... and its speed changes by the clock too: a flick ends inside a held chord, with no
+          // event to carry it)
+          while (p.leslieNext < p.hplan->leslie.size()) {
+            const double b = double(p.hplan->leslie[p.leslieNext].first) / song.div;
+            size_t k = 0;
+            while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
+            const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
+            if (at > now) break;
+            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(p.hplan->leslie[p.leslieNext].second ? 2 : 1);
+            ++p.leslieNext;
+          }
+      }
       for (; next < song.ev.size() && song.ev[next].t < now; ++next) {
         const Event& e = song.ev[next];
         const int ch = e.status & 15, kind = e.status & 0xf0;
@@ -924,9 +1040,16 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             }
         for (auto& [id, p] : parts)
           if (p.hplan)
+            while (p.lvibNext < p.hplan->lowerVib.size() && p.hplan->lowerVib[p.lvibNext].first <= long(e.tick)) {
+              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLowerVibrato(p.hplan->lowerVib[p.lvibNext].second);
+              ++p.lvibNext;
+            }
+        for (auto& [id, p] : parts)
+          if (p.hplan)
             while (p.regNext < p.hplan->upperChanges.size() && p.hplan->upperChanges[p.regNext].first <= long(e.tick)) {
               if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0)))
-                hp->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra);
+                hp->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra, p.hplan->clarity,
+                             p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerPerc);
               ++p.regNext;
             }
         // An organ's plan: its registrations and manuals from their bar on (before a note at the same tick).
@@ -977,8 +1100,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (auto* pl = dynamic_cast<HammondPlayer*>(&hp.ens->player(0))) {
               auto old = hp.hammondDiv.find(ch * 128 + e.a);
               if (old != hp.hammondDiv.end()) pl->noteOffManual(old->second, e.a);
-              pl->noteOnManual(div, e.a, e.b);
+              auto tv = hp.hplan->velocity.find({ch * 128 + e.a, long(e.tick)});  // (a trill's rising touch)
+              pl->noteOnManual(div, e.a, tv != hp.hplan->velocity.end() ? tv->second : e.b);
               hp.hammondDiv[ch * 128 + e.a] = div;
+              auto rl = hp.hplan->release.find({ch * 128 + e.a, long(e.tick)});  // (to be let go early)
+              if (rl != hp.hplan->release.end()) hp.hrel.push_back({rl->second, ch * 128 + e.a});
             }
             ++hp.played;
             continue;
@@ -1014,9 +1140,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           auto hears = [&](int id, const Part& p) {
             return id / 128 == ch || (ch != 9 && std::strcmp(p.inst->family, "hammond") == 0 && isHammond(forProgram(prog[ch])));
           };
+          // (a Hammond takes the sustain pedal and the mod wheel as its Leslie's switch only from a
+          // channel the file wrote for a Hammond: a reinstrumented piano's pedalling is not the
+          // Leslie's, and would throw it, its relay clicking, at every pedal change)
+          auto leslieFrom = [&](const Part& p) { return std::strcmp(p.inst->family, "hammond") != 0 || fileHammond(prog[ch]); };
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
-              if (hears(id, p)) p.ens->setHold(e.b >= 64);
+              if (hears(id, p) && leslieFrom(p)) p.ens->setHold(e.b >= 64);
           if (e.a == 7) chVol[ch] = e.b / 127.0;
           if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Hammond's expression pedal instead
             bool swell = false;
@@ -1031,7 +1161,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           }
           if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Hammond's Leslie (fast from 64)
             for (auto& [id, p] : parts)
-              if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || std::strcmp(p.inst->family, "hammond") == 0))
+              if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || (std::strcmp(p.inst->family, "hammond") == 0 && leslieFrom(p))))
                 p.ens->all(&Performer::setFlutter, e.b / 127.0);
           if (e.a == 82)  // the Leslie's switch (as the Leslie 2101's default): stop, slow, fast
             for (auto& [id, p] : parts)
@@ -1120,6 +1250,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     static const double kLead = std::getenv("PJ_PLAY_LEAD") ? std::atof(std::getenv("PJ_PLAY_LEAD")) : 10.0;
     const size_t lead = size_t(std::max(0.1, kLead) * kRate);
     int waits = 0;
+    static const double kTick = std::getenv("PJ_PLAY_TICK") ? std::atof(std::getenv("PJ_PLAY_TICK")) : 5.0;
+    double nextTick = kTick;
     for (size_t i = 0; i < frames;) {
       size_t have = ready.load(std::memory_order_acquire);
       if (have <= i) {
@@ -1140,6 +1272,16 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if (w < 0) w = snd_pcm_recover(pcm, int(w), 0);
       if (w < 0) break;
       i += size_t(w);
+      // The time every 5 s, as it is heard (what the device still holds taken off), so a muddy or
+      // otherwise bad moment can be named (PJ_PLAY_TICK, s; 0: none).
+      snd_pcm_sframes_t queued = 0;
+      if (snd_pcm_delay(pcm, &queued) < 0) queued = 0;
+      const double heard = (double(i) - std::max<snd_pcm_sframes_t>(queued, 0)) / kRate;
+      while (kTick > 0 && heard >= nextTick) {
+        const int s = int(nextTick + 0.5);
+        std::fprintf(stderr, "  %d:%02d\n", s / 60, s % 60);
+        nextTick += kTick;
+      }
     }
     snd_pcm_drain(pcm);
     snd_pcm_close(pcm);

@@ -19,10 +19,21 @@
 //     its strongest phrase (or two).
 //   - The harmonic percussion where the tune is single, detached and moving (the jazz line), not
 //     in legato, chordal or slow playing: one choice for the piece, switched for one long contrasting
-//     stretch at most (two changes), the percussive organ always on.
+//     stretch at most (two changes), the percussive organ always on. The jazz setting soft (Jimmy
+//     Smith's 888, 3rd, fast, soft); a ballad's single, spaced tune the 2nd, slow, soft (a bell).
+//     Where it is on, a legato line's accented notes (on the beat, or louder) are detached before,
+//     so they ping.
+//   - The vibrato tabs: the chorus on both manuals, off for counterpoint (the lines straight), off
+//     on the lower manual when it carries the bass.
+//   - Preset keys: a re-registration at a short pause at once (the B key), not pulled.
+//   - The ending: on a long final chord the Leslie up and winding down (or down, if fast), the
+//     expression closing on a ballad or swelling otherwise, two more drawbars out (not a ballad);
+//     the rock organ's sometimes ending with the run switch off: the pitch sinking.
+//   - A glissando up the white keys into the first note of a climax (where the Leslie goes fast).
 #pragma once
 
 #include <array>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -55,14 +66,46 @@ struct HammondPlan {
   // pulled out at each, toward the end; the lower manual and pedals follow (lowerExtra: its
   // balance's extra softness, steps).
   std::vector<std::pair<long, std::array<int, 9>>> upperChanges;
+  // (per change: by the preset key, at once, where the pause is too short to pull a drawbar)
+  std::vector<bool> upperInstant;
   double lowerExtra = 0;
+  // The lower manual on 008880080 (hammondLowerPercussive): the percussion on, the left hand comping
+  // above the pedals' bass, an extra octave of percussion-like sound.
+  bool lowerPerc = false;
+  // The lower manual's vibrato tab switched (tick, on): off through the planned fast phrases and
+  // back after (C3 under a fast Leslie muddies the low accompaniment; the upper keeps it).
+  std::vector<std::pair<long, bool>> lowerVib;
+  // (the lower manual's and pedals' clarity, 0..1: less 16' (and 5 1/3') under a moving pedal line
+  // or rich harmony; see hammondLowerFor, hammondPedalFor)
+  double clarity = 0;
   // The channels whose expression (CC11) is the organ's pedal: the tune's (mostly upper notes).
   std::set<int> exprChannels;
+  // Velocities the plan plays instead of the file's ((channel * 128 + pitch, on-tick) -> velocity):
+  // a trill's, rising through it (its key clicks sharpening).
+  std::map<std::pair<int, long>, int> velocity;
+  int trills = 0, trillFrom = 0, trillTo = 0;
+  // The registration thinned for the trills ((tick, 0..1): from a trill's start the drawbars glide
+  // toward the 8' and 4' alone, back after it): a trill on a thick registration is a blur.
+  std::vector<std::pair<long, double>> thin;  // (how many; the first one's touch, first and last note)
+  // Notes let go early so the next strikes the single-trigger percussion ((channel * 128 + pitch,
+  // on-tick) -> the tick it is released): a legato line's accented notes detached, as jazz organists
+  // play to choose which notes ping.
+  std::map<std::pair<int, long>, long> release;
+  // The expression pedal's planned shape over its riding (tick, x it), linear between the points:
+  // the final chord swelled or closed.
+  std::vector<std::pair<long, double>> swell;
+  // The run switch (tick, on): off on a rock organ's final chord, the generator coasting down.
+  std::vector<std::pair<long, bool>> run;
+  // Notes the plan adds: a glissando's white keys swept up into a climax's first note.
+  struct Extra { long on, off; int pitch, vel, div; };
+  std::vector<Extra> extra;
   std::string summary;
 };
 
-// fileLeslie: the file sends its own Leslie controls (CC1, CC64, CC82 on the part's channels).
+// fileLeslie: the file sends its own Leslie controls (CC1, CC64, CC82 on the part's channels);
+// fileExpr: its own expression pedal (CC11). secondsAt: a tick's time by the file's tempo map (the
+// ending's length, a ritardando's included); empty: by bpm.
 HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double bpm, const std::string& instrument,
-                        bool fileLeslie);
+                        bool fileLeslie, bool fileExpr = false, std::function<double(long)> secondsAt = nullptr);
 
 }  // namespace pajupilli

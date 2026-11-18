@@ -108,6 +108,12 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
   sections and a **spring coupling on each tone wheel** absorb them. "Hunting is suppressed by the
   resilient couplings and inertia members". So 120 Hz (60 Hz mains) or 100 Hz (50 Hz) speed
   ripple, filtered mechanically, is a known residual.
+- **[design] One shaft, two wheels (2026-11-18, the user: "always two plates are on the same
+  axis, with the same wobble and the same drive mistakes, but only two"):** the model's errors are
+  split by where they live: per assembly (shaft runout as AM, the driven gear's runout and ovality
+  as a once/twice-a-turn angle error, the coupling's torsional flutter, the shaft's starting
+  angle), per wheel (its eccentricity, ovality, teeth, filter, level), per gear ratio (the
+  ratio's nominal speed), and common (the 20 Hz drive shaft, the motor's 120 Hz, the mains drift).
 - **The 12 gear pairs**, confirmed by two independent tables **[web, ED, GV]** and reproduced here
   **[calc]**. A wheel's rotation rate is 20 × ratio. A 2-tooth wheel gives twice that.
 
@@ -209,6 +215,11 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
   - **[design]** Start with 2nd/3rd harmonics at −30 to −40 dB below the fundamental for the
     unfiltered wheels 13-43 (shunted only). Use −45 to −60 dB after the tuned filters (49-91). Fit
     by ear and to any recording the user can supply.
+  - **[design, 2026-11-18]** (the user: "because of machining difficulties, the tonewheels are not
+    an exact sine wave but have also harmonic overtones, creating a bit of dissonant brilliancy"):
+    up to the 7th, 2nd/3rd −30, 4th −42, 5th −34, 6th −48, 7th −45 dB, ±4 dB per wheel, then the
+    wheel's filter. Their beating against the tempered drawbar wheels (§3.2: the 1⅗' 13-16 c sharp
+    of the 5th) is the dissonance.
 - **The complex wheels (1-12).** From the B-2/C-2 onward, "the original two-tooth wheels in the
   generator have been replaced with twelve two-tooth complex tone wheels, which supply a
   fundamental tone, that is enriched with the odd-number harmonics" **[paper, HSM]**. The tooth is
@@ -853,7 +864,7 @@ Frequencies come from §3.1.
 | | wheel eccentricity e | half-normal, median 12 µm | 0-60 µm ("age") |
 | | tooth position σ_x | 5 µm | 0-25 µm |
 | | gap g0, flux exponent n | 0.35 mm, 1.5 | 0.2-0.5 mm, 1-2.5 |
-| | wheel harmonics (13-43) | 2nd −35, 3rd −38 dB | |
+| | wheel harmonics (13-48) | 2nd, 3rd −30, 4th −42, 5th −34, 6th −48, 7th −45 dB (±4) | |
 | | complex wheels 1-12 | 3rd −12, 5th −22 dB | |
 | | filter Q (49-91) | 4 | 2-8 |
 | | cap age factor | 1.0 | 1-4 |

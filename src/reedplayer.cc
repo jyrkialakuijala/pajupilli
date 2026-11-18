@@ -21,7 +21,7 @@ ReedPlayer::ReedPlayer(Reed& r) : Performer(r), reed_(r) {
   // reed's pitch moves with the breath and the attack far more than a
   // flute's); an ensemble's just intonation sets the target instead.
   ear_ = knob("PJ_REEDEAR", 1) > 0;
-  kEarStart_ = knob("PJ_REEDEARSTART", 0);  // s on the note before the ear listens
+  kEarStart_ = knob("PJ_REEDEARSTART", inst_.design ? inst_.design->reed.earStart : 0);  // s on the note before the ear listens
   kEarRange_ = knob("PJ_REEDEARRANGE", 120);    // cents: a larger error is another regime
   // A bagpipe's chanter reed sits in the bag: no lips to tune or bend with,
   // the bag's pressure steady.
@@ -68,6 +68,19 @@ void ReedPlayer::noteOn(int midi, int velocity) {
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
   const Articulation art = articulate(midi, velocity, legato);
   note_ = midi;
+  // A key harder (or softer) than the note can be played: the dynamics stop
+  // at the note's calibrated range, and the attack with them (the tongue, the
+  // accent, the fingers as for the dynamics it gets). A reed has more states
+  // than the note, and the attack decides which it falls into: a forte attack
+  // on a mezzo-forte breath is not a way the calibration has played the note
+  // (the English horn's G#3 spoke an octave up from any key over 64).
+  if (!bag_ && art != kArtGlide && kVelDyn_ > 0) {
+    const double want = dyn_ + breathCtl_ + kVelDyn_ * (velocity - 64) / 63.0;
+    const double got = std::clamp(want, dynLo[midi], std::max(dynLo[midi], dynHi[midi]));
+    const int v = int(std::lround(velocity - 63 * (want - got) / kVelDyn_));
+    velocity = want > got ? std::clamp(v, std::min(velocity, 64), velocity)
+                          : std::clamp(v, velocity, std::max(velocity, 64));
+  }
   keyVel_ = velocity;
   const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
                    : art == kArtTongueLegato || art == kArtDu ? kDu

@@ -127,63 +127,63 @@ const NoteInfo kOboeNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5, 0, 0.15}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // English horn in F, written Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,
 // the third register by search among vented fingerings.
 const BorePoint kEnglishHornBore[] = {
-    {0.0, 3.44}, {15.0, 4.20}, {37.5, 5.35}, {108.0, 6.90}, {763.4, 23.25}, {793.4, 24.75}, {823.4, 33.00}, {853.4, 54.00}};
+    {0.0, 3.53}, {53.7, 5.06}, {153.5, 7.91}, {818.0, 23.70}, {863.0, 25.50}, {900.5, 33.00}, {938.0, 48.00}};
 const HoleDef kEnglishHornHoles[] = {
-    {254.7, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 1 oct2
-    {360.0, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 2 oct1
-    {294.2, 4.80, 12.8, 3.8, 13.5, kNormallyClosed},  // 3 C#5
-    {337.9, 5.34, 12.4, 12.0, 22.5, kFingerHole},  // 4 C5
-    {328.7, 5.87, 12.0, 12.0, 22.5, kFingerHole},  // 5 B4
-    {355.8, 6.41, 11.6, 3.8, 13.5, kNormallyClosed},  // 6 A#4
-    {412.4, 6.94, 11.2, 12.0, 22.5, kFingerHole},  // 7 A4
-    {433.9, 7.48, 10.9, 3.8, 13.5, kNormallyClosed},  // 8 G#4
-    {482.4, 8.01, 10.5, 12.0, 22.5, kFingerHole},  // 9 G4
-    {499.4, 8.55, 10.1, 12.0, 22.5, kFingerHole},  // 10 F#4
-    {542.2, 9.09, 9.8, 3.8, 13.5, kNormallyClosed},  // 11 F4
-    {580.5, 9.62, 9.4, 12.0, 22.5, kFingerHole},  // 12 E4
-    {624.0, 10.16, 9.0, 3.8, 13.5, kNormallyClosed},  // 13 D#4
-    {660.4, 10.69, 8.6, 3.8, 13.5, 0},  // 14 D4
-    {703.2, 11.23, 8.2, 3.8, 13.5, kNormallyClosed},  // 15 C#4
-    {765.8, 11.76, 7.9, 3.8, 13.5, 0},  // 16 C4
-    {933.8, 12.30, 7.5, 3.8, 13.5, 0},  // 17 B3
+    {78.2, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 1 oct2
+    {195.0, 1.65, 18.0, 1.5, 7.5, kNormallyClosed},  // 2 oct1
+    {265.7, 4.80, 12.8, 3.8, 13.5, kNormallyClosed},  // 3 C#5
+    {294.7, 5.34, 12.4, 12.0, 22.5, kFingerHole},  // 4 C5
+    {315.6, 5.87, 12.0, 12.0, 22.5, kFingerHole},  // 5 B4
+    {353.5, 6.41, 11.6, 3.8, 13.5, kNormallyClosed},  // 6 A#4
+    {380.3, 6.94, 11.2, 12.0, 22.5, kFingerHole},  // 7 A4
+    {418.4, 7.48, 10.9, 3.8, 13.5, kNormallyClosed},  // 8 G#4
+    {454.1, 8.01, 10.5, 12.0, 22.5, kFingerHole},  // 9 G4
+    {484.0, 8.55, 10.1, 12.0, 22.5, kFingerHole},  // 10 F#4
+    {528.2, 9.09, 9.8, 3.8, 13.5, kNormallyClosed},  // 11 F4
+    {564.5, 9.62, 9.4, 12.0, 22.5, kFingerHole},  // 12 E4
+    {613.8, 10.16, 9.0, 3.8, 13.5, kNormallyClosed},  // 13 D#4
+    {654.7, 10.69, 8.6, 3.8, 13.5, 0},  // 14 D4
+    {707.3, 11.23, 8.2, 3.8, 13.5, kNormallyClosed},  // 15 C#4
+    {759.5, 11.76, 7.9, 3.8, 13.5, 0},  // 16 C4
+    {814.9, 12.30, 7.5, 3.8, 13.5, 0},  // 17 B3
 };
 const NoteInfo kEnglishHornNotes[] = {
-    {"xxxxxxxxxxxxxxxxx", 1},  // 58 A#3 (+110 c passive)
-    {"xxxxxxxxxxxxxxxxo", 1},  // 59 B3 (+10 c passive)
-    {"xxxxxxxxxxxxxxxoo", 1},  // 60 C4 (-7 c passive)
-    {"xxxxxxxxxxxxxxooo", 1},  // 61 C#4 (+10 c passive)
-    {"xxxxxxxxxxxxxoxoo", 1},  // 62 D4 (-13 c passive)
-    {"xxxxxxxxxxxxooxoo", 1},  // 63 D#4 (-16 c passive)
-    {"xxxxxxxxxxxoxoxoo", 1},  // 64 E4 (-27 c passive)
-    {"xxxxxxxxxxooxoxoo", 1},  // 65 F4 (-22 c passive)
-    {"xxxxxxxxxoxoxoxoo", 1},  // 66 F#4 (-23 c passive)
-    {"xxxxxxxxooxoxoxoo", 1},  // 67 G4 (-49 c passive)
-    {"xxxxxxxoooxoxoxoo", 1},  // 68 G#4 (-25 c passive)
-    {"xxxxxxoxooxoxoxoo", 1},  // 69 A4 (-73 c passive)
-    {"xxxxxooxooxoxoxoo", 1},  // 70 A#4 (+15 c passive)
-    {"xxxxoxoxooxoxoxoo", 1},  // 71 B4 (-7 c passive)
-    {"xxxooxoxooxoxoxoo", 1},  // 72 C5 (-56 c passive)
-    {"xxoooxoxooxoxoxoo", 1},  // 73 C#5 (-49 c passive)
-    {"xoxxxxxxxxxxxoxoo", 2},  // 74 D5 (+41 c passive)
-    {"xoxxxxxxxxxxooxoo", 2},  // 75 D#5 (+47 c passive)
-    {"xoxxxxxxxxxoxoxoo", 2},  // 76 E5 (+39 c passive)
-    {"xoxxxxxxxxooxoxoo", 2},  // 77 F5 (+55 c passive)
-    {"xoxxxxxxxoxoxoxoo", 2},  // 78 F#5 (+53 c passive)
-    {"xoxxxxxxooxoxoxoo", 2},  // 79 G5 (+37 c passive)
-    {"xoxxxxxoooxoxoxoo", 2},  // 80 G#5 (+65 c passive)
-    {"oxxxxxoxooxoxoxoo", 2},  // 81 A5 (+16 c passive)
-    {"oxxxxooxooxoxoxoo", 2},  // 82 A#5 (+128 c passive)
-    {"oxxxoxoxooxoxoxoo", 2},  // 83 B5 (+82 c passive)
-    {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (+77 c passive)
-    {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+93 c passive)
+    {"xxxxxxxxxxxxxxxxx", 1},  // 58 A#3 (+1 c passive)
+    {"xxxxxxxxxxxxxxxxo", 1},  // 59 B3 (-0 c passive)
+    {"xxxxxxxxxxxxxxxoo", 1},  // 60 C4 (-0 c passive)
+    {"xxxxxxxxxxxxxxooo", 1},  // 61 C#4 (+0 c passive)
+    {"xxxxxxxxxxxxxoxoo", 1},  // 62 D4 (-5 c passive)
+    {"xxxxxxxxxxxxooxoo", 1},  // 63 D#4 (-3 c passive)
+    {"xxxxxxxxxxxoxoxoo", 1},  // 64 E4 (-0 c passive)
+    {"xxxxxxxxxxooxoxoo", 1},  // 65 F4 (+1 c passive)
+    {"xxxxxxxxxoxoxoxoo", 1},  // 66 F#4 (+3 c passive)
+    {"xxxxxxxxooxoxoxoo", 1},  // 67 G4 (+2 c passive)
+    {"xxxxxxxoooxoxoxoo", 1},  // 68 G#4 (+1 c passive)
+    {"xxxxxxoxooxoxoxoo", 1},  // 69 A4 (-1 c passive)
+    {"xxxxxooxooxoxoxoo", 1},  // 70 A#4 (-0 c passive)
+    {"xxxxoxoxooxoxoxoo", 1},  // 71 B4 (+2 c passive)
+    {"xxxooxoxooxoxoxoo", 1},  // 72 C5 (-0 c passive)
+    {"xxoooxoxooxoxoxoo", 1},  // 73 C#5 (-4 c passive)
+    {"xoxxxxxxxxxxxoxoo", 2},  // 74 D5 (+28 c passive)
+    {"xoxxxxxxxxxxooxoo", 2},  // 75 D#5 (+17 c passive)
+    {"xoxxxxxxxxxoxoxoo", 2},  // 76 E5 (+3 c passive)
+    {"xoxxxxxxxxooxoxoo", 2},  // 77 F5 (-3 c passive)
+    {"xoxxxxxxxoxoxoxoo", 2},  // 78 F#5 (-11 c passive)
+    {"xoxxxxxxooxoxoxoo", 2},  // 79 G5 (-9 c passive)
+    {"xoxxxxxoooxoxoxoo", 2},  // 80 G#5 (-5 c passive)
+    {"oxxxxxoxooxoxoxoo", 2},  // 81 A5 (+7 c passive)
+    {"oxxxxooxooxoxoxoo", 2},  // 82 A#5 (+0 c passive)
+    {"oxxxoxoxooxoxoxoo", 2},  // 83 B5 (-11 c passive)
+    {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
+    {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kEnglishHornDesign = {kEnglishHornBore, 8, kEnglishHornHoles, 17, kEnglishHornNotes, 3.73, 853.4, false, nullptr, 0, {0.008, 0.0003, 3.2e+07, 1700, 0.3, 0.0001, 0, 1e-05, 4000, 5500, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kEnglishHornDesign = {kEnglishHornBore, 7, kEnglishHornHoles, 17, kEnglishHornNotes, 3.73, 938.0, false, nullptr, 0, {0.008, 0.0004, 2.4e+07, 2000, 0.9, 0.00015, 0, 1e-05, 4000, 5500, 0, 0.75, 0, 0.5, 0.0001, 0.15}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Bassoon, Bb1..Eb4
 // A long narrow cone and a double reed; small holes with long oblique

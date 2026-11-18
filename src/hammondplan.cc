@@ -12,7 +12,7 @@
 namespace pajupilli {
 
 HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double bpm, const std::string& instrument,
-                        bool fileLeslie) {
+                        bool fileLeslie, bool fileExpr, std::function<double(long)> secondsAt) {
   HammondPlan plan;
   plan.reg = hammondPreset(instrument);
   if (notes.empty()) {
@@ -162,11 +162,68 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     style = "ballad";
     r.upper = {8, 3, 8, 0, 0, 0, 0, 0, 0};
     r.lower = {8, 0, 8, 0, 0, 0, 0, 0, 0};
-    r.vibrato = 6;
+    r.vibrato = 4;  // (C1: the ballad clean, a slight movement that blurs neither line nor attack)
   } else {
     style = "jazz";
     r.upper = {8, 8, 8, 0, 0, 0, 0, 0, 0};
     r.vibrato = 6;
+  }
+  // Harmonically complex (dense chords, semitones and tritones among them, close intervals low): the
+  // 888's sub-octave and fifth (16', 5 1/3') turn its harmony to mud, so organists thin to a single
+  // foundation, the 8' (008000000, with a little 4'), or nearly. Measured at every onset over what
+  // sounds then: the pitch classes beyond a triad, a semitone or tritone among them, a second or
+  // third under C4; 0..1 (Bach's chorales ~0.2, jazz standards 0.3-0.45). From 0.25 the 16' and
+// 5 1/3' fade, from 0.4 a single drawbar
+  // (PJ_HAMMOND_COMPLEX scales the measure). (Not the rock organ: its grit is the point.)
+  std::string complexText;
+  double harmonyCx = 0;
+  if (instrument != "rock-organ" && !std::getenv("PJ_HAMMOND_UPPER")) {
+    std::vector<long> ons;
+    for (const HammondNote& n : notes) ons.push_back(n.on);
+    std::sort(ons.begin(), ons.end());
+    ons.erase(std::unique(ons.begin(), ons.end()), ons.end());
+    double sum = 0;
+    int m = 0;
+    for (long t : ons) {
+      int pcMask = 0;
+      std::vector<int> low;
+      for (const HammondNote& n : notes)
+        if (n.on <= t && n.off > t) {
+          pcMask |= 1 << (n.pitch % 12);
+          if (n.pitch < 60) low.push_back(n.pitch);
+        }
+      int pcs = 0;
+      for (int b = 0; b < 12; ++b) pcs += (pcMask >> b) & 1;
+      if (pcs < 2) continue;
+      bool harsh = false;
+      for (int a = 0; a < 12; ++a)
+        if ((pcMask >> a) & 1) harsh |= ((pcMask >> ((a + 1) % 12)) & 1) || ((pcMask >> ((a + 6) % 12)) & 1);
+      bool lowClose = false;
+      std::sort(low.begin(), low.end());
+      for (size_t i = 1; i < low.size(); ++i) lowClose |= low[i] - low[i - 1] > 0 && low[i] - low[i - 1] <= 4;
+      sum += 0.4 * std::clamp((pcs - 3) / 3.0, 0.0, 1.0) + 0.3 * harsh + 0.3 * lowClose;
+      ++m;
+    }
+    static const double kComplex = knob("PJ_HAMMOND_COMPLEX", 1.0);
+    const double cx = m ? kComplex * sum / m : 0;
+    harmonyCx = cx;
+    if (cx >= 0.4) {
+      r.upper = {0, 0, 8, std::min(r.upper[3], 3), 0, 0, 0, 0, 0};
+      char b7[96];
+      std::snprintf(b7, sizeof b7, "; a single foundation (harmonically complex, %.2f)", cx);
+      complexText = b7;
+    } else if (cx >= 0.25) {
+      const double f = (0.4 - cx) / 0.15;  // (1 at 0.25 .. 0 at 0.4)
+      r.upper[0] = int(std::lround(r.upper[0] * (0.3 + 0.7 * f)));
+      r.upper[1] = int(std::lround(r.upper[1] * f));
+      char b7[96];
+      std::snprintf(b7, sizeof b7, "; its subs thinned (harmonically rich, %.2f)", cx);
+      complexText = b7;
+    } else {
+      char b7[64];
+      std::snprintf(b7, sizeof b7, "; harmony %.2f", cx);  // (clarity follows below)
+      complexText = b7;
+    }
   }
   // Played low, the registration moves up: a low line on the 888 is mud, so organists take the
   // drawbars an octave (or two) higher, the 8' alone becoming the 4' alone (000800000): each
@@ -231,6 +288,16 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
       return v[v.size() / 2];
     };
+    // (clarity: a pedal line, the busier the more (a walking or contrapuntal bass), and the harmony's
+    // richness: the lower's 16' and 5 1/3' eased back, the pedals on less 16' and more 8')
+    {
+      static const double kClarity = knob("PJ_HAMMOND_CLARITY", 1.0);
+      const double pedalRate = counts[HammondModel::kPedal] / secs;
+      double c = counts[HammondModel::kPedal] > 8 ? 0.4 + 0.4 * std::clamp((pedalRate - 0.5) / 1.5, 0.0, 1.0) : 0.0;
+      c += std::clamp((harmonyCx - 0.15) * 2, 0.0, 0.5);
+      plan.clarity = std::clamp(kClarity * c, 0.0, 1.0);
+    }
+    const double clar = plan.clarity;
     double extra = 0;
     const double vu = med(HammondModel::kUpper, false), vl = med(HammondModel::kLower, false);
     const double eu = med(HammondModel::kUpper, true), el = med(HammondModel::kLower, true);
@@ -246,7 +313,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       const double want = level(up) - std::max(db, 3.0);
       double bestErr = 1e9;
       for (double e = -1; e <= 6; e += 0.1) {
-        const double err = std::fabs(level(hammondLowerFor(up, e)) - want);
+        const double err = std::fabs(level(hammondLowerFor(up, e, clar)) - want);
         if (err < bestErr) { bestErr = err; extra = e; }
       }
       if (db >= 4) {
@@ -256,10 +323,41 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       }
     }
     plan.lowerExtra = extra;
-    const std::array<double, 9> low = hammondLowerFor(up, extra);
+    const std::array<double, 9> low = hammondLowerFor(up, extra, clar);
     for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(low[d]));
-    const std::array<double, 2> ped = hammondPedalFor(up);  // (and the pedals by its loudness and brightness)
+    const std::array<double, 2> ped = hammondPedalFor(up, clar);  // (and the pedals by its loudness and brightness)
     r.pedal = {int(std::lround(ped[0])), int(std::lround(ped[1]))};
+  }
+  // The vibrato tabs (the scanner's chorus, C3, on both manuals by default): counterpoint (a moving
+  // pedal line under a moving lower manual, not chordal) played straight, both tabs off, the lines
+  // clear as on a pipe organ; the lower manual carrying the bass itself (no pedal line, its single
+  // notes low, under F3) without it, the bass tight, as trio organists play the left hand's line. (Not the presets
+  // without it: the percussive and rock organs.)
+  std::string vibText;
+  if (r.vibrato > 0) {
+    const double pedalRate = counts[HammondModel::kPedal] / secs, lowerRate = counts[HammondModel::kLower] / secs;
+    double lsum = 0;
+    int ln = 0;
+    std::map<long, std::pair<int, int>> lowerAt;  // (the lower manual's moments, notes begun together: count, pitch)
+    for (const HammondNote& nt : notes)
+      if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == HammondModel::kLower) {
+        auto& m = lowerAt[nt.on / together];
+        ++m.first;
+        m.second = nt.pitch;
+      }
+    int lowerSingle = 0;
+    for (auto& [t, c] : lowerAt)
+      if (c.first == 1) { ++lowerSingle; lsum += c.second; ++ln; }
+    // (counterpoint: the lower manual a line of its own, mostly single notes, not a comping hand's
+    // chords, over a moving pedal line; in plain harmony, not a jazz line's)
+    const bool lowerLine = !lowerAt.empty() && lowerSingle >= 0.7 * lowerAt.size();
+    if (counts[HammondModel::kPedal] > 8 && pedalRate >= 0.8 && lowerRate >= 1 && lowerLine && chordal < 0.35 && harmonyCx < 0.3) {
+      r.vibUpper = r.vibLower = false;
+      vibText = "; the vibrato off (counterpoint, the lines straight)";
+    } else if (ln >= 8 && lsum / ln < 53 && counts[HammondModel::kPedal] < std::max(8, ln / 10)) {
+      r.vibLower = false;
+      vibText = "; the lower's vibrato off (it carries the bass)";
+    }
   }
   // The harmonic percussion: where the upper manual's lines are mostly single notes, detached
   // and moving (the jazz organ's line: the 3rd, fast, the ping on every fresh note); not in
@@ -268,7 +366,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
   // stretch that clearly asks the other way (a quarter of the piece and at least 8 bars) may
   // switch it there and back: at most two changes, mostly none. The percussive organ (GM 18)
   // keeps it throughout.
-  std::string percText;
+  std::string percText, detachText;
   {
     // The upper manual's notes in time order.
     std::vector<const HammondNote*> up;
@@ -276,16 +374,17 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       if (plan.division[{n.ch * 128 + n.pitch, n.on}] == HammondModel::kUpper) up.push_back(&n);
     std::sort(up.begin(), up.end(), [](const HammondNote* a, const HammondNote* b) { return a->on != b->on ? a->on < b->on : a->pitch < b->pitch; });
     const double secsPerTick = 60 / std::max(bpm, 20.0) / tpq;
-    // Its character over [t0, t1): -1 no say (too few notes), else 0 / 1.
-    auto suits = [&](long t0, long t1) -> int {
-      int groups = 0, singles = 0, legato = 0, moves = 0;
+    // Its character over [t0, t1): its moments (notes begun together), the share of them single
+    // notes, the share of moves legato (the last still held at the next), moments a second.
+    struct Feel { int groups = 0; double single = 0, legato = 0, rate = 0; };
+    auto feel = [&](long t0, long t1) {
+      Feel f;
+      int singles = 0, legato = 0, moves = 0, inGroup = 0;
       long lastOn = -1, lastOff = -1;
-      int inGroup = 0;
-      for (size_t i = 0; i < up.size(); ++i) {
-        const HammondNote* n = up[i];
+      for (const HammondNote* n : up) {
         if (n->on < t0 || n->on >= t1) continue;
         if (n->on - lastOn > together) {
-          if (lastOn >= 0) { ++groups; singles += inGroup == 1; }
+          if (lastOn >= 0) { ++f.groups; singles += inGroup == 1; }
           if (lastOff >= 0) { ++moves; legato += lastOff > n->on; }
           inGroup = 0;
           lastOff = -1;
@@ -294,18 +393,41 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         lastOn = n->on;
         lastOff = std::max(lastOff, n->off);
       }
-      if (lastOn >= 0) { ++groups; singles += inGroup == 1; }
-      if (groups < 6) return -1;
-      const double rate = groups / std::max((t1 - t0) * secsPerTick, 0.5);
-      const double single = double(singles) / groups, leg = moves ? double(legato) / moves : 0;
-      return single >= 0.6 && leg < 0.45 && rate >= 1.5 ? 1 : 0;
+      if (lastOn >= 0) { ++f.groups; singles += inGroup == 1; }
+      f.rate = f.groups / std::max((t1 - t0) * secsPerTick, 0.5);
+      f.single = f.groups ? double(singles) / f.groups : 0;
+      f.legato = moves ? double(legato) / moves : 0;
+      return f;
+    };
+    // -1 no say (too few notes), else whether it is the jazz line (single, detached, moving).
+    auto suits = [&](long t0, long t1) -> int {
+      const Feel f = feel(t0, t1);
+      if (f.groups < 6) return -1;
+      return f.single >= 0.6 && f.legato < 0.45 && f.rate >= 1.5 ? 1 : 0;
     };
     const bool gm18 = instrument == "percussive-organ";
     bool global = gm18 || (style == "jazz" && suits(first, last + 1) == 1);
     r.perc = global;
     r.percThird = true;
     r.percFast = true;
-    percText = global ? "on (3rd, fast)" : "off";
+    // (the jazz organ's setting soft: Jimmy Smith's 888, 3rd, fast, soft; the ping over the line
+    // without the normal setting's drop of the whole manual. The percussive organ's preset normal.)
+    r.percSoft = !gm18;
+    std::string onText = gm18 ? "on (3rd, fast)" : "on (3rd, fast, soft)";
+    // A ballad's tune of single, spaced notes, high enough to ring: the 2nd, slow and soft, a bell
+    // under each note (the 8''s octave), its slow decay through the note.
+    if (!gm18 && style == "ballad") {
+      const Feel f = feel(first, last + 1);
+      double mean = 0;
+      for (const HammondNote* n : up) mean += n->pitch;
+      mean /= std::max<size_t>(up.size(), 1);
+      if (f.groups >= 8 && f.single >= 0.8 && f.legato < 0.3 && f.rate >= 0.4 && f.rate <= 2.5 && mean >= 67) {
+        global = r.perc = true;
+        r.percThird = r.percFast = false;
+        onText = "on (2nd, slow, soft: a bell on each note)";
+      }
+    }
+    percText = global ? onText : "off";
     if (!gm18 && style == "jazz") {
       // Eight-bar stretches (4/4 assumed when the file says nothing finer).
       const long window = 32L * tpq;
@@ -331,11 +453,85 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         const long t0 = at(first + long(bestA) * window), t1 = first + long(bestA + bestLen) * window;
         plan.percussion.push_back({t0, !global});
         if (t1 <= last) plan.percussion.push_back({at(t1), global});
-        char b3[96];
-        std::snprintf(b3, sizeof b3, "%s, %s for bars %ld-%ld", global ? "on (3rd, fast)" : "off", global ? "off" : "on",
+        char b3[128];
+        std::snprintf(b3, sizeof b3, "%s, %s for bars %ld-%ld", global ? onText.c_str() : "off", global ? "off" : "on",
                       long(bestA) * 8 + 1, long(bestA + bestLen) * 8);
         percText = b3;
       }
+    }
+    // (the jazz organist's upper with the percussion: 888000008. The 1' is silent while the
+    // percussion is on, its busbar taken for the ping; where the percussion is switched off it
+    // comes in, the line's top brightened instead)
+    if (!gm18 && style == "jazz" && (global || !plan.percussion.empty())) r.upper[8] = 8;
+    // Where the percussion is on, the player chooses which notes ping by the touch: single-trigger,
+    // it strikes only after every upper key has been up (~35 ms to charge again). So in a legato
+    // stretch the accented notes (a bar's first, 4/4 assumed, or played clearly louder than the
+    // line; 1.5 s apart at least) are detached: the note before let go ~45 ms early. The rest stay
+    // legato, without the ping, as written.
+    auto percAt = [&](long t) {
+      bool on = global;
+      for (auto& [tk, v] : plan.percussion)
+        if (tk <= t) on = v;
+      return on;
+    };
+    static const double kDetach = knob("PJ_HAMMOND_DETACH", 1.0);  // (0: the file's legato as written)
+    if ((global || !plan.percussion.empty()) && kDetach > 0) {
+      std::vector<int> vel;
+      for (const HammondNote* n : up) vel.push_back(n->vel);
+      std::nth_element(vel.begin(), vel.begin() + vel.size() / 2, vel.end());
+      const int medVel = vel.empty() ? 64 : vel[vel.size() / 2];
+      const long gap = std::max<long>(1, long(std::lround(0.045 / secsPerTick)));
+      int detached = 0;
+      long lastDetach = -1000000000;
+      for (size_t i = 0; i + 1 < up.size(); ++i) {
+        const HammondNote* a = up[i];
+        const HammondNote* b = up[i + 1];
+        if (b->on - a->on <= together) continue;  // (a chord: not a line's move)
+        if (i > 0 && a->on - up[i - 1]->on <= together) continue;
+        if (i + 2 < up.size() && up[i + 2]->on - b->on <= together) continue;
+        if (a->off <= b->on - gap || !percAt(b->on)) continue;  // (already detached; or no percussion there)
+        const bool accent = b->on % (4L * tpq) == 0 || b->vel >= medVel + 12;
+        if (!accent || (b->on - a->on) * secsPerTick < 0.12 || (b->on - lastDetach) * secsPerTick < 1.5) continue;
+        // (no other upper key held through the lift: it would keep the percussion from charging)
+        bool other = false;
+        for (const HammondNote* n : up)
+          if (n != a && n->on < b->on && n->off > b->on - gap) { other = true; break; }
+        if (other) continue;
+        plan.release[{a->ch * 128 + a->pitch, a->on}] = b->on - gap;
+        lastDetach = b->on;
+        ++detached;
+      }
+      if (detached) detachText = "; " + std::to_string(detached) + " accent" + (detached > 1 ? "s" : "") + " detached to strike the percussion";
+    }
+  }
+  // The lower manual as the percussion's stand-in (an organist's trick: "if you are not playing
+  // left hand bass and need an extra octave of percussion-like sound, set your lower manual
+  // drawbars to 008880080"): the percussion (3rd, fast) on for the piece, the left hand comping,
+  // its moments mostly chords, above the bass (the pedals carry it, or the lower's notes lie above
+  // G3 on the average). At the lower's planned level (hammondLowerPercussive).
+  std::string lowerPercText;
+  {
+    static const double kLowerPerc = knob("PJ_HAMMOND_LOWERPERC", 1.0);  // (0: never)
+    std::map<long, int> at;
+    double sum = 0;
+    int n = 0;
+    for (const HammondNote& nt : notes)
+      if (plan.division[{nt.ch * 128 + nt.pitch, nt.on}] == HammondModel::kLower) {
+        ++at[nt.on / together];
+        sum += nt.pitch;
+        ++n;
+      }
+    int chords = 0;
+    for (auto& [t, c] : at) chords += c >= 2;
+    const bool comping = at.size() >= 8 && chords >= 0.5 * at.size();
+    const bool aboveBass = counts[HammondModel::kPedal] > 8 || (n && sum / n >= 55);
+    if (kLowerPerc > 0 && r.perc && r.percThird && r.percFast && plan.percussion.empty() && comping && aboveBass) {
+      std::array<double, 9> low{};
+      for (int d = 0; d < 9; ++d) low[d] = r.lower[d];
+      low = hammondLowerPercussive(low);
+      for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(low[d]));
+      plan.lowerPerc = true;
+      lowerPercText = "; the lower on 008880080 (the percussion's stand-in: the left hand comps over the bass)";
     }
   }
   hammondOverrides(r);  // (PJ_HAMMOND_*: by hand, over the plan)
@@ -346,15 +542,21 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
   // toward its end: the pauses nearest 35, 55, 75 and 90 % of it). The lower manual and pedals
   // follow each.
   std::string regText;
+  std::array<int, 9> finalUpper = r.upper;  // (the upper's registration at the end, after the pauses)
+  std::vector<long> resumes;                // (the re-registering pauses: the music resuming after each)
   {
     std::vector<const HammondNote*> byOn;
     for (const HammondNote& nt : notes) byOn.push_back(&nt);
     std::sort(byOn.begin(), byOn.end(), [](const HammondNote* a, const HammondNote* b) { return a->on < b->on; });
     const long minGap = std::max<long>(tpq / 2, long(0.25 / (60 / std::max(bpm, 20.0) / tpq)));  // (half a beat and a quarter second: time to pull a drawbar)
     std::vector<long> pauses;  // (the pause's middle)
+    std::map<long, long> pauseLen;  // (its length, ticks)
     long reach = byOn.empty() ? 0 : byOn[0]->off;
     for (size_t i = 1; i < byOn.size(); ++i) {
-      if (byOn[i]->on - reach >= minGap) pauses.push_back((reach + byOn[i]->on) / 2);
+      if (byOn[i]->on - reach >= minGap) {
+        pauses.push_back((reach + byOn[i]->on) / 2);
+        pauseLen[pauses.back()] = byOn[i]->on - reach;
+      }
       reach = std::max(reach, byOn[i]->off);
     }
     std::vector<long> use;
@@ -381,13 +583,83 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         }
       }
       if (!pulled) break;
+      // (a short pause, under 0.7 s, leaves no time to pull a drawbar out to its mark: the player
+      // has set the new registration on the B drawbars beforehand and presses the B preset key,
+      // the change at once; it starts half way through the pause, as the hand moves there)
       plan.upperChanges.push_back({t, cur});
+      resumes.push_back(t);
+      static const double kPreset = knob("PJ_HAMMOND_PRESETKEY", 0.7);  // (s: pauses shorter take the preset key; 0 never)
+      plan.upperInstant.push_back(pauseLen[t] * 60 / std::max(bpm, 20.0) / tpq < kPreset);
     }
     if (!plan.upperChanges.empty()) {
-      regText = "; re-registered at " + std::to_string(plan.upperChanges.size()) + " pause" + (plan.upperChanges.size() > 1 ? "s" : "") + ", to ";
+      regText = "; re-registered at " + std::to_string(plan.upperChanges.size()) + " pause" + (plan.upperChanges.size() > 1 ? "s" : "");
+      const int keys = int(std::count(plan.upperInstant.begin(), plan.upperInstant.end(), true));
+      if (keys) regText += " (" + std::to_string(keys) + " by the preset key)";
+      regText += ", to ";
       for (int v : plan.upperChanges.back().second) regText += char('0' + v);
     }
+    finalUpper = cur;
   }
+  // Trills: a line alternating between two neighbouring notes (a semitone or a tone apart), six
+  // notes or more each within 0.2 s of the last (four, 0.1 s apart: a figure of four slower ones is
+  // a turn, not a trill). Played with a rising touch: from about half the
+  // trill's own velocity to 1.3 x it (127 at most), so the key clicks sharpen as it goes, the
+  // contacts struck ever harder (PJ_HAMMOND_TRILL scales the rise; 0 off).
+  {
+    static const double kTrill = knob("PJ_HAMMOND_TRILL", 1.0);
+    const double spt = 60 / std::max(bpm, 20.0) / tpq;
+    std::map<int, std::vector<const HammondNote*>> byLine;
+    for (const HammondNote& n : notes) byLine[n.line].push_back(&n);
+    for (auto& [line, v] : byLine) {
+      std::sort(v.begin(), v.end(), [](const HammondNote* a, const HammondNote* b) { return a->on < b->on || (a->on == b->on && a->pitch < b->pitch); });
+      // (single notes only: a moment with a chord breaks a trill)
+      size_t i = 0;
+      while (i < v.size()) {
+        size_t j = i + 1;
+        const int a = v[i]->pitch;
+        int b = -1;
+        while (j < v.size()) {
+          const int p = v[j]->pitch, iv = std::abs(p - a);
+          const bool next = (v[j]->on - v[j - 1]->on) * spt <= 0.2 && v[j]->on > v[j - 1]->on;
+          if (!next) break;
+          if (b < 0) {
+            if (iv < 1 || iv > 2) break;
+            b = p;
+          }
+          if (p != (((j - i) & 1) ? b : a)) break;
+          ++j;
+        }
+        const double meanGap = j - i > 1 ? (v[j - 1]->on - v[i]->on) * spt / (j - i - 1) : 1;
+        if (kTrill > 0 && b >= 0 && (j - i >= 6 || (j - i >= 4 && meanGap <= 0.1))) {
+          std::vector<int> vel;
+          for (size_t k = i; k < j; ++k) vel.push_back(v[k]->vel);
+          std::nth_element(vel.begin(), vel.begin() + vel.size() / 2, vel.end());
+          const double base = vel[vel.size() / 2];
+          for (size_t k = i; k < j; ++k) {
+            const double x = double(k - i) / (j - i - 1);
+            const double f = 1 + kTrill * ((0.5 + 0.8 * x) - 1);
+            plan.velocity[{v[k]->ch * 128 + v[k]->pitch, v[k]->on}] = std::clamp(int(std::lround(base * f)), 1, 127);
+          }
+          ++plan.trills;
+          {
+            static const double kThin = knob("PJ_HAMMOND_TRILLTHIN", 1.0);
+            if (kThin > 0) {
+              plan.thin.push_back({v[i]->on, kThin});
+              plan.thin.push_back({v[j - 1]->off, 0.0});
+            }
+          }
+          if (plan.trills == 1) {
+            plan.trillFrom = plan.velocity[{v[i]->ch * 128 + v[i]->pitch, v[i]->on}];
+            plan.trillTo = plan.velocity[{v[j - 1]->ch * 128 + v[j - 1]->pitch, v[j - 1]->on}];
+          }
+          i = j;
+        } else {
+          ++i;
+        }
+      }
+    }
+  }
+  std::sort(plan.thin.begin(), plan.thin.end());
   // The expression pedal follows the tune: the channels whose notes are mostly on the upper manual.
   {
     std::map<int, std::pair<int, int>> byCh;  // channel -> (upper notes, all)
@@ -404,6 +676,34 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
   // fast where it builds most: the phrase (between the band's rests) with the most, loudest notes
   // a second, and perhaps a second one nearly as strong; fast from its start, slow again at its
   // end. The choice is drawn from the notes themselves: the same file, the same plan.
+  // The final chord: the notes sounding at the end (let go within half a beat of the last), from
+  // the moment the last of them began; long enough to shape (by the tempo map, its ritardando
+  // included): 1.5 s, two notes or more (a single note 2.5 s).
+  const double spt = 60 / std::max(bpm, 20.0) / tpq;
+  auto secOf = [&](long t) { return secondsAt ? secondsAt(t) : t * spt; };
+  long endAt = -1;
+  double endDur = 0;
+  {
+    long lastOn = first;
+    int held = 0;
+    for (const HammondNote& n : notes)
+      if (n.off >= last - tpq / 2) { lastOn = std::max(lastOn, n.on); ++held; }
+    endDur = secOf(last) - secOf(lastOn);
+    if ((held >= 2 && endDur >= 1.5) || (held == 1 && endDur >= 2.5)) endAt = lastOn;
+  }
+  // (the ending's and the glissandos' choices drawn from the notes too, their own draws)
+  uint32_t h2 = 0x9e3779b9u;
+  for (const HammondNote& n : notes) h2 = (h2 ^ uint32_t(n.pitch * 7919 + n.on * 31 + n.vel)) * 16777619u;
+  auto draw2 = [&h2] { h2 = h2 * 1664525u + 1013904223u; return (h2 >> 8) * (1.0 / 16777216.0); };
+  // The rock organ's ending, about one in two: the run switch off on the final chord, the generator
+  // coasting down under the held keys, the chord sinking and fading (the Leslie left as it is).
+  static const double kDive = knob("PJ_HAMMOND_DIVE", 0.5);      // (the share of rock endings with it)
+  static const double kEnding = knob("PJ_HAMMOND_ENDING", 1.0);  // (0: no shaped ending)
+  if (kEnding <= 0) endAt = -1;
+  const bool dive = instrument == "rock-organ" && endAt >= 0 && draw2() < kDive;
+  std::vector<std::string> endParts;
+  std::vector<long> climaxes;  // (the planned fast phrases' starts)
+  long leslieEnd = -1;         // (the ending's Leslie from here: no flicks or nudges after it)
   std::string leslieText;
   if (fileLeslie || std::getenv("PJ_HAMMOND_LESLIE")) {
     leslieText = fileLeslie ? "the file's" : "set by hand";
@@ -445,12 +745,42 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       for (size_t i : pick) {
         plan.leslie.push_back({spans[i].first, true});
         plan.leslie.push_back({spans[i].second, false});
+        climaxes.push_back(spans[i].first);
+        // (a fast Leslie over the lower's chorus-vibrato smears the accompaniment: its tab off for
+        // the phrase, a dry, tight comping under the upper's C3; the tab flipped as the switch is)
+        if (r.vibrato > 0 && r.vibLower) {
+          plan.lowerVib.push_back({spans[i].first, false});
+          plan.lowerVib.push_back({spans[i].second, true});
+        }
       }
       char b2[64];
       std::snprintf(b2, sizeof b2, "planned: fast in %zu phrase%s", pick.size(), pick.size() == 1 ? "" : "s");
       leslieText = b2;
+      if (!plan.lowerVib.empty()) leslieText += " (the lower's vibrato off in it)";
     } else {
       leslieText = "planned: slow throughout";
+    }
+    // The ending, on most pieces (four in five, PJ_HAMMOND_ENDLESLIE) with a final chord of 2 s or more: the Leslie
+    // switched up as the chord is struck and back to slow at four fifths of it, so the rotors are
+    // still winding down when it is let go; already fast, it is switched to slow a third of the
+    // way in, the swirl easing to the end. (Not under the rock organ's run switch.)
+    static const double kEndLeslie = knob("PJ_HAMMOND_ENDLESLIE", 0.8);  // (the share of endings with it)
+    if (endAt >= 0 && endDur >= 2.0 && !dive && draw2() < kEndLeslie) {
+      const long d = last - endAt;
+      bool fastEnd = false;
+      for (auto& [tk, f] : plan.leslie)
+        if (tk <= endAt) fastEnd = f;
+      plan.leslie.erase(std::remove_if(plan.leslie.begin(), plan.leslie.end(), [&](auto& e) { return e.first > endAt; }),
+                        plan.leslie.end());
+      if (fastEnd) {
+        plan.leslie.push_back({endAt + long(0.35 * d), false});
+        endParts.push_back("the Leslie winding down");
+      } else {
+        plan.leslie.push_back({endAt + long(0.12 * d), true});
+        plan.leslie.push_back({endAt + long(0.8 * d), false});
+        endParts.push_back("the Leslie up and winding down");
+      }
+      leslieEnd = endAt;
     }
     // A nudge on a long held note: somewhere round its middle the slow rotors are asked a little
     // faster (1.6-2.4 x), then slow again: the horn swells and settles, the drum barely stirs. On
@@ -467,6 +797,58 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
           if (tk <= t) f = fast;
         return f;
       };
+      // A flick on a long held chord: three notes or more held unchanged 2.5 s or more (nothing
+      // begins or ends in it), the plan slow there: somewhere in its first half the switch goes to
+      // fast for 0.35-0.75 s and back, before the rotors get there (the horn ~1 s to its fast
+      // speed): the horn swirls up and settles, the drum just stirs. About two in three such
+      // chords, 10 s apart at least. (Not on the rock organ's fast pieces' fast phrases.)
+      std::vector<long> flicks;
+      {
+        static const double kFlick = knob("PJ_HAMMOND_FLICK", 0.65);  // (the share of held chords flicked)
+        std::vector<long> ev;
+        for (const HammondNote& n : notes) { ev.push_back(n.on); ev.push_back(n.off); }
+        std::sort(ev.begin(), ev.end());
+        ev.erase(std::unique(ev.begin(), ev.end()), ev.end());
+        long lastFlick = -1000000000;
+        std::vector<std::pair<long, bool>> add;
+        for (size_t i = 0; i + 1 < ev.size(); ++i) {
+          const long t0 = ev[i], t1 = ev[i + 1];
+          if ((t1 - t0) * secsPerTick < 2.5) continue;
+          int held = 0;
+          for (const HammondNote& n : notes) held += n.on <= t0 && n.off >= t1;
+          if (held < 3) continue;
+          // (struck there: the swell, an organist's way: "I switch to fast just before I hit the
+          // note and switch back to slow in the middle of the note": 0.1-0.3 s before, slow again
+          // at 40-60 % of it, the horn about up to speed, the drum half way; else, the chord's
+          // notes struck at different times, the flick inside it)
+          int struck = 0;
+          for (const HammondNote& n : notes) struck += n.on == t0 && n.off >= t1;
+          const bool swell = struck >= 1;
+          long at, len;
+          if (swell) {
+            at = t0 - long((0.1 + 0.2 * draw()) / secsPerTick);
+            len = t0 + long((0.4 + 0.2 * draw()) * (t1 - t0)) - at;
+          } else {
+            at = t0 + long((0.15 + 0.3 * draw()) * (t1 - t0));
+            len = long((0.35 + 0.4 * draw()) / secsPerTick);
+          }
+          // ("sometimes I leave it on slow over a slow part or a long note just to have that clear
+          // sound": in a slow part (under a moment a second over the 10 s round it) half as often)
+          int moments = 0;
+          long lastOn = -1;
+          for (long o : ons)
+            if (std::labs(o - t0) * secsPerTick < 5 && o - lastOn > together) { ++moments; lastOn = o; }
+          const double share = kFlick * (moments < 10 ? 0.5 : 1.0);
+          if ((at - lastFlick) * secsPerTick < 10 || fastAt(at) || fastAt(at + len) || draw() >= share) continue;
+          if (leslieEnd >= 0 && at + len >= leslieEnd) continue;  // (the ending has its own)
+          add.push_back({at, true});
+          add.push_back({at + len, false});
+          flicks.push_back(at);
+          lastFlick = at;
+        }
+        plan.leslie.insert(plan.leslie.end(), add.begin(), add.end());
+        std::stable_sort(plan.leslie.begin(), plan.leslie.end(), [](auto& a, auto& b) { return a.first < b.first; });
+      }
       std::vector<const HammondNote*> longs;
       for (const HammondNote& n : notes)
         if ((n.off - n.on) * secsPerTick >= 1.6 && n.off - n.on >= 2 * tpq) longs.push_back(&n);
@@ -478,20 +860,128 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         if (it != ons.end() && *it < b) continue;  // (something begins in its middle: not held alone)
         const long t0 = n->on + long(0.45 * d), t1 = n->on + long(0.7 * d);
         if ((t0 - lastNudge) * secsPerTick < 8 || fastAt(t0) || fastAt(t1)) continue;
+        if (leslieEnd >= 0 && t1 >= leslieEnd) continue;
+        bool nearFlick = false;  // (a flicked chord is not nudged too)
+        for (long f : flicks) nearFlick |= std::labs(f - t0) * secsPerTick < 8;
+        if (nearFlick) continue;
         const double boost = 1.6 + 0.8 * draw();
         plan.leslieBoost.push_back({t0, boost});
         plan.leslieBoost.push_back({t1, 1.0});
         lastNudge = t0;
       }
+      if (!flicks.empty()) leslieText += ", flicked fast on " + std::to_string(flicks.size()) + " held chord" + (flicks.size() > 1 ? "s" : "");
       if (!plan.leslieBoost.empty()) leslieText += ", nudged on " + std::to_string(plan.leslieBoost.size() / 2) + " long note" + (plan.leslieBoost.size() > 2 ? "s" : "");
     }
   }
-  char buf[640];
+  if (endAt >= 0) {
+    const long d = last - endAt;
+    if (dive) {
+      plan.run.push_back({endAt + long(0.5 * d), false});
+      endParts.push_back("the run switch off, the chord sinking");
+    }
+    // The expression pedal on the final chord (when the file has none of its own): a ballad's
+    // closing from a third of the way in, the chord fading to ~-12 dB; otherwise the organist's
+    // swell, the chord struck, the pedal eased back and opened past where it was.
+    if (!fileExpr) {
+      if (style == "ballad") {
+        plan.swell = {{endAt + long(0.3 * d), 1.0}, {last, 0.6}};
+        endParts.push_back("the pedal closing");
+      } else {
+        plan.swell = {{endAt, 1.0}, {endAt + long(0.1 * d), 0.85}, {endAt + long(0.75 * d), 1.2}};
+        endParts.push_back("a swell");
+      }
+    }
+    // Two more drawbars pulled out through a final chord of 2 s or more (the next in the order of
+    // the pauses'), the chord opening up: not a ballad's, nor on harmony thinned to one foundation.
+    if (style != "ballad" && endDur >= 2.0 && harmonyCx < 0.4) {
+      static const int kOrder[6] = {3, 5, 4, 8, 7, 6};
+      std::array<int, 9> cur = finalUpper;
+      int pulled = 0;
+      for (double at : {0.25, 0.5}) {
+        for (int dd : kOrder) {
+          const int top = dd >= 6 ? 6 : 8;
+          if (cur[dd] < top) {
+            cur[dd] = top;
+            plan.upperChanges.push_back({endAt + long(at * d), cur});
+            plan.upperInstant.push_back(false);
+            ++pulled;
+            break;
+          }
+        }
+      }
+      if (pulled) {
+        std::string bars;
+        for (int v : cur) bars += char('0' + v);
+        endParts.push_back(std::to_string(pulled) + " drawbar" + (pulled > 1 ? "s" : "") + " out, to " + bars);
+      }
+    }
+  }
+  // Glissandos: the palm swept up the white keys into the first note of a climax (where the Leslie
+  // goes fast), and on the rock organ or a full chordal piece into the final chord: over ~0.16-0.26
+  // s, from an octave and a bit under the note, each key held into the next, the last let go just
+  // before the note so the percussion strikes it. Only where the upper manual is free for the sweep;
+  // not on complex harmony (a smear of white keys through it is wrong), not in a ballad. At most two.
+  std::string glissText;
+  if ((style == "jazz" || style == "rock" || style == "full (chordal)" || style == "percussive") && harmonyCx < 0.3) {
+    auto gliss = [&](long t) {
+      // (the target: the upper manual's first moment from t on, within two beats; its top note)
+      long at = -1;
+      for (const HammondNote& n : notes)
+        if (n.on >= t && n.on <= t + 2L * tpq && plan.division[{n.ch * 128 + n.pitch, n.on}] == HammondModel::kUpper && (at < 0 || n.on < at)) at = n.on;
+      const HammondNote* tg = nullptr;
+      for (const HammondNote& n : notes)
+        if (n.on >= at && n.on <= at + together && plan.division[{n.ch * 128 + n.pitch, n.on}] == HammondModel::kUpper && (!tg || n.pitch > tg->pitch)) tg = &n;
+      if (at < 0 || !tg) return false;
+      const double lspt = std::max(1e-5, (secOf(tg->on) - secOf(tg->on - tpq)) / tpq);  // (the tempo there)
+      const long L = std::max<long>(4, long((0.16 + 0.1 * draw2()) / lspt)), t0 = tg->on - L;
+      if (t0 < first) return false;
+      for (const HammondPlan::Extra& x : plan.extra)
+        if (x.on >= t0 - L && x.on <= tg->on) return false;  // (swept into already)
+      for (const HammondNote& n : notes)
+        if (plan.division[{n.ch * 128 + n.pitch, n.on}] == HammondModel::kUpper && n.on < tg->on && n.off > t0 - long(0.05 / lspt)) return false;
+      const int span = 12 + int(5 * draw2());
+      std::vector<int> keys;
+      for (int k = tg->pitch - span; k < tg->pitch; ++k) {
+        const int pc = k % 12;
+        if (k >= 36 && (pc == 0 || pc == 2 || pc == 4 || pc == 5 || pc == 7 || pc == 9 || pc == 11)) keys.push_back(k);
+      }
+      if (keys.size() < 4) return false;
+      const size_t m = keys.size();
+      const long lift = long(0.035 / lspt) + 1;
+      for (size_t k = 0; k < m; ++k) {
+        const long on = t0 + long(L * k / m);
+        long off = k + 1 < m ? t0 + long(L * (k + 1) / m) + long(0.012 / lspt) : tg->on - lift;
+        off = std::min(off, tg->on - lift);
+        if (off <= on) off = on + 1;
+        bool busy = false;  // (that key sounding on another division)
+        for (const HammondNote& n : notes) busy |= n.pitch == keys[k] && n.on <= off && n.off >= on;
+        if (busy) continue;
+        const int vel = std::clamp(int(std::lround(tg->vel * (0.5 + 0.35 * k / double(m - 1)))), 1, 127);
+        plan.extra.push_back({on, off, keys[k], vel, HammondModel::kUpper});
+      }
+      return true;
+    };
+    static const int kGliss = int(knob("PJ_HAMMOND_GLISS", 2));  // (at most this many; 0 none)
+    int n = 0;
+    for (long c : climaxes)
+      if (n < kGliss && gliss(c)) ++n;
+    // (the rock organ and the full, gospel-like organ also sweep into the music resuming after a
+    // re-registering pause, the later ones first: the piece growing)
+    if (style == "rock" || style == "full (chordal)")
+      for (auto it = resumes.rbegin(); it != resumes.rend() && n < kGliss; ++it)
+        if (draw2() < 0.7 && gliss(*it)) ++n;
+    if (n < kGliss && endAt >= 0 && (style == "rock" || style == "full (chordal)") && draw2() < 0.6 && gliss(endAt)) ++n;
+    if (n) glissText = "; " + std::string(n > 1 ? "two glissandos" : "a glissando") + " up the white keys";
+    std::sort(plan.extra.begin(), plan.extra.end(), [](const HammondPlan::Extra& a, const HammondPlan::Extra& b) { return a.on < b.on; });
+  }
+  std::string endText;
+  for (size_t i = 0; i < endParts.size(); ++i) endText += (i ? ", " : "; the ending: ") + endParts[i];
+  char buf[1600];
   std::snprintf(buf, sizeof buf,
                 "hammond plan: %s (%.0f bpm, %.1f tune notes a second, %.0f %% chords): %s\n"
                 "%snotes: %d upper, %d lower, %d pedals; percussion %s; Leslie %s\n",
                 style.c_str(), bpm, busy, 100 * chordal, r.text().c_str(), lineText.c_str(), counts[HammondModel::kUpper],
-                counts[HammondModel::kLower], counts[HammondModel::kPedal], percText.c_str(), (leslieText + shiftText + balanceText_ + regText).c_str());
+                counts[HammondModel::kLower], counts[HammondModel::kPedal], percText.c_str(), (leslieText + (plan.trills ? "; " + std::to_string(plan.trills) + " trill" + (plan.trills > 1 ? "s" : "") + " with a rising touch (the first " + std::to_string(plan.trillFrom) + " -> " + std::to_string(plan.trillTo) + ")" : std::string()) + complexText + (plan.clarity > 0.05 ? "; clarity " + std::to_string(int(std::lround(100 * plan.clarity))) + " %" : std::string()) + shiftText + balanceText_ + regText + vibText + detachText + lowerPercText + endText + glissText).c_str());
   plan.summary = buf;
   return plan;
 }

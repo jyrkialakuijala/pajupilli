@@ -116,7 +116,9 @@ void HornPlayer::applyNote(Attack a) {
   const char* ov = std::getenv("PJ_HOLES");
   const bool glide = gliding();
   horn_.setGlide(takeHoleGlide());
+  const bool rested = !blowing_;
   horn_.setHoles(ov && *ov ? ov : played(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
+  if (rested) horn_.slideAhead(sinceOff_);  // the arm moved in the rest
   blowing_ = true;
   if (!gliding()) earCorr_ = 0;
   earClock_ = 0;

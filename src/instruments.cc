@@ -84,6 +84,7 @@ extern const Instrument kPlucked[];
 extern const int kNumPlucked;
 extern const Instrument kModals[];
 extern const int kNumModals;
+extern const Instrument kOrchestraHit;  // (src/orchhit.cc)
 
 // The instruments at a common loudness: each one's trim (tools/levels.py),
 // as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
@@ -124,6 +125,8 @@ double velocityGainDb(const Instrument& inst, int velocity) {
 
 double noteLead(const Instrument& inst) {
   static const double kMaracas = knob("PJ_MARACA_LEAD", 0.12);
+  static const double kHit = knob("PJ_HIT_LEAD", 0.12);  // (the orchestra hit's run-ups: src/orchhit.cc)
+  if (std::strcmp(inst.name, "orchestra-hit") == 0) return kHit;
   return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
 }
 
@@ -160,6 +163,7 @@ const Instrument* findInstrument(const std::string& name) {
     if (name == kPlucked[k].name) return &kPlucked[k];
   for (int k = 0; k < kNumModals; ++k)
     if (name == kModals[k].name) return &kModals[k];
+  if (name == kOrchestraHit.name) return &kOrchestraHit;
   return nullptr;
 }
 
@@ -173,6 +177,7 @@ std::string instrumentNames() {
   for (int k = 0; k < kNumLeads; ++k) s += ", " + std::string(kLeads[k].name);
   for (int k = 0; k < kNumPlucked; ++k) s += ", " + std::string(kPlucked[k].name);
   for (int k = 0; k < kNumModals; ++k) s += ", " + std::string(kModals[k].name);
+  s += ", " + std::string(kOrchestraHit.name);
   return s;
 }
 
