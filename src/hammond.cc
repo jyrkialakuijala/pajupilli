@@ -57,18 +57,32 @@ std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double
   return lower;
 }
 
-// The lower manual as a percussion's stand-in (008880080: the 8', 4', 2 2/3' and 1 1/3'; no
-// sub-octave, no fifth below): a sharp, bright attack an octave of percussion-like sound where the
-// left hand does not play the bass (the B-3 has the percussion on the upper manual alone). At the
-// level of the lower registration it replaces (low: its whole loudness, 3 dB a step).
-std::array<double, 9> hammondLowerPercussive(const std::array<double, 9>& low) {
+// The lower manual on a shape of its own, at the level of the lower registration it replaces (low:
+// its whole loudness, 3 dB a step). kind 1, the percussion's stand-in (008880080: the 8', 4',
+// 2 2/3' and 1 1/3'; no sub-octave, no fifth below): a sharp, bright attack, an octave of
+// percussion-like sound where the left hand does not play the bass (the B-3 has the percussion on
+// the upper manual alone). kind 2, the hollow 8' (008060400: the 8' with its odd harmonics, the
+// 2 2/3' and 1 3/5', the clarinet): a line of another colour from the upper's.
+std::array<double, 9> hammondLowerShaped(const std::array<double, 9>& low, int kind) {
   auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
+  static const double kOff[3][9] = {{-99, -99, 0, -99, -99, -99, -99, -99, -99},
+                                    {-99, -99, 0, 0, 0, -99, -99, 0, -99},
+                                    {-99, -99, 0, -99, -2, -99, -4, -99, -99}};
+  const double(&off)[9] = kOff[std::clamp(kind, 0, 2)];
   double g = 0;
   for (double x : low) g += gain(x);
-  const double each = g / 4;  // (four drawbars share it)
-  const double v = each >= std::pow(10.0, -21.0 / 20) ? 8 + 20.0 / 3 * std::log10(each) : each / std::pow(10.0, -21.0 / 20);
-  const double b = std::clamp(v, 0.0, 8.0);
-  return {0, 0, b, b, b, 0, 0, b, 0};
+  auto at = [&](double b) {
+    std::array<double, 9> r{};
+    for (int d = 0; d < 9; ++d) r[d] = off[d] > -50 ? std::clamp(b + off[d], 0.0, 8.0) : 0;
+    return r;
+  };
+  auto sum = [&](const std::array<double, 9>& r) { double t = 0; for (double x : r) t += gain(x); return t; };
+  double lo = 0, hi = 8;  // (the top drawbar's setting: bisected to the level)
+  for (int it = 0; it < 40; ++it) {
+    const double mid = (lo + hi) / 2;
+    (sum(at(mid)) < g ? lo : hi) = mid;
+  }
+  return at(lo);
 }
 
 // The pedals for an upper manual (its two drawbars, 16' and 8'): how loud the upper is sets the

@@ -142,6 +142,9 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
           xc.push_back(x[i]);
         }
       if (!xc.empty()) rooms_[c].reset(new Room(*spec[c], xc));
+      // (an instrument whose sound differs with direction: how it stands in the room)
+      for (size_t k = 0; k < roomSlots_[c].size(); ++k)
+        if (const float* axes = f_[roomSlots_[c][k]].v->dipoleAxes()) rooms_[c]->setAxes(int(k), axes);
     }
     room_ = true;
     for (Slot& s : f_) s.room.assign(Room::kBlock, 0.0f);
@@ -889,17 +892,35 @@ void Ensemble::block(float* left, float* right, int n) {
       // through the church: the room adds only its late field)
       lg[i] = f_[i].v->ownEarly() ? 0.0f : g;
     }
+    // An instrument whose sound differs with direction: its three directional parts, to the
+    // same scale (the velocity's gain; not the listener's gain and trim, which the voice's
+    // output carries and these do not).
+    std::vector<const float*> dipSrc(size_t(3) * nf, nullptr);
+    dipBuf_.resize(size_t(3) * nf * n);
+    for (int i : go)
+      if (f_[i].v->dipoleAxes())
+        for (int d = 0; d < 3; ++d)
+          if (const float* p = f_[i].v->dipole(n, d)) {
+            float* o = &dipBuf_[(size_t(3) * i + d) * n];
+            const float gd = float(f_[i].vg) / k;
+            for (int j = 0; j < n; ++j) o[j] = p[j] * gd;
+            dipSrc[size_t(3) * i + d] = o;
+          }
     for (int c = 0; c < 3; ++c) {
       if (!rooms_[c]) continue;
       std::vector<const float*> sc;
       std::vector<float*> ac;
       std::vector<float> gc;
+      std::vector<const float*> dc;
       for (int i : roomSlots_[c]) {
         sc.push_back(src[i]);
         ac.push_back(at[i]);
         gc.push_back(lg[i]);
+        for (int d = 0; d < 3; ++d) dc.push_back(dipSrc[size_t(3) * i + d]);
       }
+      rooms_[c]->setDipoles(dc.data());
       rooms_[c]->process(sc.data(), n, ac.data(), left, right, gc.data());
+      rooms_[c]->setDipoles(nullptr);
     }
     for (int i = 0; i < nf; ++i)
       for (int j = 0; j < n; ++j) at[i][j] *= roomFb_;
@@ -928,8 +949,10 @@ void Ensemble::block(float* left, float* right, int n) {
   // An instrument that sounds differently to its two sides (the double bass):
   // its direct sound's difference, to the left and from the right.
   for (int i : go)
-    if (room_ && f_[i].v->ownEarly()) {
-      f_[i].v->side(n);  // (its own early sound has its sides: this one dropped)
+    if (room_ && (f_[i].v->ownEarly() || f_[i].v->dipoleAxes())) {
+      // (its own early sound has its sides, or the room gives each of its paths its own mix of
+      // the instrument's directional parts: this one dropped)
+      f_[i].v->side(n);
     } else if (const float* sd = f_[i].v->side(n)) {
       const float g = float(f_[i].vg);
       for (int j = 0; j < n; ++j) {

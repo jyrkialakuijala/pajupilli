@@ -199,6 +199,9 @@ class Controls {
     const int n = fold(note);
     sounding_[note] = n;
     p_.noteOn(n, vel);
+    // (Each key as it is played: its MIDI number and what sounds.)
+    static const char* kNames[12] = {"C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"};
+    std::fprintf(stderr, "key %d -> %d %s%d vel %d\n", note, n, kNames[n % 12], n / 12 - 1, vel);
   }
   void noteOff(int ch, int note) {
     if (o_.kit && (isPad(ch) || o_.kitOnKeys)) { o_.kit->noteOff(isPad(ch) ? note : note + kitShift_); return; }

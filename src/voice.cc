@@ -114,6 +114,13 @@ const float* Voice::side(int n) {
   return model_->takeSide(n);
 }
 
+const float* Voice::dipole(int n, int k) {
+  if (!rs_.identity()) return nullptr;
+  return model_->takeDipole(n, k);
+}
+
+const float* Voice::dipoleAxes() const { return rs_.identity() ? model_->dipoleAxes() : nullptr; }
+
 bool Voice::ownEarly() const { return rs_.identity() && model_->ownEarly(); }
 bool Voice::ownLate() const { return ownEarly() && model_->ownLate(); }
 

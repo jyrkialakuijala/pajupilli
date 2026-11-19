@@ -29,6 +29,14 @@ class BassModel : public Tube {
     side_.clear();
     return sideOut_.data();
   }
+  const float* takeDipole(int n, int k) override {
+    dipOut_[k].assign(n, 0.0f);
+    const int have = int(dip_[k].size()), m = std::min(n, have);
+    std::copy(dip_[k].end() - m, dip_[k].end(), dipOut_[k].end() - m);
+    dip_[k].clear();
+    return dipOut_[k].data();
+  }
+  const float* dipoleAxes() const override { return axes_; }
   void resetAir() override;
 
  private:
@@ -38,6 +46,8 @@ class BassModel : public Tube {
   bool bowed_ = false;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
+  std::vector<float> dip_[3], dipOut_[3];
+  float axes_[9];
 };
 
 // The bassist. A key is a string and a place on it: the highest string whose
@@ -75,6 +85,8 @@ class BassPlayer : public Performer {
  protected:
   int pickString(int midi) const;
   BassModel& m_;
+  const int* open_;  // the open strings' notes, and the top of the stopped ones (the instrument's)
+  int top_;
   int key_[4] = {-1, -1, -1, -1};      // the key on each string
   double since_[4] = {1e9, 1e9, 1e9, 1e9};  // s since its note began
   int lastVel_ = 64, lastString_ = -1;
@@ -115,6 +127,8 @@ class BassPlayer : public Performer {
 //   - Vibrato (its knob): the fingertip rocks, coming in after a moment, its
 //     speed and depth never quite even (performer.h: Vibrato).
 //   - Keys above G4: harmonics, the finger lying lightly on the string.
+//   - The cello: a key let go within 100 ms is plucked (pizzicato); for that, every key sounds
+//     100 ms late (bassinst.cc: BowPlayer::noteOn).
 class BowPlayer : public BassPlayer {
  public:
   explicit BowPlayer(BassModel& m);
@@ -123,6 +137,14 @@ class BowPlayer : public BassPlayer {
   void render(float* out, int n) override;
   void setHold(bool h) override;
   void seed(unsigned s) override;
+  // The director's cue: the left hand's own vibrato scaled, and when in the note it begins.
+  void direct(const Cue& c) override {
+    Performer::direct(c);
+    vibDepth_ = 0;  // (not the knob's vibrato: the hand's own, scaled)
+    vibScale_ = c.v[kCueVibDepth];
+    vibDelay_ = c.v[kCueVibDelay];
+    m_.bass().setMute(c.v[kCueMute] > 0.5f);
+  }
   static double bowPlace(double brightness);  // the bow's place, a share of the sounding length
   static const char* bowPlaceName(double brightness);
 
@@ -142,6 +164,15 @@ class BowPlayer : public BassPlayer {
   double lastOn_ = 1e9;        // s since the last key
   double tremClock_ = 0, drift_ = 0, drift1_ = 0, tremor_ = 0, trem1_ = 0;
   Vibrato vib_;
+  // Pizzicato (the cello): keys wait this long (s; 0: no wait, no pizzicato); one let go
+  // while it waits is plucked.
+  struct Pending { int midi, vel; double age; bool on, pizz; };
+  void strike(int midi, int velocity);
+  void letGo(int midi);
+  void due(double dt);
+  double wait_ = 0;
+  double vibScale_ = 1, vibDelay_ = 0;
+  std::vector<Pending> pend_;
 };
 
 }  // namespace pajupilli

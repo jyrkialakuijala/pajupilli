@@ -58,9 +58,10 @@ struct HammondRegistration {
 // The lower manual for an upper (the accompaniment: softer, darker, of the same family).
 // extraSofter: steps more (a file whose accompaniment is written quieter than its tune).
 std::array<double, 9> hammondLowerFor(const std::array<double, 9>& upper, double extraSofter = 0, double clarity = 0);
-// The lower manual as the percussion's stand-in, 008880080 at low's level (the planner's, when the
-// percussion is on and the left hand comps above the pedals' bass).
-std::array<double, 9> hammondLowerPercussive(const std::array<double, 9>& low);
+// The lower manual on a shape at low's level: kind 1 the percussion's stand-in (008880080: the
+// percussion on, the left hand comping above the pedals' bass); 2 the hollow 8' (008060400: a line
+// of another colour from the upper's).
+std::array<double, 9> hammondLowerShaped(const std::array<double, 9>& low, int kind);
 // The pedals' two drawbars for an upper (16' by its loudness, 8' by its brightness).
 std::array<double, 2> hammondPedalFor(const std::array<double, 9>& upper, double clarity = 0);
 // The General MIDI program's registration (by the instrument's name).
@@ -243,13 +244,13 @@ class HammondPlayer : public Performer {
   // pedals follow (lowerExtra: the lower's extra softness, steps).
   // instant: by a preset key (the B), not the drawbars' glide: the upper manual's sound changes at
   // once (the lower manual and pedals still glide after it).
-  // lowerPerc: the lower manual on the percussion's stand-in (hammondLowerPercussive).
-  void setUpper(const std::array<int, 9>& upper, double lowerExtra, double clarity = 0, bool instant = false, bool lowerPerc = false) {
+  // lowerShape: the lower manual on a shape of its own (hammondLowerShaped; 0: derived).
+  void setUpper(const std::array<int, 9>& upper, double lowerExtra, double clarity = 0, bool instant = false, int lowerShape = 0) {
     HammondRegistration r = m_.registration();
     std::array<double, 9> up{};
     for (int d = 0; d < 9; ++d) { up[d] = upper[d]; r.upper[d] = upper[d]; }
     std::array<double, 9> low = hammondLowerFor(up, lowerExtra, clarity);
-    if (lowerPerc) low = hammondLowerPercussive(low);
+    if (lowerShape) low = hammondLowerShaped(low, lowerShape);
     std::array<double, 2> ped = hammondPedalFor(up, clarity);
     // (set by hand, PJ_HAMMOND_LOWER / _PEDAL: kept through the re-registrations)
     if (std::getenv("PJ_HAMMOND_LOWER"))

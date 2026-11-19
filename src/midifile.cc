@@ -25,6 +25,7 @@
 
 #include "analysis.h"
 #include "calibrate.h"
+#include "director.h"
 #include "drumkit.h"
 #include "ensemble.h"
 #include "instrument.h"
@@ -48,6 +49,7 @@ struct Event {
   uint64_t tick = 0;
   float touch = 0;     // (an organ note-on's finger: 0 normal .. 1 the softest, a long high note)
   bool trill = false;  // (an organ note-on in a trill: kept legato, not articulated)
+  int cue = -1;        // (a note-on: the director's cue for it, an index into Direction::cues)
 };
 
 struct Song {
@@ -443,6 +445,98 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     if (!sw.empty())
       std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
   }
+  // The director (director.h, Director.md): one reading of the piece for every part. It works
+  // on the raw song, before the leads and the plans: the tempo map is replaced by its own (the
+  // ritardando, the fermatas) and every event's time found again from its tick; the notes'
+  // releases are moved for the articulation; each note-on is given its cue; the instruments
+  // whose loudness is their key velocity (a piano, a pluck) get the level and the emphasis there.
+  Direction dir;
+  std::vector<std::pair<double, float>> dirLevel[16];  // each channel's level curve, in seconds
+  {
+    DirInput di;
+    di.div = song.div;
+    di.barTicks = song.barTicks;
+    di.tonic = song.tonic;
+    di.minor = song.minor;
+    for (const Song::Tempo& x : song.tempo) di.tempo.push_back({x.t, x.beat, x.len});
+    struct Span { size_t on, off; const Instrument* inst; };
+    std::vector<Span> spans;
+    std::map<int, size_t> open;  // channel * 128 + key -> its span
+    int pr[16] = {};
+    for (size_t i = 0; i < song.ev.size(); ++i) {
+      const Event& e = song.ev[i];
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pr[ch] = e.a;
+      if ((kind == 0xb0 && (e.a == 11 || e.a == 1 || e.a == 2)) || kind == 0xd0) di.ridden[ch] = true;
+      if (ch == 9 || (kind != 0x90 && kind != 0x80)) continue;
+      auto it = open.find(ch * 128 + e.a);
+      if (it != open.end()) { spans[it->second].off = i; open.erase(it); }
+      if (kind == 0x90 && e.b > 0) {
+        open[ch * 128 + e.a] = spans.size();
+        spans.push_back({i, i, forProgram(pr[ch])});
+      }
+    }
+    std::vector<size_t> order;
+    for (size_t k = 0; k < spans.size(); ++k)
+      if (spans[k].off != spans[k].on && song.ev[spans[k].off].tick > song.ev[spans[k].on].tick) order.push_back(k);
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return song.ev[spans[a].on].tick < song.ev[spans[b].on].tick; });
+    for (size_t k : order) {
+      const Event& on = song.ev[spans[k].on];
+      di.notes.push_back({long(on.tick), long(song.ev[spans[k].off].tick), on.status & 15, on.a, on.b});
+    }
+    dir = direct(di);
+    std::fprintf(stderr, "%s\n", dir.summary.c_str());
+    // (the times must be the ticks' through the tempo map: so they are in a file as read)
+    auto secAt = [](const std::vector<DirTempo>& tm, int div, uint64_t tick) {
+      const double b = double(tick) / div;
+      size_t k = 0;
+      while (k + 1 < tm.size() && tm[k + 1].beat <= b) ++k;
+      return tm.empty() ? b * 0.5 : tm[k].t + (b - tm[k].beat) * tm[k].len;
+    };
+    bool byTicks = true;
+    for (const Event& e : song.ev) byTicks &= std::fabs(secAt(di.tempo, song.div, e.tick) - e.t) < 2e-3;
+    if (dir.acts && !byTicks) {
+      std::fprintf(stderr, "  (director: the events' times are not their ticks': it stays out)\n");
+      dir.acts = false;
+    }
+    if (dir.acts) {
+      for (size_t q = 0; q < order.size(); ++q) {
+        const Span& sp = spans[order[q]];
+        const Cue& c = dir.cues[q];
+        Event& on = song.ev[sp.on];
+        Event& off = song.ev[sp.off];
+        // (the organs articulate and balance by their own plans: they take the shared time only)
+        if (sp.inst && (std::strcmp(sp.inst->family, "organ") == 0 || isHammond(sp.inst))) continue;
+        on.cue = int(q);
+        if (c.v[kCueLength] < 1) off.tick = on.tick + uint64_t(std::max(1.0, double(off.tick - on.tick) * c.v[kCueLength]));
+        // Key velocity: the emphasis for all; the level too where velocity is the loudness.
+        double g = 1 + 0.22 * c.v[kCueAccent];
+        if (sp.inst && !velocityAsGain(*sp.inst)) g *= 1 + 1.1 * (c.v[kCueLevel] - 0.5);
+        on.b = uint8_t(std::clamp(int(std::lround(on.b * g)), 1, 127));
+      }
+      // Mutes: a muted trumpet is another instrument (General MIDI 60): the trumpets' channels
+      // change program where the mutes go on and come off. (The strings take theirs from the cue.)
+      {
+        std::set<int> trumpets;
+        for (const Span& sp : spans)
+          if (sp.inst && std::strcmp(sp.inst->name, "trumpet") == 0) trumpets.insert(song.ev[sp.on].status & 15);
+        std::vector<Event> pc;
+        for (int ch : trumpets)
+          for (auto& [tick, on] : dir.mutes) {
+            Event e{0, 0, uint8_t(0xc0 | ch), uint8_t(on ? 59 : 56), 0};
+            e.tick = uint64_t(tick);
+            pc.push_back(e);
+          }
+        song.ev.insert(song.ev.begin(), pc.begin(), pc.end());
+      }
+      song.tempo.clear();
+      for (const DirTempo& x : dir.tempo) song.tempo.push_back({x.t, x.beat, x.len});
+      for (Event& e : song.ev) e.t = secAt(dir.tempo, song.div, e.tick);
+      std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
+      for (int ch = 0; ch < 16; ++ch)
+        for (auto& [tick, lv] : dir.level[ch]) dirLevel[ch].push_back({secAt(dir.tempo, song.div, uint64_t(tick)), lv});
+    }
+  }
   // An instrument may want its note early: what its player does before the
   // sound falls on the beat (a maraca's seeds sliding before the slap) takes
   // time. Its notes' events are moved that much earlier (noteLead), and the
@@ -545,14 +639,23 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
                    song.keySigned ? "the file's key signature" : "the key its notes fit best");
       break;
     }
-  // An organ plays in a church, unless -room said otherwise.
-  if (!roomGiven)
-    for (auto& [id, p] : parts)
-      if (std::strcmp(p.inst->family, "organ") == 0) {
-        room = findRoom("church");
-        std::fprintf(stderr, "  (an organ: in the church)\n");
-        break;
-      }
+  // An organ plays in a church, unless -room said otherwise. The timpani belong to a symphony hall
+  // (research/timpani.md 12.8b): a piece with timpani plays there, and its organ is then a concert
+  // hall's organ, not the timpani brought into a church.
+  if (!roomGiven) {
+    bool organ = false, timpani = false;
+    for (auto& [id, p] : parts) {
+      if (std::strcmp(p.inst->family, "organ") == 0) organ = true;
+      if (id / 128 != 9 && id % 128 == 47) timpani = true;  // (General MIDI program 48, counted from 0)
+    }
+    if (timpani) {
+      room = findRoom("concert");
+      std::fprintf(stderr, organ ? "  (timpani and an organ: in the concert hall)\n" : "  (timpani: in the concert hall)\n");
+    } else if (organ) {
+      room = findRoom("church");
+      std::fprintf(stderr, "  (an organ: in the church)\n");
+    }
+  }
   std::map<const Instrument*, std::unique_ptr<Calibration>> cals;
   for (auto& [id, p] : parts) {
     if (!cals.count(p.inst)) {
@@ -920,6 +1023,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     int heldAll = 0;
     double lastOn = -1e9;
     std::map<int, int> heldNote;  // channel * 128 + key -> times down (not the drums)
+    size_t dirAt[16] = {};       // where each channel's level curve is
     for (size_t n = 0; n < frames; n += kBlock) {
       const double now = (n + kBlock) / double(kRate);
       {  // the beat, for those who keep time with it
@@ -936,6 +1040,20 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         const double toNext = ahead < song.ev.size() ? song.ev[ahead].t - now : 1e9;
         c.pause = heldAll <= 0 && now - lastOn > 2 * c.beatLen && toNext > c.beatLen;
       }
+      // The director's level for each part, block by block (as a file's own expression would
+      // come: the breath, the bow's speed); the organs keep their plans' own.
+      if (dir.acts)
+        for (auto& [id, p] : parts) {
+          const int ch = id / 128;
+          if (ch == 9 || p.plan || p.hplan || dirLevel[ch].empty()) continue;
+          const auto& c = dirLevel[ch];
+          size_t& k = dirAt[ch];
+          while (k + 1 < c.size() && c[k + 1].first <= now) ++k;
+          double lv = c[k].second;
+          if (k + 1 < c.size() && now > c[k].first)
+            lv += (c[k + 1].second - lv) * (now - c[k].first) / std::max(1e-9, c[k + 1].first - c[k].first);
+          p.ens->all(&Performer::setBreath, lv - 0.5);
+        }
       // A Hammond's planned Leslie nudges: in the middle of a long note, where no event comes, so
       // by the clock (their ticks turned to seconds by the tempo map).
       for (auto& [id, p] : parts) {
@@ -970,7 +1088,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           while (p.regNext < p.hplan->upperChanges.size() && when(p.hplan->upperChanges[p.regNext].first) <= now) {
             if (hpl)
               hpl->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra, p.hplan->clarity,
-                            p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerPerc);
+                            p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerShape);
             ++p.regNext;
           }
           // The run switch.
@@ -1049,7 +1167,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             while (p.regNext < p.hplan->upperChanges.size() && p.hplan->upperChanges[p.regNext].first <= long(e.tick)) {
               if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0)))
                 hp->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra, p.hplan->clarity,
-                             p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerPerc);
+                             p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerShape);
               ++p.regNext;
             }
         // An organ's plan: its registrations and manuals from their bar on (before a note at the same tick).
@@ -1109,6 +1227,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             ++hp.played;
             continue;
           }
+          if (dir.acts && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
           it->second.ens->noteOn(pk + it->second.inst->transpose, e.b);
           ++it->second.played;
         } else if (kind == 0x80 || kind == 0x90) {

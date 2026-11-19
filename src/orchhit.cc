@@ -4,18 +4,20 @@
 // Stravinsky's Firebird, 1919 suite) moved up and down the keyboard: an octave away the piccolo is a
 // bass flute or a whistle, the tuba a trumpet. Here each key is scored for the orchestra instead: the
 // key's note in octaves, every section in its own register, as that page is laid out (piccolo, flutes,
-// oboes, clarinets, bassoons, horns, trumpets, trombones, tuba, bass drum, piano, violins, low strings).
+// oboes, clarinets, bassoons, horns, trumpets, trombones, tuba, bass drum, piano, violins, cellos, basses).
 // A section's notes are the key plus its octave offsets, each folded by octaves into the range where
 // the section sounds well, so the voicing changes with the key as an orchestrator's would: up the
 // keyboard the bass instruments stay in the bass and the piccolo stops climbing.
 //
-// An eighth note: the wind, brass and string players stop after PJ_HIT_LEN seconds (0.28) though the
-// key is held (the hall and the piano's and drum's ring carry on); a key let go sooner stops them sooner.
+// The orchestra plays as long as the key is held (these are players, not a recording: the chord
+// sustains as a tutti would), and at least PJ_HIT_MIN seconds (0.10) for a file's very short note.
+// PJ_HIT_LEN > 0: an eighth note instead, the wind, brass and string players stop after that long
+// (the hall and the piano's and drum's ring carry on).
 // Not only a thump: as on the page, the piccolo and the first flute run up into their note and the piano
 // rolls its chord (hitOn).
 //
 // Not built yet, so not playing: the timpani and the harp (the taiko stands in for the bass drum; the
-// bowed double bass model plays the cellos' and violas' notes too; one fiddle the violins').
+// cello plays the violas' notes too; one fiddle the violins').
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -61,7 +63,8 @@ const SectionDef kSections[] = {
     {"trombone", 2, {0, -12}, 2, 40, 70, 1.0, true},
     {"tuba", 1, {-24}, 1, 28, 52, 1.4, true},
     {"fiddle", 1, {24, 12, 0}, 3, 55, 93, 1.4, true},
-    {"contrabass", 1, {0, -12, -24}, 3, 28, 67, 1.0, true},
+    {"cello", 1, {0, -12}, 2, 36, 69, 1.0, true},
+    {"contrabass", 1, {-24}, 1, 28, 52, 1.0, true},
     {"grand-piano", 1, {-24, -12, 0, 12, 24}, 5, 24, 103, 0.4, false, false, true},
     {"taiko", 1, {-24}, 1, 26, 37, 0.7, false},
 };
@@ -88,6 +91,7 @@ void Ensemble::initOrchestra(const RoomSpec* room) {
     s.hi = d.hi;
     s.gain = float(d.gain * kGain);
     s.stops = d.stops;
+    s.lead = noteLead(*in);
     s.run = d.run;
     s.roll = d.roll;
     kids_.push_back(std::move(s));
@@ -139,7 +143,8 @@ void Ensemble::hitOn(int key, int velocity) {
         h.ev.push_back({now_ + (runEnd - now_) * double(i) / double(notes.size() - 1 ? notes.size() - 1 : 1), k, notes[i],
                         velocity, true});
     } else {
-      for (int p : notes) h.ev.push_back({h.tuttiAt, k, p, velocity, true});
+      // (a section that acts late on its keys, the cello for its pizzicato, is given them early)
+      for (int p : notes) h.ev.push_back({std::max(now_, h.tuttiAt - s.lead), k, p, velocity, true});
     }
   }
   std::stable_sort(h.ev.begin(), h.ev.end(), [](const HitEvent& a, const HitEvent& b) { return a.t < b.t; });
@@ -171,7 +176,7 @@ void Ensemble::hitOff(int key, bool all, bool force) {
 }
 
 void Ensemble::hitRender(float* left, float* right, int n) {
-  static const double kLen = knob("PJ_HIT_LEN", 0.28);
+  static const double kLen = knob("PJ_HIT_LEN", 0);  // (> 0: the players stop after this long, a held key or not)
   std::fill(left, left + n, 0.0f);
   std::fill(right, right + n, 0.0f);
   hitL_.resize(n);
@@ -185,7 +190,7 @@ void Ensemble::hitRender(float* left, float* right, int n) {
         if (e.on) kids_[e.section].ens->noteOn(e.pitch, e.vel);
         else kids_[e.section].ens->noteOff(e.pitch);
       }
-      if (!h.stopped && now_ - h.tuttiAt >= kLen) { hitOff(h.key, false, true); h.stopped = true; }
+      if (kLen > 0 && !h.stopped && now_ - h.tuttiAt >= kLen) { hitOff(h.key, false, true); h.stopped = true; }
       if (h.offAt >= 0 && now_ >= h.offAt) { hitOff(h.key, true, true); --i; }
     }
     const int m = std::min(n - done, 128);

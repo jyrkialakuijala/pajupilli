@@ -23,8 +23,10 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <complex>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -68,9 +70,10 @@ class OrganRoom {
   // case's front behind them (facade), occl 0..1 (the rows in front of it:
   // the share darkened), dirDark (a flue mouth's shadow behind it: 0 omni),
   // its ring set. Returns its index; its paths traced in finish().
-  int addSource(V3 at, int caseId, bool facade, double occl, double dirDark, int set) {
+  int addSource(V3 at, int caseId, bool facade, double occl, double dirDark, int set, double hz = 250) {
     Source s;
     s.at = at;
+    s.hz = hz;
     s.caseId = caseId;
     if (caseId >= 0) {  // (inside its case, a little in from its walls)
       const Box& b = cases_[caseId].box;
@@ -164,9 +167,15 @@ class OrganRoom {
           const int d = int(std::lround(p.r / kC * fs_)) - d0_;
           if (d < 0 || d >= kRingN - kBlock) continue;
           const double cosA = dot(p.arriveFrom, lis_.axis[m]);
-          const double g = std::pow(10.0, (p.reflDb - 3.0 * p.shadow) / 20) / p.r * (lis_.pattern + (1 - lis_.pattern) * cosA);
+          // (the direct sound PJ_ORGAN_DIRECT_DB over the physical balance, 4 dB: the stand's
+          // pair nearer the case, as a recording's main pair is placed for clarity, against a
+          // muffled wash of the reflections)
+          static const double kDirect = std::pow(10.0, (std::getenv("PJ_ORGAN_DIRECT_DB") ? std::atof(std::getenv("PJ_ORGAN_DIRECT_DB")) : 4.0) / 20);
+          const double g = std::pow(10.0, (p.reflDb - 3.0 * p.shadow - p.diffDb) / 20) / p.r * (lis_.pattern + (1 - lis_.pattern) * cosA) *
+                           (cls(p) == 0 ? kDirect : 1.0);
           const Source& s = srcs_[i];
-          const double o = std::clamp(s.occl + s.dirDark * 0.5 * (1 - p.firstDir.z) + 0.7 * p.shadow, 0.0, 1.0);
+          // (bent round the edge, its harmonics more than its fundamental: darker)
+          const double o = std::clamp(s.occl + s.dirDark * 0.5 * (1 - p.firstDir.z) + 0.7 * p.shadow + p.diffDb / 15, 0.0, 1.0);
           taps_[m][i].push_back({ringIndex(m, cls(p), int(std::lround(2 * o))), d, float(g)});
         }
       }
@@ -176,6 +185,13 @@ class OrganRoom {
   // How many taps a source has (both microphones): 0 if the church cannot
   // hear it directly (behind a wall: heard through its enclosure's field).
   int taps(int src) const { return int(taps_[0][src].size() + taps_[1][src].size()); }
+  // (its taps' gains summed, by class: [0] direct, [1] the reflections; both microphones)
+  std::array<double, 2> tapSum(int src) const {
+    std::array<double, 2> r{};
+    for (int m = 0; m < 2; ++m)
+      for (const Tap& t : taps_[m][src]) r[t.ring / kDark % kCls == 0 ? 0 : 1] += t.g;
+    return r;
+  }
   // The first arrival's delay (samples, after the common delay) at a microphone.
   int firstDelay(int src, int mic) const {
     int d = 1 << 30;
@@ -393,6 +409,7 @@ class OrganRoom {
     Plane back;
     double occl, dirDark;
     int set;
+    double hz = 250;  // (its fundamental: the wavelength the gallery's edge bends)
   };
   struct Path {
     double r;
@@ -400,6 +417,7 @@ class OrganRoom {
     double reflDb;
     V3 firstDir, arriveFrom;
     int shadow = 0;
+    double diffDb = 0;  // (bent round the gallery's front edge: its loss)
   };
   struct Tap {
     int ring, delay;
@@ -476,8 +494,79 @@ class OrganRoom {
     std::vector<Path> out;
     const int np = int(planes.size());
     int shadow = 0;
+    double diff = 0;
+    // The gallery's front edge: a leg past it, from the gallery to the nave below or above, bent
+    // round it (Kurze-Anderson's form of Maekawa's chart, at the source's fundamental: N = 2 delta /
+    // lambda, delta the detour over the edge; in its shadow 5 + 20 log10(x / tanh x) dB, x =
+    // sqrt(2 pi N), 5 dB on the line of sight; on the lit side within N = -0.2, 5 + 20 log10(x /
+    // tan x), falling to nothing). A pedal pipe's wavelength of 3-5 m bends round it: a pipe a
+    // little below the line of sight a few dB softer, not cut off. (Beyond 30 dB: blocked.)
+    auto edge = [&](V3 a, V3 b, bool blocked) -> double {
+      const double Z = kGalleryZ;
+      if ((a.z - Z) * (b.z - Z) >= 0) return blocked ? -1 : 0;
+      const V3 on = a.z < Z ? a : b;  // (the end over the gallery)
+      const double t = (Z - a.z) / (b.z - a.z);
+      const V3 q = add(a, mul(t, sub(b, a)));
+      const double ey = on.y >= kGalleryY - 0.15 ? kGalleryY : kGalleryY - 0.3;
+      if (!blocked && std::fabs(q.y - ey) > 3) return 0;  // (well clear)
+      const V3 E{q.x, ey, Z};
+      const double delta = len(sub(E, a)) + len(sub(b, E)) - len(sub(b, a));
+      const double N = 2 * delta * s.hz / 343.0;
+      if (blocked) {
+        const double x = std::sqrt(2 * M_PI * N);
+        const double A = 5 + 20 * std::log10(x > 1e-6 ? x / std::tanh(x) : 1.0);
+        return A > 30 ? -1 : A;
+      }
+      // (lit: passing on the open side of the edge)
+      const bool openSide = ey == kGalleryY ? q.y > ey : q.y < ey;
+      if (!openSide || N >= 0.2) return 0;
+      const double x = std::sqrt(2 * M_PI * N);
+      return std::max(0.0, 5 + 20 * std::log10(x > 1e-6 ? x / std::tan(x) : 1.0));
+    };
+    // The same at a case's edges (its four upright corners and its top's four): the least detour
+    // round one (closed form: the edge unfolded into the leg's plane), against the pipe's
+    // wavelength; blocked, the shadow's loss; past it in the open within N = 0.2, the lit side's.
+    auto caseEdge = [&](const Box& bx, V3 a, V3 b, bool blocked) -> double {
+      const double ab = len(sub(b, a));
+      double best = 1e9;
+      auto tryEdge = [&](int ax, double u0, double v0, double lo, double hi) {
+        // (an edge along axis ax, at the other two coordinates (u0, v0))
+        const int au = (ax + 1) % 3, av = (ax + 2) % 3;
+        const double da = std::hypot(get(a, au) - u0, get(a, av) - v0), db = std::hypot(get(b, au) - u0, get(b, av) - v0);
+        if (da + db < 1e-9) return;
+        const double A = get(a, ax), B = get(b, ax);
+        const double w = std::clamp(A + (B - A) * da / (da + db), lo, hi);
+        if (!blocked) {  // (lit: only an edge the leg passes beside, between its ends)
+          const double t = da / (da + db);
+          if (t < 0.05 || t > 0.95) return;
+        }
+        best = std::min(best, std::hypot(da, w - A) + std::hypot(db, B - w) - ab);
+      };
+      for (double x : {bx.lo.x, bx.hi.x})
+        for (double z : {bx.lo.z, bx.hi.z}) tryEdge(1, z, x, bx.lo.y, bx.hi.y);  // (upright: along y; (z, x))
+      for (double z : {bx.lo.z, bx.hi.z}) tryEdge(0, bx.hi.y, z, bx.lo.x, bx.hi.x);  // (the top's, along x: (y, z))
+      for (double x : {bx.lo.x, bx.hi.x}) tryEdge(2, x, bx.hi.y, bx.lo.z, bx.hi.z);  // (along z: (x, y))
+      if (best > 1e8) return blocked ? -1 : 0;
+      const double N = 2 * std::max(best, 0.0) * s.hz / 343.0;
+      const double x = std::sqrt(2 * M_PI * N);
+      if (blocked) {
+        const double A = 5 + 20 * std::log10(x > 1e-6 ? x / std::tanh(x) : 1.0);
+        return A > 30 ? -1 : A;
+      }
+      if (N >= 0.2) return 0;
+      return std::max(0.0, 5 + 20 * std::log10(x > 1e-6 ? x / std::tan(x) : 1.0));
+    };
+    // (a leg's losses: each edge it is bent round, summed; of the edges it passes in the open, the
+    // nearest alone: the lit side's loss is one edge's)
     auto legOk = [&](V3 a, V3 b, bool& exited) {
-      if (hits(gallery_, a, b)) return false;  // (the gallery's floor, a slab)
+      double lit = 0;
+      {
+        const bool blocked = hits(gallery_, a, b);  // (the gallery's floor, a slab)
+        const double A = edge(a, b, blocked);
+        if (A < 0) return false;
+        if (blocked) diff += A;
+        else lit = std::max(lit, A);
+      }
       for (int k = 0; k < int(cases_.size()); ++k) {
         const Case& c = cases_[k];
         if (k == s.caseId && !exited) {
@@ -486,7 +575,14 @@ class OrganRoom {
           const double A = a.z, B = b.z, fz = c.box.hi.z;
           if (B <= fz) return false;
           const V3 q = add(a, mul((fz - A) / (B - A), sub(b, a)));
-          if (q.x < c.box.lo.x || q.x > c.box.hi.x) return false;
+          if (q.x < c.box.lo.x || q.x > c.box.hi.x) {
+            // (out through a side wall: bent round the open front's upright edge instead)
+            const double D = caseEdge(c.box, a, b, true);
+            if (D < 0) return false;
+            diff += D;
+            exited = true;
+            continue;
+          }
           // (past the aperture's edges, the impost, the roof: diffracted within 0.6 m)
           const double past = std::max(c.apLoY - q.y, q.y - c.apHiY);
           if (past > 0.6) return false;
@@ -494,11 +590,19 @@ class OrganRoom {
           exited = true;
           continue;
         }
-        if (hits(c.box, a, b)) {
-          if (!c.shadowOnly) return false;
+        const bool hit = hits(c.box, a, b);
+        if (hit && c.shadowOnly) {
           ++shadow;
+          continue;
         }
+        if (k == s.caseId && hit) return false;  // (back into its own case)
+        if (k == s.caseId) continue;
+        const double A = caseEdge(c.box, a, b, hit);  // (round another case's edge)
+        if (A < 0) return false;
+        if (hit) diff += A;
+        else lit = std::max(lit, A);
       }
+      diff += lit;
       return true;
     };
     std::vector<std::vector<int>> seqs = {{}};
@@ -525,7 +629,9 @@ class OrganRoom {
       if (!ok) continue;
       bool exited = s.caseId < 0;
       shadow = 0;
+      diff = 0;
       for (size_t k = 0; k + 1 < pts.size() && ok; ++k) ok = legOk(pts[k], pts[k + 1], exited);
+      if (diff > 30) ok = false;
       if (!ok || !exited) continue;
       Path p;
       p.r = 0;
@@ -537,6 +643,7 @@ class OrganRoom {
       const V3 back = sub(pts[pts.size() - 2], mic);
       p.arriveFrom = mul(1 / len(back), back);
       p.shadow = shadow;
+      p.diffDb = diff;
       out.push_back(p);
     }
     return out;

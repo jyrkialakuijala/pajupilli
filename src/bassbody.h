@@ -22,25 +22,74 @@
 
 namespace pajupilli {
 
+// A body's design (tools/bassbody.py -emit): the double bass (bassbody_data.h), the cello
+// (cellobody_data.h, tools/bassbody.py -cello) or the viola (violabody_data.h, -viola), the same grid.
+struct BodyData {
+  const float (*topK)[bassdata::kNY][bassdata::kNX];
+  const float (*topInvM)[bassdata::kNX];
+  const float (*backK)[bassdata::kNY][bassdata::kNX];
+  const float (*backInvM)[bassdata::kNX];
+  float nodeArea;
+  const float* rowY;
+  const float* colX;
+  const float* airK;
+  const float* slugArea;
+  float slugInv, plugArea, plugInvM, postBehind;
+  int bridgeI, bassJ, trebleJ;
+  // The two sides' difference: up to where the top is small against the wavelength, and where
+  // its patches average out (Hz; the bass 250 and 700, a smaller body higher).
+  float sideLo, sideHi;
+  // Steps per sample: a small body's grid (the viola's) has resonances up to ~15 kHz, at the
+  // leapfrog's limit at 48 kHz (fs / pi): two steps of half the time each hold it to 30 kHz.
+  int substeps = 1;
+  float depth = 0.20f;  // the ribs' height (m): the top's and the back's distance, the air's passage across
+  // The air's losses that grow with frequency (s): its motion is driven by the pressure plus
+  // this x the pressure's rate of change, which damps a resonance at f to Q = 1 / (2 pi f x this)
+  // at most. What the f-holes radiate grows with the frequency squared, and so does what the
+  // air loses on the walls of a narrow body. Without it the one slice of air at the f-holes
+  // bounces on their plugs with almost no loss (the viola: at 4.9 kHz, Q over 1000): every note
+  // with an overtone there (D#4, E4, F4, B4, F5) rang with a metallic shine. 0: none.
+  float airHf = 0;
+};
+extern const BodyData kBassBodyData, kCelloBodyData, kViolaBodyData, kViolinBodyData;
+
 class BassBody {
  public:
-  explicit BassBody(double fs);
+  explicit BassBody(double fs, const BodyData& data = kBassBodyData);
   void reset();
   // One sample: the bridge feet's forces on the top (N, outward positive).
   // Returns the body's radiated sound: the acceleration of the volume it
   // displaces (top + back + f-holes: a monopole).
-  float step(float bassFoot, float trebleFoot);
+  float step(float bassFoot, float trebleFoot) {
+    if (d_.substeps == 1) return stepOne(bassFoot, trebleFoot);
+    float a = 0, h = 0;
+    for (int k = 0; k < d_.substeps; ++k) {
+      a += stepOne(bassFoot, trebleFoot);
+      h += fhole_;
+    }
+    fhole_ = h / float(d_.substeps);
+    return a / float(d_.substeps);
+  }
   // The feet's motion (for the bridge): displacement and velocity.
-  float bassFootW() const { return w_[0][bassdata::kBassJ + kPad][bassdata::kBridgeI + kPad]; }
-  float trebleFootW() const { return w_[0][bassdata::kTrebleJ + kPad][bassdata::kBridgeI + kPad]; }
-  float bassFootV() const { return v_[0][bassdata::kBassJ + kPad][bassdata::kBridgeI + kPad]; }
-  float trebleFootV() const { return v_[0][bassdata::kTrebleJ + kPad][bassdata::kBridgeI + kPad]; }
+  float bassFootW() const { return w_[0][d_.bassJ + kPad][d_.bridgeI + kPad]; }
+  float trebleFootW() const { return w_[0][d_.trebleJ + kPad][d_.bridgeI + kPad]; }
+  float bassFootV() const { return v_[0][d_.bassJ + kPad][d_.bridgeI + kPad]; }
+  float trebleFootV() const { return v_[0][d_.trebleJ + kPad][d_.bridgeI + kPad]; }
   // What a close microphone at an f-hole hears: the air plugs' own flow's
   // acceleration (not cancelled by the plates, as it is far away).
   float fholeSound() const { return fhole_; }
   // What differs between the two sides of the bass (add to one ear, take
   // from the other): see step().
   float sideSound() const { return side_; }
+  // How the body's motion lies in space: the moments of the volume it displaces (top, back and
+  // f-holes), as the sound each sends along its axis over and above the whole volume's (the
+  // return value of step(), heard alike all round): k = 0 across the body (towards the treble
+  // side), 1 along it (towards the tail), 2 out of the top (the top and the f-holes against the
+  // back). A resonance that moves the two halves of the top against each other, or pumps the air
+  // in at one f-hole and out at the other, displaces no volume: it is heard only through these,
+  // with opposite signs to its two sides. Each resonance has its own share of the four, so each
+  // overtone of a note goes out into the room in its own directions.
+  float dipole(int k) const { return dip_[k]; }
   // Losses: a decay rate for all motion (1/s), and one that grows with
   // frequency (the wood's internal friction: a share of the stiffness force,
   // as its rate of change; s).
@@ -49,6 +98,8 @@ class BassBody {
   }
 
  private:
+  const BodyData& d_;
+  float stepOne(float bassFoot, float trebleFoot);
   static constexpr int kPad = 2;
   static constexpr int kRows = bassdata::kNY + 2 * kPad, kCols = bassdata::kNX + 2 * kPad;
   // [plate: 0 top, 1 back][row][column], padded with masses at rest.
@@ -56,9 +107,17 @@ class BassBody {
   alignas(64) float v_[2][kRows][kCols] = {};
   alignas(64) float f_[2][bassdata::kNY][bassdata::kNX] = {};
   alignas(64) float fPrev_[2][bassdata::kNY][bassdata::kNX] = {};
-  float plugW_ = 0, plugV_ = 0, fhole_ = 0, side_ = 0, side1_ = 0, dipPrev_ = 0, sideA_ = 0, sideB_ = 0;
+  float fhole_ = 0, side_ = 0, side1_ = 0, dipPrev_ = 0, sideA_ = 0, sideB_ = 0;
+  // The air in two halves side by side, the bass side's and the treble side's ([side]): each a
+  // column of cells with its own f-hole's plug, and the air free to cross between the halves.
   // The air slugs between the cells: [i + 1] between cells i and i + 1 ([0] and [16]: walls).
-  float slugW_[bassdata::kNX + 1] = {}, slugV_[bassdata::kNX + 1] = {};
+  float plugW_[2] = {}, plugV_[2] = {};
+  float slugW_[2][bassdata::kNX + 1] = {}, slugV_[2][bassdata::kNX + 1] = {};
+  float crossW_[bassdata::kNX] = {}, crossV_[bassdata::kNX] = {}, crossInv_[bassdata::kNX] = {};  // from the bass side to the treble side
+  float crossArea_ = 0, holeY_ = 0;
+  bool sides_ = true;  // (PJ_AIR_SIDES 0: one column of air and one plug for both f-holes, as before)
+  float dip_[3] = {}, dip1_[3] = {}, momPrev_[3] = {};
+  float pressPrev_[2][bassdata::kNX + 1] = {};
   float dt_, rate_ = 18, stiff_ = 3e-6f, airRate_ = 14;
 };
 

@@ -63,17 +63,64 @@ struct BassString {
   double action;   // its height over the fingerboard's end (m)
 };
 
+// An instrument of this construction: the double bass, or the cello (research/cello.md), the
+// same parts at its size.
+struct BassSpec {
+  BassString strings[4];     // low to high
+  int open[4];               // their open notes (MIDI)
+  int top;                   // the top of the stopped notes (above: harmonics)
+  double notch;              // the strings' spacing on the bridge (m)
+  double crown;              // the bow's angle from one string to the next (rad)
+  double bridgeM;            // the bridge's top, above the waist (kg)
+  double bridgeFy, bridgeQy; // its top against the feet, up and down (Hz, 1 / Q)
+  double bridgeFz, bridgeQz; // ... sideways on the waist: the bridge's own resonance
+  double tailM, tailF, tailQ;  // the tailpiece on its cord (kg, Hz, Q)
+  double bridgeKx, bridgeCx, cordK, cordC;  // along the strings (N/m, N s/m)
+  double bridgeH, feet;      // bridge height, foot spacing (m)
+  double afterLen;           // bridge to tailpiece (m)
+  double boardEnd;           // the fingerboard's end to the bridge (m)
+  double hair;               // the bow hair's width on the string (m)
+  double bodyRate, bodyStiff, bodyAir;  // the body's losses (BassBody::setDamping)
+  const BodyData* body;
+  // What is heard: the levels that bring the far sound, the f-hole, the bridge pickup and the
+  // top by the bridge to a like level, and the two sides' difference.
+  double farLevel, holeLevel, pickupLevel, topLevel;
+  double bowLength;          // the hair's length used in a stroke (m)
+  double vibRate;            // the vibrato's speed x the knob's (a bassist's is slower)
+  const float* bowLevels;    // each bowed note against its neighbours (dB; tools/bowlevels.py), from bowLevelLo
+  int bowLevelLo, bowLevelN;
+  double bowSpeed;           // the bow's speed at ff less its 5 cm/s at pp (m/s)
+  double vibNat;             // the player's own vibrato on a stopped note under the bow, with no knob
+                             // (cents each way in the first position; wider up the neck: the same
+                             // finger travel on a shorter string)
+  // The endpin on the stage floor: the bridge's force on the body, as far as the pin passes it,
+  // sets the floor going around its own resonance (Hz, Q); floorGain: its sound against the
+  // body's far sound (0: none).
+  double floorGain, floorF, floorQ;
+  // The open strings below equal temperament (semitones): a cello is tuned in pure fifths down
+  // from its A (C 5.9, G 3.9, D 2.0 cents flat), so its open strings' overtones meet and do not
+  // beat; the stopping finger makes up the difference.
+  double openFlat[4];
+  double pizzWait;           // (s) a key let go within this is plucked; keys sound this much late (0: none)
+  double muteM;              // the mute's mass on the bridge's top (kg; con sordino)
+  double attackScale = 1;    // the stroke's ease-in against the bass's (a light string speaks sooner)
+  double bowWmax = 0.5;      // the bow drives the modes turning up to about this much a sample (rad;
+                             // 0.5: 3.8 kHz at 48 kHz), the higher ones less and less
+};
+extern const BassSpec kDoubleBassSpec, kCelloSpec, kViolaSpec, kViolinSpec;
+
 class Bass {
  public:
   static constexpr int kStrings = 4, kModes = 64, kAfter = 6, kBoard = 5;
-  explicit Bass(double fs);
+  explicit Bass(double fs, const BassSpec& spec = kDoubleBassSpec);
+  const BassSpec& spec() const { return spec_; }
   void setStringDef(int s, const BassString& def);
   // Pluck string s, stopped at a sounding length (m; 0: open): pull depth (m),
   // where (share of the sounding length from the bridge), the pull's angle
   // from the top's plane (rad; outward positive: the string then swings back
   // onto the fingerboard). finger: 0 index tip, 1 middle tip, 2 the jazz pull
   // (the two as one), 3 the thumb, 4 the flat finger (the index's side along
-  // the string), -1: the tips take turns.
+  // the string), 5 the nail, -1: the tips take turns.
   void pluck(int s, double stoppedLength, double depth, double where = 0.2, double angle = 0.3, int finger = -1);
   // The left hand moves on a sounding string: a new length over `glide` s
   // (a slide; short: a hammer-on or pull-off), without a pluck.
@@ -117,6 +164,9 @@ class Bass {
   // The left hand lies on the string: it dies at `rate` (1/s; a firm stop ~70,
   // a light touch ~10 lets it ring out).
   void damp(int s, double rate = 40);
+  // The mute (con sordino): its mass on the bridge's top, which lowers the bridge's own
+  // resonances and holds the upper overtones back from the body (veiled, softer).
+  void setMute(bool on) { kBridgeM = float(spec_.bridgeM + (on ? spec_.muteM : 0.0)); }
   void setSkin(double toughness) { skin_ = toughness; }  // 0 soft fingertip .. 1 calloused
   // The strings' height over the fingerboard, x the instrument's (1): low (0.4)
   // and the strings graze the board (the growl); high (1.4): clean.
@@ -127,6 +177,8 @@ class Bass {
   }
   float sample(float testForce = 0);
   float side() const { return side_; }
+  // The body's sound along its three axes (BassBody::dipole), on the far sound's scale.
+  float dipole(int k) const { return dipScale_ * body_.dipole(k) / farLevel_; }
   float footForce() const { return footForce_; }  // the bridge's bass foot on the top (N)  // left = sample + side, right = sample - side
   void reset();  // everything at rest (after a NaN)
   BassBody& body() { return body_; }
@@ -153,6 +205,7 @@ class Bass {
     alignas(64) float bowShape[kModes] = {};
     float bowSum = 0, bowBr = 0, bowV = 0, bowF = 0, bowVTo = 0, bowFTo = 0, bowK = 0.01f, bowKF = 0.01f, bowSin = 0, bowCos = 1;
     float bowNoise = 0, bowTors = 0, bowTw = 0, bowTwR = 0;
+    float bowTurn = 0;  // (a change of direction under way: the speed it came from)
     double bowDist = 0;
     bool bowOn = false, slipping = true;
     // The finger: a force along its pull (N), rising, held, then slipping off.
@@ -166,6 +219,12 @@ class Bass {
   void tune(Str& s);     // the modes' coefficients at the present length
   void bowShape(Str& s);
   void control();        // every 16 samples: slides, vibrato, which strings sound
+  const BassSpec& spec_;
+  // (the instrument's constants, from its spec: named as when they were the bass's alone)
+  float kBridgeM, kKy, kCy, kKz, kCz, kTailM, kTailK, kTailC, kBridgeKx, kBridgeCx, kCordK, kCordC;
+  double kHair, kBridgeH_, kFeet_, kAfterLen_, kBoardEnd_;
+  float farLevel_, holeLevel_, pickupLevel_, topLevel_;
+  float floorG_ = 0, floorW_ = 0, floorD_ = 0, floorY_ = 0, floorV_ = 0, floorLp_ = 0;  // the stage floor under the endpin
   double fs_, dt_;
   BassBody body_;
   Str str_[kStrings];
@@ -182,11 +241,9 @@ class Bass {
   uint32_t rng_ = 12345;
   float micFar_ = 0.25f, micHole_ = 0.42f, micPickup_ = 0.33f, micTop_ = 0.08f, width_ = 0.7f, side_ = 0;
   bool kSymp_, kAfter_, kTail_, kBridge_, kTmod_, kBoard_;
+  float dipScale_ = 1;  // PJ_DIPOLE: the directional parts against the physical (1; 0: none)
   double kAlive_ = 1;  // PJ_BASS_ALIVE: the two directions' differences and the string's irregularities
   static constexpr double kRise_ = 0.012, kHold_ = 0.003;
-  static constexpr double kBridgeH_ = 0.16, kFeet_ = 0.17;  // bridge height, foot spacing (m)
-  static constexpr double kAfterLen_ = 1.06 / 6;            // bridge to tailpiece (m): 1/6 of the string
-  static constexpr double kBoardEnd_ = 0.20;                // fingerboard's end to the bridge (m)
 };
 
 }  // namespace pajupilli

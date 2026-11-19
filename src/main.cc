@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include "director.h"
 #include "analysis.h"
 #include "calibrate.h"
 #include "midifile.h"
@@ -380,6 +381,10 @@ const char kUsage[] =
     "  -play FILE.mid      play a MIDI file: each channel's GM program on its\n"
     "                      instrument (or the nearest built), drums on the\n"
     "                      percussion built; played as it is rendered (or -o)\n"
+    "  -director M         with -play: the director (Director.md) reads the whole file first\n"
+    "                      and gives every part one reading: phrases, dynamics, accents,\n"
+    "                      vibrato, a final ritardando, fermatas. auto (default): only\n"
+    "                      for a file with no performance of its own; on; off\n"
     "  -reinstrument R     with -play: FROM=TO[,FROM=TO]: a channel's instrument\n"
     "                      (a name, a family, or * for all but the drums) on\n"
     "                      another (organ: the church organ by its plan), e.g.\n"
@@ -413,7 +418,7 @@ const char kUsage[] =
     "  -ensemble [LIST]    a flute choir instead of -poly: bass, alto, two flutes\n"
     "                      and a piccolo (default LIST bass,alto,flute,flute,piccolo);\n"
     "                      notes go to the instrument they suit, chords low to high\n"
-    "  -room NAME          dry, studio, hall (default) or church: the instruments\n"
+    "  -room NAME          dry, studio, hall (default), concert or church: the instruments\n"
     "                      play in it and hear it in their bores; stereo out\n"
     "\n"
     "Environment: PJ_NOCAL (skip calibration), PJ_NOCALCACHE (ignore the cache),\n"
@@ -558,6 +563,9 @@ int main(int argc, char** argv) {
     else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
     else if (a == "-polydemo") polyDemo = true;
     else if (a == "-play") playFile = next();
+    else if (a == "-director") {
+      if (!setDirectorMode(next())) { std::fprintf(stderr, "-director: on, off or auto\n"); return 1; }
+    }
     else if (a == "-reinstrument") {
       if (!setReinstrument(next())) return 1;
     }
@@ -567,7 +575,7 @@ int main(int argc, char** argv) {
     }
     else if (a == "-room") {
       room = findRoom(next());
-      if (!room) { std::fprintf(stderr, "-room: dry, studio, hall or church\n"); return 1; }
+      if (!room) { std::fprintf(stderr, "-room: dry, studio, hall, concert or church\n"); return 1; }
       roomGiven = true;
     }
     else if (a == "-fuzz") { const double fs = std::atof(next()); return fuzz(fs, unsigned(std::atoi(next()))); }
@@ -610,7 +618,7 @@ int main(int argc, char** argv) {
     else if (a == "-scatter") return scatter();
     else if (a == "-roomimp") {
       const RoomSpec* rs = findRoom(next());
-      if (!rs) { std::fprintf(stderr, "-roomimp: dry, studio, hall or church\n"); return 1; }
+      if (!rs) { std::fprintf(stderr, "-roomimp: dry, studio, hall, concert or church\n"); return 1; }
       return roomImpulse(*rs);
     }
     else if (a == "-o") out = next();

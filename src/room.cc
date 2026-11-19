@@ -13,6 +13,7 @@ constexpr RoomSpec kRooms[] = {
     {"booth", 40, 0.3, 1.5},      // a small, dead room (a drum booth)
     {"studio", 150, 0.5, 2},      // a small studio, damped
     {"hall", 2500, 1.8, 3},       // a chamber-music hall
+    {"concert", 18000, 2.0, 8},   // a symphony hall: where the timpani belong (research/timpani.md 12.8b)
     {"church", 15000, 4.0, 6},    // a stone church
     {"gated", 3000, 4.0, 3, 0.5},  // a big live room, its ambience compressed and gated (80s snare, toms)
 };
@@ -141,7 +142,13 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
               if (z == 1 || std::abs(z) == 2) g *= bCeil;
               const double cosT = (dx * ax + dy * ay) / std::max(r, 1e-9);
               g *= kMicPattern + (1 - kMicPattern) * cosT;
-              early_.push_back({s, mic, d, float(g / std::max(r, 0.5)), u, w, z});
+              Tap tp{s, mic, d, float(g / std::max(r, 0.5)), u, w, z};
+              // (The image is the source mirrored: the path leaves the source itself in the
+              // image's direction with each hit wall's component turned round.)
+              tp.n[0] = float(-dx / std::max(r, 1e-9)) * (u & 1 ? -1 : 1);
+              tp.n[1] = float(-dy / std::max(r, 1e-9)) * (w & 1 ? -1 : 1);
+              tp.n[2] = float(-dz / std::max(r, 1e-9)) * (z & 1 ? -1 : 1);
+              early_.push_back(tp);
             }
       }
     // The reverberant field reaches a directional microphone weaker than an
@@ -151,6 +158,32 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     micGain_ = float(spec.listener /
                      std::sqrt(on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_));
   }
+}
+
+void Room::setAxes(int s, const float* axes) {
+  const int ns = int(x_.size());
+  if (hasDip_.empty()) {
+    hasDip_.assign(ns, 0);
+    dring_.assign(size_t(3) * ns * kRing, 0.0f);
+    // (their own random directions into the network, apart from the sources' own)
+    unsigned seed = 4242;
+    inDirDip_.resize(size_t(3) * ns * kLines);
+    for (int r = 0; r < 3 * ns; ++r) {
+      double nn = 0;
+      for (int k = 0; k < kLines; ++k) {
+        double t = 0;
+        for (int j = 0; j < 4; ++j) { seed = seed * 1664525u + 1013904223u; t += (seed >> 8) / double(1 << 24) - 0.5; }
+        inDirDip_[r * kLines + k] = float(t);
+        nn += t * t;
+      }
+      for (int k = 0; k < kLines; ++k) inDirDip_[r * kLines + k] = float(inDirDip_[r * kLines + k] / std::sqrt(nn));
+    }
+  }
+  hasDip_[s] = 1;
+  for (Tap& tp : early_)
+    if (tp.src == s)
+      for (int k = 0; k < 3; ++k)
+        tp.dg[k] = tp.gain * (axes[3 * k] * tp.n[0] + axes[3 * k + 1] * tp.n[1] + axes[3 * k + 2] * tp.n[2]);
 }
 
 std::string Room::lateral(int s) const {
@@ -177,6 +210,13 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
   for (int i = 0; i < n; ++i) {
     const int now = (rpos_ + i) & (kRing - 1);
     for (int s = 0; s < ns; ++s) ring_[size_t(s) * kRing + now] = src[s][i];
+    if (!hasDip_.empty())
+      for (int s = 0; s < ns; ++s)
+        if (hasDip_[s])
+          for (int k = 0; k < 3; ++k) {
+            const float* d = dip_ ? dip_[3 * s + k] : nullptr;
+            dring_[size_t(3 * s + k) * kRing + now] = d ? d[i] : 0.0f;
+          }
     float x[kLines], y[kLines];
     for (int k = 0; k < kLines; ++k) {
       const float raw = line_[k * kLineRing + ((pos_ - len_[k]) & (kLineRing - 1))];
@@ -230,8 +270,15 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
     right[i] += g * amb[1];
     // Early sound at the microphones.
     float e[2] = {0, 0};
-    for (const Tap& tp : early_)
-      e[tp.mic] += listenGain[tp.src] * tp.gain * ring_[size_t(tp.src) * kRing + ((now - tp.delay) & (kRing - 1))];
+    for (const Tap& tp : early_) {
+      const int at = (now - tp.delay) & (kRing - 1);
+      float v = tp.gain * ring_[size_t(tp.src) * kRing + at];
+      if (!hasDip_.empty() && hasDip_[tp.src]) {
+        const float* dr = &dring_[size_t(3 * tp.src) * kRing];
+        v += tp.dg[0] * dr[at] + tp.dg[1] * dr[kRing + at] + tp.dg[2] * dr[2 * kRing + at];
+      }
+      e[tp.mic] += listenGain[tp.src] * v;
+    }
     left[i] += lg * e[0];
     right[i] += lg * e[1];
     // Mixing: fast Hadamard transform, / 4 (orthogonal).
@@ -257,6 +304,14 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
       }
       const float* dir = &inDir_[s * kLines];
       for (int k = 0; k < kLines; ++k) y[k] += dir[k] * in;
+      // (The directional parts' power into the reverberant field: each a third of what the
+      // same sound sent all round would give.)
+      if (!hasDip_.empty() && hasDip_[s])
+        for (int c = 0; c < 3; ++c) {
+          const float d = 0.57735f * inGain_ * dring_[size_t(3 * s + c) * kRing + now];
+          const float* dd = &inDirDip_[size_t(3 * s + c) * kLines];
+          for (int k = 0; k < kLines; ++k) y[k] += dd[k] * d;
+        }
     }
     for (int k = 0; k < kLines; ++k) line_[k * kLineRing + (pos_ & (kLineRing - 1))] = y[k];
     pos_ = (pos_ + 1) & (kLineRing - 1);

@@ -55,6 +55,14 @@ class Tube {
   // metal pipes): the last n samples' difference (left = out + side, right =
   // out - side), taken once; null if it has none.
   virtual const float* takeSide(int /*n*/) { return nullptr; }
+  // A model whose sound goes out differently in different directions (the bowed strings' bodies,
+  // src/bassbody.h): besides its output (heard alike all round) three parts, each heard along one
+  // axis of the instrument and with the opposite sign the other way (k = 0 .. 2; the last n
+  // samples, taken once); dipoleAxes(): those axes in the room (3 x 3: x to the listener's right,
+  // y towards the listener, z up), or null if it has none. The room gives every reflection its
+  // own mix of them (Room::setAxes).
+  virtual const float* takeDipole(int /*n*/, int /*k*/) { return nullptr; }
+  virtual const float* dipoleAxes() const { return nullptr; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right

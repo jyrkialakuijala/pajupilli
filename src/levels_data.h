@@ -51,6 +51,9 @@ constexpr LevelTrim kLevelTrims[] = {
     {"synth-drum", 11.0f},
     {"double-bass", 3.1f},
     {"contrabass", 1.3f},
+    {"cello", -5.4f},
+    {"viola", -5.1f},  // (measured against the cello; tools/levels.py -emit will redo it)
+    {"violin", -4.7f},  // (measured against the viola; tools/levels.py -emit will redo it)
     {"grand-piano", 9.8f},
     {"upright-piano", 6.2f},
     {"honky-tonk", 5.4f},  // (measured 0.8 dB over the upright: brighter, harder hammers and tacks, in its closed case)

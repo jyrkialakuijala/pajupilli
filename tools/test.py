@@ -513,6 +513,132 @@ def strings():
     check('fuzz 10 s (contrabass)', r.returncode == 0, r.stdout.strip())
     ns = cpu_time(['-inst', 'contrabass', '-note', '45', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
     check('real-time margin (contrabass)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The cello (-inst cello): the bass's construction at a cello's size (research/cello.md); its
+    # open strings, stopped notes to A5, a harmonic.
+    cents, clar = [], []
+    for note in (38, 43, 50, 57, 64, 72, 81, 88):
+        r = run(['-inst', 'cello', '-note', str(note), '-secs', '2'])
+        c = re.search(r'\(([+-]?\d+) cents\) clarity ([0-9.]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    check('cello: bowed notes in tune', max(abs(c) for c in cents) <= 10, f'cents {cents}')
+    check('cello: bowed notes clear', min(clar) >= 0.7, f'clarity {clar}')
+    r = run(['-inst', 'cello', '-fuzz', '10', '1'])
+    check('fuzz 10 s (cello)', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', 'cello', '-note', '57', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (cello)', ns < 5200, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The viola (-inst viola): the cello's construction with a viola's strings, body and bridge
+    # (research/viola.md); its open strings, stopped notes to E6, harmonics to E7.
+    import numpy as np
+    from scipy.io import wavfile
+    cents, clar = [], []
+    for note in (50, 55, 62, 69, 76, 84, 88, 93):
+        r = run(['-inst', 'viola', '-note', str(note), '-secs', '2'])
+        c = re.search(r'\(([+-]?\d+) cents\) clarity ([0-9.]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    check('viola: bowed notes in tune', max(abs(c) for c in cents) <= 10, f'cents {cents}')
+    check('viola: bowed notes clear', min(clar) >= 0.7, f'clarity {clar}')
+    # Its two main resonances as heard (a force on the bridge's foot, the open strings silent): the
+    # air (A0) 2-4 semitones above the open G, the main wood resonance near F#4, each about a
+    # semitone wide or a little less (Q 15 .. 50).
+    with tempfile.TemporaryDirectory() as d:
+        dump = os.path.join(d, 'imp.bin')
+        run(['-inst', 'viola', '-imp', '60'], env={'PJ_BASS_SYMP': '0', 'PJ_IMPOUT': '1', 'PJ_IMPDUMP': dump})
+        q = np.fromfile(dump)
+    X = np.abs(np.fft.rfft(q, 8 * len(q)))
+    f = np.fft.rfftfreq(8 * len(q), 1 / 48000)
+    def peak(lo, hi):
+        m = (f > lo) & (f < hi)
+        i = np.where(m)[0][np.argmax(X[m])]
+        a, b = i, i
+        while X[a] > X[i] / 2 ** 0.5: a -= 1
+        while X[b] > X[i] / 2 ** 0.5: b += 1
+        return f[i], f[i] / (f[b] - f[a])
+    (fa, qa), (ft, qt) = peak(205, 245), peak(345, 390)
+    check('viola: A0 and the main wood resonance, a semitone wide or less',
+          205 < fa < 245 and 345 < ft < 390 and 15 <= qa <= 50 and 15 <= qt <= 50,
+          f'A0 {fa:.0f} Hz Q {qa:.1f}, main {ft:.0f} Hz Q {qt:.1f}')
+    # (A body whose main resonance does not rock the bridge, and a mode above it that does, robs
+    # the notes whose second harmonic falls there of their fundamental: D#4 .. F#4.)
+    worst = 99.0
+    for note in (63, 64, 65, 66):
+        with tempfile.TemporaryDirectory() as d:
+            wav = os.path.join(d, 'n.wav')
+            run(['-inst', 'viola', '-note', str(note), '-secs', '2', '-o', wav])
+            fs, x = wavfile.read(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        seg = x[int(0.6 * fs):int(1.6 * fs)]
+        S = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+        g = np.fft.rfftfreq(len(seg), 1 / fs)
+        f0 = 440 * 2 ** ((note - 69) / 12)
+        lev = lambda h: 20 * np.log10(S[(g > 0.98 * h * f0) & (g < 1.02 * h * f0)].max())
+        worst = min(worst, lev(1) - lev(2))
+    check('viola: D#4 .. F#4 keep their fundamental', worst > -15, f'fundamental re second harmonic at worst {worst:+.1f} dB')
+    # Pizzicato (a key let go within 100 ms): the nail's pluck, dying away.
+    with tempfile.TemporaryDirectory() as d:
+        wav = os.path.join(d, 'p.wav')
+        run(['-inst', 'viola', '-seq', 'on 62 100 wait 0.05 off 62 wait 1.5', '-o', wav])
+        fs, x = wavfile.read(wav)
+    x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    e = lambda t: 10 * math.log10(np.mean(x[int(t * fs):int((t + 0.1) * fs)] ** 2) + 1e-20)
+    check('viola: a pizzicato dies away', e(0.1) - e(0.9) > 15, f'{e(0.1) - e(0.9):.1f} dB from 0.1 to 0.9 s')
+    # The bow's turns (a long note: the hair runs out every second or so) leave the open C and the
+    # cello's open D sounding: the fundamental dips for a moment, not a new note's 'buaaa' (held at
+    # full weight through the turn the string sticks, and its fundamental comes back through a
+    # double slip over ~1 s).
+    for inst, note in (('viola', 48), ('cello', 50)):
+        with tempfile.TemporaryDirectory() as d:
+            wav = os.path.join(d, 't.wav')
+            run(['-inst', inst, '-note', str(note), '-secs', '6', '-o', wav])
+            fs, x = wavfile.read(wav)
+        x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+        f0 = 440 * 2 ** ((note - 69) / 12)
+        h1 = []
+        for t in np.arange(0.5, 5.5, 0.01):
+            seg = x[int(t * fs):int((t + 0.04) * fs)]
+            S = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 16 * len(seg)))
+            g = np.fft.rfftfreq(16 * len(seg), 1 / fs)
+            h1.append(20 * np.log10(S[(g > 0.7 * f0) & (g < 1.3 * f0)].max() + 1e-9))
+        down = int((np.array(h1) < np.median(h1) - 3).sum()) * 10
+        check(f'{inst}: the bow turns gently', down < 450, f'fundamental more than 3 dB down {down} ms of 5 s')
+    for seed in ('1', '2', '3'):
+        r = run(['-inst', 'viola', '-fuzz', '10', seed])
+        check(f'fuzz 10 s (viola, seed {seed})', r.returncode == 0 and 'ok' in r.stdout, r.stdout.strip())
+    # (Its body steps twice per sample: a small body's grid rings up to ~16 kHz.)
+    ns = cpu_time(['-inst', 'viola', '-note', '69', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (viola)', ns < 6500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+    # The violin (-inst violin): the viola's construction at its size, the body fitted to recorded
+    # violins; G3 .. C7 stopped, harmonics to A7.
+    cents, clar = [], []
+    for note in (57, 62, 69, 76, 83, 88, 93, 100):
+        r = run(['-inst', 'violin', '-note', str(note), '-secs', '2'])
+        c = re.search(r'\(([+-]?\d+) cents\) clarity ([0-9.]+)', r.stdout)
+        cents.append(int(c.group(1)) if c else 999)
+        clar.append(float(c.group(2)) if c else 0)
+    check('violin: bowed notes in tune', max(abs(c) for c in cents) <= 10, f'cents {cents}')
+    check('violin: bowed notes clear', min(clar) >= 0.7, f'clarity {clar}')
+    # Its air resonance (A0) as heard, near the open D's fifth below (270 .. 290 Hz on violins).
+    with tempfile.TemporaryDirectory() as d:
+        dump = os.path.join(d, 'imp.bin')
+        run(['-inst', 'violin', '-imp', '60'], env={'PJ_BASS_SYMP': '0', 'PJ_IMPOUT': '1', 'PJ_IMPDUMP': dump})
+        q = np.fromfile(dump)
+    X = np.abs(np.fft.rfft(q, 8 * len(q)))
+    f = np.fft.rfftfreq(8 * len(q), 1 / 48000)
+    fa, qa = peak(255, 305)
+    check('violin: A0, a semitone wide or less', 255 < fa < 305 and 12 <= qa <= 60, f'A0 {fa:.0f} Hz Q {qa:.1f}')
+    with tempfile.TemporaryDirectory() as d:
+        wav = os.path.join(d, 'p.wav')
+        run(['-inst', 'violin', '-seq', 'on 69 100 wait 0.05 off 69 wait 1.5', '-o', wav])
+        fs, x = wavfile.read(wav)
+    x = x.astype(float).mean(1) if x.ndim > 1 else x.astype(float)
+    e = lambda t: 10 * np.log10(np.mean(x[int(t * fs):int((t + 0.05) * fs)] ** 2) + 1e-20)
+    check('violin: a pizzicato dies away', e(0.1) - e(0.9) > 15, f'{e(0.1) - e(0.9):.1f} dB from 0.1 to 0.9 s')
+    for seed in ('1', '2', '3'):
+        r = run(['-inst', 'violin', '-fuzz', '10', seed])
+        check(f'fuzz 10 s (violin, seed {seed})', r.returncode == 0 and 'ok' in r.stdout, r.stdout.strip())
+    ns = cpu_time(['-inst', 'violin', '-note', '76', '-secs', '4'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check('real-time margin (violin)', ns < 8000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
     # The concert grand (-inst grand-piano): every octave speaks at its pitch (read a little
     # sharp: the stiff wires' partials lie above the harmonics), no blow-up, and real time
     # both for one note and with the pedal down (all 243 strings free).
@@ -2403,6 +2529,29 @@ def hammond():
                   '-o', os.devnull])
         got_ = re.search(r'lower (\d{9})', r_.stderr)
         return got_.group(1) if got_ else '?', 'stand-in' in r_.stderr
+    # A soft accompaniment (velocity 45 against the tune's 120, the same register): no whisper
+    # 11+ dB under, 6 dB under on the hollow 8' (008060400's shape), its vibrato off.
+    ev_ = [(0, [0xC0, 0]), (0, [0xC1, 2])]
+    for i in range(96):
+        m_ = [72, 74, 76, 79, 77, 74, 72, 71][i % 8]
+        ev_ += [(i * 240, [0x90, m_, 120]), (i * 240 + 220, [0x80, m_, 0])]
+    for i in range(48):
+        m_ = [64, 65, 67, 65][i % 4]
+        ev_ += [(i * 480, [0x91, m_, 45]), (i * 480 + 460, [0x81, m_, 0])]
+    ev_.sort(key=lambda e_: (e_[0], e_[1][0] & 0xf0 == 0x90))
+    out, last = b'', 0
+    for tk, e_ in ev_:
+        out += vlq(tk - last) + bytes(e_)
+        last = tk
+    out += b'\x00\xff\x2f\x00'
+    with open(mid, 'wb') as fh:
+        fh.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(out)) + out)
+    r_ = run(['-play', mid, '-reinstrument', 'grand-piano=hammond-upper-manual,electric-grand=hammond-lower-manual', '-o', os.devnull])
+    low_ = re.search(r'lower (\d{9})', r_.stderr)
+    low_ = low_.group(1) if low_ else '?'
+    check('hammond: a soft accompaniment set apart by colour (the hollow 8\', 6 dB under, vibrato off), not left a whisper',
+          'set apart by colour' in r_.stderr and low_[:2] == '00' and low_[2] != '0' and low_[3] == '0' and low_[5] == '0'
+          and low_[7:] == '00' and 'upper only' in r_.stderr, low_)
     a_, b_ = comp(True), comp(False)
     shape = lambda s_: ''.join('x' if c_ != '0' else '0' for c_ in s_)
     check('hammond: the lower comping over the pedals on 008880080 (the percussion\'s stand-in), the left hand\'s bass not',

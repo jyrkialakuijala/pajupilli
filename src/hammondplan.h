@@ -69,9 +69,10 @@ struct HammondPlan {
   // (per change: by the preset key, at once, where the pause is too short to pull a drawbar)
   std::vector<bool> upperInstant;
   double lowerExtra = 0;
-  // The lower manual on 008880080 (hammondLowerPercussive): the percussion on, the left hand comping
-  // above the pedals' bass, an extra octave of percussion-like sound.
-  bool lowerPerc = false;
+  // The lower manual on a shape of its own (hammondLowerShaped): 1 008880080, the percussion on, the
+  // left hand comping above the pedals' bass, an extra octave of percussion-like sound; 2 the hollow
+  // 8', a soft line set apart from the tune by colour, not left a whisper. 0: derived.
+  int lowerShape = 0;
   // The lower manual's vibrato tab switched (tick, on): off through the planned fast phrases and
   // back after (C3 under a fast Leslie muddies the low accompaniment; the upper keeps it).
   std::vector<std::pair<long, bool>> lowerVib;

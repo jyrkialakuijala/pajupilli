@@ -127,6 +127,9 @@ double noteLead(const Instrument& inst) {
   static const double kMaracas = knob("PJ_MARACA_LEAD", 0.12);
   static const double kHit = knob("PJ_HIT_LEAD", 0.12);  // (the orchestra hit's run-ups: src/orchhit.cc)
   if (std::strcmp(inst.name, "orchestra-hit") == 0) return kHit;
+  // (the cello's keys sound 100 ms late, for its pizzicato: src/bassinst.cc)
+  static const double kPizz = knob("PJ_PIZZ_MS", 100) / 1000;
+  if (std::strcmp(inst.name, "cello") == 0 || std::strcmp(inst.name, "viola") == 0 || std::strcmp(inst.name, "violin") == 0) return kPizz;
   return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
 }
 
@@ -136,7 +139,9 @@ bool& noteLeadsApplied() {
 }
 
 bool velocityAsGain(const Instrument& inst) {
-  return !inst.oneVoice() || std::strcmp(inst.name, "fiddle") == 0 || std::strcmp(inst.name, "contrabass") == 0;
+  return !inst.oneVoice() || std::strcmp(inst.name, "fiddle") == 0 || std::strcmp(inst.name, "contrabass") == 0 ||
+         std::strcmp(inst.name, "cello") == 0 || std::strcmp(inst.name, "viola") == 0 ||
+         std::strcmp(inst.name, "violin") == 0;
 }
 
 // The instrument's own loudness at velocity u is the GM curve's less the

@@ -90,6 +90,11 @@ class Ensemble {
     velGain_ = on;
     for (Section& k : kids_) k.ens->setVelocityGain(on);
   }
+  // (-play) The director's cue for the key that follows (Performer::direct).
+  void direct(const Cue& c) {
+    for (Slot& s : f_) s.v->player().direct(c);
+    for (Section& k : kids_) k.ens->direct(c);
+  }
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
     for (Section& k : kids_) k.ens->setHold(h);
@@ -151,6 +156,7 @@ class Ensemble {
     float gain;
     bool stops;             // its players stop with the eighth (not the piano, the drum)
     bool run = false, roll = false;  // a grace run up to its note; a rolled chord
+    double lead = 0;        // its players act this long after a key (noteLead)
   };
   struct HitEvent { double t; int section, pitch, vel; bool on; };
   struct Hit {
@@ -197,6 +203,7 @@ class Ensemble {
   static int reverbChannel(const Instrument& in);
   float roomFb_ = std::getenv("PJ_ROOMFB") ? float(std::atof(std::getenv("PJ_ROOMFB"))) : 1.0f;  // room into the bores
   std::vector<float> srcBuf_;  // physical pressures for the room
+  std::vector<float> dipBuf_;  // ... and the sources' directional parts
   std::vector<float> qL_, qR_; // rendered, not yet handed out
   size_t qPos_ = 0;
 };

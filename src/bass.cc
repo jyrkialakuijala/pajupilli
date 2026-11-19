@@ -5,6 +5,10 @@
 #include <cstdint>
 #include <cstring>
 
+#include "bowlevels_data.h"
+#include "cellobowlevels_data.h"
+#include "violabowlevels_data.h"
+#include "violinbowlevels_data.h"
 #include "knob.h"
 
 namespace pajupilli {
@@ -16,32 +20,143 @@ const BassString kGut[4] = {{41.203, 1.06, 230, 3e-4, 0.55, 0.34, 1.5e4, 0.0095}
                             {55.0, 1.06, 240, 2e-4, 0.50, 0.31, 1.3e4, 0.0085},
                             {73.416, 1.06, 240, 1.2e-4, 0.45, 0.28, 1.1e4, 0.0075},
                             {97.999, 1.06, 230, 8e-5, 0.45, 0.25, 0.95e4, 0.0065}};
-// The bridge's top (the part above the waist): 60 g on its legs; up and down
-// ~1500 Hz, sideways on the waist ~440 Hz (the bridge's own resonance), both
-// well damped.
-constexpr float kBridgeM = 0.06f;
-const float kKy = kBridgeM * float(std::pow(2 * M_PI * 1500, 2)), kCy = kBridgeM * 2 * float(M_PI) * 1500 * 0.15f;
-const float kKz = kBridgeM * float(std::pow(2 * M_PI * 440, 2)), kCz = kBridgeM * 2 * float(M_PI) * 440 * 0.45f;
-// The tailpiece: 250 g hanging on its cord and the strings: ~48 Hz, Q ~12.
-constexpr float kTailM = 0.25f;
-const float kTailK = kTailM * float(std::pow(2 * M_PI * 48, 2)), kTailC = kTailM * 2 * float(M_PI) * 48 / 12;
-// Along the strings: the bridge's top tipping (its legs bend: 2e5 N/m, well
-// damped), the tailpiece on its cord (1.5e5 N/m), the strings' angles over
-// the bridge (6 degrees on the long side, 15 behind).
-constexpr float kBridgeKx = 2e5f, kBridgeCx = 60.0f, kCordK = 1.5e5f, kCordC = 30.0f, kSinA = 0.10f, kSinB = 0.26f;
+// Along the strings: the strings' angles over the bridge (6 degrees on the long side, 15 behind).
+constexpr float kSinA = 0.10f, kSinB = 0.26f;
 // The fingerboard against the string: a stiff, lossy one-sided spring.
 constexpr float kBoardK = 3e4f, kBoardC = 1.5f;
 // The rosin: sticking friction, slipping friction at high speed, and the
 // slipping speed at which it is half-way between them (m/s).
 const float kMuS = float(knob("PJ_MUS", 0.9)), kMuD = float(knob("PJ_MUD", 0.35)), kMuV = float(knob("PJ_MUV", 0.08));
-// The bow's hair on the string: 16 mm wide.
-constexpr double kHair = 0.016;
+// A cello's strings (a steel or synthetic core, wound: research/cello.md): C2 G2 D3 A3 on 0.69 m.
+// Tuned in pure fifths down from A3 = 220 Hz (BassSpec::openFlat). Tensions as measured on a set (131.5, 135.5, 136, 171 N); inharmonicity 0.3 .. 1 e-4, the thick
+// C string the most. (Stretch stiffness: a rope-core string is at about 1 % strain at pitch,
+// E A = 100 x its tension.)
+const BassString kCelloStrings[4] = {{65.185, 0.69, 131.5, 1.0e-4, 0.85, 0.42, 1.32e4, 0.0080},
+                                     {97.778, 0.69, 135.5, 6e-5, 0.80, 0.38, 1.36e4, 0.0070},
+                                     {146.667, 0.69, 136, 4e-5, 0.75, 0.34, 1.36e4, 0.0062},
+                                     {220.0, 0.69, 171, 3e-5, 0.75, 0.30, 1.71e4, 0.0055}};
+// A viola's strings (synthetic cores, the C and G silver-wound: research/viola.md): C3 G3 D4 A4 on
+// 0.37 m, tuned in pure fifths down from A4 = 440 Hz. Tensions of a medium set (55, 52, 58, 76 N:
+// the A much the tightest); the C short and heavy (98 m/s: nearly a cello string's), the stiffest.
+// Losses as the cello's strings of the same rank (the same materials); the action 5.5 mm (C) to
+// 3.6 mm (A) over the fingerboard's end.
+const BassString kViolaStrings[4] = {{130.370, 0.37, 55, 1.0e-4, 0.85, 0.42, 5.5e3, 0.0055},
+                                     {195.556, 0.37, 52, 6e-5, 0.80, 0.38, 5.2e3, 0.0048},
+                                     {293.333, 0.37, 58, 4e-5, 0.75, 0.34, 5.8e3, 0.0042},
+                                     {440.0, 0.37, 76, 3e-5, 0.75, 0.30, 7.6e3, 0.0036}};
+// The violin's: G3 D4 A4 E5 on 32.8 cm, in pure fifths from A 440; gut-core G, D, A (43, 42,
+// 51 N) and a steel E (78 N, 0.25 mm: stiff to stretch, little loss); the action 4.2 mm (G) to
+// 2.8 mm (E) over the fingerboard's end.
+// Their losses: the k-dependent part twice the cello's strings of the same rank (a string loses
+// about the same share of its energy each cycle, and these run an octave and a fifth higher), the
+// constant part ~4.5 x, for what the bridge passes into a real violin's body between its modes
+// (the model's takes little there). With the cello's losses an open string ringing along held an
+// overtone for 5 .. 6 s (the open D's third, A5, after every A4; the open A for 4 s after A3);
+// now ~2.3 s.
+const BassString kViolinStrings[4] = {{195.556, 0.328, 43, 6e-5, 3.50, 0.76, 4.3e3, 0.0042},
+                                      {293.333, 0.328, 42, 4e-5, 3.50, 0.68, 4.2e3, 0.0036},
+                                      {440.0, 0.328, 51, 3e-5, 3.50, 0.60, 5.1e3, 0.0032},
+                                      {660.0, 0.328, 78, 1.5e-5, 2.60, 0.44, 9.8e3, 0.0028}};
 }  // namespace
 
-Bass::Bass(double fs) : fs_(fs), dt_(1 / fs), body_(fs) {
+// The double bass. The bridge's top (the part above the waist): 60 g on its legs; up and down
+// ~1500 Hz, sideways on the waist ~440 Hz (the bridge's own resonance), both well damped. The
+// tailpiece: 250 g hanging on its cord and the strings: ~48 Hz, Q ~12. Along the strings: the
+// bridge's top tipping (its legs bend: 2e5 N/m, well damped), the tailpiece on its cord
+// (1.5e5 N/m). The bow's hair on the string: 16 mm wide.
+extern const BassSpec kDoubleBassSpec = {
+    {kGut[0], kGut[1], kGut[2], kGut[3]}, {28, 33, 38, 43}, 67,
+    0.028, 0.28, 0.06, 1500, 0.15, 440, 0.45, 0.25, 48, 12, 2e5, 60.0, 1.5e5, 30.0,
+    0.16, 0.17, 1.06 / 6, 0.20, 0.016, 16.0, 1.6e-6, 9.0, &kBassBodyData,
+    22.0, 3.5, 0.047, 9.0, 0.5, 0.85, kBowLevels, kBowLevelLo, int(sizeof kBowLevels / sizeof kBowLevels[0]),
+    0.45, 0, 0, 70, 2.5, {0, 0, 0, 0}, 0, 0.012};
+
+// The cello (research/cello.md): the same parts at 0.65 x the size. The bridge: 90 mm high, its
+// feet 90 mm apart, the strings 16 mm apart on its crown; its top ~9 g, rocking on its waist at
+// ~1 kHz and moving up and down at ~2.1 kHz (the cello bridge's two resonances). The tailpiece:
+// 80 g, on its cord near 85 Hz. The after-length 1/6 of the string, the fingerboard's end 110 mm
+// from the bridge, the hair 12 mm wide, 59 cm long (55 of it in a stroke). The bow: 6 to 90 cm/s
+// (cellists measured: means 17 slow, 40 fast; the bass 5 to 50). Vibrato: 6 Hz (soloists 6.5,
+// students 5.5), +-10 cents in the first position to +-35 high up, always there on a held
+// stopped note. The endpin stands on a stage floor: the floor's sound is small (Cremer: about
+// 1 % of the cello's power) but under the air resonance, where the body itself gives little, a
+// hollow floor adds up to 5 dB at 64 .. 80 Hz (Fuchs, on a riser): the C string's fundamentals.
+extern const BassSpec kCelloSpec = {
+    {kCelloStrings[0], kCelloStrings[1], kCelloStrings[2], kCelloStrings[3]}, {36, 43, 50, 57}, 81,
+    0.016, 0.28, 0.009, 2100, 0.15, 1000, 0.35, 0.08, 85, 12, 1.2e5, 25.0, 1.0e5, 14.0,
+    0.09, 0.09, 0.69 / 6, 0.11, 0.012, 22.0, 1.3e-6, 12.0, &kCelloBodyData,
+    22.0, 3.5, 0.047, 9.0, 0.55, 1.2, kCelloBowLevels, kCelloBowLevelLo, kCelloBowLevelN,
+    0.55, 10, 1.35e-5, 72, 2.5, {0.0587, 0.0391, 0.0196, 0}, knob("PJ_PIZZ_MS", 100) / 1000, 0.006};  // (the floor: +5 dB on D2's fundamental, 73 Hz)
+
+// The viola (research/viola.md): the cello's construction with a violin family's body
+// (tools/bassbody.py -viola: 410 mm, A0 225 Hz and the main wood resonance 370 Hz, between the
+// open strings, not on them) and a violin-type bridge: 39 mm high, 46 mm feet, the strings 12 mm
+// apart; its top ~1.5 g, rocking on its waist at ~2.1 kHz (one hill, where the cello has two) and
+// up and down at ~4 kHz. The tailpiece 18 g, on its cord near 150 Hz. The after-length 1/6, the
+// fingerboard's end 55 mm from the bridge, the hair 10 mm wide, 64 cm long (60 of it in a stroke).
+// The body's two main resonances about Q 23 (a semitone is Q 17; the cello's 15 and 37): the wood
+// 45/s and 6e-6 s (its losses growing with frequency: a small body's next modes, 561 and 685 Hz,
+// otherwise as strong at the bridge as the main one, and the notes whose second harmonic falls
+// there, D#4 .. F#4, lost their fundamental), the air 17/s (A0 moves the air inside more than the
+// f-holes': its slugs lose 4 x that). The bow up to 0.7 m/s in a held note. Vibrato ~6.1 Hz, +-12
+// cents in the first position. No end pin: held under the chin, no floor. What is heard: the
+// four paths in the cello's balance (each measured alone on played notes). The top is 0.3 x the
+// cello's area, but its motion by the bridge no smaller: at the cello's levels the top by the
+// bridge drowned the rest (the far sound 23 dB under it, the cello's 10): its level x 3.5, the
+// pickup's x 1.3, the f-hole's x 0.93.
+extern const BassSpec kViolaSpec = {
+    {kViolaStrings[0], kViolaStrings[1], kViolaStrings[2], kViolaStrings[3]}, {48, 55, 62, 69}, 88,
+    0.012, 0.26, 0.0015, 4000, 0.15, 2100, 0.35, 0.018, 150, 12, 6e4, 8.0, 5e4, 5.0,
+    0.039, 0.046, 0.37 / 6, 0.055, 0.010, 45.0, 6e-6, 17.0, &kViolaBodyData,
+    22.0, 3.27, 0.062, 31.3, 0.60, 1.22, kViolaBowLevels, kViolaBowLevelLo, kViolaBowLevelN,
+    0.65, 12, 0, 72, 2.5, {0.0587, 0.0391, 0.0196, 0}, knob("PJ_PIZZ_MS", 100) / 1000, 0.002,
+    knob("PJ_ARCO_ATTACK", 0.2), 0.9};  // (the bow to 6.9 kHz: the real violas' shine, ~/Music/viola4.wav)
+
+// The violin: the viola's construction at its size (tools/bassbody.py -violin, 356 mm), its body
+// fitted to recorded violins; a violin bridge, 33 mm high, 41 mm feet, the strings 11 mm apart,
+// its top ~1.1 g, rocking on its waist at ~2.8 kHz (the bridge hill, 2 .. 3 kHz) and up and down
+// at ~4.5 kHz. The tailpiece 14 g, near 170 Hz. The after-length 1/6, the fingerboard's end
+// 50 mm from the bridge, the hair 10 mm wide, 65 cm long (60 of it in a stroke). Vibrato ~6 Hz.
+// Held under the chin. What is heard: the four paths in the viola's balance (each measured alone
+// on played notes: the f-hole's and the pickup's x 1.6 against the viola's levels).
+extern const BassSpec kViolinSpec = {
+    {kViolinStrings[0], kViolinStrings[1], kViolinStrings[2], kViolinStrings[3]}, {55, 62, 69, 76}, 96,
+    0.011, 0.26, 0.0011, 4500, 0.15, 2800, 0.35, 0.014, 170, 12, 6e4, 8.0, 5e4, 5.0,
+    0.033, 0.041, 0.328 / 6, 0.050, 0.010, 45.0, 6e-6, 17.0, &kViolinBodyData,
+    22.0, 2.04, 0.0374, 30.6, 0.60, 1.30, kViolinBowLevels, kViolinBowLevelLo, kViolinBowLevelN,
+    0.65, 12, 0, 72, 2.5, {0.0392, 0.0196, 0, -0.0196}, knob("PJ_PIZZ_MS", 100) / 1000, 0.0015,
+    knob("PJ_ARCO_ATTACK", 0.2), 0.9};
+
+Bass::Bass(double fs, const BassSpec& sp) : spec_(sp), fs_(fs), dt_(1 / fs), body_(fs, *sp.body) {
+  micTop_ = float(knob("PJ_MIC_TOP", micTop_));  // (the top by the bridge in the mix; tests: 0 to hear the rest)
+  kBridgeM = float(sp.bridgeM);
+  kKy = kBridgeM * float(std::pow(2 * M_PI * sp.bridgeFy, 2));
+  kCy = kBridgeM * 2 * float(M_PI * sp.bridgeFy * sp.bridgeQy);
+  kKz = kBridgeM * float(std::pow(2 * M_PI * sp.bridgeFz, 2));
+  kCz = kBridgeM * 2 * float(M_PI * sp.bridgeFz * sp.bridgeQz);
+  kTailM = float(sp.tailM);
+  kTailK = kTailM * float(std::pow(2 * M_PI * sp.tailF, 2));
+  kTailC = kTailM * 2 * float(M_PI * sp.tailF / sp.tailQ);
+  kBridgeKx = float(sp.bridgeKx);
+  kBridgeCx = float(sp.bridgeCx);
+  kCordK = float(sp.cordK);
+  kCordC = float(sp.cordC);
+  kHair = sp.hair;
+  kBridgeH_ = sp.bridgeH;
+  kFeet_ = sp.feet;
+  kAfterLen_ = sp.afterLen;
+  kBoardEnd_ = sp.boardEnd;
+  farLevel_ = float(sp.farLevel);
+  holeLevel_ = float(sp.holeLevel);
+  pickupLevel_ = float(sp.pickupLevel);
+  topLevel_ = float(sp.topLevel);
+  floorG_ = float(sp.floorGain * knob("PJ_FLOOR", 1.0));  // (PJ_FLOOR 0: a dead floor)
+  floorW_ = float(2 * M_PI * sp.floorF);
+  floorD_ = float(2 * M_PI * sp.floorF / sp.floorQ);
   // The body's losses: its resonances ring for a few tenths of a second (Q
   // about 45 at the wood resonance, 45 at the air resonance).
-  body_.setDamping(knob("PJ_BODY_RATE", 16.0), 1.6e-6, 9.0);
+  static const double kBodyRate = knob("PJ_BODY_RATE", 0);  // (> 0: instead of the instrument's own)
+  body_.setDamping(kBodyRate > 0 ? kBodyRate : sp.bodyRate, sp.bodyStiff, sp.bodyAir);
   kSymp_ = knob("PJ_BASS_SYMP", 1) > 0;
   kAfter_ = knob("PJ_BASS_AFTER", 1) > 0;
   kTail_ = knob("PJ_BASS_TAIL", 1) > 0;
@@ -49,20 +164,21 @@ Bass::Bass(double fs) : fs_(fs), dt_(1 / fs), body_(fs) {
   kTmod_ = knob("PJ_BASS_TMOD", 1) > 0;
   kBoard_ = knob("PJ_BASS_BOARD", 1) > 0;
   kAlive_ = knob("PJ_BASS_ALIVE", 1);
+  dipScale_ = float(knob("PJ_DIPOLE", 1.0));
   width_ = float(knob("PJ_BASS_WIDTH", 0.7));  // the two sides' difference (0: mono)
   for (int s = 0; s < kStrings; ++s) {
     // The notches: 28 mm apart, the E string on the bass side.
-    str_[s].notch = float(0.028 * (s - 1.5));
+    str_[s].notch = float(sp.notch * (s - 1.5));
     // The bridge's crown: the bow lies along it, 16 degrees more from one
     // string to the next (the E string's stroke leans away from the top
     // towards the middle, the G string's the other way).
-    str_[s].bowSin = float(std::sin(-0.28 * (s - 1.5)));
-    str_[s].bowCos = float(std::cos(-0.28 * (s - 1.5)));
+    str_[s].bowSin = float(std::sin(-sp.crown * (s - 1.5)));
+    str_[s].bowCos = float(std::cos(-sp.crown * (s - 1.5)));
     // PJ_BASS_OLDGUT (0..1): plain gut as on 1950s records, where the
     // fundamental dies at 20-34 dB/s (measured: Ella Fitzgerald's "Body and
     // Soul", Louis Armstrong's "On the Sunny Side of the Street"); the
     // default strings ring about twice as long.
-    BassString def = kGut[s];
+    BassString def = sp.strings[s];
     const double old = knob("PJ_BASS_OLDGUT", 0);
     def.loss0 *= 1 + 1.6 * old;
     def.loss1 *= 1 + 0.5 * old;
@@ -98,7 +214,10 @@ void Bass::setStringDef(int si, const BassString& def) {
     s.aw[k - 1] = float(w);
     s.acs[k - 1] = float(std::cos(w * dt_));
     s.asn[k - 1] = float(std::sin(w * dt_));
-    s.adecay[k - 1] = on ? float(std::exp(-(5.0 + 4.0 * k) * dt_)) : 0.0f;
+    // (A passive resonator: it takes energy from the bridge's motion and gives it back, to the
+    // bridge and into the tailpiece's cord and wrappings, within a few dozen cycles: Q ~40.)
+    static const double kAfterQ = knob("PJ_AFTER_Q", 40);
+    s.adecay[k - 1] = on ? float(std::exp(-std::max(5.0 + 4.0 * k, 0.5 * w / kAfterQ) * dt_)) : 0.0f;
     s.aInB[k - 1] = float(-2 * ((k & 1) ? 1.0 : -1.0) / (k * M_PI));
     s.aInT[k - 1] = float(-2 / (k * M_PI));
     s.aSlopeB[k - 1] = float(k * M_PI / kAfterLen_ * ((k & 1) ? -1.0 : 1.0));
@@ -128,7 +247,11 @@ void Bass::tune(Str& s) {
     // string ends on a fingertip, which takes more of every mode, the high
     // ones most.
     // (An open string ends on the nut, hard wood: it rings longest.)
-    const double loss = ((d.loss0 + d.loss1 * std::pow(k, 1.2)) * (s.stopped ? 1.2 : 0.7) + (s.stopped ? 0.3 + 0.12 * k : 0.0)) *
+    // (The fingertip's flesh takes the highest overtones most: above ~3 kHz an open string, on the
+    // nut, shines and a stopped one less so.)
+    static const double kFingerHi = knob("PJ_FINGER_HI", 15);
+    const double fingerHi = s.stopped ? kFingerHi * std::pow(f / 4000, 2) : 0.0;
+    const double loss = ((d.loss0 + d.loss1 * std::pow(k, 1.2)) * (s.stopped ? 1.2 : 0.7) + (s.stopped ? 0.3 + 0.12 * k : 0.0) + fingerHi) *
                         (1 + kAlive_ * 0.25 * rnd(k, 2));
     for (int dir = 0; dir < 2; ++dir) {
       // Along the top (z) the ends give differently than towards it (y):
@@ -180,7 +303,10 @@ void Bass::bowShape(Str& s) {
     // (Modes turning more than ~0.5 rad a sample, above 3.8 kHz, are left
     // to themselves, the more the higher: the hair is too wide and soft for
     // them, and a force held for a sample is too coarse.)
-    static const double kWmax = knob("PJ_BOW_WMAX", 0.5);
+    static const double kWmaxEnv = knob("PJ_BOW_WMAX", 0);
+    // (A high note, fundamental 400 .. 800 Hz, back to 0.5: driven further it plays flat.)
+    const double wTop = kWmaxEnv > 0 ? kWmaxEnv : spec_.bowWmax;
+    const double kWmax = wTop <= 0.5 ? wTop : wTop - (wTop - 0.5) * std::clamp((s.w[0][0] / (2 * M_PI) - 400) / 400, 0.0, 1.0);
     const double taper = 1 / (1 + std::pow(s.wdt[0][i] / kWmax, 6));
     // (Under a finger lying at 1/n of the string only every n-th mode lives:
     // the bow drives those.)
@@ -235,6 +361,11 @@ void Bass::bow(int si, double speed, double force, double where, double rise, do
     s.bowDist = where;
     bowShape(s);
   }
+  // A change of direction (the bow on the string): the arm eases the weight off as the speed
+  // goes through nothing and back on as it comes again, so the hair never grips a string it is
+  // not drawing (held at full weight there, the string sticks, its fundamental dies and comes
+  // back through a double slip: a bow change heard as a new note).
+  if (s.bowOn && speed * s.bowVTo < 0) s.bowTurn = std::fabs(s.bowVTo);
   s.bowVTo = float(speed);
   s.bowFTo = float(std::max(0.0, force));
   s.bowK = float(1 - std::exp(-dt_ / std::max(1e-3, rise)));
@@ -252,7 +383,7 @@ void Bass::bow(int si, double speed, double force, double where, double rise, do
 void Bass::reset() {
   for (Str& s : str_) {
     s.bowOn = false;
-    s.bowV = s.bowF = s.bowVTo = s.bowFTo = 0;
+    s.bowV = s.bowF = s.bowVTo = s.bowFTo = s.bowTurn = 0;
     std::memset(s.q, 0, sizeof s.q);
     std::memset(s.v, 0, sizeof s.v);
     std::memset(s.aq, 0, sizeof s.aq);
@@ -261,6 +392,7 @@ void Bass::reset() {
     s.active = false;
   }
   uy_ = vy_ = uz_ = vz_ = ay_ = az_ = ut_ = vt_ = at_ = prevVy_ = prevVz_ = 0;
+  floorY_ = floorV_ = floorLp_ = 0;
   ux_ = vx_ = xt_ = vxt_ = 0;
   body_.reset();
 }
@@ -320,6 +452,13 @@ void Bass::pluck(int si, double stoppedLength, double depth, double where, doubl
     s.slip = 0.0042 - 0.002 * skin_;
     s.cut = 0.0005 + 0.0006 * (1 - skin_);
     depth *= 1.4;
+  } else if (finger == 5) {
+    // The nail: 2 mm of it catch the string and let it go at once, with a click: all the
+    // overtones, nothing held back by flesh.
+    pad = 0.002;
+    s.slip = 0.0004;
+    s.cut = 0.00008;
+    s.holdDamp = 120;
   }
   // The pad at `where` from the bridge: each mode's shape averaged over it.
   // The force that holds the string `depth` aside there:
@@ -504,7 +643,13 @@ float Bass::sample(float testForce) {
         rng_ = rng_ * 1664525u + 1013904223u;
         s.bowNoise += 0.3f * (((rng_ >> 8) * (2.0f / 16777216.0f) - 1) - s.bowNoise);
         static const float kBowNoise = float(knob("PJ_BOW_NOISE", 0.5));
-        const float Fn = s.bowF * (1 + kBowNoise * s.bowNoise);
+        float Fn = s.bowF * (1 + kBowNoise * s.bowNoise);
+        if (s.bowTurn > 0) {
+          static const float kTurnFloor = float(knob("PJ_ARCO_TURN_FLOOR", 0.3));
+          const float to = std::fabs(s.bowVTo);
+          if (s.bowV * s.bowVTo > 0 && std::fabs(s.bowV) > 0.9f * to) s.bowTurn = 0;
+          else Fn *= std::max(kTurnFloor, std::fabs(s.bowV) / std::max(1e-4f, std::min(s.bowTurn, to)));
+        }
         const float a = vh - back - s.bowV;  // the string's surface against the hair, without friction
         const float A = std::fabs(a), sg = a > 0 ? 1.0f : -1.0f;
         const bool canStick = A <= Y * Fn * kMuS;
@@ -545,7 +690,14 @@ float Bass::sample(float testForce) {
         }
         const float pen = -y - s.clear[p];
         if (pen > 0) {
-          const float f = std::max(0.0f, kBoardK * pen - kBoardC * vy) * s.invModalMass;  // pushes towards +y
+          // (The board's spring and damper are the bass's. A light string, the viola's A at
+          // 0.7 g/m, has so little mass at the contact that they would overshoot within one step
+          // and blow up: there they are held to what a step can take. The bass's and the cello's
+          // strings, 1.85 g/m and up, stay under the limit.)
+          float g = 0;
+          for (int i = 0; i < kModes; ++i) g += s.board[p][i] * s.board[p][i];
+          const float hold = std::min(1.0f, 1.6f / (kBoardC * float(dt_) * g * s.invModalMass));
+          const float f = std::max(0.0f, hold * (kBoardK * pen - kBoardC * vy)) * s.invModalMass;  // pushes towards +y
           if (!touching) {
             for (int i = 0; i < kModes; ++i) boardF[i] = 0;
             touching = true;
@@ -679,7 +831,17 @@ float Bass::sample(float testForce) {
   // y presses both feet (each string more on its side); z rocks the bridge.
   const float tilt = moment / float(kFeet_);
   footForce_ = 0.5f * feetY + lever * feetZ - tilt;
-  const float far = body_.step(footForce_ + testForce, 0.5f * feetY - lever * feetZ + tilt);
+  float far = body_.step(footForce_ + testForce, 0.5f * feetY - lever * feetZ + tilt);
+  // The stage floor under the endpin: a resonance driven by the force the bridge puts into the
+  // body (both feet: feetY); heard is the floor's velocity around its resonance (it passes
+  // little above: the pin and the body's mass hold the higher frequencies back).
+  if (floorG_ > 0) {
+    const float a = floorW_ * floorW_ * (feetY - floorY_) - floorD_ * floorV_;
+    floorV_ += a * float(dt_);
+    floorY_ += floorV_ * float(dt_);
+    floorLp_ += floorW_ * float(dt_) * (floorD_ * floorV_ - floorLp_);  // (and less still above it)
+    far -= floorG_ * floorLp_;  // (in phase with the body's own sound under its air resonance)
+  }
   // What is heard, as a jazz bass is recorded: a pickup at the bridge's bass
   // foot (its velocity), a microphone close to an f-hole, and a little of
   // the room (far away: the whole body's volume flow, where the plates and
@@ -687,13 +849,13 @@ float Bass::sample(float testForce) {
   // like level (a 6 mm pluck of an open string: ~1).
   // The two sides of the bass differ (bassbody.h: sideSound): left = this +
   // side, right = this - side.
-  side_ = width_ * body_.sideSound() / 22.0f;
+  side_ = width_ * body_.sideSound() / farLevel_;
   // A microphone close to the top by the bridge hears the top's acceleration
   // there (the pluck's definition, the fingerboard's click).
   const float v = body_.bassFootV();
   const float topAcc = (v - prevFootV_) * float(fs_);
   prevFootV_ = v;
-  return micTop_ * topAcc / 9.0f + micFar_ * far / 22.0f + micHole_ * body_.fholeSound() / 3.5f + micPickup_ * body_.bassFootV() / 0.047f;
+  return micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
 }
 
 }  // namespace pajupilli

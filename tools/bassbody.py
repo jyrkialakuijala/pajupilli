@@ -38,6 +38,42 @@ DX, DY = LEN / NX, WID / NY
 A0_TARGET = 66.0
 RATIO = (5 * (1 + 5 ** 0.5) / 2 + 12) / (3 * (1 + 5 ** 0.5) / 2 + 7)  # 1.69478: a noble number
 T1_TARGET = A0_TARGET * RATIO
+# -cello: the same construction at a cello's size (research/cello.md): body 755 mm long, lower
+# bout 440 mm, ribs 117 mm; the air resonance near 96 Hz (A0: 90 .. 100 Hz on cellos, by the open G),
+# the main wood resonance at 174 Hz (F3, where the wolf was measured on two cellos); the back
+# stiffer against the top than on the bass, which puts the next resonances near 267 and 285 Hz
+# (cellos: about 280 and 300), between the notes C4, C#4 and D4.
+CELLO = '-cello' in sys.argv
+OUTLINE = 1.0
+if CELLO:
+    LEN, WID, DEPTH = 0.755, 0.44, 0.117
+    DX, DY = LEN / NX, WID / NY
+    OUTLINE = WID / 0.68
+    A0_TARGET, T1_TARGET = 96.0, 174.0
+    RATIO = T1_TARGET / A0_TARGET
+# -viola: a violin-family body at a viola's size (research/viola.md): body 410 mm long, lower bout
+# 237 mm, ribs 38 mm; the violin family's outline (upper bout 0.82, the waist 0.56 of the lower).
+# Its two main resonances are not on its open strings as a violin's are, but between them: the air
+# at 225 Hz (2-4 semitones above the open G; 208 .. 244 Hz on violas by size), the main wood
+# resonance at 370 Hz (F#4: B1-, 342 .. 385 Hz, where violas have their wolf).
+VIOLA = '-viola' in sys.argv
+if VIOLA:
+    LEN, WID, DEPTH = 0.410, 0.237, 0.038
+    DX, DY = LEN / NX, WID / NY
+    OUTLINE = WID / 0.68
+    A0_TARGET, T1_TARGET = 223.0, 354.0  # (the body fitted to a real viola's sound: VIOLA_P)
+    RATIO = T1_TARGET / A0_TARGET
+# The violin: 356 mm long, the lower bout 206 mm, ribs 31 mm; the same outline. A0 ~280 Hz (on the
+# open D's fifth below: 270 .. 290 Hz), B1- 430 .. 480 (around the open A). (The first targets: the
+# body is then fitted to recorded violins' sound, VIOLIN_P.)
+VIOLIN = '-violin' in sys.argv
+if VIOLIN:
+    LEN, WID, DEPTH = 0.356, 0.206, 0.031
+    DX, DY = LEN / NX, WID / NY
+    OUTLINE = WID / 0.68
+    A0_TARGET, T1_TARGET = 268.2, 354.3  # (the body fitted to recorded violins: VIOLIN_P)
+    RATIO = T1_TARGET / A0_TARGET
+FIDDLE = VIOLA or VIOLIN  # (the violin family's outline)
 OFFSETS = [(0, 0), (1, 0), (-1, 0), (2, 0), (-2, 0), (0, 1), (0, -1), (0, 2), (0, -2),
            (1, 1), (1, -1), (-1, 1), (-1, -1)]  # (along the row, across rows)
 
@@ -46,7 +82,10 @@ def half_width(u):
     """The outline: half the body's width (m) at u = 0 (neck end) .. 1 (tail end)."""
     pts = [(0.0, 0.10), (0.06, 0.20), (0.18, 0.25), (0.30, 0.245), (0.40, 0.19), (0.50, 0.185),
            (0.60, 0.20), (0.70, 0.30), (0.82, 0.34), (0.93, 0.31), (1.0, 0.16)]
-    return np.interp(u, [p[0] for p in pts], [p[1] for p in pts])
+    if FIDDLE:  # (the violin family's: the upper bout 0.82 of the lower, the waist 0.56, round shoulders)
+        pts = [(0.0, 0.12), (0.06, 0.24), (0.20, 0.28), (0.32, 0.25), (0.42, 0.20), (0.50, 0.19),
+               (0.58, 0.21), (0.68, 0.29), (0.80, 0.34), (0.92, 0.31), (1.0, 0.15)]
+    return OUTLINE * np.interp(u, [p[0] for p in pts], [p[1] for p in pts])
 
 
 def mask():
@@ -143,6 +182,43 @@ DEFAULT = dict(h_top=0.0085, h_top_edge=0.0055, h_back=0.0080, h_back_edge=0.005
                arch_back=15.0, bar_row=3, bridge_i=10, bass_j=3, treble_j=4, k_post=1e11,
                post_mass=0.026, post_behind=0.35, fhole_area=0.008, fhole_len=0.07, fhole_soft=0.15,
                v1=False)
+# A cello: the top 4.5 mm in the middle, 3.6 at the edge; the back 7.5 to 4.2; the bar 11 mm
+# wide, 25 mm high under the bridge; the post 11 mm of spruce, 120 mm long (5 g).
+CELLO_P = dict(DEFAULT, h_top=0.0045, h_top_edge=0.0036, h_back=0.0075, h_back_edge=0.0042, arch_back=24.0, post_mass=0.005,
+               fhole_area=0.004, fhole_len=0.045, bar_w=0.011, bar_lo=0.008, bar_hi=0.025)
+# A viola: the top 3.2 mm in the middle, 2.7 at the edge; the back 4.5 to 3.0; the bar 6 mm wide,
+# 14 mm high under the bridge; the post 6.5 mm of spruce, 38 mm long (0.5 g). The back's arching
+# twice the top's stiffness. With the cello's 4 x a small body's plates give way to the air so
+# readily that A0 falls to 0.6 of the rigid box's (violins: about 0.85) and no f-hole lifts it to
+# 225 Hz; with the back as stiff as the top, A0 and the main resonance land, but the main one no
+# longer rocks the bridge (both feet rise together) and a mode at 685 Hz rocks it 65 x as much:
+# the bow drives the bridge sideways, and every note whose second harmonic fell there (D#4 .. F#4)
+# lost its fundamental. At 2 x the main resonance rocks it (the bass foot 1.7 x the treble's, the
+# post holding that one) and nothing above rocks it more than 3.7 x. The f-holes: 44 cm2 with
+# their end corrections, 10 mm deep in effect (the two cut 78 mm long, ~11 cm2; the cello's
+# fitted area is 5 x its cut one).
+# (2026-11-18, second body.) The first (top 3.2 .. 2.7 mm, back 4.5 .. 3.0, arching 2 x the top's
+# at the back, the post 0.5 g) sounded thin on the C and G strings: against ~/Music/viola4.wav
+# (and eleven other violas, which agree) 12 .. 17 dB short at 200 .. 470 Hz and 5 .. 7 dB over at
+# 490 .. 620 Hz (A1 and a bass-side top mode at 575 Hz pumping the f-holes). This one is fitted to
+# that sound (each mode's rocking drive x the volume it pushes, Q 20; within 3 .. 6 dB of the
+# simulation): the bridge a node nearer the neck, the top an even 2.9 mm and softly arched, the
+# back 5.3 .. 3.5 mm and arched 6.6 x the top, a 7 mm bar 5.6 .. 15.8 mm high, the post 0.67 g a
+# quarter node behind the foot. A0 223 Hz, then 354 and 404 Hz (B1- and B1+), 495 Hz. The stiff
+# back rings to 26 kHz with the post: three steps a sample.
+# A violin, fitted to the sound of 17 recorded violins (~/Music/violin*.wav: each band's median,
+# from the harmonic levels of their notes with the bowed string's 1 / n undone; each mode's rocking
+# drive x the volume it pushes, Q 20, against it, then checked in the simulation: within 5 dB from
+# 196 Hz to 1.4 kHz). The bridge at node 8, the post right behind its treble foot (0.3 g), the top
+# 3.4 .. 2.7 mm, the back 5.0 .. 2.0, a 7 mm bar 6 .. 14 mm high, f-holes 11 cm2 (a real
+# violin's). A0 268 Hz, then 354 and 369 (CBR, B1-), 549 and 553 (B1+). The back rings to ~45 kHz
+# with the post: four steps a sample.
+VIOLIN_P = dict(DEFAULT, bridge_i=8, h_top=0.0034, h_top_edge=0.002715, h_back=0.004987, h_back_edge=0.002,
+                arch_top=2.819839, arch_back=10.952438, post_mass=0.0003, post_behind=0.013485, fhole_area=0.001095,
+                fhole_len=0.008871, bar_w=0.007, bar_lo=0.006, bar_hi=0.014)
+VIOLA_P = dict(DEFAULT, bridge_i=9, h_top=0.0029, h_top_edge=0.0029, h_back=0.0053, h_back_edge=0.0035, arch_top=2.84,
+               arch_back=18.75, post_mass=0.00067, post_behind=0.26, fhole_area=0.0040, fhole_len=0.0059, bar_w=0.007,
+               bar_lo=0.0056, bar_hi=0.0158)
 V1 = dict(DEFAULT, k_post=1.7e7, arch_back=6.0, h_top=0.007, h_top_edge=0.007, h_back=0.007, h_back_edge=0.007, post_mass=0.0,
           post_behind=0.0, fhole_soft=1.0, v1=True, volume=0.125)
 
@@ -153,9 +229,10 @@ def parts(p):
     if p['v1']:
         bar_h = np.full(NX, 0.040)
     else:  # 40 mm under the bridge, tapering to 12 mm, over the middle three quarters
-        bar_h = np.array([0.012 + 0.028 * max(0.0, 1 - abs(i - p['bridge_i']) / 8) if 2 <= i <= 14 else 0.0
+        lo, hi = p.get('bar_lo', 0.012), p.get('bar_hi', 0.040)
+        bar_h = np.array([lo + (hi - lo) * max(0.0, 1 - abs(i - p['bridge_i']) / 8) if 2 <= i <= 14 else 0.0
                           for i in range(NX)])
-    bar = dict(row=p['bar_row'], e=11e9, rho=420, width=0.025, height=bar_h)
+    bar = dict(row=p['bar_row'], e=11e9, rho=420, width=p.get('bar_w', 0.025), height=bar_h)
     soft = {}
     if p['fhole_soft'] < 1:  # the f-holes: beside the bridge, at the rows outside the feet
         for i in range(p['bridge_i'] - 2, p['bridge_i'] + 2):
@@ -302,9 +379,13 @@ def emit(p, path):
             mt[it[i, tj]] += 0.5 * p['post_mass'] * w
             mb[ib[i, tj]] += 0.5 * p['post_mass'] * w
     vol, s = air(m, p)
-    out = ['// Generated by tools/bassbody.py -emit: the double bass body (research/double_bass.md).',
+    ns = 'violindata' if VIOLIN else 'violadata' if VIOLA else 'cellodata' if CELLO else 'bassdata'
+    out = ['// Generated by tools/bassbody.py -violin -emit: the violin body (research/viola.md).' if VIOLIN else
+           '// Generated by tools/bassbody.py -viola -emit: the viola body (research/viola.md).' if VIOLA else
+           '// Generated by tools/bassbody.py -emit: the double bass body (research/double_bass.md).' if not CELLO else
+           '// Generated by tools/bassbody.py -cello -emit: the cello body (research/cello.md).',
            '// Rows of 16 along the body (neck to tail), 8 rows across (bass side first).',
-           '#pragma once', 'namespace pajupilli {', 'namespace bassdata {',
+           '#pragma once', 'namespace pajupilli {', f'namespace {ns} {{',
            f'constexpr int kNX = {NX}, kNY = {NY}, kOffsets = {len(OFFSETS)};',
            'constexpr int kOffI[kOffsets] = ' + '{' + ', '.join(str(o[0]) for o in OFFSETS) + '};',
            'constexpr int kOffJ[kOffsets] = ' + '{' + ', '.join(str(o[1]) for o in OFFSETS) + '};']
@@ -329,19 +410,21 @@ def emit(p, path):
             f'constexpr float kPostBehind = {lit(p["post_behind"])};  // the rigid post: this share of a node behind the foot',
             f'constexpr int kBridgeI = {bi}, kBassJ = {p["bass_j"]}, kTrebleJ = {tj};',
             f'constexpr float kA0 = {lit(A0_TARGET)}, kT1 = {lit(T1_TARGET)};',
-            '}  // namespace bassdata', '}  // namespace pajupilli', '']
+            f'}}  // namespace {ns}', '}  // namespace pajupilli', '']
     open(path, 'w').write('\n'.join(out))
     print('wrote', path)
 
 
 if __name__ == '__main__':
-    p = dict(V1 if '-v1' in sys.argv else DEFAULT)
+    p = dict(V1 if '-v1' in sys.argv else VIOLIN_P if VIOLIN else VIOLA_P if VIOLA else CELLO_P if CELLO else DEFAULT)
     if '-fit' in sys.argv or '-emit' in sys.argv:
         p = fit(p)
         print(f"fitted: arching stiffness top x{p['arch_top']:.2f}, back x{p['arch_back']:.2f}, f-holes {1e4 * p['fhole_area']:.1f} cm2 "
               f"(targets {A0_TARGET:.2f} and {T1_TARGET:.2f} Hz, ratio {RATIO:.5f})")
     f = describe(p)
+    fall = modes(p)[0]
+    print(f'highest resonance of the grid: {fall[-1]:.0f} Hz (the real-time scheme at 48 kHz holds to {48000 / np.pi:.0f} Hz)')
     print(f'lowest two: {f[0]:.2f} and {f[1]:.2f} Hz, ratio {f[1] / f[0]:.4f}')
     if '-emit' in sys.argv:
         assert not p['v1']
-        emit(p, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'bassbody_data.h'))
+        emit(p, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'violinbody_data.h' if VIOLIN else 'violabody_data.h' if VIOLA else 'cellobody_data.h' if CELLO else 'bassbody_data.h'))

@@ -3,13 +3,54 @@
 #include <cmath>
 #include <cstring>
 
+#include "cellobody_data.h"
+#include "knob.h"
+#include "violabody_data.h"
+#include "violinbody_data.h"
+
 namespace pajupilli {
 
 using namespace bassdata;
 
-BassBody::BassBody(double fs) : dt_(float(1 / fs)) {
-  sideA_ = float(1 - std::exp(-2 * M_PI * 250 / fs));
-  sideB_ = float(1 - std::exp(-2 * M_PI * 700 / fs));
+extern const BodyData kBassBodyData = {kTopK, kTopInvM, kBackK, kBackInvM, kNodeArea, kRowY, kColX, kAirK, kSlugArea,
+                                       kSlugInv, kPlugArea, kPlugInvM, kPostBehind, kBridgeI, kBassJ, kTrebleJ, 250, 700};
+static_assert(cellodata::kNX == kNX && cellodata::kNY == kNY && cellodata::kOffsets == kOffsets, "the same grid");
+// (A cello's top is 0.65 x the bass's: its sides differ from 0.65 x shorter waves on.)
+extern const BodyData kCelloBodyData = {cellodata::kTopK, cellodata::kTopInvM, cellodata::kBackK, cellodata::kBackInvM,
+                                        cellodata::kNodeArea, cellodata::kRowY, cellodata::kColX, cellodata::kAirK,
+                                        cellodata::kSlugArea, cellodata::kSlugInv, cellodata::kPlugArea, cellodata::kPlugInvM,
+                                        cellodata::kPostBehind, cellodata::kBridgeI, cellodata::kBassJ, cellodata::kTrebleJ,
+                                        385, 1080, 1, 0.117f};
+static_assert(violadata::kNX == kNX && violadata::kNY == kNY && violadata::kOffsets == kOffsets, "the same grid");
+// (The viola's top is 0.54 x the cello's: its sides differ from 1.85 x the cello's frequencies on.)
+extern const BodyData kViolaBodyData = {violadata::kTopK, violadata::kTopInvM, violadata::kBackK, violadata::kBackInvM,
+                                        violadata::kNodeArea, violadata::kRowY, violadata::kColX, violadata::kAirK,
+                                        violadata::kSlugArea, violadata::kSlugInv, violadata::kPlugArea, violadata::kPlugInvM,
+                                        violadata::kPostBehind, violadata::kBridgeI, violadata::kBassJ, violadata::kTrebleJ,
+                                        710, 2000, 3, 0.038f, float(knob("PJ_AIR_HF", 2.2e-6))};  // (Q 15 at 4.9 kHz, 320 at A0)
+static_assert(violindata::kNX == kNX && violindata::kNY == kNY && violindata::kOffsets == kOffsets, "the same grid");
+// (The violin's top is 0.75 x the viola's: its sides differ from 1.15 x the viola's frequencies on.)
+extern const BodyData kViolinBodyData = {violindata::kTopK, violindata::kTopInvM, violindata::kBackK, violindata::kBackInvM,
+                                         violindata::kNodeArea, violindata::kRowY, violindata::kColX, violindata::kAirK,
+                                         violindata::kSlugArea, violindata::kSlugInv, violindata::kPlugArea, violindata::kPlugInvM,
+                                         violindata::kPostBehind, violindata::kBridgeI, violindata::kBassJ, violindata::kTrebleJ,
+                                         820, 2300, 4, 0.031f, float(knob("PJ_AIR_HF", 2.2e-6))};
+
+BassBody::BassBody(double fs, const BodyData& data) : d_(data), dt_(float(1 / (fs * data.substeps))) {
+  sideA_ = float(1 - std::exp(-2 * M_PI * d_.sideLo * dt_));
+  sideB_ = float(1 - std::exp(-2 * M_PI * d_.sideHi * dt_));
+  // The air crossing between the body's two halves, in each cell: a slug as long as half the
+  // body's width there (centre to centre), through the body's depth.
+  sides_ = knob("PJ_AIR_SIDES", 1) > 0;
+  const float dx = d_.colX[1] - d_.colX[0], dy = d_.rowY[1] - d_.rowY[0];
+  crossArea_ = dx * d_.depth;
+  for (int i = 0; i < kNX; ++i) {
+    int rows = 0;
+    for (int j = 0; j < kNY; ++j) rows += d_.topInvM[j][i] > 0;
+    crossInv_[i] = rows >= 2 ? d_.slugInv * dx / (0.5f * rows * dy) : 0.0f;
+  }
+  // The f-holes: one each side of the bridge, about a fifth of the body's width from its middle.
+  holeY_ = 0.2f * kNY * dy;
 }
 
 void BassBody::reset() {
@@ -17,20 +58,38 @@ void BassBody::reset() {
   std::memset(v_, 0, sizeof v_);
   std::memset(f_, 0, sizeof f_);
   std::memset(fPrev_, 0, sizeof fPrev_);
-  plugW_ = plugV_ = 0;
+  std::memset(plugW_, 0, sizeof plugW_);
+  std::memset(plugV_, 0, sizeof plugV_);
+  std::memset(crossW_, 0, sizeof crossW_);
+  std::memset(crossV_, 0, sizeof crossV_);
+  std::memset(dip_, 0, sizeof dip_);
+  std::memset(dip1_, 0, sizeof dip1_);
+  std::memset(momPrev_, 0, sizeof momPrev_);
+  std::memset(pressPrev_, 0, sizeof pressPrev_);
   side_ = side1_ = dipPrev_ = 0;
   std::memset(slugW_, 0, sizeof slugW_);
   std::memset(slugV_, 0, sizeof slugV_);
 }
 
-float BassBody::step(float bassFoot, float trebleFoot) {
-  const float (*K[2])[kNY][kNX] = {kTopK, kBackK};
-  const float (*invM[2])[kNX] = {kTopInvM, kBackInvM};
+float BassBody::stepOne(float bassFoot, float trebleFoot) {
+  // (the design's numbers as locals, under the names the generated header gives them)
+  const float (*K[2])[kNY][kNX] = {d_.topK, d_.backK};
+  const float (*invM[2])[kNX] = {d_.topInvM, d_.backInvM};
+  const float kNodeArea = d_.nodeArea, kSlugInv = d_.slugInv, kPlugArea = d_.plugArea, kPlugInvM = d_.plugInvM;
+  // (PJ_POST_BEHIND: the post's place behind the treble foot, as a share of a node's spacing,
+  // instead of the design's: to try it nearer or further.)
+  static const float kPostKnob = float(knob("PJ_POST_BEHIND", -1));
+  const float kPostBehind = kPostKnob >= 0 ? kPostKnob : d_.postBehind;
+  const float* const kRowY = d_.rowY;
+  const float* const kColX = d_.colX;
+  const float* const kAirK = d_.airK;
+  const float* const kSlugArea = d_.slugArea;
+  const int kBridgeI = d_.bridgeI, kBassJ = d_.bassJ, kTrebleJ = d_.trebleJ;
   // --- Collect the forces. The plates' stiffness: each mass and its 13
   // neighbours (rows of 16: one register each). The air cells' volumes: the
   // plates' rows summed down each column (one register).
-  alignas(64) float vol[kNX];
-  for (int i = 0; i < kNX; ++i) vol[i] = 0;
+  alignas(64) float vol[2][kNX];  // [the bass side's half, the treble side's]
+  for (int i = 0; i < kNX; ++i) vol[0][i] = vol[1][i] = 0;
   for (int p = 0; p < 2; ++p) {
     for (int j = 0; j < kNY; ++j) {
       float* f = f_[p][j];
@@ -41,7 +100,8 @@ float BassBody::step(float bassFoot, float trebleFoot) {
         for (int i = 0; i < kNX; ++i) f[i] -= c[i] * w[i];
       }
       const float* w = &w_[p][j + kPad][kPad];
-      for (int i = 0; i < kNX; ++i) vol[i] += kNodeArea * w[i];
+      float* vs = vol[j >= kNY / 2];
+      for (int i = 0; i < kNX; ++i) vs[i] += kNodeArea * w[i];
     }
   }
   // The wood's internal friction: the stiffness force's rate of change.
@@ -58,17 +118,30 @@ float BassBody::step(float bassFoot, float trebleFoot) {
   // The air: 16 cells along the body. Each cell's volume: the plates over it,
   // the slugs of air leaving it for its neighbours, the f-holes' plugs (at
   // the bridge's cell). Its pressure pushes the plates, the slugs, the plugs.
-  alignas(64) float press[kNX + 1];
-  for (int i = 0; i < kNX; ++i)
-    vol[i] += kSlugArea[i] * slugW_[i + 1] - (i > 0 ? kSlugArea[i - 1] : 0.0f) * slugW_[i];
-  vol[kBridgeI] += kPlugArea * plugW_;
-  for (int i = 0; i < kNX; ++i) press[i] = -kAirK[i] * vol[i];
-  press[kNX] = 0;
+  // (Each half of a cell has half its volume and half its passages; the air crosses between
+  // the halves. Moved alike, the two halves are the one column of before.)
+  alignas(64) float press[2][kNX + 1];
+  for (int s = 0; s < 2; ++s) {
+    for (int i = 0; i < kNX; ++i)
+      vol[s][i] += 0.5f * (kSlugArea[i] * slugW_[s][i + 1] - (i > 0 ? kSlugArea[i - 1] : 0.0f) * slugW_[s][i]) +
+                   (s == 0 ? crossArea_ : -crossArea_) * crossW_[i];
+    vol[s][kBridgeI] += 0.5f * kPlugArea * plugW_[s];
+  }
+  for (int i = 0; i < kNX; ++i) {
+    if (sides_) {
+      press[0][i] = -2 * kAirK[i] * vol[0][i];
+      press[1][i] = -2 * kAirK[i] * vol[1][i];
+    } else {
+      press[0][i] = press[1][i] = -kAirK[i] * (vol[0][i] + vol[1][i]);
+    }
+  }
+  press[0][kNX] = press[1][kNX] = 0;
   for (int p = 0; p < 2; ++p)
     for (int j = 0; j < kNY; ++j) {
       float* f = f_[p][j];
       const float* im = invM[p][j];
-      for (int i = 0; i < kNX; ++i) f[i] += im[i] > 0 ? press[i] * kNodeArea : 0.0f;
+      const float* pr = press[j >= kNY / 2];
+      for (int i = 0; i < kNX; ++i) f[i] += im[i] > 0 ? pr[i] * kNodeArea : 0.0f;
     }
   // The bridge's feet.
   f_[0][kBassJ][kBridgeI] += bassFoot;
@@ -100,6 +173,7 @@ float BassBody::step(float bassFoot, float trebleFoot) {
   // acceleration.
   const float keep = 1 - rate_ * dt_;
   float accel = 0, dipY = 0, dipX = 0;
+  float mom[3] = {0, 0, 0};  // the displaced volume's moments (both plates): across, along, out of the top
   for (int p = 0; p < 2; ++p)
     for (int j = 0; j < kNY; ++j) {
       const float* f = f_[p][j];
@@ -115,6 +189,9 @@ float BassBody::step(float bassFoot, float trebleFoot) {
         w[i] += v[i] * dt_;
       }
       accel += kNodeArea * s;
+      mom[0] += kNodeArea * s * kRowY[j];
+      mom[1] += kNodeArea * sx;
+      mom[2] += (p == 0 ? 0.5f : -0.5f) * d_.depth * kNodeArea * s;
       if (p == 0) {  // where on the top the motion is: across it, along it
         dipY += kNodeArea * s * kRowY[j];
         dipX += kNodeArea * sx;
@@ -140,17 +217,53 @@ float BassBody::step(float bassFoot, float trebleFoot) {
   // (The air along the body rubs on the plates and ribs: more loss than the
   // plugs in the f-holes.)
   const float keepAir = 1 - airRate_ * dt_, keepSlug = 1 - 4 * airRate_ * dt_;
-  for (int i = 0; i + 1 < kNX; ++i) {  // slug i: between cells i and i + 1 (slugW_[i + 1])
-    const float a = (press[i] - press[i + 1]) * kSlugInv;
-    slugV_[i + 1] = keepSlug * slugV_[i + 1] + a * dt_;
-    slugW_[i + 1] += slugV_[i + 1] * dt_;
+  // (The air's losses that grow with frequency: BodyData::airHf. The plates feel the pressure
+  // itself, above.)
+  if (d_.airHf > 0) {
+    const float h = d_.airHf / dt_;
+    for (int s = 0; s < 2; ++s)
+      for (int i = 0; i < kNX; ++i) {
+        const float p = press[s][i];
+        press[s][i] = p + h * (p - pressPrev_[s][i]);
+        pressPrev_[s][i] = p;
+      }
   }
-  {
-    const float a = press[kBridgeI] * kPlugArea * kPlugInvM;
-    accel += kPlugArea * a;
-    fhole_ = kPlugArea * a;
-    plugV_ = keepAir * plugV_ + a * dt_;
-    plugW_ += plugV_ * dt_;
+  for (int s = 0; s < 2; ++s)
+    for (int i = 0; i + 1 < kNX; ++i) {  // slug i: between cells i and i + 1 (slugW_[i + 1])
+      const float a = (press[s][i] - press[s][i + 1]) * kSlugInv;
+      slugV_[s][i + 1] = keepSlug * slugV_[s][i + 1] + a * dt_;
+      slugW_[s][i + 1] += slugV_[s][i + 1] * dt_;
+    }
+  if (sides_)
+    for (int i = 0; i < kNX; ++i) {  // across, from the bass side's half to the treble side's
+      const float a = (press[0][i] - press[1][i]) * crossInv_[i];
+      crossV_[i] = keepSlug * crossV_[i] + a * dt_;
+      crossW_[i] += crossV_[i] * dt_;
+    }
+  // The two f-holes, each from its own half: the air out of both together (the air resonance:
+  // heard all round), or in at one and out at the other (heard to the sides, with opposite signs).
+  fhole_ = 0;
+  for (int s = 0; s < 2; ++s) {
+    const float a = press[s][kBridgeI] * kPlugArea * kPlugInvM;
+    const float q = 0.5f * kPlugArea * a;
+    accel += q;
+    fhole_ += q;
+    mom[0] += (s == 0 ? -holeY_ : holeY_) * q;
+    mom[1] += kColX[kBridgeI] * q;
+    mom[2] += 0.5f * d_.depth * q;
+    plugV_[s] = keepAir * plugV_[s] + a * dt_;
+    plugW_[s] += plugV_[s] * dt_;
+  }
+  // Each moment's sound along its axis: its rate of change over the speed of sound, while the
+  // body is small against the wavelength; above (the first low-pass of the sides' difference)
+  // it stops growing and stays as large as the moment's own volume is: there the body's patches
+  // send the sound out in lobes, each overtone in its own, and the moments carry what a
+  // listener to one side gets of that and one to the other does not. (Not the second low-pass:
+  // the directions matter most where the overtones are many.)
+  for (int k = 0; k < 3; ++k) {
+    dip1_[k] += sideA_ * ((mom[k] - momPrev_[k]) / (dt_ * 349.5f) - dip1_[k]);
+    dip_[k] = dip1_[k];
+    momPrev_[k] = mom[k];
   }
   return accel;
 }

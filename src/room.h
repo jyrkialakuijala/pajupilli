@@ -48,7 +48,7 @@ struct RoomSpec {
   // each hit opens it for `gate` seconds (s; 0: none), then it shuts fast.
   double gate = 0;
 };
-// "dry" (no room), "studio", "hall" (default), "church"; nullptr if unknown.
+// "dry" (no room), "studio", "hall" (default), "concert" (a symphony hall), "church"; nullptr if unknown.
 const RoomSpec* findRoom(const std::string& name);
 
 class Room {
@@ -64,6 +64,16 @@ class Room {
   // reflections) times listenGain[i] (a microphone's balance).
   void process(const float* const* src, int n, float* const* atSource, float* left, float* right,
                const float* listenGain);
+  // A source whose sound differs with direction (Tube::takeDipole): its three axes in the room
+  // (3 x 3: x to the listener's right, y towards the listener, z up). Every path from it to a
+  // microphone, direct or off the walls, leaves it in its own direction (a reflection's as
+  // mirrored by its walls) and carries the three parts by how much of each axis lies along it:
+  // what moves the two halves of a top against each other reaches the left wall and the right
+  // with opposite signs, and nothing straight ahead. The reverberant field takes the three
+  // parts' power (a third of each: its mean over all directions).
+  void setAxes(int s, const float* axes);
+  // The sources' three parts for the next process() ([3 * source + k], n samples each; null: none).
+  void setDipoles(const float* const* dip) { dip_ = dip; }
   int sources() const { return int(x_.size()); }
   // The microphones' gain on everything the room delivers (early and late):
   // an instrument bringing its own early sound to the listener takes it too.
@@ -101,7 +111,17 @@ class Room {
   // The gate (RoomSpec::gate): the input's envelope, its recent peak, the hold left, the gain.
   float gateFast_ = 0, gateSlow_ = 0, gatePeak_ = 0, gateHold_ = 0, gateGain_ = 0;
   float compEnv_ = 0, compPeak_ = 0;  // the ambience's compressor: its level, its recent peak
-  struct Tap { int src, mic, delay; float gain; int u, w, z; };  // u, w, z: the image (walls hit)
+  struct Tap {
+    int src, mic, delay;
+    float gain;
+    int u, w, z;              // the image (walls hit)
+    float n[3] = {0, 0, 0};   // the path's direction as it leaves the source
+    float dg[3] = {0, 0, 0};  // the source's three directional parts' gains on it
+  };
+  const float* const* dip_ = nullptr;
+  std::vector<char> hasDip_;    // [source]
+  std::vector<float> dring_;    // [3 * source + k][kRing]
+  std::vector<float> inDirDip_; // [3 * source + k][line], unit length
   std::vector<Tap> early_;      // to the microphones: direct and reflections
 };
 

@@ -1590,7 +1590,7 @@ void OrganModel::buildPaths() {
   };
   for (Pipe& pp : pipes_) {
     const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
-    pp.rsrc = nave_.addSource(world(pp.enc, pp.at), kPlace[pp.enc].caseId, facade, occl(pp), pp.p.reed ? 0.0 : 0.8, setOf(pp.enc));
+    pp.rsrc = nave_.addSource(world(pp.enc, pp.at), kPlace[pp.enc].caseId, facade, occl(pp), pp.p.reed ? 0.0 : 0.8, setOf(pp.enc), pp.hz);
   }
   const int mouths = nave_.sources();
   for (Pipe& pp : pipes_)
@@ -1598,7 +1598,7 @@ void OrganModel::buildPaths() {
       Vec3 top = pp.at;
       top.y += 0.95 * 343 / (2 * pp.hz);
       const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
-      pp.rtop = nave_.addSource(world(pp.enc, top), kPlace[pp.enc].caseId, facade, 0.5 * occl(pp), 0.0, setOf(pp.enc));
+      pp.rtop = nave_.addSource(world(pp.enc, top), kPlace[pp.enc].caseId, facade, 0.5 * occl(pp), 0.0, setOf(pp.enc), pp.hz);
     }
   regionSrc_.assign(enc_.size(), -1);
   for (int e = 0; e < int(enc_.size()); ++e) {
@@ -1611,6 +1611,13 @@ void OrganModel::buildPaths() {
     regionSrc_[e] = nave_.addSource({P.centre.x, y, zf + 0.05}, OrganRoom::kNoCase, false, 0, 0, setOf(e));
   }
   nave_.finish(mouths);
+  if (std::getenv("PJ_ORGAN_TAPLOG"))
+    for (const Pipe& pp : pipes_)
+      if (pp.enc == kPedC || pp.enc == kPedCis) {
+        const auto m = nave_.tapSum(pp.rsrc);
+        const auto t = pp.rtop >= 0 ? nave_.tapSum(pp.rtop) : std::array<double, 2>{};
+        std::fprintf(stderr, "tap %s %d mouth %.3f %.3f top %.3f %.3f y %.2f\n", kStops[pp.stop].token, pp.key, m[0], m[1], t[0], t[1], pp.at.y);
+      }
   encField_.assign(enc_.size(), {});
 }
 

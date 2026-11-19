@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "calibrate.h"
+#include "director.h"
 #include "tube.h"
 
 namespace pajupilli {
@@ -56,6 +57,17 @@ class Performer {
   // (-play) How much the other parts are playing in this instrument's register just now (0:
   // nothing, ~1: a full texture). A soloist plays with more drama over less (the harmonica's hands).
   virtual void setAccompaniment(double /*busy*/) {}
+  // (-play) The director's cue for the next key (director.h): its vector of intentions. Here
+  // what every player can do with it: a harder or softer attack for the emphasis, the vibrato's
+  // depth and speed. A player that can do more (the bow's own vibrato and its delay) adds that.
+  // The level comes separately, block by block, as the breath (setBreath).
+  virtual void direct(const Cue& c) {
+    cue_ = c;
+    cued_ = true;
+    hardness_ = std::clamp(1.0 + 0.7 * c.v[kCueAccent], 0.6, 1.9);
+    vibDepth_ = 0.05 * c.v[kCueVibDepth];
+    vibRate_ = 5.0 * c.v[kCueVibRate];
+  }
   // (live) An instrument's own use of the MPK's knobs K1..K8 (k 0..7, x 0..1); true if it took
   // the knob (the Hammond's drawbars on K1-K4), false to leave it to the common map.
   virtual bool setKnob(int /*k*/, double /*x*/) { return false; }
@@ -113,6 +125,8 @@ class Performer {
   }
 
  protected:
+  Cue cue_{};         // the director's last cue (cued_: there was one)
+  bool cued_ = false;
   // The pitch of the note from a band-pass around it: each upward zero
   // crossing gives one period; corr (log of the pitch control) follows the
   // error (dcents / dcorr = `slope`) with time constant tau (s), after `clock`

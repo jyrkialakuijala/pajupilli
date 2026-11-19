@@ -275,6 +275,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     }
   }
   // The lower manual: the upper's accompaniment, softer and darker (hammondLowerFor).
+  bool lowerDry = false;  // (its vibrato off: set apart from the tune)
   {
     std::array<double, 9> up{};
     for (int d = 0; d < 9; ++d) up[d] = r.upper[d];
@@ -299,6 +300,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     }
     const double clar = plan.clarity;
     double extra = 0;
+    bool contrast = false;
     const double vu = med(HammondModel::kUpper, false), vl = med(HammondModel::kLower, false);
     const double eu = med(HammondModel::kUpper, true), el = med(HammondModel::kLower, true);
     if (vu > 0 && vl > 0) {
@@ -310,21 +312,36 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
         for (double x : b) g += x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20);
         return 20 * std::log10(std::max(g, 1e-9));
       };
-      const double want = level(up) - std::max(db, 3.0);
+      // (but no further than ~6 dB: a soft accompaniment left a whisper is lost under the tune;
+      // past that it is set apart by colour instead, below)
+      static const double kGap = knob("PJ_HAMMOND_BALANCEGAP", 6.0);  // (dB)
+      const double want = level(up) - std::clamp(db, 3.0, std::max(kGap, 3.0));
+      contrast = db > kGap + 1;
       double bestErr = 1e9;
       for (double e = -1; e <= 6; e += 0.1) {
         const double err = std::fabs(level(hammondLowerFor(up, e, clar)) - want);
         if (err < bestErr) { bestErr = err; extra = e; }
       }
       if (db >= 4) {
-        char b5[96];
-        std::snprintf(b5, sizeof b5, "; the lower %.0f dB under the upper (the file's balance)", db);
+        char b5[160];
+        if (contrast)
+          std::snprintf(b5, sizeof b5, "; the lower %.0f dB under the upper in the file: %.0f dB under, the hollow 8', its vibrato off (set apart by colour)", db, kGap);
+        else
+          std::snprintf(b5, sizeof b5, "; the lower %.0f dB under the upper (the file's balance)", db);
         balanceText_ = b5;
       }
     }
     plan.lowerExtra = extra;
     const std::array<double, 9> low = hammondLowerFor(up, extra, clar);
-    for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(low[d]));
+    std::array<double, 9> lowS = low;
+    // (set apart by colour: the hollow 8' (the clarinet's odd harmonics) at that level, a line of
+    // its own beside the tune's foundation and flutes, as a trio organist sets two lines apart)
+    if (contrast) {
+      lowS = hammondLowerShaped(low, 2);
+      plan.lowerShape = 2;
+      lowerDry = true;
+    }
+    for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(lowS[d]));
     const std::array<double, 2> ped = hammondPedalFor(up, clar);  // (and the pedals by its loudness and brightness)
     r.pedal = {int(std::lround(ped[0])), int(std::lround(ped[1]))};
   }
@@ -334,7 +351,9 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
   // notes low, under F3) without it, the bass tight, as trio organists play the left hand's line. (Not the presets
   // without it: the percussive and rock organs.)
   std::string vibText;
-  if (r.vibrato > 0) {
+  if (r.vibrato > 0 && lowerDry) {
+    r.vibLower = false;  // (the tune moving, the accompaniment still: one more difference)
+  } else if (r.vibrato > 0) {
     const double pedalRate = counts[HammondModel::kPedal] / secs, lowerRate = counts[HammondModel::kLower] / secs;
     double lsum = 0;
     int ln = 0;
@@ -508,7 +527,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
   // left hand bass and need an extra octave of percussion-like sound, set your lower manual
   // drawbars to 008880080"): the percussion (3rd, fast) on for the piece, the left hand comping,
   // its moments mostly chords, above the bass (the pedals carry it, or the lower's notes lie above
-  // G3 on the average). At the lower's planned level (hammondLowerPercussive).
+  // G3 on the average). At the lower's planned level (hammondLowerShaped).
   std::string lowerPercText;
   {
     static const double kLowerPerc = knob("PJ_HAMMOND_LOWERPERC", 1.0);  // (0: never)
@@ -528,9 +547,9 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
     if (kLowerPerc > 0 && r.perc && r.percThird && r.percFast && plan.percussion.empty() && comping && aboveBass) {
       std::array<double, 9> low{};
       for (int d = 0; d < 9; ++d) low[d] = r.lower[d];
-      low = hammondLowerPercussive(low);
+      low = hammondLowerShaped(low, 1);
       for (int d = 0; d < 9; ++d) r.lower[d] = int(std::lround(low[d]));
-      plan.lowerPerc = true;
+      plan.lowerShape = 1;
       lowerPercText = "; the lower on 008880080 (the percussion's stand-in: the left hand comps over the bass)";
     }
   }

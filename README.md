@@ -103,7 +103,7 @@ roughness (Sethares, from the partials) drops by 21 %.
 
     ./pajupilli -live -ensemble                  # bass, alto, two flutes, piccolo
     ./pajupilli -live -ensemble alto,flute,flute # any list
-    ./pajupilli -live -room church               # dry, studio, hall (default), church
+    ./pajupilli -live -room church               # dry, studio, hall (default), concert, church
     ./pajupilli -ensemble -polydemo -o choir.wav # with a five-voice chorale (stereo)
 
 A flute choir instead of a pool of one instrument: the keys are at sounding pitch over the
@@ -323,6 +323,52 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
   air resonance at 66 Hz and the main wood resonance 1.69478 times higher.
 - **Knobs:** dynamics scales the pull, brightness moves the plucking point, vibrato rocks the
   stopping finger.
+
+`-inst cello` (GM 43) is the same construction at a cello's size (`research/cello.md`, its
+last section): C2 to A5, harmonics to C7, pure-fifth open strings, its own vibrato, the endpin on
+a stage floor; a key let go within 100 ms is a pizzicato. `-inst orchestra-hit` (GM 56) scores
+each key for the orchestra's sections (`src/orchhit.cc`) and holds as long as the key. With
+`-play`, the director (`Director.md`, `-director on|off|auto`) gives a quantized file one
+reading for all parts.
+
+`-inst viola` (GM 42) is the cello's construction with a viola's own parts (`research/viola.md`,
+its last two sections): C3 to E6, harmonics to E7, on 37 cm strings (the C short and heavy,
+nearly a cello string), a violin-type bridge (39 mm, one hill near 2 kHz), and a 41 cm body in
+the violin family's outline (`tools/bassbody.py -viola`). Its two main resonances lie between its
+open strings, not on them: the air at 226 Hz (2–4 semitones above the open G), the main wood
+resonance at 365 Hz (F♯4), each about a semitone wide (Q 19 and 24). The lowest fifth has no body
+under it, the viola's veiled colour. The back is twice as stiff as the top, so the main resonance
+rocks the bridge as the bow drives it (with the back as soft as the top the notes D♯4–F♯4 lost
+their fundamental to a mode at 685 Hz). Held under the chin: no floor. The body steps twice a
+sample (a small body's grid rings to 16 kHz); about 28 % of a core. A pizzicato, there and on the
+cello, is the nail's: velocity sets only how far it pulls the string (`PJ_PIZZ_FLESH`: below this
+velocity the fingertip's flesh instead).
+
+`-inst violin` (GM 41) is the viola's construction at a violin's size: G3 to C7, harmonics to A7,
+on 32.8 cm strings (gut-core G, D, A and a steel E, in pure fifths from A 440), a violin bridge
+(33 mm, its hill near 2.8 kHz) and a 35.6 cm body. The body is fitted to the sound of 17 recorded
+violins (`tools/bassbody.py -violin`). Each band's level is the median across them, read from the
+harmonics of their notes. The simulation comes within 5 dB of it from 196 Hz to 1.4 kHz: A0 at
+268 Hz (Q 27), then 354, 369, 549 and 553 Hz, f-holes 11 cm². The body steps four times a sample;
+about 26 % of a core. Its notes start in tens of milliseconds, and its stopped notes are tuned to
+ring with the open strings, as on the viola (`PJ_RING_TUNE`).
+
+**Where each resonance sends its sound** (bass, cello, viola; `src/bassbody.h`, `Room::setAxes`).
+A body resonance that moves the whole top out and in, or pumps the air out of both f-holes
+together, is heard alike all round. One that moves the two halves of the top against each other,
+or draws the air in at one f-hole while it leaves the other, displaces no air on balance: it is
+heard to the sides with opposite signs and not straight ahead. So the air inside is in two halves
+side by side, each with its own f-hole and free to cross to the other (`PJ_AIR_SIDES=0`: one
+column and one plug for both, as before), and besides the whole displaced volume the body gives
+its three moments: across it, along it, and top against back. In a room every path to the
+listener, direct or off a wall, leaves the instrument in its own direction and takes its own mix
+of the four; the reverberant field takes their power. Each overtone of a note excites the
+resonances differently, so each goes out in its own directions and reaches the two ears by a
+different balance (Jyrki: string instruments mix up their overtone structure for the space they
+radiate to, so nothing is heard as a comb filter between the ears). `PJ_DIPOLE` scales the
+directional parts (0: none). Limits: the moments stand for the lobes only up to where the body is
+as large as the wavelength; and the close parts of the sound (the top by the bridge, the f-hole,
+the pickup), a large share on the viola, still go out alike all round.
 
 `-inst contrabass` is the same bass under the bow (GM 44), E1 to G4, harmonics to C6:
 
@@ -907,6 +953,23 @@ darker, the pedal's towers too (`PJ_ORGAN_PEDAL_OCCL`); each enclosure's field f
 swell's through its shutters; below 300 Hz both channels alike. The church adds only its late field
 for the organ (the room's own early sound for it off). ~19 % more time on full organ.
 
+- **Bent round the edges, not cut off:** a path past the gallery's front edge, another case's
+  corner or top, or out of its own pedal tower through the side is diffracted. It is not dropped.
+  The model is Kurze-Anderson's form of Maekawa's chart at the pipe's own fundamental:
+  - N = 2 δ / λ, where δ is the detour over the edge;
+  - in the shadow, 5 + 20 log10(x / tanh x) dB, with x = √(2πN);
+  - on the open side within N = 0.2, the lit side's fading loss (one edge's per leg);
+  - its harmonics darker with the loss; beyond 30 dB, blocked.
+
+  A cut path made the pedal erratic: a Posaune 16' resonator or a Principalbass 16' top above
+  the gallery's line of sight had a full direct path, one just below it none. So the long pipes
+  came out loud and dry, the shorter ones buried in the reverberation (the early sound's level
+  over a pedal scale spread 27 dB, now 9; the path gains glide from key to key, steps under
+  2 dB). `PJ_ORGAN_TAPLOG=1` prints each pedal pipe's path gains.
+- **The direct sound 4 dB over the physical balance** (`PJ_ORGAN_DIRECT_DB`, 4): clearer against
+  the church, less muffled. Overall it is only ~0.2 dB louder, the reflections carrying most of
+  the energy.
+
 **Its own nave** (`PJ_NAVE`, on with the paths; src/organnave.h): the late field behind the pipes'
 early sound is the organ's own, a 50 × 20 × 20 m stone nave (20 000 m³, `PJ_NAVE_VOLUME`) ringing 7 s
 at 63 Hz, 8 s at 125, 6.5 / 5.8 / 5.3 s at 250 Hz-1 kHz, then 4.2 / 3 / 1.6 s at 2 / 4 / 8 kHz and
@@ -1338,7 +1401,12 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     whatever its register: all of it on the upper manual.
   - **The file's own balance:** an accompaniment written quieter than the tune (by velocity and
     its channels' expression, on General MIDI's square law) gets a lower manual that much softer,
-    3 dB a step. The expression pedal follows only the tune's channels (CC11), the
+    3 dB a step. At most ~6 dB (`PJ_HAMMOND_BALANCEGAP`): an accompaniment written much
+    softer (say 11 dB) would be left a whisper under the tune, so past that it is set apart by
+    colour instead: the hollow 8' (008060400's shape: the 8' with its odd harmonics, the
+    clarinet) at 6 dB under, its vibrato off under the tune's C3, as a trio organist sets two lines
+    apart. E.g. a quiet line in the tune's register under a 4' melody: 005030100 instead of
+    102300000. The expression pedal follows only the tune's channels (CC11), the
     accompaniment's loudness being in its registration.
   - **General pauses re-register:** where every line rests half a beat and a quarter second or
     more, one more drawbar is pulled out (the 4', the 2', the 2⅔', the 1', the 1⅓', the 1⅗').

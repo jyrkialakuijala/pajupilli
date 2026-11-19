@@ -46,6 +46,9 @@ class Voice {
   // A model that sounds differently to its two sides (the double bass): the
   // last n samples' difference (left = out + side, right = out - side), or null.
   const float* side(int n);
+  // Its sound along its three axes (Tube::takeDipole) and those axes in the room, or null.
+  const float* dipole(int n, int k);
+  const float* dipoleAxes() const;
   // Its own early sound (Tube::ownEarly), its last n samples x g, added to l and r.
   bool ownEarly() const;
   void early(int n, float* l, float* r, float g);
