@@ -16,9 +16,18 @@
 // plate's stiffness from 13 neighbours, the feet, the post, the air). Then
 // v += F / m dt, w += v dt (leapfrog; the grid's highest resonance, 7.2 kHz,
 // is well under the scheme's limit at 48 kHz, fs / pi).
+//
+// The grid is the body's definition; it runs as its modes (bodymodes.h: the same response from
+// the feet's forces to everything read here, within -58 dB, at a thirteenth (the bass, the
+// cello) to a sixtieth (the violin's four steps a sample) of the cost). PJ_BODY_GRID=1 runs the
+// grid itself.
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "bassbody_data.h"
+#include "bodymodes.h"
 
 namespace pajupilli {
 
@@ -66,20 +75,32 @@ class BassBody {
   // Returns the body's radiated sound: the acceleration of the volume it
   // displaces (top + back + f-holes: a monopole).
   float step(float bassFoot, float trebleFoot) {
-    if (d_.substeps == 1) return stepOne(bassFoot, trebleFoot);
-    float a = 0, h = 0;
-    for (int k = 0; k < d_.substeps; ++k) {
-      a += stepOne(bassFoot, trebleFoot);
-      h += fhole_;
+    if (dirty_) prepare();
+    if (modes_) return stepModes(bassFoot, trebleFoot);
+    float a;
+    if (d_.substeps == 1) {
+      a = stepOne(bassFoot, trebleFoot);
+    } else {
+      a = 0;
+      float h = 0;
+      for (int k = 0; k < d_.substeps; ++k) {
+        a += stepOne(bassFoot, trebleFoot);
+        h += fhole_;
+      }
+      fhole_ = h / float(d_.substeps);
+      a /= float(d_.substeps);
     }
-    fhole_ = h / float(d_.substeps);
-    return a / float(d_.substeps);
+    feet_[0] = w_[0][d_.bassJ + kPad][d_.bridgeI + kPad];
+    feet_[1] = w_[0][d_.trebleJ + kPad][d_.bridgeI + kPad];
+    feet_[2] = v_[0][d_.bassJ + kPad][d_.bridgeI + kPad];
+    feet_[3] = v_[0][d_.trebleJ + kPad][d_.bridgeI + kPad];
+    return a;
   }
   // The feet's motion (for the bridge): displacement and velocity.
-  float bassFootW() const { return w_[0][d_.bassJ + kPad][d_.bridgeI + kPad]; }
-  float trebleFootW() const { return w_[0][d_.trebleJ + kPad][d_.bridgeI + kPad]; }
-  float bassFootV() const { return v_[0][d_.bassJ + kPad][d_.bridgeI + kPad]; }
-  float trebleFootV() const { return v_[0][d_.trebleJ + kPad][d_.bridgeI + kPad]; }
+  float bassFootW() const { return feet_[0]; }
+  float trebleFootW() const { return feet_[1]; }
+  float bassFootV() const { return feet_[2]; }
+  float trebleFootV() const { return feet_[3]; }
   // What a close microphone at an f-hole hears: the air plugs' own flow's
   // acceleration (not cancelled by the plates, as it is far away).
   float fholeSound() const { return fhole_; }
@@ -100,17 +121,33 @@ class BassBody {
   // as its rate of change; s).
   void setDamping(double rate, double stiff, double air = 14) {
     rate_ = float(rate); stiff_ = float(stiff); airRate_ = float(air);
+    dirty_ = true;
   }
   double dampRate() const { return rate_; }
   double dampStiff() const { return stiff_; }
   double dampAir() const { return airRate_; }
   // Another instrument of the same design: its plates this much stiffer (x; its wood
   // resonances move by the square root of it) and its air (the ribs a little higher or lower).
-  void setVariation(double plates, double air) { plateK_ = float(plates); airKs_ = float(air); }
+  void setVariation(double plates, double air) { plateK_ = float(plates); airKs_ = float(air); dirty_ = true; }
+  // The modes for the damping and build set (found once for each, bodymodes.h; else at the next
+  // step). The body is put at rest when they change.
+  void prepare();
+  bool modal() const { return modes_ != nullptr; }
+  // The grid itself (true) or its modes (false), whatever PJ_BODY_GRID says (tests, A/B).
+  void setGrid(bool on) { grid_ = on ? 1 : 0; dirty_ = true; }
+  int modeCount() const { return modes_ ? modes_->modes : 0; }
 
  private:
   const BodyData& d_;
   float stepOne(float bassFoot, float trebleFoot);
+  float stepModes(float bassFoot, float trebleFoot);
+  std::shared_ptr<const BodyModes> modes_;
+  std::vector<BodyModes::v16> zr_, zi_;  // the modes' states (re, im), 16 a group
+  float phi_[BodyModes::kGlobal] = {};
+  float feet_[4] = {};
+  double fs_ = 48000;
+  int grid_ = -1;  // (-1: PJ_BODY_GRID)
+  bool dirty_ = true;
   static constexpr int kPad = 2;
   static constexpr int kRows = bassdata::kNY + 2 * kPad, kCols = bassdata::kNX + 2 * kPad;
   // [plate: 0 top, 1 back][row][column], padded with masses at rest.

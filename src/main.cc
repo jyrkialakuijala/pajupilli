@@ -24,6 +24,7 @@
 
 #include "director.h"
 #include "analysis.h"
+#include "brasssect.h"
 #include "calibrate.h"
 #include "midifile.h"
 #include "ensemble.h"
@@ -373,6 +374,7 @@ const char kUsage[] =
     "  -imp M              passive resonances of a fingering\n"    "  -ramp M             register map: breath x0.25 .. x3 and back (-secs per way)\n"
     "  -cal                relearn the tuning (cached in ~/.cache/pajupilli)\n"
     "  -fuzz SECS SEED     random playing, check for blow-ups\n"
+    "  -brassvoice SPEC    the brass section's voicings (\"mode bigband; chord Dm7 77; chord G7 77\")\n"
     "  -nantest            check recovery from NaN states\n"
     "  -scatter            how much a silent instrument gives back of the room's\n"
     "                      sound, per octave band\n"
@@ -616,6 +618,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     else if (a == "-scatter") return scatter();
+    else if (a == "-brassvoice") return brassVoiceDemo(next());  // (the brass section's voicer alone: src/brasssect.h)
     else if (a == "-roomimp") {
       const RoomSpec* rs = findRoom(next());
       if (!rs) { std::fprintf(stderr, "-roomimp: dry, studio, hall, concert or church\n"); return 1; }

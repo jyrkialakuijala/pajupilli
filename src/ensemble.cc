@@ -71,6 +71,12 @@ Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes
     initChoir(inst, room);
     return;
   }
+  if (std::strcmp(inst.family, "brass-section") == 0) {  // (the brass section: its seats, src/brasssect.cc)
+    std::fill(owner_, owner_ + 128, -1);
+    std::fill(pitch_, pitch_ + 128, -1);
+    initBrass(inst, room);
+    return;
+  }
   if (std::strcmp(inst.family, "orchestra") == 0) {  // (the orchestra hit: sections, src/orchhit.cc)
     std::fill(owner_, owner_ + 128, -1);
     std::fill(pitch_, pitch_ + 128, -1);
@@ -140,6 +146,9 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
     std::vector<double> x(n);
     const double gap = n > 16 ? 0.45 : n > 6 ? 0.8 : 1.0;  // (a string section: 24 players in 10 m)
     for (int k = 0; k < n; ++k) x[order[k]] = (k - (n - 1) / 2.0) * gap;
+    // (a section seated as it sits: the brass section's rows, src/brasssect.cc)
+    for (int i = 0; i < n; ++i)
+      if (members[i].x < 1e8) x[i] = members[i].x;
     // The channels' rooms: small is smaller than the main one, large larger
     // (or the same where the main one already is the smallest or largest).
     const RoomSpec* spec[3] = {findRoom(room->volume > 150 ? "studio" : "booth"), room, findRoom("gated")};
@@ -394,6 +403,7 @@ int Ensemble::reach(int key) const {
 
 void Ensemble::noteOn(int key, int velocity) {
   if (choir_) { choirOn(key, velocity); return; }
+  if (brass_) { brassOn(key, velocity); return; }
   if (strings_) { sectOn(key, velocity); return; }
   if (!kids_.empty()) { hitOn(key, velocity); return; }
   key = reach(key);
@@ -444,6 +454,7 @@ void Ensemble::noteOn(int key, int velocity) {
 
 void Ensemble::noteOff(int key) {
   if (choir_) { choirOff(key); return; }
+  if (brass_) { brassOff(key); return; }
   if (strings_) { sectOff(key); return; }
   if (!kids_.empty()) { hitOff(std::clamp(key, lo_, hi_), true, false); return; }
   key = reach(key);
@@ -776,7 +787,7 @@ void Ensemble::retune() {
     Slot& s = f_[idx[i]];
     s.cents = c[i];
     s.tunedNote = note[i];
-    s.v->player().setTuning(c[i]);
+    s.v->player().setTuning(c[i] * jiScale_);
   }
   if (n > 1 && !heal && !quiet_) {
     std::fprintf(stderr, "tune:");
@@ -791,6 +802,7 @@ void Ensemble::retune() {
 
 void Ensemble::render(float* left, float* right, int n) {
   if (choir_) { choirRender(left, right, n); return; }
+  if (brass_) { brassRender(left, right, n); return; }
   if (strings_) { sectRender(left, right, n); return; }
   if (!kids_.empty()) { hitRender(left, right, n); return; }
   // In blocks of Room::kBlock (the room's coupling step), queued.
@@ -987,7 +999,7 @@ void Ensemble::block(float* left, float* right, int n) {
       }
     }
   // Several flutes add up; keep the sum near one flute's level (1 / sqrt(n)).
-  const double target = 1 / std::sqrt(std::max(1, playing));
+  const double target = mixFixed_ ? 1.0 : 1 / std::sqrt(std::max(1, playing));
   // Down at once when voices join (~40 ms: no clipping), back up slowly when
   // they leave (~2 s, as a compressor's release): a released note still
   // rings, and turning the others up under its tail is an "umpf" on every

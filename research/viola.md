@@ -834,6 +834,34 @@ above for comparison:
 So the code should take body size, bridge type and the hold as parameters, not as cello or viola
 special cases.
 
+### The body as modes (2026-11-20)
+
+The grid (section 7's first build) is linear and time-invariant: the plates' masses and springs,
+the air cells, slugs, cross passages and plugs, the rigid post (a linear constraint), the losses
+(proportional to displacements and velocities: `rate`, the wood's friction on the plates'
+stiffness, the slugs' and plugs' rates, `airHf`) and the instrument's own build (`setVariation`,
+each section seat its own) are fixed once it is made. So it now runs as its modes
+(`src/bodymodes.h`; `PJ_BODY_GRID=1` runs the grid, which stays the definition):
+
+- The undamped modes come from a symmetric eigenproblem in mass-weighted coordinates, the post's
+  direction removed. The air's circulations between the two halves (no cell's volume changes:
+  zero frequency, neither driven nor heard) drop out.
+- The losses are not proportional, and leaving their couplings out was wrong by -13 dB (the
+  plate and air modes near each other trade energy through them). The grid's own step is written
+  in the modes, each mode's 2 x 2 step solved exactly, and the couplings removed by 2 x 2
+  similarity transforms on the pairs that matter, the rest to first order. The substeps of a
+  sample (the viola's three, the violin's four) compose into one pole a sample.
+- What finding 7 and the air's high-frequency loss did is kept: the plugs opening from three
+  cells and the pressure-rate loss are in the matrices, so the modes carry them as the grid does
+  (the f-hole's output in the 4-8 kHz octave within -59 dB of the grid's).
+- About 190 modes of the viola's 253 carry more than 1e-7 of some output's energy and are kept.
+  Against the grid, over a second: every output from either foot within -58 dB; per octave from
+  31 Hz to 16 kHz, in each octave holding more than 1e-5 of the output's energy, within -42 dB
+  (mostly -50 to -80); the feet's resonances at the same frequencies and Q (224, 357, 495, 593 Hz
+  ...); a bowed note -70 dB, a pizzicato -66 dB.
+- The body costs 0.13 us a sample, not 6; the viola 19 % of a core instead of 30, the violin 8 %
+  instead of 27.
+
 ---
 
 ## 8. Not found (no reliable source)

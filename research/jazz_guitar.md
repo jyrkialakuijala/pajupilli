@@ -1,6 +1,6 @@
 # Jazz guitar (GM 27, "Electric Guitar (jazz)"): research
 
-Status: research 2026-11-19. Nothing built yet. This goes deeper than `research/electric_guitars.md`
+Status: research 2026-11-19; built 2026-11-20 (section 12, as built). This goes deeper than `research/electric_guitars.md`
 §2.1, §4.1, §5, §6, §12–13 (the sketch) and does not repeat it. It builds on what is in the code:
 `src/guitar.h/.cc` (`GuitarSpec`, `electricGuitar()`: the Strat and the Les Paul, two-coil
 humbuckers, the pick, the palm, the pickups' comb, aperture and magnet nonlinearity),
@@ -828,3 +828,133 @@ goes to the koto (electric_guitars.md, status).
 - **[louisiana]** `~/Music/midi/bushgrafts/louisiana.mid`, channel 7 (the user's file).
 - Within this repository: `research/electric_guitars.md` (§2.1, 4–6, 12–19), `research/guitars.md`
   (§3.2, §7, §9.3), `src/guitar.*`, `src/guitaramp.*`, `src/guitarinst.*`.
+
+---
+
+## 12. As built (2026-11-20)
+
+`src/guitar.cc` `jazzGuitar()`, `src/jazzguitar.h/.cc` (the guitarist), `src/guitaramp.cc` `jazz()`
+(the amp and the speaking strip), `src/guitarinst.cc` (the model's wiring), `tools/test.py`
+`jazz_guitar()`. GM 27 now plays it (`src/midifile.cc`'s map already named it first).
+
+### 12.1 The touch speaks
+
+The request: the player's touch shapes the tone like a vowel, through pick position, pick strength,
+pick width and softness, with formants and an envelope that follow the playing. All of it is
+physical, in the string and the pick:
+
+- **The pick** is `Guitar::pickContact` (a place carried by a hand, a tip of finite stiffness, a
+  slip), given a contact width (default 0.8 mm: every older caller unchanged). The jazz pick: 1.5
+  mm (17 kN/m), a rounded edge (its slip 0.25 ms against a sharp pick's 0.15), 2.5 mm of contact.
+  The contact's width hardly matters for a pick (its sinc's first zero lies past the 400th
+  harmonic); the slip is what softens: a raised-cosine release over T rolls off above ~1/T.
+  Wes's thumb: `pluckPad`, 14 mm, a 4 ms rise, a 1.8 ms slip.
+- **Strength:** velocity v sets the depth (0.1 + 2.0 v^1.25 mm) and the push (10 − 7.5 v ms); the
+  slip follows the hand's speed, edge × √(0.3 m/s ÷ speed), 0.5 ms at v30, 0.2 ms at v120.
+- **Place:** 0.165 m × (1.15 − 0.54 I) from the saddle, I the phrase's intensity (its running mean
+  velocity) and this note's accent against it: 0.19 m on soft, even comping (the pluck's comb puts
+  a notch near the 3rd harmonic: round), 0.10–0.13 m on accents and climaxes (the notch past the
+  5th: nasal). Checked: picked at L/3, harmonics 3 and 6 drop 9 and 23 dB against their
+  neighbours; at L/4, 4 and 8 drop 5 and 22 dB (bridge pickup; on the neck pickup its own notch at
+  3.7 hides 3 and 4).
+- **The angle:** 0.22 + 0.35 v rad: a harder stroke digs into the top, the swing the floating
+  bridge drains twice as fast: the punch.
+- **In time:** the wound flats' k² loss: what a hard stroke adds above 1.5 kHz dies in 50–300 ms
+  (G3 v120: the 2–5 kHz share −26 dB from the first 50 ms to 200–400 ms).
+- **Measured** (the first 50 ms, v30/60/90/120): G3 centroid 236/250/259/275 Hz, 2–5 kHz share
+  −63/−47/−40/−31 dB; D4 315/339/363/396, −51/−35/−28/−23; A4 469/508/556/628, −47/−31/−27/−20.
+  Every step up, the share by 27–32 dB over the range. The 5–10 kHz share at 127: −90 to −52 dB.
+
+### 12.2 Deviations from section 9
+
+- **The body's masses** ×8 (box) and ×100 (the neck's three modes), **towardsLoss 2.0** (not 1.7),
+  **loss0 ×0.6** and **loss1 ×0.75** (wound: 0.036–0.054 k²; plain 1.1× the Strat's). With the
+  table's masses the 85 Hz neck mode beside E2 passed the fundamental into the along-swing, which
+  the pickup hears little: 15 dB down in 0.4 s against Rau's 5.45. As fitted: harmonics 1–5 of the
+  open low E 15 dB down in 5.7, 3.4, 0.5, 1.2, 1.0 s (Rau17 5.45, 4.49, 0.86, 0.87, 1.12; within
+  40 %; the 3rd sits on the top's 240 Hz mode). The larger towardsLoss on smaller losses gives the
+  two stages (a quicker first half second, a longer tail).
+- **The tone at 45 kΩ** (−3 dB at 1.9 kHz), the top of the research's 25–45 kΩ, and the amp's
+  treble shelf −2 dB (not −4): with all of the tone pot, the shelf and the 15" a soft note was dull.
+- **The amp's output** is brought up ×74 in the model (37 dB: the jazz preset's level against the
+  Twin's), past the strip; the level trim is then 0.0 dB.
+- **The guitarist:** open strings are forbidden in chords of 3+ (cost +2 left 12 in the user's
+  file); the fretted span is 5 frets from the 5th fret (not the 7th: with it 5.2 % of the notes
+  were dropped). A chord over C6 goes down an octave as a whole where its bass allows (folding
+  only its top note made it collide with a lower one: 8 top notes lost). Keys within 8 ms are
+  gathered as one gesture. No look-ahead: the chord's length is not known at its key, so "long
+  soft chords" with the fingers are those soft ones after a rest of 1.5 beats.
+- **Muting:** the strings outside a chord's grip are damped by the fretting hand (200/s), those
+  beside a single line lightly (40/s): left free they rang along through the body for half a second
+  at −36 to −40 dB.
+- **Not built:** the afterlength resonators, feedback, reverb.
+
+### 12.3 The speaking strip (the "compressor kludge")
+
+The user's idea: a mild 3–4 kHz boost with a compressor arranged so the touch shows in timbre
+more than in loudness. As built, after the speaker (an engineer's channel on the miked amp):
+
+1. **Presence, static:** a peak of +2 dB at 3.4 kHz, Q 0.8 (x + (g − 1)·bp, bp a constant-peak
+   band-pass: an exact peaking filter, no dip).
+2. **Presence, dynamic (an upward expander on the band alone):** the band's envelope (1 ms up, 80
+   ms down) against a reference, a firm mf attack's (−64 dB of the output): g = 2 + 0.8 (L − ref)
+   dB, within −4 … +8 dB, smoothed over 2 ms. A hard attack opens it, a soft one leaves it shut,
+   and as the note's highs die (12.1) it closes again: the boost follows the vowel the string
+   already makes, and exaggerates it.
+3. **The compressor:** 2:1 above −56 dB rms (two 10 ms poles), a 10 dB soft knee, 10 ms attack
+   (the pick's first transient passes: no flattened attack, section 8 item 13), 250 ms release.
+   Its ear is the signal *before* the presence lift: it hears the body, so the presence it is
+   letting through does not make it duck, and a hard stroke comes out held back in level but open
+   in colour. Soft playing (under the knee) passes untouched.
+
+Why not a plain compressor: compression alone *raises* a soft note's attack against its body and
+narrows the timbre range (measured: alone it brightened a soft phrase by 2 dB). Why not a plain
+boost: a static 3–4 kHz lift makes every note the "clean electric" of section 8 item 1. Keyed on
+the band's own level, the boost is there only when the player puts it there.
+
+Measured on one phrase (a 12-note line and a four-note chord) at velocity 35, 70, 110 (the whole
+phrase, its tails included):
+
+| | 2–5 kHz share (dB) | centroid (Hz) | loudness (LUFS, as trimmed) |
+|---|---|---|---|
+| strip on, v35 / 70 / 110 | −29.8 / −26.3 / −22.0 | 293 / 309 / 363 | −36.8 / −30.5 / −26.4 |
+| strip off | −28.9 / −30.4 / −30.4 | 289 / 279 / 293 | −36.4 / −27.6 / −20.6 |
+| soft → hard, on / off | +7.7 / −1.5 dB | ×1.24 / ×1.01 | +10.4 / +15.8 dB |
+
+(Over a whole phrase without the strip the hard one is no brighter: its louder, long fundamentals
+outweigh the brighter attacks. Per attack, the guitar alone opens by 25–30 dB (12.1); the strip
+makes that heard over the phrase.) In the tuning runs, before the unused strings were muted, the
+same phrase gave ×1.58 / ×1.29, +11.9 / +3.8 dB, +9.7 / +14.8 dB.
+
+The single notes' level from v30 to v120 is then 15–18 dB (the guitar alone ~20; the research's
+target 20 ± 3 was for the instrument without a compressor). In `-play` the velocity row in
+`src/velgain_data.h` puts the loudness on General MIDI's curve as for every instrument; the colour
+stays the touch's.
+
+### 12.4 Checks (tools/test.py `jazz_guitar()`)
+
+| Check | Result |
+|---|---|
+| In tune, E2 … B5 | within 2 c |
+| Tone network, 35 kΩ / 0 | −3 dB at 1378 Hz, no peak / +3.8 dB at 467 Hz |
+| Rau17, harmonics 1–5 to −15 dB | 5.66, 3.37, 0.54, 1.15, 1.04 s (within 40 %) |
+| Wound G, partial 10 | +0.6 c |
+| Velocity opens the spectrum (G3, D4, A4) | monotonic, above |
+| 5–10 kHz at 127 | −90 to −52 dB |
+| Brightness dies into the body | G3 v120 −26 dB by 200–400 ms |
+| Pick place, comb | as 12.1 |
+| Strip: colour up, loudness down | as 12.3 |
+| A short chord choked | −40 dB 18–41 ms after its keys (three chords; the body's own sound the last of it; FluidR3 30–60 ms; the test's bound 60) |
+| Acoustic share | −20.1 dB, A-weighted |
+| louisiana ch7 | 492 chords, 4.9 % of 1660 notes dropped, 0 top notes, 0 unplayable, 0 open strings, 0.99 frets |
+| Fuzz 10 s; cost | ok; 2.7 % of a core on a five-note chord |
+
+Not met, or met loosely:
+- **FluidR3's brightness** (section 7: centroid 600–800 Hz soft, 1.3–1.6 kHz loud in G3–A4):
+  here 236–628 Hz. On louisiana ch7 (43 s): centroid 348 Hz against FluidR3's 901, 0.8–2 kHz −17
+  dB against −4, 2–5 kHz −27 against −12, short-term loudness spread 17 against 27 dB. With the
+  tone full up, 419 Hz: the neck humbucker's comb on a string picked near it, and the closed 15",
+  leave a strong fundamental. A warm archtop by choice; FluidR3's sample is a brighter guitar.
+- **The first half second's fall** of the mid and high notes: 6–12 dB/s (FluidR3 13–30), the tail
+  7–12 dB/s on the high ones (FluidR3 3–6).
+- The velocity range 15–18 dB with the strip (12.3).

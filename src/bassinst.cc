@@ -139,6 +139,9 @@ extern const Instrument kPlucked[] = {
     {"electric-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
     // GM 35 (src/ebass.cc PickBassPlayer): a Precision Bass played with a pick, into an SVT; E1 .. D#4.
     {"pick-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
+    // GM 36 (src/fretless.cc): the Jazz Bass defretted, its board under the finger (the mwah), slides,
+    // scoops, vibrato, tuned by ear to the band; E1 .. D#4 stopped, natural harmonics above (to E4).
+    {"fretless-bass", 0, 24, 76, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
     // GM 37, 38 (src/ebass.cc SlapBassPlayer): the Jazz Bass slapped and popped, its frets
     // struck; 38 active, stainless, pop-forward; E1 .. D#4.
     {"slap-bass-1", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},

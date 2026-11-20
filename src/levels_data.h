@@ -32,6 +32,7 @@ constexpr LevelTrim kLevelTrims[] = {
     {"muted-trumpet", 17.9f},
     {"trombone", 9.7f},
     {"tuba", 10.4f},
+    {"brass-section", 4.8f},  // (levels.py measure() untrimmed: -33.0 LUFS against the trimmed instruments' median -28.2; tools/levels.py -emit will redo it)
     {"lead-saw", 0.8f},
     {"lead-square", -2.9f},
     {"lead-calliope", -1.9f},
@@ -81,8 +82,9 @@ constexpr LevelTrim kLevelTrims[] = {
     {"guitar-harmonics", 15.1f},  // (tools/levels.py's measure(): -43.3 LUFS untrimmed, the median -28.2)
     {"electric-bass", 9.7f},  // (measured -37.9 LUFS at three notes, through the B-15, the DI and the LA-2A; the bare DI -34.7)
     {"pick-bass", 10.8f},  // (tools/levels.py's measure(): -39.0 LUFS untrimmed through the SVT, the DI and the 1176; the median -28.2)
-    {"slap-bass-1", 9.2f},  // (tools/levels.py's measure(): -37.4 LUFS untrimmed through the slap DI, the 4x10 and the 1176; the median -28.2)
-    {"slap-bass-2", 8.1f},  // (-36.3 LUFS untrimmed: the active J popped, the same chain)
+    {"fretless-bass", 16.4f},  // (tools/levels.py's measure(): -44.6 LUFS untrimmed through "fretless-di": the round pad's pluck, D#4 high on the G string; the median -28.2)
+    {"slap-bass-1", 7.7f},  // (tools/levels.py's measure(): -35.9 LUFS untrimmed through the slap DI, the 4x10 and the 1176; the median -28.2)
+    {"slap-bass-2", 8.4f},  // (-36.6 LUFS untrimmed: the active J popped, the same chain)
     {"muted-guitar", 8.6f},  // (-44.4 LUFS by the 1 s rule: a muted note is short; set so its strokes are as loud as the clean guitar's over 100 ms)
     {"harpsichord", 24.0f},
     {"harpsichord-8", 26.0f},

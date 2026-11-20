@@ -23,7 +23,8 @@ namespace {
 // obstacles, the modes to 10 kHz (the slap's 2-8 kHz; 128 reach 10.9 kHz on the open E). The
 // action at the 17th fret (PJ_SLAP_ACTION, mm on the E; the others a little lower as set up),
 // the relief (PJ_SLAP_RELIEF, mm); PJ_SLAP_FRETS=0: no frets (to hear what they make). GM 38: new
-// stainless roundwounds, their partials losing a third less (PJ_SLAP2_LOSS1, 0.65 of loss1).
+// stainless roundwounds, their partials losing 15 % less (PJ_SLAP2_LOSS1, 0.85 of loss1: the
+// research's 0.65 came out brighter than every reference set).
 // GM 34 (the finger bass) gets the frets only with PJ_EBASS_FRETS=1.
 GuitarSpec bassFor(const Instrument& inst) {
   if (pickBassInstrument(inst)) return precisionBass();
@@ -321,7 +322,7 @@ SlapBassPlayer::SlapBassPlayer(ElectricBassModel& m, int program) : BassLinePlay
   force_ = int(knob("PJ_SLAP_FORCE", 0));
   flesh_ = knob("PJ_SLAP_FLESH", 0.0);
   thumbAngle_ = knob("PJ_SLAP_THUMBANGLE", 1.3);
-  thumbLight_ = knob("PJ_SLAP_THUMBLIGHT", 1.0);
+  thumbLight_ = knob("PJ_SLAP_THUMBLIGHT", 0.5);
   for (int i = 0; i < 128; ++i) { tech_[i] = kThumb; rise_[i] = 0; delay_[i] = 0; offAt_[i] = -10; }
 }
 
@@ -541,7 +542,7 @@ void SlapBassPlayer::strike(int s, int fret, const Asked& a) {
   if (t == kPop) {
     // The pop: the finger hooks under the string between the neck's end and the neck pickup,
     // pulls it out from the body and lets it slip off its callus; it slams back onto the frets.
-    const double depth = (prog_ == 2 ? 0.6e-3 + 5.6e-3 * std::pow(v, 1.8) : 0.5e-3 + 5.0e-3 * std::pow(v, 1.8)) * dynK *
+    const double depth = (prog_ == 2 ? 0.6e-3 + 6.5e-3 * std::pow(v, 1.6) : 0.5e-3 + 6.0e-3 * std::pow(v, 1.6)) * dynK *
                          (0.9 + 0.2 * ur());
     const double from = std::clamp((prog_ == 2 ? 0.20 : 0.215) * std::pow(2.0, 0.35 * (1 - brightness_)) + 0.02 * (ur() - 0.5), 0.12, 0.3);
     const double angle = -1.45 + 0.16 * (ur() - 0.5);
@@ -558,7 +559,7 @@ void SlapBassPlayer::strike(int s, int fret, const Asked& a) {
   up_ = now_ - lastThumbAt_ < 0.11 ? !up_ : false;
   lastThumbAt_ = now_;
   // (The thinner strings struck as hard sound weaker, 10 dB from the E to the G: the player
-  // digs in more on them, as their lightness to the fourth root.)
+  // digs in a little more on them, kLight^PJ_SLAP_THUMBLIGHT (0.5): their lightness to the 1/8.)
   static const double kLight[kStrings] = {1.0, 1.11, 1.23, 1.47};
   const double speed = (0.4 + 2.9 * std::pow(v, 1.4)) * thumbV_ * dynK * (0.93 + 0.14 * ur()) * (up_ ? 0.65 : 1.0) *
                        std::pow(kLight[s], thumbLight_);

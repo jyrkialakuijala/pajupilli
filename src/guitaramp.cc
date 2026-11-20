@@ -203,6 +203,20 @@ GuitarAmp::Preset GuitarAmp::b15Di() {
 // a mf line hardly touched, a ff one ~2.5 dB down, E1 v40 -> v120 11 dB after it: research/
 // bass_amps.md 10.6 item 9). PJ_BAMP_MID (Hz), PJ_BAMP_MIDDB, Ultra Lo
 // and Hi (PJ_BAMP_ULTRALO, PJ_BAMP_ULTRAHI: 1 on).
+// GM 36 (the fretless, src/fretless.cc; research/fretless_bass.md 6, bass_amps.md 10.3): the
+// records' fretless, DI-heavy. The B-15's path as GM 34's, blended 30 % for warmth; the DI 70 %,
+// both with the Acoustic 360's Variamp pushing the mids (+3 dB at 800 Hz, Q 0.8: PJ_FRETLESS_MIDDB);
+// the LA-2A at 3:1. (Its chorus is the model's own: PJ_FRETLESS_CHORUS.)
+GuitarAmp::Preset GuitarAmp::fretlessDi() {
+  Preset p = b15Di();
+  p.name = "fretless-di";
+  const double mid = knob("PJ_FRETLESS_MIDDB", 3);
+  p.blend = knob("PJ_FRETLESS_BLEND", 0.7);
+  p.di[p.dis++] = {2, 800, 0.8, mid};
+  p.voice[p.voices++] = {2, 800, 0.8, mid};
+  return p;
+}
+
 GuitarAmp::Preset GuitarAmp::svt() {
   Preset p{};
   p.name = "svt";

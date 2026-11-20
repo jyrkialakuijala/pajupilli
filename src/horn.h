@@ -39,6 +39,8 @@ class Horn : public Tube {
 
   double testResponse() const override { return bore_.s.p()[ec_]; }
   void resetAir() override;
+  // One of a brass section (src/brasssect.cc): this instrument's own build, fixed for its seat.
+  void vary(unsigned seat) override;
   // Introspection for tests.
   double mouthPressure() const { return pm_; }
   double cupPressure() const { return bore_.s.p()[ec_]; }

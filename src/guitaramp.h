@@ -176,6 +176,7 @@ class GuitarAmp {
   static Preset svt();         // GM 35: a Precision with a pick, an SVT and an 8x10, the DI, 1176
   static Preset slapDi();      // GM 37: the DI first, a clean solid-state head and a 4x10, 1176
   static Preset slapSquash();  // GM 38: as 37, the DI 80 %, the 1176 4:1 with a slower attack (no squash)
+  static Preset fretlessDi();  // GM 36: the DI 70 % with a mid push (+3 dB at 800 Hz), the B-15 30 %, LA-2A
   // GM 27: a clean solid-state jazz amp (Polytone-like: research/jazz_guitar.md 5, 9.2): no tube
   // stage driven, an active EQ instead of the Fender stack, a closed 1x15, and the speaking strip.
   static Preset jazz();

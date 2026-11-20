@@ -200,6 +200,7 @@ Bass::Bass(double fs, const BassSpec& sp)
     sumEAL_ += float(s.def.ea / s.def.length);
     sumEALa_ += float(s.def.ea / kAfterLen_);
   }
+  body_.prepare();  // (its modes found now, not at the first sample: bassbody.h)
 }
 
 void Bass::vary(unsigned seat) {
@@ -224,6 +225,7 @@ void Bass::vary(unsigned seat) {
     bankG_ *= float(1 + 0.3 * u());
     bank_.init(fsOut_, violin ? 1100 : 900, violin ? 10000 : 9000, violin ? 95 : 80, 35 * (1 + 0.15 * u()), 7 + seat);
   }
+  body_.prepare();
 }
 
 void Bass::setStringDef(int si, const BassString& def) {

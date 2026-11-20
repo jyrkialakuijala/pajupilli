@@ -42,6 +42,7 @@ extern const BodyData kViolinBodyData = {violindata::kTopK, violindata::kTopInvM
                                          820, 2300, 4, 0.031f, float(knob("PJ_AIR_HF", 2.2e-6))};
 
 BassBody::BassBody(double fs, const BodyData& data) : d_(data), dt_(float(1 / (fs * data.substeps))) {
+  fs_ = fs;
   sideA_ = float(1 - std::exp(-2 * M_PI * d_.sideLo * dt_));
   sideB_ = float(1 - std::exp(-2 * M_PI * d_.sideHi * dt_));
   // The air crossing between the body's two halves, in each cell: a slug as long as half the
@@ -58,7 +59,77 @@ BassBody::BassBody(double fs, const BodyData& data) : d_(data), dt_(float(1 / (f
   holeY_ = 0.2f * kNY * dy;
 }
 
+namespace {
+// (PJ_POST_BEHIND: the post's place behind the treble foot, as a share of a node's spacing,
+// instead of the design's: to try it nearer or further.)
+float postBehind(const BodyData& d) {
+  static const float kPostKnob = float(knob("PJ_POST_BEHIND", -1));
+  return kPostKnob >= 0 ? kPostKnob : d.postBehind;
+}
+}  // namespace
+
+void BassBody::prepare() {
+  dirty_ = false;
+  static const bool kGrid = knob("PJ_BODY_GRID", 0) > 0;
+  if (grid_ < 0 ? kGrid : grid_ > 0) {
+    modes_.reset();
+    return;
+  }
+  modes_ = bodyModes({&d_, fs_, rate_, stiff_, airRate_, plateK_, airKs_, postBehind(d_), sides_});
+  zr_.assign(modes_->groups.size(), BodyModes::v16{});
+  zi_.assign(modes_->groups.size(), BodyModes::v16{});
+  std::memset(phi_, 0, sizeof phi_);
+  std::memset(feet_, 0, sizeof feet_);
+  fhole_ = side_ = 0;
+  std::memset(dip_, 0, sizeof dip_);
+}
+
+float BassBody::stepModes(float bassFoot, float trebleFoot) {
+  using v16 = BodyModes::v16;
+  const BodyModes& m = *modes_;
+  constexpr int kG = BodyModes::kGlobal, kO = BodyModes::kOut;
+  // The low-passes' own states (the sides', the directions'), driven by the feet.
+  float phi[kG];
+  for (int r = 0; r < kG; ++r) {
+    float s = m.qs[r][0] * bassFoot + m.qs[r][1] * trebleFoot;
+    for (int c = 0; c < kG; ++c) s += m.ps[r][c] * phi_[c];
+    phi[r] = s;
+  }
+  std::memcpy(phi_, phi, sizeof phi);
+  // The modes, 16 at a time: each output's share of their states, then their step.
+  v16 acc[kO] = {};
+  const int ng = int(m.groups.size());
+  for (int g = 0; g < ng; ++g) {
+    const BodyModes::Group& c = m.groups[g];
+    const v16 zr = zr_[g], zi = zi_[g];
+    for (int o = 0; o < kO; ++o) acc[o] += c.wr[o] * zr - c.wi[o] * zi;
+    zr_[g] = c.lr * zr - c.li * zi + c.b0r * bassFoot + c.b1r * trebleFoot;
+    zi_[g] = c.lr * zi + c.li * zr + c.b0i * bassFoot + c.b1i * trebleFoot;
+  }
+  float y[kO];
+  for (int o = 0; o < kO; ++o) {
+    float s = m.d[o][0] * bassFoot + m.d[o][1] * trebleFoot;
+    for (int l = 0; l < 16; ++l) s += acc[o][l];
+    for (int r = 0; r < kG; ++r) s += m.e[o][r] * phi[r];
+    y[o] = s;
+  }
+  fhole_ = y[1];
+  side_ = y[2];
+  dip_[0] = y[3];
+  dip_[1] = y[4];
+  dip_[2] = y[5];
+  feet_[0] = y[6];
+  feet_[1] = y[7];
+  feet_[2] = y[8];
+  feet_[3] = y[9];
+  return y[0];
+}
+
 void BassBody::reset() {
+  for (auto& z : zr_) z = BodyModes::v16{};
+  for (auto& z : zi_) z = BodyModes::v16{};
+  std::memset(phi_, 0, sizeof phi_);
+  std::memset(feet_, 0, sizeof feet_);
   std::memset(w_, 0, sizeof w_);
   std::memset(v_, 0, sizeof v_);
   std::memset(f_, 0, sizeof f_);
@@ -81,10 +152,7 @@ float BassBody::stepOne(float bassFoot, float trebleFoot) {
   const float (*K[2])[kNY][kNX] = {d_.topK, d_.backK};
   const float (*invM[2])[kNX] = {d_.topInvM, d_.backInvM};
   const float kNodeArea = d_.nodeArea, kSlugInv = d_.slugInv, kPlugArea = d_.plugArea, kPlugInvM = d_.plugInvM;
-  // (PJ_POST_BEHIND: the post's place behind the treble foot, as a share of a node's spacing,
-  // instead of the design's: to try it nearer or further.)
-  static const float kPostKnob = float(knob("PJ_POST_BEHIND", -1));
-  const float kPostBehind = kPostKnob >= 0 ? kPostKnob : d_.postBehind;
+  const float kPostBehind = postBehind(d_);
   const float* const kRowY = d_.rowY;
   const float* const kColX = d_.colX;
   const float* const kAirK = d_.airK;

@@ -131,6 +131,16 @@ struct GuitarSpec {
   // The crowns' contact as seen by the modes: over this width (m; a raised cosine: the crown's
   // round, the string's own stiffness bending it over it); 0: a point.
   double fretWidth = 0;
+  // The fretless bass (research/fretless_bass.md 2, 8.2; off by default: no cost, no change). The
+  // board behind the stopping finger: a few points where the string, swinging towards it, lies
+  // down on it every period (the mwah): a one-sided spring boardK (N/m) with a damper boardC
+  // (N s/m), the double bass's; the string over the board's end (boardEnd m from the saddle)
+  // boardAction m high, the neck's relief boardRelief (its curvature, 1/m). A stopped string ends
+  // on a fingertip: fingerLoss times the double bass's fingertip loss (0.3 + 0.12 k + 15 (f / 4
+  // kHz)^2 per s) instead of the fret's x1.15 (0: a fret).
+  bool board = false;
+  double boardK = 3e4, boardC = 1.5, boardEnd = 0.27, boardAction = 2.5e-3, boardRelief = 0;
+  double fingerLoss = 0;
 };
 GuitarSpec classicalGuitar();  // with the PJ_GUITAR_* knobs
 GuitarSpec electricGuitar(const char* name);  // "clean-guitar": a Stratocaster
@@ -236,6 +246,15 @@ class Guitar {
   void reset();
   bool asleep() const { return asleep_; }
   double frequency(int s) const;  // as stopped now
+  // The fretless's left hand (GuitarSpec::board; any guitar can): string s stopped `semis`
+  // semitones above its open pitch, anywhere along the board (fractional; 0: open). Called again
+  // each control block as the finger slides or rocks: a slow change of length keeps each mode's
+  // action (its swing's amplitude; its velocity follows its frequency), no new attack.
+  // fret(s, f) is stop(s, f) at once.
+  void stop(int s, double semis);
+  double stopped(int s) const { return str_[s].fret + str_[s].cents / 100; }
+  // The board (GuitarSpec::board): how many samples string s has lain on it since the last call.
+  int boardHits(int s) { const int n = boardHits_[s]; boardHits_[s] = 0; return n; }
 
  private:
   struct Str {
@@ -281,6 +300,8 @@ class Guitar {
     // stroke or a contact; contacts counted, the frets touched.
     int fretFirst = 0, fretCount = 0, fretHits = 0;
     uint32_t fretWhich = 0;
+    // The fretless (stop()): cents beyond `fret`; where the modes were last fully placed (semis).
+    double cents = 0, placed = 0;
     double fretIdle = 0;
   };
   void tune(Str& st, int index, bool place = true);
@@ -299,6 +320,17 @@ class Guitar {
   // (fretA_[string][fret][dir][mode]), its clearance and its compliance; the write-back factors.
   void placeFrets(int s);
   void fretStep(Str& st, int s, float& y0, float& y1);
+  // The fretless's board (GuitarSpec::board): kBoardPts points behind the stopping finger, each
+  // mode's shape there towards the board (board_[string][point][dir][mode]), their clearance and
+  // their dampers' limit; s since a stroke or a contact; samples touching.
+  static constexpr int kBoardPts = 5;
+  void placeBoard(int s);
+  void boardStep(Str& st, int s);
+  std::vector<float> board_;
+  float boardClear_[kStrings][kBoardPts] = {}, boardHold_[kStrings][kBoardPts] = {};
+  int boardN_[kStrings] = {}, boardHits_[kStrings] = {}, boardTick_[kStrings] = {};
+  uint32_t boardLive_[kStrings] = {};
+  double boardClock_[kStrings] = {};
   static constexpr int kMaxFrets = 24;
   std::vector<float> fretA_, fretK_;  // kStrings*kMaxFrets*2*kMaxModes; kStrings*4*kMaxModes
   float fretClear_[kStrings][kMaxFrets] = {}, fretG_[kStrings][kMaxFrets] = {};

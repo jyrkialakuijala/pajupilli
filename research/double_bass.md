@@ -410,6 +410,16 @@ What had to be added for the string to be caught once a period (Helmholtz's moti
 double stops only for keys pressed within 60 ms (later keys are a slur). Random playing peaks at
 1.13 (clipping at the extreme).
 
+## 7f. The body as modes (2026-11-20)
+
+The body's grid is linear and does not change while it plays, so it runs as its modes
+(`src/bodymodes.h`; research/viola.md, "The body as modes", has the method): about 211 of the
+bass's 235 plate-and-air modes, each a complex pole driven by the two feet and heard in each
+output in its own share. Against the grid (`PJ_BODY_GRID=1`, still the definition): every output
+within -73 dB, the feet's resonances at the same frequencies and Q (112, 140, 184, 335 Hz ...),
+a plucked note -79 dB, a bowed one -84 dB. The body costs 0.14 us a sample instead of 1.8; the
+bass under the bow 4.4 instead of 8.2 G instructions for a 4 s note.
+
 ## 8. Sources found
 
 - Guettler, Buen & Askenfelt, "An in-depth analysis of the double bass–stage floor contact" (the

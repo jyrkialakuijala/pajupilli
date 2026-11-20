@@ -305,7 +305,110 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
 - **Dynamics**: louder, the player presses the lips together (the rest opening shrinks), so
   they still shut each cycle under the higher breath, and the breath spans more (×3 pp to ff
   around mezzo-forte): the trumpet's ff is 10–12 dB over its mf.
-- GM 61 "brass section": an ensemble, e.g. `-ensemble trumpet,trumpet,horn,trombone,tuba`.
+- GM 62 "Brass Section" is a section of these players, voiced: see the next section.
+
+### Brass section
+
+`-inst brass-section` (GM 62; `src/brasssect.h`, `src/brasssect.cc`; `research/brass_section.md`)
+is a brass section of the physical players above, voiced as an arranger would voice it. Nothing
+is sampled or chorused: each seat is its own trumpet, trombone, horn or tuba with its own player.
+
+**The make-ups** (research 4, 11.1). `-play` reads the part once with the rest of the song
+(research 4.3: its note lengths, how many keys at once, how wide, how low; the director's
+style; which instruments play beside it; swing) and picks the section; `PJ_BRASS_MODE=pop |
+bigband | orchestral` forces one. `-v` (or `PJ_BRASS_SHOW=1`) prints the plan and every voicing.
+
+| Section | Seats, top to bottom | Chosen for |
+|---|---|---|
+| pop / soul / funk | trumpet ×3, trombone ×2 | the default: short notes, a band with drums and electric bass |
+| big band | trumpet ×4, trombone ×4 (the 4th a bass trombone) | 4–5-key close chords, or swing with saxes, piano and upright bass |
+| orchestral | trumpet ×2, horn ×4, trombone ×3, tuba | a classical style, long notes and wide chords, strings or timpani, no drums |
+
+**The voicing rules** (`BrassVoicer`; `-brassvoice "SPEC"` prints them without sound):
+
+- The keys are the harmony, and the top key is the lead: trumpet 1 plays it whenever it can.
+- Written chords (two keys or more) are dealt, never re-harmonised: every key sounded, none
+  moved by an octave. Spare players double the lead first, then the bottom, never a third under
+  C4; at most about P/K players a key, so a chord's notes are shared out. The trumpets take the
+  top keys, the horns the middle, the trombones and tuba the bottom; the tuba only plays the
+  bottom key, and only from F3 down. The big band's trombones double a close chord of two to four
+  keys an octave down, where that is no mud.
+- A lone key is a unison of those at ease on it (pop: trumpets from C4 up, trombones to B♭4;
+  orchestral: trumpets from D4, horns C3–D5, trombones to D4, tuba to D3). In a unison line
+  (a run of single keys) at G4 and above, the low brass doubles it an octave down: the soul
+  line, the fanfare. Not if the part writes its own octaves.
+- A sparse part (single keys, a third or sixth) is harmonised only where the song says what the
+  chord is (the other channels' notes over the onset, the bass weighted) and the part fits it
+  (75 % of its notes chord tones or the tensions an arranger keeps: 9, 11 on minor, 13). Pop:
+  only held notes (0.3 s or longer) bloom into three-part close harmony under the lead (on
+  seventh chords the 3, 5 and 7, the root left to the bass), the lead doubled an octave down;
+  the short notes stay in unison. Big band: 4-way close from a D5 lead up, drop-2 below it
+  (a triad as a 6th chord, a major 7th chord as a 6th unless the lead is the 7th; a 9 in the
+  lead replaces the root, a 13 the fifth), the trombones on the same an octave down, or on its
+  inner parts, or doubling the lead; a passing note between voiced ones moves the whole
+  voicing with it (planing). Orchestral parts are never harmonised.
+- Practical limits on every voicing it makes: each seat in its range, its comfortable register
+  weighed; no close interval under its low interval limit (a minor second under G3, a major
+  second or a minor third under F3, a major third under E3, a fourth under B2, a fifth under
+  B♭1); no minor second or ninth between any two voices; the least motion from the last
+  voicing (a common tone held, a seat moving to the nearest note).
+
+Worked examples (`-brassvoice`):
+
+```
+C major triad, written (pop):     keys C4 E4 G4     -> dealt: tp1 G4, tp2 G4, tp3 G4, tb1 E4, tb2 C4
+... with the octave on top:       keys C4 E4 G4 C5  -> dealt: tp1 C5, tp2 C5, tp3 G4, tb1 E4, tb2 C4
+... orchestral, open:             keys C3 G3 E4 C5  -> tp1 C5, tp2 C5, hn1 C5, hn3 E4, hn2 E4, hn4 E4,
+                                                       tb1 G3, tb2 G3, tb3 G3, tuba C3
+E5 held over C7 (pop):            3-part close, the lead 8vb: tp1 E5, tp2 E5, tp3 Bb4, tb1 G4, tb2 E4
+E5 over C7 (big band):            4-way close, the trombones 8vb: tp1 E5, tp2 C5, tp3 Bb4, tp4 G4,
+                                                       tb1 E4, tb2 C4, tb3 Bb3, tb4 G3
+Bb4 over C7 (big band, lower):    drop-2, the lead 8vb: tp1-3 Bb4, tp4 E4, tb1 C4, tb2 Bb3, tb3 G3
+ii-V-I under F5 F5 E5 (big band): Dm7 F5 D5 C5 A4 / F4 D4 C4 A3; G7 F5 D5 B4 G4 (tb G4 F4);
+                                  Cmaj7 E5 C5 A4 G4 (tb G4 E4): each seat moves 1-2 semitones
+Unison fanfare (pop):             G4 -> tp1-3 G4, tb1-2 G3;  C5 -> tp1-3 C5, tb1-2 C4
+... orchestral:                   C5 -> tp1-2, hn1, hn3 C5; hn2, hn4, tb1-3 C4
+```
+
+**The playing** (research 6–8):
+
+- Onsets: the lead on the key; on a stab the others 4 ± 6 ms after it, each seat's habit (±3 ms)
+  and its section's moment (±4 ms) on top; a soft long entry 10 ± 15 ms. Played from a file the
+  keys come 90 ms early (`PJ_BRASS_LEAD`) and each player starts its instrument's speaking time
+  before the beat (the trumpet's ~30 ms, a trombone's 30–55, the horn's up to 85), so the section
+  lands together: six C5 stabs land within 14 ms, sd 5 ms, the lead never behind. Releases: a
+  stab's within ~5 ms, a long note's over ~25 ms.
+- Pitch: each seat spread over ±4 c (`PJ_BRASS_CENTS`; the lips aim there, so the players beat
+  as a section does: each harmonic's amplitude moves 5–6 dB at 0.5–2 Hz, as in the GM section
+  sample, against 0.3–0.8 dB for one trumpet); a section player lips a forte note up to 2 % of
+  its lips' tension (`PJ_BRASS_EAR`; a soloist 0.8 %). Held chords move towards just intervals
+  by the pajupilli intonation at half strength (`PJ_BRASS_JI` 0.5: brass players lean to equal
+  temperament).
+- Each player and instrument its own (`HornPlayer::vary`, `Horn::vary`): the attack's push
+  (±15 %) and its decay (±20 %); the cup's volume (±5 %), the lips' Q (±10 %), the brassiness
+  (±12 %).
+- Vibrato: none under 0.6 s; then the lead a little (half the director's depth, `PJ_BRASS_VIB`
+  without one), the other trumpets less and later; horns, trombones and tuba none; none in a
+  unison.
+- Balance: the lead 1.5 dB on top (`PJ_BRASS_LEAD_DB`); every seat's velocity its own (±4); the
+  harmony's added notes softer. A unison key is 2 dB over one trumpet in `-play`
+  (`PJ_BRASS_GAIN`), four keys 8.6 dB over one (FluidR3's section: +7 to +9). Velocity is
+  brightness: a section player's breath spans 1.6× a soloist's over velocity (`PJ_BRASS_VELDYN`),
+  so the 4 kHz octave rises 17 dB against the 1 kHz one from velocity 64 to 112.
+- Falls and doits only from the file's pitch bend (General MIDI's ±2 semitones,
+  `PJ_BRASS_BEND_RANGE`): each player follows a moment later (3–20 ms) at its own speed, gliding
+  down its valves or slide a semitone at a time with the lips bending the rest; the players'
+  half-way times lie ~50 ms apart, a smear, not one bend for all. Nothing is invented.
+- A CC 11 ride inside a held note (an fp<, a swell) moves the players' breath as well as the
+  fader: the brass darkens and brightens with it.
+- Seating (in the room): pop, the trumpets left of centre and the trombones right; big band, two
+  rows across, the leads in the middle; orchestral, horns left, trumpets centre, trombones and tuba
+  right.
+
+Cost (one thread): the pop section 0.66 µs a sample (3.2 % of a core), the orchestral one
+1.2 µs (5.9 %). `make test` checks the voicer (no crossing, ranges, the lead on top, every key,
+no mud, the motion over a ii-V-I), the dealing, the beating, the tuning, the stabs, the
+brightness, the balance, the falls, fuzz and real time.
 
 ### Double bass (plucked)
 
@@ -340,7 +443,7 @@ resonance at 365 Hz (F♯4), each about a semitone wide (Q 19 and 24). The lowes
 under it, the viola's veiled colour. The back is twice as stiff as the top, so the main resonance
 rocks the bridge as the bow drives it (with the back as soft as the top the notes D♯4–F♯4 lost
 their fundamental to a mode at 685 Hz). Held under the chin: no floor. The body steps twice a
-sample (a small body's grid rings to 16 kHz); about 28 % of a core. The strings and the bow take two steps a sample, the bow reaches higher overtones the harder it presses, the f-holes open from three cells of the air, and a bank of resonances stands for the body above the grid's reach (`Viola.md`, `src/bodybank.h`). A pizzicato, there and on the
+sample (a small body's grid rings to 16 kHz); about 19 % of a core (30 % on the grid). The strings and the bow take two steps a sample, the bow reaches higher overtones the harder it presses, the f-holes open from three cells of the air, and a bank of resonances stands for the body above the grid's reach (`Viola.md`, `src/bodybank.h`). A pizzicato, there and on the
 cello, is the nail's: velocity sets only how far it pulls the string (`PJ_PIZZ_FLESH`: below this
 velocity the fingertip's flesh instead).
 
@@ -349,9 +452,26 @@ on 32.8 cm strings (gut-core G, D, A and a steel E, in pure fifths from A 440), 
 (33 mm, its hill near 2.8 kHz) and a 35.6 cm body. The body is fitted to the sound of 17 recorded
 violins (`tools/bassbody.py -violin`). Each band's level is the median across them, read from the
 harmonics of their notes. The simulation comes within 5 dB of it from 196 Hz to 1.4 kHz: A0 at
-268 Hz (Q 27), then 354, 369, 549 and 553 Hz, f-holes 11 cm². The body steps four times a sample;
-about 26 % of a core. Its notes start in tens of milliseconds, and its stopped notes are tuned to
+268 Hz (Q 27), then 354, 369, 549 and 553 Hz, f-holes 11 cm². The body's grid steps four times a sample;
+about 8 % of a core as modes (27 % on the grid). Its notes start in tens of milliseconds, and its stopped notes are tuned to
 ring with the open strings, as on the viola (`PJ_RING_TUNE`).
+
+**The body as modes** (`src/bodymodes.h`). The grid (plates, air cells, slugs, plugs, the post,
+the losses, each instrument's own build) is linear and fixed once the instrument is made, so it
+runs as its modes. At start-up its equations become matrices; the undamped modes come from a
+symmetric eigenproblem; the losses, which are not proportional (the plates, the air slugs and the
+plugs each lose at their own rate, the wood's and the air's friction act on their own stiffness),
+couple modes near each other, and 2 x 2 similarity transforms remove those couplings (the
+weaker ones to first order); the grid's substeps become one complex pole a sample per mode, and
+the sides' and directions' low-passes partial fractions of them. The modes that add nothing above
+-70 dB to any output, from either foot, are dropped: about 190 to 215 remain, run 16 at a time.
+Each output, from each foot, is the grid's within -58 dB (each design, a section's seats too), the
+resonances at the feet at the same frequencies and Q; a bowed or plucked note differs from the
+grid's by -66 to -84 dB, a section's chords by -69 dB, and the bow starts the same. A body costs
+about 0.14 us a sample instead of 1.8 (bass, cello), 6 (viola) or 8 us (violin). Finding the
+modes takes 25 to 50 ms a body, once for each build (a section's seats share them across its
+channels). `PJ_BODY_GRID=1` runs the grid itself (the definition; A/B); `PJ_BODY_TOL` (3e-3) is
+the coupling left to first order, `PJ_BODY_PRUNE` (1e-7) a dropped mode's largest share.
 
 **Where each resonance sends its sound** (bass, cello, viola; `src/bassbody.h`, `Room::setAxes`).
 A body resonance that moves the whole top out and in, or pumps the air out of both f-holes
@@ -1103,6 +1223,77 @@ a harmonic, at the pitch written (E3 .. G#7; below an octave up, above an octave
 - Not yet: pinch and tapped harmonics, the tremolo bar's dives, chorus; the pitch wheel does
   nothing. 2.4 % of a core.
 
+### Jazz guitar
+
+`-inst jazz-guitar` (GM 27; `research/jazz_guitar.md` 9–12; `src/guitar.cc` `jazzGuitar()`,
+`src/jazzguitar.cc` `JazzGuitarPlayer`, `src/guitaramp.cc` `jazz()`): a Gibson ES-175 played by a
+jazz guitarist into a clean jazz amp.
+- **The guitar:** 628 mm, 20 frets, flatwounds 12–52 (95–103 N each, the G wound: its 10th
+  partial +0.6 c). The wound strings lose above the fundamental as k² (the ribbon's turns
+  rubbing): the open low E through the pickup has its harmonics 1–5 down 15 dB in 5.7, 3.4, 0.5,
+  1.2, 1.0 s (Rau17's measured flatwound hollow body: 5.45, 4.49, 0.86, 0.87, 1.12). A laminated
+  archtop body (the neck's modes at 85/175/332 Hz, the f-hole air at 125, the top at 240, the
+  bridge rocking on its feet at 420, plates to 2.2 kHz); the floating bridge drains the swing
+  towards the top twice as fast as the one along it. The neck humbucker 169 mm from the saddle
+  (4.4 H; its comb's first notch at an open string's 3.7th harmonic), mounted in the top: it moves
+  with the top and hears the body through every string's steel. The archtop's own sound is mixed
+  20 dB under the amp (A-weighted, on a chord).
+- **The tone control at "3":** the tone pot (45 kΩ, `PJ_JAZZ_TONE` in kΩ) in series with 22 nF
+  across the pickup, a 600 pF cable: the amp's input as an exact third-order network (35 kΩ:
+  −3 dB at 1.38 kHz, no peak; 0: the "woman tone", +3.8 dB at 467 Hz).
+- **The amp ("jazz"):** a Polytone-like clean solid-state amp: no tube stage driven, an active EQ
+  (+3 dB under 150 Hz, +2 at 500, −2 above 2.5 kHz) instead of the Fender stack's scoop, a closed
+  1×15 (85 Hz, −3 dB at 2.5 kHz, 24 dB an octave above 3.5).
+- **The touch speaks.** Every stroke is a heavy, round-edged pick held by a hand
+  (`Guitar::pickContact`, now with the tip's width): 1.5 mm (17 kN/m), a 0.25 ms edge, 2.5 mm of
+  contact. Velocity is how far (0.1–2.1 mm) and how fast (a 10 ms push soft, 2.5 ms hard) the hand
+  carries the tip, and the string slips off the edge the faster the faster the hand goes (0.5 ms
+  soft: rounded, few partials over 1.5 kHz; 0.2 ms hard). The hand moves with the phrase:
+  0.19 m from the saddle on soft, even comping (round, "oo"), toward 0.10–0.13 m on accents and
+  loud phrases (nasal, "ah"); harder strokes dig into the top. Against the body's resonances and
+  the pickup's comb, that is the vowel; the flatwounds' k² losses make it change in time (G3 at
+  v120: the 2–5 kHz share falls 26 dB from the first 50 ms to 200–400 ms, into the round tail).
+  Measured on G3, D4, A4 at velocity 30/60/90/120: the centroid rises 236→275, 315→396, 469→628 Hz
+  and the 2–5 kHz share −63→−31, −51→−23, −47→−20 dB, every step up; the 5–10 kHz share at 127
+  stays 52–90 dB under the attack.
+- **The speaking strip** (the "compressor kludge"; `guitaramp.h` `Preset::presDb …`, after the
+  speaker, as an engineer's channel): a presence peak at 3.4 kHz (Q 0.8), +2 dB, and an upward
+  expander on that band alone: it opens 0.8 dB for each dB the band stands above a firm mf attack
+  (−64 dB of the output) and closes as much under it, within −4 … +8 dB, quick up (1 ms), back
+  over 80 ms as the note's highs die. Then a 2:1 compressor (above −56 dB rms, 10 dB knee, 10 ms
+  attack so the pick's first transient passes, 250 ms release) whose ear is the signal *before*
+  the lift: it hears the body, not the presence it is helping. A soft phrase passes untouched (as
+  dark as without the strip), a hard one gains presence while its level is held back. On one
+  phrase (a line and a chord) from velocity 35 to 110: centroid ×1.24 against ×1.01 without, the
+  2–5 kHz share +7.7 dB against −1.5, loudness +10.4 dB against +15.8. Knobs `PJ_JAZZ_PRESENCE` (dB),
+  `PJ_JAZZ_PRESHZ`, `PJ_JAZZ_SPEAK` (dB/dB; 0: static), `PJ_JAZZ_PRESREF`, `PJ_JAZZ_PRESMAX`,
+  `PJ_JAZZ_COMP` (ratio; 1: none), `PJ_JAZZ_COMPAT`, `PJ_JAZZ_STRIP=0` (none).
+- **The guitarist:** chords voiced as a hand can hold them, never dropping the top note: the range
+  folded (a chord over C6 down an octave as a whole), one string a note, the fretted notes within
+  4 frets (5 from the 5th fret), no open strings in comping, known grips (shell, drop 2, drop 3)
+  preferred, the hand near where it was; if none fits, reduced (doubled pitch classes, the fifth,
+  the bass under a wide gap, inner notes sparing the 3rd and 7th). On the user's louisiana.mid
+  channel 7: 492 chords, 4.9 % of the notes dropped, no top note, none unplayable, no open
+  string, the hand moving 0.99 frets on average. A quick down rake (2 ms a string loud, 5 soft), up
+  on quick off-beats; strings skipped inside a grip a dead click, the strings outside it muted by
+  the fretting hand; a key let go chokes its string (a chord −40 dB 18–41 ms after its keys,
+  FluidR3 30–60) with a soft "chk"; a note let go before it sounded is a ghost stroke;
+  four-to-the-bar comping (Freddie Green) all down with the inner line ringing; a soft chord after a
+  rest plucked with the fingers. Keys within 8 ms are one gesture (every note 8 ms late). Single
+  lines: down on the beat, up off it, slurs (hammer-on, pull-off) onto the beat on one string about
+  half the time, ghost notes, late shallow vibrato. Octaves (two notes 12 apart) on strings s and
+  s+2 with the middle one muted, with Wes's thumb (`PJ_JAZZ_THUMB`: 0 never, 1 octaves and the
+  soft notes among them, 2 every single line). `PJ_JAZZ_PLACE`, `PJ_JAZZ_MOVE`, `PJ_JAZZ_PICKMM`,
+  `PJ_JAZZ_EDGE`, `PJ_JAZZ_TIPW`, `PJ_JAZZ_PICKUP` (1 bridge, 2 both, 3 neck), `PJ_JAZZ_DEBUG=1`,
+  `PJ_JAZZ_STATS=1`.
+- **Against FluidR3's Jazz Guitar** (louisiana ch7, 43 s): FluidR3 is much brighter (centroid 901
+  Hz against 348; 0.8–2 kHz −4 dB against −17), its velocity a two-layer switch; here the colour
+  moves continuously with the touch. Even with the tone full up the centroid is 419 Hz: the neck
+  humbucker's comb and the closed 15" make the archtop dark.
+- Not yet: the afterlength's bell (the tailpiece), feedback, reverb; the chord's length is not
+  known at its key, so "long soft chords" are guessed from the rest before them. 2.7 % of a core
+  on a five-note chord.
+
 ### Electric bass
 
 `-inst electric-bass` (GM 34, Electric Bass (finger); `research/bass_section.md`, `src/ebass.cc`):
@@ -1229,6 +1420,164 @@ amp module's "svt".
   growl), the Rickenbacker and the StingRay, the "svt-flat" session chain, XG's muted pick bass on
   bank 28 (the files' bank select is not passed on), a click of the pick itself (through a pickup
   there is none to speak of). 0.6 % of a core for the strings and the DI, 2.4 % with the SVT at 4x.
+
+`-inst slap-bass-1` (GM 37, Slap Bass 1) and `-inst slap-bass-2` (GM 38, Slap Bass 2;
+`research/slap_bass_1.md`, `research/slap_bass_2.md`, `src/ebass.cc` `SlapBassPlayer`, `src/guitar.cc`
+the frets and the thumb, `tools/slapfret.cc`): the finger bass's Jazz Bass slapped and popped, its
+frets struck. 37 thumb-led and passive, 38 pop-forward, active, on stainless strings.
+- **The frets as obstacles** (`GuitarSpec::fretContact`, off for every other guitar): 20 crowns on a
+  plane with 0.3 mm of relief (a parabola, `PJ_SLAP_RELIEF`), each its own ±0.03 mm; the open string
+  0.5 mm over the first fret and 2.4 mm over the 17th on the E (a little less towards the G,
+  `PJ_SLAP_ACTION`); a fretted string runs from its fret's crown to the saddle (~0.2 mm over the
+  next fret). Each sample the string's displacement towards the board at each crown over the
+  sounding part (each mode's shape there through its askew axes); one that has passed a crown has
+  its speed into it reflected, 0.6 of it given back (`PJ_SLAP_BOUNCE`: the modes' masses are equal,
+  so the reflection keeps or takes energy, never gives it; stopping it dead instead drained a pop of
+  70 % of its energy in 50 ms in 128 modes, and 1.0 came out three times too bright against
+  FluidR3's recorded slaps), and what is deeper than 0.01 mm is moved back by the least stretch
+  (along the shape over ω²). Two sweeps. The gate: while a stroke is on, or just after a contact,
+  every crown every sample; otherwise only the crowns each mode's swing could reach together, found
+  every 16 samples, the modes above the 32nd first bounded. The modes run to 10 kHz
+  (`PJ_SLAP_TOP`), a stopped string's losing as the open one's at the same frequency.
+  `PJ_SLAP_FRETS=0`: no frets. Measured: a thumb on the open E meets the 20th fret 2 ms in and is
+  pinned there for most of its contact; a popped open G (3.6 mm at 22 cm, Issanchou's case) meets
+  the frets 3.9 ms after its release, at 10 frets, dense until 43 ms (Issanchou: 0-90); a 1.2 mm
+  pop touches nothing; with the frets the thumbed E1's 30-100 ms centroid is 316 Hz against 88
+  without, 2-4 kHz +18 dB. 2000 random strokes stay finite; with the losses off the energy never
+  rises at a contact.
+- **The thumb** (`Guitar::thump`, new): a 20 g mass on a 3·10⁴ N/m flesh spring over 15 mm, 2 mm
+  off the string at 0.265 m from the saddle (`PJ_SLAP_THUMBAT`; the brightness knob moves it, ±8 mm
+  a stroke), at 1.3 rad into the body (`PJ_SLAP_THUMBANGLE`); from 2 ms after it touches the
+  forearm pulls it back at 30 m/s² (a rebound stroke; a slow heavy note on the E/A/D a rest stroke
+  that ends on the next string and damps it). Speed 0.4 + 2.9·(v/127)^1.4 m/s (`PJ_SLAP_THUMBV`;
+  ±7 %), a little more on the thinner strings. Thumbed notes under 110 ms apart alternate down and
+  up (double thumbing: the nail's side, 8 mm, 65 % of the speed, out of the body).
+- **The pop** (`Guitar::pop`, new: `pluckPad` with a hook up to 30 ms): the finger hooks under the
+  D or G string 18-23 cm from the saddle (6 mm wide; 38 3 mm and nearer the bridge), pulls it out
+  of the body 0.5 + 6·(v/127)^1.6 mm (38: 0.6 + 6.5·(v/127)^1.6; up to 6.5-7 mm), over 12-25 ms
+  (slower when soft), and lets it slip off in 0.15-0.35 ms; it slams into the frets. A double stop:
+  the second finger 3-8 ms later. From a file every slap-bass key comes 90 ms early (`noteLead`,
+  `PJ_SLAP_LEAD`): the hook begins early and the snap lands on the beat (measured -2 ms against
+  the thumbs; live 12-13 ms late, as on a bass).
+- **The slapper** (`SlapBassPlayer`, on `BassLinePlayer`'s fretting hand, one voice): each key is
+  decided 30 ms before its stroke may begin, having seen its own release and the next key when the
+  file sent them early:
+  - a ghost: velocity under 40 (`PJ_SLAP_GHOST`), or under 55 and shorter than 90 ms (38: only the
+    soft ones). The fretting hand lies on the string unpressed (a mute of 200/s where it would have
+    fretted, `PJ_SLAP_GHOSTMUTE`) and the stroke falls all the same: a pitchless click off the frets;
+  - a hammer-on or pull-off: 1-3 semitones on the string still held, under 0.2 s after, not
+    accented: no stroke; the finger comes down (a 5 g knock) or leaves (a small sideways pluck);
+  - a pop (only on the D and G strings; the string choice is pushed there): 37 where the line leaps
+    9-16 semitones over its last thumbed note within 1 s, on an accented note an octave over the
+    lowest of late, the notes of a double stop on D and G, and from E4 up; 38 everything from D2 up
+    (the hand up the neck to keep it on D and G), except a note an octave or tenth under the pop
+    that follows it;
+  - otherwise the thumb.
+  Counted on the user's files: louisiana.mid (37) 13 % popped, 12 % ghosts; Gaviota trio 2 (37,
+  velocities flat at ~110) 6 % popped; grelots.mid on 38 66 % popped, every thumbed note under D2
+  (on 37: 9 %). A released note is damped at 60/s (`PJ_SLAP_OFFDAMP`): -63 dB 0.12 s after a short
+  note's release. `PJ_SLAP_COUNT=1` prints the counts, `PJ_SLAP_LOG=1` every stroke and every fret
+  contact; `PJ_SLAP_FORCE=1/2` thumbs or pops everything (for measuring).
+- **GM 38's bass**: active: a buffer at the coils (the two volumes' 125 k across them, the wiring's
+  ~20 pF: the J pair's resonance from 4.4 kHz to ~8.8, broad; `PJ_SLAP2_POTS`, `PJ_SLAP2_WIRING`;
+  `PJ_SLAP2_ACTIVE=0` passive), its two shelves +4 dB at 4 kHz and +4 dB at 50 Hz
+  (`PJ_SLAP2_TREBLE`, `PJ_SLAP2_BASS`; 37 has the same knobs at 0, `PJ_SLAP_TREBLE`/`_BASS`);
+  stainless strings losing 15 % less above the fundamental (`PJ_SLAP2_LOSS1` 0.85; the research's
+  0.65 and +6 dB came out 3-6 dB brighter at 0.3-0.8 s than every reference set).
+- **The chain**: 37 "slap-di" (the DI 75 % with the VPF at noon, a GK-like head into a 4x10 and
+  horn, an 1176 at 4:1, 0.8 ms / 150 ms: 3-4 dB of gain reduction on a v100 line); 38
+  "slap-squash", revised after `research/slap_bass_2.md` 4: every SoundFont's 38 is brighter than
+  its 37 and rings longer but is no more squashed, so the same chain with the DI at 80 % and the
+  1176's attack at 1.5 ms (the snap kept), release 120 ms; the stomp compressor (`PJ_BAMP_STOMP`)
+  and the drive (`PJ_BAMP_DRIVEMIX`) off unless asked. In -play the velocity is a gain on the voice
+  as well (a GM curve; the frets cap how loud a slap rings: E1 v40 to v120 +14 dB at the DI, +10
+  after the chain; a pop's own rise is ~5 dB).
+- **Against the references:** thumb against pop on the same note (D2 G2 C3), the share above 2 kHz
+  at 30-100 ms +4 / +10 / +5 dB for the pop (FluidR3's two recordings: +4..+9), the two within
+  4.4 dB after the 1176 (K-weighted); 38 against 37 from E2 up: the first 100 ms 2.4-4.4 times as
+  bright (the references 1.2-5.1), above 2 kHz at 0.3-0.8 s +4..+12 dB (refs +7..+15), more than
+  in the first 30 ms (not an EQ), decaying as fast or faster, its E3 above 2 kHz +23 dB from v32 to
+  v127 (Jnsgm2 +24). The thumb's first 10 ms are its loudest, but its crest factor is ~19-22 dB
+  against the samples' 11-16.
+- GM 34 is untouched (bit for bit); `PJ_EBASS_FRETS=1` gives the finger bass the same frets: no
+  contact at v40, a light buzz from v80 (2-4 kHz up 15-30 dB from a very low floor, the first
+  100 ms's centroid +3 to +50 %).
+- Not yet: a left-hand slap, slides, the StingRay (`PJ_SLAP2_BASS=stingray` of the research), the
+  thumb's measured mass and speed (assumed); fretted notes buzz on the next fret for 0.2-0.3 s
+  after a hard stroke. ~2 % of a core for the strings and the frets (2.1× the finger bass), 3 %
+  with the chain.
+
+### Fretless bass
+
+`-inst fretless-bass` (GM 36, Fretless Bass; `research/fretless_bass.md`, `src/fretless.cc`,
+`src/fretlessspec.cc`, `src/band.h`, `tools/fretlessboard.cc`): the finger bass's Jazz Bass with its
+frets pulled, played by a fretless player who tunes by ear to the band.
+- **The board under the finger** (`GuitarSpec::board`, off for every other guitar): behind the
+  stopping finger the string rises from the board to 2.5 mm over its end (27 cm from the saddle;
+  `PJ_FRETLESS_ACTION` x): 7-20 mrad. Five points 3-36 mm behind the finger, towards the board only
+  (each mode's shape there through its askew axes), each a one-sided spring and damper (the double
+  bass's 3e4 N/m and 1.5 N s/m, `PJ_FRETLESS_BOARDK`, `_BOARDC`, its step limiter), awake for 1.5 s
+  after a stroke or a contact and, within that, only where the modes' swings could reach. A hard
+  stroke lays the string on the board next to the finger for part of every period: energy moves
+  from the low partials into 0.3-1 kHz. A stopped A1 at v100: partials 10-18 peak 80-400 ms after
+  the pluck (the fretted J's all at the attack), that band 4-8 dB over the fretted note's at
+  0.15-0.35 s; the board touched in ~5 % of the samples, the last at 0.85 s. At v30 it never
+  touches; open strings never (they end on the nut); action x0.6 grazes to 1.15 s, x1.4 to 0.7 s.
+  48 and 96 kHz agree within 0.3 dB.
+- **The stroke is round** (the fingertip's pad 18 mm, rolling off in 3-5 ms, no snap:
+  `PJ_FRETLESS_PAD`, `_SLIP`, `_SNAP`, `_ANGLE` 0.65 rad into the board): the stroke gives the low
+  partials and the board the upper ones a moment later. A bright, snapping stroke (the J player's)
+  leaves the board nothing to add: measured, the mwah then only takes energy away.
+- **The finger** (`Guitar::stop`, any guitar's; `fret()` is unchanged, bit for bit): the stopping
+  place in fractional semitones, each control block; small moves turn the modes' frequencies (a
+  rotation by a small angle), every 4 c everything is placed anew. A slow change of length keeps
+  each mode's action (E / ω, amplitude constant: a lossless slide of 5 semitones keeps it to
+  0.00 dB). The fingertip's loss: half the double bass's (`PJ_FRETLESS_FINGER`) instead of a fret's
+  x1.15: above 1 kHz a stopped note dies ~3x as fast as fretted, the fundamental 4.8 dB/s against
+  3.4 (FluidR3's recorded fretless -4 to -7).
+- **The pickups and the chain:** the bridge pickup full, the neck at half (`PJ_FRETLESS_PICKUP`); the
+  amp module's "fretless-di": the DI 70 % and the B-15 30 % (`PJ_FRETLESS_BLEND`), both with the
+  Acoustic 360's mid push (+3 dB at 800 Hz, `PJ_FRETLESS_MIDDB`), the LA-2A at 3:1.
+  `PJ_FRETLESS_CHORUS` 0..1: a bucket-brigade chorus (7 ± 2 ms at 0.6 Hz, the lows under 150 Hz
+  dry, stereo by the inverted sweep), off as on a Sound Canvas. `PJ_FRETLESS_FLATS=1` flatwounds.
+- **The player** (`FretlessBassPlayer`): every stopped note is the stopping finger's place in cents:
+  - the landing: a human error (sd 8 c, `PJ_FRETLESS_ERR`; the player's bias 0 ± 3 c) and, on
+    slower notes at v80 and up, now and then a scoop from 15-35 c flat (`PJ_FRETLESS_SCOOP`: 0
+    none, 2 every stopped note): the finger lands flat, crosses the note at ~55 ms, overshoots
+    ~12 c and is within 2 c by 300 ms (the Recardo file's sequenced scoop); no scoops of its own
+    once the file bends;
+  - the correction, a second-order approach; a residue of ± (2 + 0.3 sd) c left (halved, and 2 c
+    lower, under the vibrato);
+  - the vibrato from 0.2-0.35 s on a held stopped note, in over 0.2 s: 4.6-5.4 Hz, ± 10 c, wider
+    up the neck (`PJ_FRETLESS_VIB`); the mod wheel adds up to ± 25 c, the director's cue scales it;
+  - slides: a new note while the last one's key is held over it for 40 ms or more, at most 4
+    semitones away on the same string: no pluck, the finger glides 60 ms + 35 ms a semitone (a
+    raised cosine; 1-2 semitones 60 % of the time, 3-4 30 %; `PJ_FRETLESS_SLIDES` 0 never, 2
+    always; never in a jazz trio's file). The keys are acted on 60 ms after they come
+    (`PJ_FRETLESS_LEAD`; `-play` moves them that much earlier) so the player sees the overlap;
+  - the pitch wheel moves the finger (± 2 semitones); open strings only in quick lines (they cannot
+    sing), never once the wheel is in use; notes above the board (D#4 up) as natural harmonics
+    where one fits within 20 c, else an octave down (`PJ_FRETLESS_HARMONICS=1`: from C4 up wherever
+    they fit). `PJ_FRETLESS_LOG` 1: each note's decisions and the board's contacts; 2: the finger.
+- **Tuned by ear to the band** (`-play`): `src/band.h`'s registry of what the other channels sound
+  (kept by the event loop between blocks: a note-on adds, a note-off takes away unless the
+  channel's sustain pedal keeps it falling at its family's rate; a harp's or a bell's rings on;
+  each family a spectrum template; `PJ_BAND_LOG=1` prints it). Each block the fretless solves its
+  one note against it by the choir's spectral rule (its own partials, its string's stiffness
+  included, against each note's template; pairs within 36 c pulling by the weaker level over the
+  higher harmonic number squared), followed by its weight w as w / (w + 0.0005), within ± 15 c
+  (`PJ_FRETLESS_JI_LIM`; `PJ_FRETLESS_JI=0` off). C2 under a piano's E3: +10 c, its 5th partial
+  beating 0.2 Hz against the piano's 2nd; under C3 E3 G3 -0.9 c; G1 under B2 F3 +9 c. A chord
+  changing over a held note is followed at most 1 c/ms (no change under 25 ms), changes under 2 c
+  let be; with nothing to hear, back to equal temperament in ~3 s. The fretless writes its tuning
+  back (`Performer::tuning`) for adaptive players to use later.
+- **GM 36 in a file:** the fretless, except in a jazz trio's file (a piano and GM 33 or 36: the
+  user's bushgrafts files, where GM 36 is the upright): there the double bass, as before.
+  `-reinstrument double-bass=fretless-bass` forces it (then without slides).
+- Not yet: the mwah high on the neck (from the 12th position the steeper angle keeps a v120 G3 off
+  the board, where FluidR3's G3 blooms most), the slide's squeak, finger buzz on a light touch, the
+  second polarisation's friction on the board, a velocity table for `-play`, the adaptive players
+  (organ, choir, flutes) tuning to the fretless. About 1.2x the finger bass's CPU with the chorus.
 
 ### Concert harp
 

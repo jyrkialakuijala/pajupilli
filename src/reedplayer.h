@@ -33,6 +33,9 @@ class ReedPlayer : public Performer {
  private:
   enum Attack { kSlur, kBreath, kDu, kTu, kAccent };
   void applyNote(Attack a);
+  bool ringing_ = false;
+  double kRingT_ = 0.002;
+  bool rings(int from, int to) const;  // a slur down onto a note the old one is a harmonic of
 
   Reed& reed_;
   int held_[128] = {};

@@ -245,7 +245,11 @@ const NoteInfo kBassoonNotes[] = {
     {"oxxxxoxooxoxoxooxoxoo", 2},  // 62 D4 (-19 c passive)
     {"oxxxooxooxoxoxooxoxoo", 2},  // 63 D#4 (-8 c passive)
 };
-const Design kBassoonDesign = {kBassoonBore, 5, kBassoonHoles, 21, kBassoonNotes, 7.47, 2625.5, false, nullptr, 0, {0.013, 0.0006, 1e+07, 1100, 0.35, 6e-05, 0, 1.3e-05, 2500, 3800, 0, 1, 0, 1, 3e-4}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (The ear waits 0.1 s into a note before the lips tune it, as on the oboe and the English horn:
+// a reed's attack starts flat and settles by itself, and lips chasing it from the first periods
+// carried the note into another state and held it there. Wrong-state starts of the attack
+// matrix, tools/attacks.py: 15 -> 4 of 288.)
+const Design kBassoonDesign = {kBassoonBore, 5, kBassoonHoles, 21, kBassoonNotes, 7.47, 2625.5, false, nullptr, 0, {0.013, 0.0006, 1e+07, 1100, 0.35, 6e-05, 0, 1.3e-05, 2500, 3800, 0, 1, 0, 1, 3e-4, 0.1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Duduk in A, A3..C#5
 // A cylindrical bore and a large soft double reed; diatonic finger holes,
@@ -282,7 +286,11 @@ const NoteInfo kDudukNotes[] = {
     {"hoxxooooo", 1},  // 72 C5 (+20 c passive)
     {"ooooooooo", 1},  // 73 C#5 (+0 c passive)
 };
-const Design kDudukDesign = {kDudukBore, 4, kDudukHoles, 9, kDudukNotes, 3.73, 409.9, false, nullptr, 0, {0.018, 0.0005, 5e+06, 900, 0.5, 8e-05, 0, 2e-05, 1100, 1500, 0.6}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (The ear waits 0.1 s into a note before the lips tune it, as on the oboe and the English horn:
+// a reed's attack starts flat and settles by itself, and lips chasing it from the first periods
+// carried the note into another state and held it there. Wrong-state starts of the attack
+// matrix, tools/attacks.py: 8 -> 6 of 145.)
+const Design kDudukDesign = {kDudukBore, 4, kDudukHoles, 9, kDudukNotes, 3.73, 409.9, false, nullptr, 0, {0.018, 0.0005, 5e+06, 900, 0.5, 8e-05, 0, 2e-05, 1100, 1500, 0.6, 1, 0, 1, 0, 0.1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Treble shawm in D, D4..D5
 // A wide cone, a flared bell and a large double reed behind a pirouette
@@ -741,7 +749,11 @@ const NoteInfo kSopranoSaxNotes[] = {
     {"oxxxxxxoxoxoxoxooxoxoo", 2},  // 85 C#6 (+48 c passive)
     {"oxxxxoxoxoxoxoxooxoxoo", 2},  // 86 D6 (+13 c passive)
 };
-const Design kSopranoSaxDesign = {kSopranoSaxBore, 6, kSopranoSaxHoles, 22, kSopranoSaxNotes, 3.73, 707.6, false, nullptr, 0, {0.011, 0.0008, 4.5e+06, 2400, 0.3, 4.3e-05, 0, 0, 1700, 2300, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (The ear waits 0.1 s into a note before the lips tune it, as on the oboe and the English horn:
+// a reed's attack starts flat and settles by itself, and lips chasing it from the first periods
+// carried the note into another state and held it there. Wrong-state starts of the attack
+// matrix, tools/attacks.py: 30 -> 18 of 277.)
+const Design kSopranoSaxDesign = {kSopranoSaxBore, 6, kSopranoSaxHoles, 22, kSopranoSaxNotes, 3.73, 707.6, false, nullptr, 0, {0.011, 0.0008, 4.5e+06, 2400, 0.3, 4.3e-05, 0, 0, 1700, 2300, 1, 1, 0, 1, 0, 0.1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Alto saxophone in Eb, written Bb3..D#6
 // A conical bore: all harmonics, the octave key opens a vent (body or neck)
@@ -804,7 +816,11 @@ const NoteInfo kAltoSaxNotes[] = {
     {"oxxxxoxoxoxoxoxooxoxoo", 2},  // 86 D6 (+30 c passive)
     {"oxxxoxxoxoxoxoxooxoxoo", 2},  // 87 D#6 (+2 c passive)
 };
-const Design kAltoSaxDesign = {kAltoSaxBore, 6, kAltoSaxHoles, 22, kAltoSaxNotes, 3.73, 1066.0, false, nullptr, 0, {0.013, 0.0008, 4e+06, 1900, 0.3, 6e-05, 0, 0, 1500, 2100, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (The ear waits 0.1 s into a note before the lips tune it, as on the oboe and the English horn:
+// a reed's attack starts flat and settles by itself, and lips chasing it from the first periods
+// carried the note into another state and held it there. Wrong-state starts of the attack
+// matrix, tools/attacks.py: 16 -> 10 of 288.)
+const Design kAltoSaxDesign = {kAltoSaxBore, 6, kAltoSaxHoles, 22, kAltoSaxNotes, 3.73, 1066.0, false, nullptr, 0, {0.013, 0.0008, 4e+06, 1900, 0.3, 6e-05, 0, 0, 1500, 2100, 1, 1, 0, 1, 0, 0.1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Tenor saxophone in Bb, written Bb3..D#6
 // A conical bore: all harmonics, the octave key opens a vent (body or neck)
@@ -867,7 +883,11 @@ const NoteInfo kTenorSaxNotes[] = {
     {"oxxxxoxoxoxoxoxooxoxoo", 2},  // 86 D6 (+32 c passive)
     {"oxxxoxxoxoxoxoxooxoxoo", 2},  // 87 D#6 (+7 c passive)
 };
-const Design kTenorSaxDesign = {kTenorSaxBore, 6, kTenorSaxHoles, 22, kTenorSaxNotes, 4.98, 1424.4, false, nullptr, 0, {0.015, 0.00085, 3.5e+06, 1500, 0.3, 8e-05, 0, 0, 1400, 2000, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (The ear waits 0.1 s into a note before the lips tune it, as on the oboe and the English horn:
+// a reed's attack starts flat and settles by itself, and lips chasing it from the first periods
+// carried the note into another state and held it there. Wrong-state starts of the attack
+// matrix, tools/attacks.py: 10 -> 4 of 288.)
+const Design kTenorSaxDesign = {kTenorSaxBore, 6, kTenorSaxHoles, 22, kTenorSaxNotes, 4.98, 1424.4, false, nullptr, 0, {0.015, 0.00085, 3.5e+06, 1500, 0.3, 8e-05, 0, 0, 1400, 2000, 1, 1, 0, 1, 0, 0.1}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Baritone saxophone in Eb, written Bb3..D#6
 // A conical bore: all harmonics, the octave key opens a vent (body or neck)

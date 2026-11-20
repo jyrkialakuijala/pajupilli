@@ -24,9 +24,11 @@
 #include <vector>
 
 #include "analysis.h"
+#include "brasssect.h"
 #include "calibrate.h"
 #include "director.h"
 #include "drumkit.h"
+#include "band.h"
 #include "ensemble.h"
 #include "instrument.h"
 #include "parallel.h"
@@ -222,11 +224,16 @@ const char* const kGm[128][3] = {
 
 // -reinstrument's rules: (from, to).
 std::vector<std::pair<std::string, const Instrument*>> gReinstrument;
+// (a jazz trio's file, a piano and an upright bass: its GM 36 is the upright, not a fretless:
+// research/fretless_bass.md 5, 8.4; the user's decision of 2026-11-16)
+bool gJazzUpright = false;
 
 const Instrument* forProgram(int prog) {
   const Instrument* in = nullptr;
   for (const char* nm : kGm[prog & 127])
     if (nm && !in) in = findInstrument(nm);
+  if (gJazzUpright && (prog & 127) == 35)
+    if (const Instrument* db = findInstrument("double-bass")) in = db;
   for (const auto& [from, to] : gReinstrument)
     if (from == "*" || (in && (from == in->name || from == in->family))) return to;
   return in;
@@ -345,6 +352,8 @@ struct Part {
   std::map<int, std::pair<int, int>> organKey;  // channel * 128 + key -> (division, key)
   // A Hammond by its plan (src/hammondplan.h): each note's division, the drawbars for the piece.
   std::unique_ptr<HammondPlan> hplan;
+  // The brass section (src/brasssect.h): the section the part stands for, the song's harmony per onset.
+  std::unique_ptr<BrassPlan> bplan;
   std::map<int, int> hammondDiv;             // channel * 128 + key -> division (held notes)
   size_t leslieNext = 0;                     // the plan's next Leslie change
   size_t lvibNext = 0;                       // the plan's next lower vibrato tab switch
@@ -466,6 +475,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
     }
     jazzBand = piano && upright;
+    gJazzUpright = jazzBandFile() = jazzBand;
   }
   auto kitOf = [&](int program) {
     if (brushKitWanted() || kitFor(program) == Kit::kBrush) return Kit::kBrush;
@@ -728,6 +738,32 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     else
       std::fprintf(stderr, "  %s %2d: %s (%d held at once; %d voices for their tails)\n", id / 128 == 9 ? "drums  " : "channel",
                    id / 128 + 1, p.inst->name, p.maxHeld, poly);
+  }
+  // The brass section: the part read once with the rest of the song (src/brasssect.h): which
+  // section it stands for, and under each onset the song's chord, to voice a sparse part by.
+  for (auto& [id, p] : parts) {
+    if (id / 128 == 9 || !brassSectionInstrument(*p.inst)) continue;
+    std::vector<BrassNoteIn> notes;
+    std::map<int, std::pair<size_t, int>> on;  // channel * 128 + key -> (its event, the program then)
+    int pg[16] = {};
+    for (size_t i = 0; i < song.ev.size(); ++i) {
+      const Event& e = song.ev[i];
+      const int ech = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pg[ech] = e.a;
+      if (kind == 0x90 && e.b > 0) {
+        on[ech * 128 + e.a] = {i, pg[ech]};
+      } else if (kind == 0x80 || kind == 0x90) {
+        auto it = on.find(ech * 128 + e.a);
+        if (it == on.end()) continue;
+        const Event& o = song.ev[it->second.first];
+        notes.push_back({o.t, e.t, long(o.tick), ech, o.a, o.b, it->second.second,
+                         ech == id / 128 && it->second.second == id % 128});
+        on.erase(it);
+      }
+    }
+    p.bplan.reset(new BrassPlan(planBrassSection(notes, song.div, dir.style)));
+    p.ens->setBrassMode(p.bplan->mode);
+    std::fprintf(stderr, "    (%s)\n", p.bplan->summary.c_str());
   }
   // A Hammond: its notes by track, its pedals and manuals and drawbars planned (src/hammondplan.h).
   for (auto& [id, p] : parts) {
@@ -1087,6 +1123,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   // heaviest first (the most voices); the synth circuits all in one job, in their order (one
   // board couples them, sample by sample). Each part's voices go on the same pool in turn
   // (Ensemble::block), so one big part no longer holds back the rest on one thread.
+  // The band's sounding notes (src/band.h), kept by the loop below between blocks; every part
+  // may listen (the fretless bass does), each told its own channel.
+  SoundingSet band;
+  static const bool kBandLog = std::getenv("PJ_BAND_LOG") != nullptr;
+  unsigned bandSeen = ~0u;
+  for (auto& [id, p] : parts)
+    if (id / 128 != 9)
+      for (int i = 0; i < p.ens->size(); ++i) p.ens->player(i).setBand(&band, id / 128);
   std::vector<std::vector<Part*>> jobs;
   {
     std::vector<Part*> circuits, others;
@@ -1281,6 +1325,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (id < 0 || it == parts.end()) continue;
           noteOwner[ch * 128 + e.a] = id;
           heldKey[ch * 128 + e.a] = pk + it->second.inst->transpose;
+          if (ch != 9) band.on(ch, e.a, heldKey[ch * 128 + e.a], e.b, bandFamily(it->second.inst->family, it->second.inst->name));
           if (it->second.plan) {  // (an organ by its plan: the note on its track's division)
             Part& op = it->second;
             const int line = ch * 1000 + e.track;
@@ -1312,11 +1357,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             continue;
           }
           if (dir.acts && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
+          if (it->second.bplan)  // (the brass section: what the song says about this key)
+            if (const BrassHint* bh = it->second.bplan->find(e.a, e.t)) it->second.ens->brassHint(*bh);
           it->second.ens->noteOn(pk + it->second.inst->transpose, e.b);
           ++it->second.played;
         } else if (kind == 0x80 || kind == 0x90) {
           auto it = noteOwner.find(ch * 128 + e.a);
           if (it == noteOwner.end()) continue;
+          if (ch != 9) band.off(ch, e.a);
           Part& np = parts[it->second];
           if (np.plan) {
             auto k = np.organKey.find(ch * 128 + e.a);
@@ -1347,6 +1395,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           // channel the file wrote for a Hammond: a reinstrumented piano's pedalling is not the
           // Leslie's, and would throw it, its relay clicking, at every pedal change)
           auto leslieFrom = [&](const Part& p) { return std::strcmp(p.inst->family, "hammond") != 0 || fileHammond(prog[ch]); };
+          if (e.a == 64) band.pedal(ch, e.b >= 64);
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
               if (hears(id, p) && leslieFrom(p)) p.ens->setHold(e.b >= 64);
@@ -1361,10 +1410,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
                 swell = true;
               }
             if (!swell) chExpr[ch] = e.b / 127.0;
+            for (auto& [id, p] : parts)  // (the brass section: a swell moves its players' breath too)
+              if (id / 128 == ch && brassSectionInstrument(*p.inst)) p.ens->brassExpression(e.b / 127.0);
           }
           if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Hammond's Leslie (fast from 64); the timpani's roll
             for (auto& [id, p] : parts)
               if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || std::strcmp(p.inst->name, "timpani") == 0 ||
+                                   std::strcmp(p.inst->name, "fretless-bass") == 0 ||
                                    (std::strcmp(p.inst->family, "hammond") == 0 && leslieFrom(p))))
                 p.ens->all(&Performer::setFlutter, e.b / 127.0);
           if (e.a == 82)  // the Leslie's switch (as the Leslie 2101's default): stop, slow, fast
@@ -1373,7 +1425,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
                 if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(e.b < 43 ? 0 : e.b < 86 ? 1 : 2);
           if (e.a == 123 || e.a == 120)  // all notes off
             for (auto& [k, id] : noteOwner)
-              if (k / 128 == ch) parts[id].ens->noteOff(heldKey[k]);
+              if (k / 128 == ch) { parts[id].ens->noteOff(heldKey[k]); band.off(ch, k % 128); }
         } else if (kind == 0xd0) {  // channel pressure: the breath (a Clavinet: its keys pressed harder)
           for (auto& [id, p] : parts)
             if (id / 128 == ch) p.ens->all(&Performer::setBreath, 0.5 * e.a / 127.0);
@@ -1391,6 +1443,21 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (c > 0 && k / 128 != id / 128 && k % 128 >= 48 && k % 128 <= 98) busy += 0.25 * c;
           p.ens->all(&Performer::setAccompaniment, busy);
         }
+      // What the band sounds (src/band.h): the ringing notes fall; a part that tunes its keys by ear
+      // (the fretless) writes back where it has them.
+      band.step(double(kBlock) / kRate);
+      if (kBandLog && band.version() != bandSeen) {  // (PJ_BAND_LOG: the set whenever it changes)
+        bandSeen = band.version();
+        std::fprintf(stderr, "band %.3f:", now);
+        for (const BandNote& bn : band.notes()) std::fprintf(stderr, " %d:%d%s(%.2f)", bn.ch, bn.pitch, bn.down ? "" : "~", bn.level);
+        std::fprintf(stderr, "\n");
+      }
+      for (const BandNote& bn : band.notes()) {
+        auto o = noteOwner.find(bn.ch * 128 + bn.key);
+        if (o == noteOwner.end()) continue;
+        auto pt = parts.find(o->second);
+        if (pt != parts.end() && pt->second.ens->size() == 1) band.setCents(bn.ch, bn.key, pt->second.ens->player(0).tuning(bn.pitch));
+      }
       std::fill(l.begin(), l.end(), 0.0f);
       std::fill(r.begin(), r.end(), 0.0f);
       // The parts side by side on the pool's threads (the circuits as one

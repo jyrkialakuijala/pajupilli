@@ -839,3 +839,8 @@ Not done: no comparison with a recording; the directivity of section 3 (the bass
 two-sides difference, scaled); the wolf does not warble; no sul ponticello / col legno beyond
 what the bass's bow player has; the velocity curve is the contrabass's; a section of cellos is
 one player.
+
+The body runs as its modes since 2026-11-20 (`src/bodymodes.h`; `research/viola.md`, "The body
+as modes"): 212 modes, every output within -67 dB of the grid's (`PJ_BODY_GRID=1`), the
+resonances at the feet at the same frequencies and Q (173, 194, 267, 370 Hz ...), a bowed phrase
+-80 dB; 0.14 us a sample instead of 1.8.

@@ -22,6 +22,7 @@ ReedPlayer::ReedPlayer(Reed& r) : Performer(r), reed_(r) {
   // flute's); an ensemble's just intonation sets the target instead.
   ear_ = knob("PJ_REEDEAR", 1) > 0;
   kEarStart_ = knob("PJ_REEDEARSTART", inst_.design ? inst_.design->reed.earStart : 0);  // s on the note before the ear listens
+  kRingT_ = knob("PJ_REEDSLURDOWNT", 0.008);   // s: the tongue on the reed in a slur down onto a subharmonic
   kEarRange_ = knob("PJ_REEDEARRANGE", 120);    // cents: a larger error is another regime
   // A bagpipe's chanter reed sits in the bag: no lips to tune or bend with,
   // the bag's pressure steady.
@@ -67,6 +68,7 @@ void ReedPlayer::noteOn(int midi, int velocity) {
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
   const Articulation art = articulate(midi, velocity, legato);
+  const int from = note_;
   note_ = midi;
   // A key harder (or softer) than the note can be played: the dynamics stop
   // at the note's calibrated range, and the attack with them (the tongue, the
@@ -86,10 +88,12 @@ void ReedPlayer::noteOn(int midi, int velocity) {
   // is tongued, as the calibration played it there. The alto saxophone's E3, playable at
   // mezzo-forte only, spoke an octave up from a key of 30: a breath attack at that breath.)
   const bool breath = art == kArtBreath && (bag_ || velocity < 35 * hardness_);
-  const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
-                   : art == kArtTongueLegato || art == kArtDu ? kDu
-                   : breath ? kBreath
-                   : art == kArtAccent ? kAccent : kTu;
+  Attack a = art == kArtSlur || art == kArtGlide ? kSlur
+             : art == kArtTongueLegato || art == kArtDu ? kDu
+             : breath ? kBreath
+             : art == kArtAccent ? kAccent : kTu;
+  ringing_ = art == kArtSlur && !bag_ && rings(from, midi);
+  if (ringing_) a = kDu;
   // (A glide's soft key is its sign, not a diminuendo.)
   if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
   if (a != kSlur) velDyn_ = velDynTarget_;
@@ -128,14 +132,27 @@ void ReedPlayer::noteOff(int midi) {
   stackTop_ = w;
   if (midi != note_) return;
   if (stackTop_ > 0) {
+    const int from = note_;
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;
-    applyNote(kSlur);
+    ringing_ = !bag_ && rings(from, note_);
+    applyNote(ringing_ ? kDu : kSlur);
   } else if (!hold_) {
     blowing_ = false;
     sinceOff_ = 0;
     released();
   }
+}
+
+// A slur down an octave, a twelfth or two octaves: the note left is a harmonic of the new one
+// and its air column goes on ringing in the new fingering, which holds it as its own second or
+// third register (the oboe's C5 slurred to C4 stayed on C5; the bassoon's, the saxophones' low
+// notes likewise). A player touches the reed with the tongue there, or the slur fails for him
+// too. PJ_REEDSLURDOWN=0: a plain slur.
+bool ReedPlayer::rings(int from, int to) const {
+  static const bool kOn = knob("PJ_REEDSLURDOWN", 1) > 0;
+  const int d = from - to;
+  return kOn && from >= 0 && (d == 12 || d == 19 || d == 24);
 }
 
 void ReedPlayer::applyNote(Attack a) {
@@ -155,7 +172,7 @@ void ReedPlayer::applyNote(Attack a) {
       lungAttack_ = bag_ ? 0.015 : 0.040;  // (the bag is full: the arm's squeeze)
       break;
     case kDu:  // a light touch of the tongue on the reed
-      tongueClosed_ = 0.002;
+      tongueClosed_ = ringing_ ? kRingT_ : 0.002;
       tongueRelease_ = 0.006;
       lungAttack_ = 0.008;
       break;

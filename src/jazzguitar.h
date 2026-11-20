@@ -32,6 +32,8 @@
 // will not fit go to four.
 //   - The stroke: a down rake (2 ms a string loud, 5 soft), up on quick off-beats; the strings
 //     between the grip's skipped: muted by the fretting hand, the pick's dead click.
+//     The strings outside the grip, not holding a note, lie under the fretting hand's fingers
+//     (200 /s; beside a single line 40 /s): they do not ring along through the body.
 //   - Let go: the left hand eases off (5 ms), the string dies in ~30 ms (200 /s) with a soft "chk";
 //     each string as its key is let go.
 //   - A note let go before it sounded (zero length in the file): a ghost stroke, the strings
@@ -45,7 +47,8 @@
 // Octaves (6.6): two notes 12 apart, strings s and s+2, the one between muted and swept: with the
 // thumb (PJ_JAZZ_THUMB: 0 never, 1 octaves and the soft notes among them (default), 2 every
 // single line). Pitch bend: the last single note's string.
-// PJ_JAZZ_PLACE (0.165 m), PJ_JAZZ_MOVE (1: how far the hand follows the phrase), PJ_JAZZ_RELEASE
+// The keys of one gesture: whatever comes within 8 ms (PJ_JAZZ_GATHER) of the first is played
+// together (every note 8 ms late: a constant). PJ_JAZZ_PLACE (0.165 m), PJ_JAZZ_MOVE (1: how far the hand follows the phrase), PJ_JAZZ_RELEASE
 // (200 /s), PJ_JAZZ_DEBUG=1 (each stroke on stderr), PJ_JAZZ_STATS=1 (the voicings' tally at the end).
 #pragma once
 
@@ -99,6 +102,7 @@ class JazzGuitarPlayer : public Performer {
   bool fourBar_ = false;
   double vib_[kS] = {}, vibPh_[kS] = {};
   // The knobs.
+  double askAge_ = 0, gather_ = 0.008;  // (the keys gathered for this long before they are played)
   double place_ = 0.165, move_ = 1, stiff_ = 17000, edge_ = 0.0003, tipW_ = 0.0025, release_ = 200, chk_ = 1;
   int thumb_ = 1;
   bool debug_ = false, stats_ = false;

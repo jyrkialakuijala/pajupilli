@@ -161,7 +161,7 @@ class PickBassPlayer : public BassLinePlayer {
 //   - a hammer-on or pull-off (a step of 1-3 semitones on the string still held, soon after,
 //     not accented): no stroke, the fretting finger comes down (a small knock) or leaves (a small
 //     pluck);
-//   - a pop (the D and G strings): GM 37 where a line leaps up 7-16 semitones from its last
+//   - a pop (the D and G strings): GM 37 where a line leaps up 9-16 semitones from its last
 //     thumbed note, accented high notes, the top of a double stop; GM 38 nearly everything from
 //     D2 up, the hand up the neck to keep it on the D and G strings. The finger hooks the string
 //     12-25 ms before it lets go (the hook early by that much when the keys come early: noteLead);

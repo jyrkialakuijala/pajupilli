@@ -53,12 +53,15 @@
 namespace pajupilli {
 
 struct ChoirState;  // (the choir's dealing: src/choir.cc)
+struct BrassState;  // (the brass section's: src/brasssect.cc)
+struct BrassHint;
 
 class Ensemble {
  public:
   struct Member {
     const Instrument* inst;
     const Calibration* cal;
+    double x = 1e9;  // its place across the stage (m; 1e9: by its range, high on the left)
   };
   Ensemble(const std::vector<Member>& members, bool verbose, const RoomSpec* room = nullptr);
   // maxFlutes of one instrument.
@@ -68,6 +71,9 @@ class Ensemble {
   void noteOff(int midi);
   // A player setting, for every flute.
   void all(void (Performer::*set)(double), double x) {
+    // (the brass section: a bend is each player's own fall, the dynamics its swell's base)
+    if (brass_ && set == &Performer::setLipRoll) { brassBend(x); return; }
+    if (brass_ && set == &Performer::setDynamics) { brassSetDynamics(x); return; }
     for (Slot& s : f_) (s.v->player().*set)(x);
     for (Section& k : kids_) k.ens->all(set, x);
   }
@@ -90,10 +96,11 @@ class Ensemble {
   // the listener's gain (the room's air is not). Live keeps the physics alone.
   void setVelocityGain(bool on) {
     velGain_ = on;
-    for (Section& k : kids_) k.ens->setVelocityGain(on);
+    for (Section& k : kids_) k.ens->setVelocityGain(on && !brass_);  // (the brass section applies its own)
   }
   // (-play) The director's cue for the key that follows (Performer::direct).
   void direct(const Cue& c) {
+    if (brass_) brassCue(c);
     for (Slot& s : f_) s.v->player().direct(c);
     for (Section& k : kids_) k.ens->direct(c);
   }
@@ -201,6 +208,25 @@ class Ensemble {
   void choirOff(int key);
   void choirRender(float* left, float* right, int n);
   std::shared_ptr<ChoirState> choir_;
+  // The brass section (src/brasssect.cc, src/brasssect.h): one ensemble of players (kids_[0]), the
+  // held keys voiced and dealt to its seats.
+ public:
+  void setBrassMode(int mode);           // (-play: the section the part stands for, before it plays)
+  void brassHint(const BrassHint& h);    // (-play: what the song says about the next key)
+  void brassExpression(double x);        // (-play: CC 11, 0..1)
+ private:
+  void initBrass(const Instrument& inst, const RoomSpec* room);
+  void brassBuild(int mode);
+  void brassCue(const Cue& c);
+  void brassBend(double x);
+  void brassSetDynamics(double d);
+  void brassOn(int key, int velocity);
+  void brassOff(int key);
+  void brassAssign(bool onset);
+  void brassRender(float* left, float* right, int n);
+  std::shared_ptr<BrassState> brass_;
+  bool mixFixed_ = false;  // (a section's players: their sum not evened to one player's level)
+  double jiScale_ = 1;     // (the pajupilli intonation's share: the brass section's players lean to equal temperament)
   int sheld_[128] = {};  // the held keys' velocities (0: up)
   unsigned srng_ = 2026;
   std::vector<Section> kids_;

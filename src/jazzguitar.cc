@@ -33,6 +33,7 @@ JazzGuitarPlayer::JazzGuitarPlayer(GuitarModel& m) : Performer(m), m_(m) {
   thumb_ = int(std::lround(knob("PJ_JAZZ_THUMB", 1)));
   release_ = knob("PJ_JAZZ_RELEASE", 200);
   chk_ = knob("PJ_JAZZ_CHK", 1.0);
+  gather_ = knob("PJ_JAZZ_GATHER", 0.008);
   debug_ = knob("PJ_JAZZ_DEBUG", 0) > 0;
   stats_ = knob("PJ_JAZZ_STATS", 0) > 0;
 }
@@ -54,7 +55,7 @@ void JazzGuitarPlayer::noteOn(int midi, int velocity) {
   articulate(midi, velocity, false);
   note_ = midi;
   blowing_ = true;
-  if (asked_.empty()) gapBefore_ = sinceNote_;
+  if (asked_.empty()) { gapBefore_ = sinceNote_; askAge_ = 0; }
   asked_.push_back({midi, velocity, false});
   sinceNote_ = 0;
 }
@@ -297,6 +298,13 @@ void JazzGuitarPlayer::chord(std::vector<Asked>& notes) {
     const int beatInBar = int(std::floor(std::fmod(sc.beat + 0.1, 4.0)));
     if (beatInBar == 1 || beatInBar == 3) vmean += 3;
   }
+  // The strings outside the grip, not holding a note: the fretting hand's fingers lie on them
+  // (every unfretted string is muted, 6.2): they do not ring along.
+  for (int s = 0; s < kS; ++s) {
+    bool in = false;
+    for (int i = 0; i < n; ++i) in = in || grip.string[i] == s;
+    if (!in && !held_[s] && !hold_) g.damp(s, 200);
+  }
   // Strings: those of the grip, and the ones skipped inside it (dead).
   const int sLo = grip.string[0], sHi = grip.string[n - 1];
   std::vector<int> order;
@@ -341,7 +349,6 @@ void JazzGuitarPlayer::chord(std::vector<Asked>& notes) {
     for (int i = 0; i < n; ++i) std::fprintf(stderr, " %d@s%d/f%d", notes[i].midi, 6 - grip.string[i], grip.fret[i]);
     std::fprintf(stderr, " (asked %zu)\n", asked);
   }
-  (void)g;
 }
 
 void JazzGuitarPlayer::octave(const Asked& lo, const Asked& hi) {
@@ -432,6 +439,9 @@ void JazzGuitarPlayer::single(const Asked& a) {
   due_.push_back({0, kind, best, fret, t, ghost ? 0.015 + 0.01 * ur() : 0.0, ghost ? 150.0 : 0.0});
   sounding(best, a.midi, fret, a.velocity, a.ghost);
   if (fret > 0) hand_ += 0.4 * (fret - 1 - hand_);
+  // (The other strings, not holding a note, under the hands: they do not ring along.)
+  for (int s = 0; s < kS; ++s)
+    if (s != best && !held_[s] && !hold_) g.damp(s, 40);
   hand_ = std::clamp(hand_, 1.0, 15.0);
   lastString_ = best;
   lastMidi_ = midi;
@@ -458,10 +468,12 @@ void JazzGuitarPlayer::play() {
 void JazzGuitarPlayer::render(float* out, int n) {
   constexpr int kBlock = 16;
   Guitar& g = m_.guitar();
-  if (!asked_.empty()) play();
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
     const double dt = m / fs_;
+    // (What comes within a few ms is one gesture: a chord whose keys were not struck quite together.)
+    if (!asked_.empty() && askAge_ >= gather_) play();
+    askAge_ += dt;
     tick(dt);
     clock_ += dt;
     sinceNote_ += dt;
@@ -525,7 +537,7 @@ void JazzGuitarPlayer::render(float* out, int n) {
     }
     m_.process(out + i, m);
   }
-  blowing_ = !g.asleep() || !due_.empty();
+  blowing_ = !g.asleep() || !due_.empty() || !asked_.empty();
 }
 
 }  // namespace pajupilli

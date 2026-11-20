@@ -356,12 +356,14 @@ double Guitar::frequency(int s) const { return str_[s].f1; }
 
 void Guitar::tune(Str& st, int index, bool place) {
   const GuitarString& d = s_.str[index];
-  st.len = s_.scale * std::exp2(-st.fret / 12.0);
+  st.len = s_.scale * std::exp2(-(st.fret + st.cents / 100) / 12.0);
   st.f1 = d.f0 * s_.scale / st.len * std::exp2(st.bend / 1200);
   const double mu = d.tension / std::pow(2 * s_.scale * d.f0, 2);
   // (A fretted string ends on metal with a finger behind it: a little more
   // loss than on the nut.)
-  const double end = st.fret > 0 ? 1.15 : 1.0;
+  // (The fretless's fingertip instead: GuitarSpec::fingerLoss, below.)
+  const bool stopped = st.fret > 0 || st.cents > 0;
+  const double end = stopped && s_.fingerLoss <= 0 ? 1.15 : 1.0;
   const double top = std::min(0.45 * fs_, s_.topHz > 0 ? s_.topHz : 1e9);
   int n = 0;
   for (int k = 1; k <= std::min(s_.modes, int(kMaxModes)); ++k) {
@@ -392,6 +394,8 @@ void Guitar::tune(Str& st, int index, bool place) {
     // (A harmonic's fingertip at 1/n of the sounding length: each mode by its shape squared
     // there, over the fingertip's width.)
     if (st.touchN > 1) palm += st.touchRate * underFinger(k, st.len / st.touchN + st.touchOff, st.touchWidth, st.len);
+    // (The fretless's fingertip: the double bass's loss at the stopping finger, fingerLoss of it.)
+    if (s_.fingerLoss > 0 && stopped) palm += s_.fingerLoss * (0.3 + 0.12 * k + 15 * (f / 4000) * (f / 4000));
     st.decay[0][i] = on ? float(std::exp(-(loss * s_.towardsLoss + palm) * dt_)) : 0.0f;
     st.decay[1][i] = on ? float(std::exp(-(loss + palm) * dt_)) : 0.0f;
     st.slope[i] = float(d.tension * k * kPi / st.len * ((k & 1) ? -1.0 : 1.0));   // its pull on the bridge per unit swing (N/m)
@@ -402,6 +406,7 @@ void Guitar::tune(Str& st, int index, bool place) {
     for (int dir = 0; dir < 2; ++dir) st.q[dir][i] = st.v[dir][i] = 0;
   st.n = std::max(n, 1);
   st.invMass = float(2 / (mu * st.len));
+  if (place && s_.board) placeBoard(index);
   if (!place || !electric()) return;
   // The pickups' ears: each mode's shape where the pickup is, over the field's width (a
   // Gaussian), a humbucker's two coils; what of each direction lies towards the magnet (and
@@ -449,11 +454,148 @@ void Guitar::push(Str& st, const float* shape, float (*to)[kMaxModes], double an
 void Guitar::fret(int s, int fret) {
   Str& st = str_[s];
   fret = std::clamp(fret, 0, s_.frets);
-  if (fret == st.fret) return;
+  if (fret == st.fret && st.cents == 0) return;
   st.fret = fret;
+  st.cents = 0;
+  st.placed = fret;
   st.bend = 0;
   tune(st, s);
   if (s_.fretContact) placeFrets(s);
+}
+
+// The fretless's finger (research/fretless_bass.md 3.3, 8.2). A length changing slowly keeps each
+// mode's action E / w; with E = (mu L / 4) w^2 A^2 and w L fixed, its amplitude A stays and its
+// velocity scales with w: v x w_new / w_old, the swing's phase kept. Small moves (vibrato, the
+// landing's last cents, a slide's steps) turn the modes' frequencies alone; every 4 c, or at a
+// jump, everything is placed anew (the losses, the pickups' ears, the board).
+void Guitar::stop(int s, double semis) {
+  Str& st = str_[s];
+  semis = std::clamp(semis, 0.0, double(s_.frets) + 4);
+  int f = int(std::floor(semis + 1e-9));
+  double c = (semis - f) * 100;
+  if (c < 1e-6) c = 0;
+  if (f == st.fret && std::fabs(c - st.cents) < 0.01) return;
+  const double was = st.fret + st.cents / 100;
+  alignas(64) float w0[2][kMaxModes];
+  const int n0 = st.n;
+  std::copy(&st.w[0][0], &st.w[0][0] + 2 * kMaxModes, &w0[0][0]);
+  st.fret = f;
+  st.cents = c;
+  if (std::fabs(semis - st.placed) > 0.04 || (was == 0) != (semis == 0)) {
+    st.placed = semis;
+    tune(st, s);
+  } else {
+    // (Only the frequencies: the losses and the ears move little within 4 c.)
+    const double r = std::exp2((semis - was) / 12);
+    st.len = s_.scale * std::exp2(-semis / 12.0);
+    st.f1 *= r;
+    // (Each mode's turn a sample moved by a small angle d: the rotation turned by d, its sine and
+    // cosine to d^4, exact to ~1e-10 for a step of a few cents, kept a pure rotation; the full
+    // placing every 4 c keeps it from drifting.)
+    for (int i = 0; i < st.n; ++i) {
+      for (int dir = 0; dir < 2; ++dir) {
+        const double w = st.w[dir][i], d = w * (r - 1) * dt_, d2 = d * d;
+        const double cd = 1 - d2 * (0.5 - d2 / 24), sd = d * (1 - d2 / 6);
+        const double c = st.cs[dir][i], sn = st.sn[dir][i];
+        const double c1 = c * cd - sn * sd, s1 = sn * cd + c * sd, nrm = 1 / std::sqrt(c1 * c1 + s1 * s1);
+        st.w[dir][i] = float(w * r);
+        st.cs[dir][i] = float(c1 * nrm);
+        st.sn[dir][i] = float(s1 * nrm);
+      }
+      st.slope[i] = float(st.slope[i] * r);
+    }
+    st.invMass = float(st.invMass * r);
+  }
+  for (int dir = 0; dir < 2; ++dir)
+    for (int i = 0; i < std::min(n0, st.n); ++i) st.v[dir][i] *= st.w[dir][i] / w0[dir][i];
+}
+
+// The board behind the finger (research/fretless_bass.md 2.1, 8.2): points 3 .. 36 mm behind it
+// (the contact lies close to the finger: there the string is lowest), each where the string at
+// rest clears the board by theta d + kappa d^2 / 2 (theta: its rise from the finger to the
+// action over the board's end). Each mode's shape there, towards the board (as push() into the
+// top: the two askew axes' parts). None on an open string (it ends on the nut, the board lies
+// under its far end) or past the board's end.
+void Guitar::placeBoard(int s) {
+  Str& st = str_[s];
+  boardN_[s] = 0;
+  const double span = st.len - s_.boardEnd;
+  if (!(st.fret > 0 || st.cents > 0) || span < 0.03) return;
+  if (board_.empty()) board_.assign(size_t(kStrings) * kBoardPts * 2 * kMaxModes, 0.0f);
+  static const double kAt[kBoardPts] = {0.003, 0.007, 0.013, 0.022, 0.036};
+  const double theta = s_.boardAction / span;
+  for (int p = 0; p < kBoardPts && kAt[p] < span; ++p) {
+    const double d = kAt[p];
+    float* a0 = &board_[((size_t(s) * kBoardPts + p) * 2) * kMaxModes];
+    float* a1 = a0 + kMaxModes;
+    double g = 0;
+    for (int i = 0; i < kMaxModes; ++i) {
+      const double ph = i < st.n ? std::sin((i + 1) * kPi * d / st.len) : 0.0;
+      a0[i] = float(ph * st.ct[i]);
+      a1[i] = float(-ph * st.st[i]);
+      g += double(a0[i]) * a0[i] + double(a1[i]) * a1[i];
+    }
+    boardClear_[s][p] = float(theta * d + 0.5 * s_.boardRelief * d * d);
+    // (The damper held to what one step can take: Bass's limit.)
+    boardHold_[s][p] = float(std::min(1.0, 1.6 / (s_.boardC * dt_ * g * st.invMass)));
+    boardN_[s] = p + 1;
+  }
+  boardLive_[s] = ~0u;
+}
+
+void Guitar::boardStep(Str& st, int s) {
+  // Awake for 1.5 s after a stroke or a contact; within that, every 16 samples, only the points
+  // the modes' swings (which, free, only fall) could reach.
+  if (st.clock < 1e8 || st.pkOn || st.thOn) {
+    boardClock_[s] = 0;
+    boardLive_[s] = ~0u;
+  }
+  boardClock_[s] += dt_;
+  if (!boardN_[s] || boardClock_[s] > 1.5) return;
+  const int n = st.n, P = boardN_[s];
+  if ((++boardTick_[s] & 15) == 0 && boardClock_[s] > 0.01) {
+    alignas(64) float m0[kMaxModes], m1[kMaxModes];
+    for (int i = 0; i < n; ++i) {
+      m0[i] = std::sqrt(st.q[0][i] * st.q[0][i] + st.v[0][i] * st.v[0][i] / (st.w[0][i] * st.w[0][i]));
+      m1[i] = std::sqrt(st.q[1][i] * st.q[1][i] + st.v[1][i] * st.v[1][i] / (st.w[1][i] * st.w[1][i]));
+    }
+    uint32_t live = 0;
+    for (int p = 0; p < P; ++p) {
+      const float* a0 = &board_[((size_t(s) * kBoardPts + p) * 2) * kMaxModes];
+      const float* a1 = a0 + kMaxModes;
+      float b = 0;
+      for (int i = 0; i < n; ++i) b += std::fabs(a0[i]) * m0[i] + std::fabs(a1[i]) * m1[i];
+      if (1.02f * b > boardClear_[s][p]) live |= 1u << p;
+    }
+    boardLive_[s] = live;
+  }
+  if (!boardLive_[s]) return;
+  const float K = float(s_.boardK), C = float(s_.boardC), im = st.invMass * float(dt_);
+  bool hit = false;
+  for (int p = 0; p < P; ++p) {
+    if (!(boardLive_[s] >> p & 1)) continue;
+    const float* a0 = &board_[((size_t(s) * kBoardPts + p) * 2) * kMaxModes];
+    const float* a1 = a0 + kMaxModes;
+    float d = 0;
+    for (int i = 0; i < n; ++i) d += a0[i] * st.q[0][i] + a1[i] * st.q[1][i];
+    const float pen = d - boardClear_[s][p];
+    if (pen <= 0) continue;
+    // The board pushes back: its spring on how deep the string lies in it, its damper on how fast
+    // it goes in (one-sided: it never pulls).
+    float u = 0;
+    for (int i = 0; i < n; ++i) u += a0[i] * st.v[0][i] + a1[i] * st.v[1][i];
+    const float f = std::max(0.0f, boardHold_[s][p] * (K * pen + C * u));
+    const float dv = -im * f;
+    for (int i = 0; i < n; ++i) {
+      st.v[0][i] += dv * a0[i];
+      st.v[1][i] += dv * a1[i];
+    }
+    hit = true;
+  }
+  if (hit) {
+    ++boardHits_[s];
+    boardClock_[s] = 0;
+  }
 }
 
 void Guitar::bend(int s, double cents) {
@@ -1041,6 +1183,7 @@ float Guitar::run() {
     };
     if (elec) modes(std::true_type{}); else modes(std::false_type{});
     if (s_.fretContact) fretStep(st, int(&st - str_), y0, y1);
+    if (s_.board) boardStep(st, int(&st - str_));
     for (int i = 0; i < st.holdN; ++i) {
       // Feedback: the low modes held where they were.
       if (i == st.fbMode[0] || i == st.fbMode[1]) continue;

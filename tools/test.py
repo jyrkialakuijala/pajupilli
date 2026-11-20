@@ -705,6 +705,53 @@ def struck_cents(inst, midi, harmonics=8):
     return bc
 
 
+def bowed_body_modes():
+    """The bowed instruments' body runs as its modes (src/bodymodes.h), not as its grid
+    (PJ_BODY_GRID=1, the definition): the instrument's answer to a force on the bridge's foot (the
+    open strings silent, as heard) is the grid's within -60 dB, and within -45 dB in every octave
+    from 62.5 Hz to 16 kHz that carries its sound (more than -50 dB of it), for each design and
+    for a section's seats (their own plates, air and losses); a bowed note sounds the same; and
+    the body costs a fraction of the grid's."""
+    import numpy as np
+    from scipy.io import wavfile
+
+    def imp(inst, grid, seat):
+        with tempfile.TemporaryDirectory() as d:
+            dump = os.path.join(d, 'imp.bin')
+            run(['-inst', inst, '-imp', '60'], env={'PJ_BASS_SYMP': '0', 'PJ_IMPOUT': '1', 'PJ_IMPDUMP': dump,
+                                                   'PJ_BODY_GRID': str(grid), 'PJ_SEAT': str(seat)})
+            return np.fromfile(dump)
+    for inst, seat in (('contrabass', 0), ('cello', 0), ('viola', 0), ('violin', 0), ('viola', 14), ('violin', 5), ('cello', 20)):
+        g, m = imp(inst, 1, seat), imp(inst, 0, seat)
+        G, M = np.fft.rfft(g), np.fft.rfft(m)
+        f = np.fft.rfftfreq(len(g), 1 / 48000)
+        E, P = np.abs(G - M) ** 2, np.abs(G) ** 2
+        total = 10 * math.log10(E.sum() / P.sum())
+        worst, at = -999.0, 0
+        for lo in (62.5, 125, 250, 500, 1000, 2000, 4000, 8000):
+            s = (f >= lo) & (f < 2 * lo)
+            if P[s].sum() > 1e-5 * P.sum():
+                e = 10 * math.log10(E[s].sum() / P[s].sum())
+                if e > worst:
+                    worst, at = e, lo
+        check(f'{inst}{f" (seat {seat})" if seat else ""}: the body\'s modes answer as its grid', total < -60 and worst < -45,
+              f'error {total:.0f} dB, at worst {worst:.0f} dB ({at:g} Hz octave)')
+    with tempfile.TemporaryDirectory() as d:
+        x = []
+        for grid in (1, 0):
+            wav = os.path.join(d, f'{grid}.wav')
+            run(['-inst', 'cello', '-seq', 'on 48 90 wait 0.6 on 55 90 wait 0.05 off 48 wait 0.5 off 55 on 57 100 wait 0.4 off 57 wait 0.5', '-o', wav],
+                env={'PJ_BODY_GRID': str(grid)})
+            x.append(wavfile.read(wav)[1].astype(float))
+    n = min(len(x[0]), len(x[1]))
+    e = 10 * math.log10(np.sum((x[0][:n] - x[1][:n]) ** 2) / np.sum(x[0][:n] ** 2))
+    check('cello: a bowed phrase on the modes as on the grid', e < -50, f'difference {e:.0f} dB')
+    ns = [cpu_time(['-inst', 'violin', '-note', '76', '-secs', '2'], env={'PJ_NOCAL': '1', 'PJ_BODY_GRID': g}) / (2 * 48000) * 1e9
+          for g in ('1', '0')]
+    check('violin: the body as modes, at most half the grid\'s cost', ns[1] < 0.5 * ns[0],
+          f'{ns[1]:.0f} ns/sample against {ns[0]:.0f} on the grid')
+
+
 def modals():
     for inst in MODALS:
         r = run(['-inst', inst, '-fuzz', '10', '1'])
@@ -1305,6 +1352,213 @@ def guitar_harmonics():
     check('real-time margin (guitar-harmonics, random playing)', ns < 2500, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
 
+def jazz_guitar():
+    """The jazz guitar (-inst jazz-guitar, GM 27; src/guitar.cc jazzGuitar(), src/jazzguitar.cc, the
+    amp's "jazz" preset; research/jazz_guitar.md 9.4, 12): in tune; the tone control's network;
+    the flatwound low E against Rau17; a wound G; the touch speaks (velocity opens the spectrum,
+    not only the level; the pick's place moves its comb; the attack's brightness dies into the
+    body); the speaking strip widens the colour and narrows the loudness; no harshness at 127; a
+    short chord choked; the acoustic share; the user's file voiced as a guitarist would; stable,
+    real time."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt, bilinear, lfilter
+    inst = 'jazz-guitar'
+    out = [struck_cents(inst, m, 4) for m in (40, 45, 50, 55, 59, 64, 69, 76, 83)]
+    bad = [c for c in out if c is None or abs(c) > 8]
+    check(f'{inst}: in tune', not bad, ' '.join('silent' if c is None else f'{c:+d} c' for c in out))
+    wav = os.path.join(ROOT, 'tools', '.jazz.wav')
+    def render(seq, env=None):
+        run(['-inst', inst, '-room', 'dry', '-seq', seq, '-o', wav], env=env)
+        fs, x = wavfile.read(wav)
+        os.remove(wav)
+        return fs, (x.astype(float).mean(1) if x.ndim > 1 else x.astype(float))
+    def note(n, v, env=None, hold=1.0):
+        fs, x = render(f'on {n} {v} wait {hold} off {n} wait 0.2', env)
+        a = np.abs(x)
+        i = int(np.argmax(a > 0.05 * a.max()))
+        return fs, x[max(0, i - int(0.002 * fs)):]
+    def power(x, fs, t0, t1):
+        seg = x[int(t0 * fs):int(t1 * fs)]
+        n = max(16384, 1 << int(math.ceil(math.log2(len(seg)))))
+        P = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), n)) ** 2
+        return np.fft.rfftfreq(n, 1 / fs), P
+    def colour(x, fs, t0=0.0, t1=0.05):
+        """The spectral centroid (Hz) and the 2-5 kHz and 5-10 kHz shares (dB of the whole)."""
+        f, P = power(x, fs, t0, t1)
+        tot = P[f > 40].sum() + 1e-30
+        return ((f * P)[f > 40].sum() / tot, 10 * math.log10(P[(f >= 2000) & (f < 5000)].sum() / tot + 1e-30),
+                10 * math.log10(P[(f >= 5000) & (f < 10000)].sum() / tot + 1e-30))
+    # The tone control (research 4.3): the pickup, the 600 pF cable, the 500 k volume and the amp's
+    # 1 MOhm, the tone pot's resistance in series with 22 nF: at 35 k -3 dB at 1.4 +- 0.2 kHz and no
+    # peak; at 0 the "woman tone", a peak near 460 Hz. (GuitarAmp::response(0), a small program.)
+    exe = os.path.join(ROOT, 'tools', '.jazznet')
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, 'net.cc')
+        open(src, 'w').write('#include "guitaramp.h"\n#include <cmath>\n#include <cstdio>\nusing namespace pajupilli;\n'
+                             'int main() { for (double rt : {35e3, 0.0}) { GuitarAmp a(48000, GuitarAmp::jazz());\n'
+                             '  GuitarAmp::Source s{4.4, 7.8e3, 120e-12, 500e3}; s.Rt = rt; s.Ct = 22e-9; a.connect(s, 600e-12);\n'
+                             '  const double ref = std::abs(a.response(0, 200)); double pk = 0, pf = 0, f3 = 0;\n'
+                             '  for (double f = 50; f < 20000; f *= 1.005) { const double d = 20 * std::log10(std::abs(a.response(0, f)) / ref);\n'
+                             '    if (d > pk) { pk = d; pf = f; } if (!f3 && f > 300 && d < -3) f3 = f; }\n'
+                             '  std::printf("%.2f %.0f %.0f\\n", pk, pf, f3); } }\n')
+        b = subprocess.run(['g++', '-O1', '-std=c++17', '-Isrc', src, 'src/guitaramp.cc', '-o', exe], capture_output=True, text=True, cwd=ROOT)
+    if b.returncode:
+        check(f'{inst}: the tone control\'s network (builds)', False, b.stderr.strip()[-300:])
+    else:
+        r = subprocess.run([exe], capture_output=True, text=True, cwd=ROOT)
+        os.remove(exe)
+        (pk35, _, f35), (pk0, pf0, _) = [[float(v) for v in line.split()] for line in r.stdout.split('\n')[:2]]
+        check(f'{inst}: the tone control (35 k: -3 dB at 1.4 +- 0.2 kHz, no peak; 0: a peak near 460 Hz)',
+              abs(f35 - 1400) <= 200 and pk35 < 0.5 and 400 <= pf0 <= 520 and pk0 > 2,
+              f'35 k: -3 dB at {f35:.0f} Hz, its highest {pk35:+.1f} dB; 0: {pk0:+.1f} dB at {pf0:.0f} Hz')
+    # Rau17's flatwound low E through the neck pickup (the EMF): harmonics 1-5, 15 dB down in 5.45,
+    # 4.49, 0.86, 0.87, 1.12 s; within 40 % (the third lies on the top's 240 Hz mode).
+    fs, x = render('on 40 100 wait 8 off 40', {'PJ_EGTR_DI': '1'})
+    i0 = int(np.argmax(np.abs(x) > 0.05 * np.abs(x).max()))
+    rau = (5.45, 4.49, 0.86, 0.87, 1.12)
+    t15 = []
+    for k in range(1, 6):
+        fk = 82.41 * k * math.sqrt(1 + 3.5e-4 * k * k)
+        y = sosfiltfilt(butter(2, [fk * 0.95, fk * 1.05], 'band', fs=fs, output='sos'), x)
+        e = np.sqrt(np.convolve(y * y, np.ones(2400) / 2400, 'same'))
+        j = i0 + int(np.argmax(e[i0:i0 + int(0.2 * fs)]))
+        below = np.where(e[j:] < e[j] * 10 ** (-15 / 20))[0]
+        t15.append(below[0] / fs if len(below) else 99)
+    check(f'{inst}: the open low E as Rau17\'s flatwound (harmonics 1-5 to -15 dB, within 40 %)',
+          all(abs(t / r - 1) <= 0.4 for t, r in zip(t15, rau)),
+          ' '.join(f'{t:.2f}' for t in t15) + ' s (Rau17: ' + ' '.join(f'{r:.2f}' for r in rau) + ')')
+    # The wound G: its 10th partial within 2 cents of 10 f1 (a plain G's is ~10 sharp).
+    fs, x = render('on 55 100 wait 1.5 off 55', {'PJ_EGTR_DI': '1'})
+    f, P = power(x, fs, 0.02, 1.2)
+    pk = lambda c: f[(f > c * 0.985) & (f < c * 1.015)][np.argmax(P[(f > c * 0.985) & (f < c * 1.015)])]
+    f1 = pk(196.0)
+    c10 = 1200 * math.log2(pk(10 * f1) / (10 * f1))
+    check(f'{inst}: the wound G (partial 10 within 2 c of 10 f1)', abs(c10) <= 2, f'{c10:+.1f} c')
+    # The touch speaks: G3, D4, A4 at velocity 30, 60, 90, 120: the centroid and the 2-5 kHz share of
+    # the first 50 ms rise with each step, the share by 15 dB or more over the range, the centroid
+    # by 10 % or more (FluidR3's two layers: 600-800 Hz soft, 1.3-1.6 kHz loud; this archtop is
+    # darker, its fundamental strong under the neck pickup); at 127 the 5-10 kHz share bounded.
+    rows, ok = [], True
+    for n in (55, 62, 69):
+        cs = [colour(*note(n, v)[::-1]) for v in (30, 60, 90, 120)]
+        c = [v[0] for v in cs]
+        s25 = [v[1] for v in cs]
+        ok = ok and all(b > a for a, b in zip(c, c[1:])) and all(b > a for a, b in zip(s25, s25[1:])) and s25[-1] - s25[0] >= 15 and c[-1] / c[0] >= 1.1
+        rows.append(f'{n}: centroid ' + '/'.join(f'{v:.0f}' for v in c) + ' Hz, 2-5 kHz ' + '/'.join(f'{v:.0f}' for v in s25) + ' dB')
+    check(f'{inst}: velocity opens the spectrum (v30/60/90/120)', ok, '; '.join(rows))
+    hi = [colour(*note(n, 127)[::-1])[2] for n in (55, 62, 69, 76)]
+    check(f'{inst}: no harshness at 127 (5-10 kHz under -35 dB of the attack)', max(hi) < -35, ' '.join(f'{v:.0f}' for v in hi) + ' dB (G3 D4 A4 E5)')
+    # The attack's brightness dies into the body (the flatwounds' k^2): G3 at 120, the 2-5 kHz share
+    # 15 dB lower at 200-400 ms than in the first 50.
+    fs, x = note(55, 120, hold=1.5)
+    d = colour(x, fs, 0.2, 0.4)[1] - colour(x, fs, 0, 0.05)[1]
+    check(f'{inst}: the attack\'s brightness dies into the body', d <= -15, f'G3 v120: 2-5 kHz share {d:+.1f} dB from the first 50 ms to 200-400 ms')
+    # The pick's place, its comb: the open low E picked at L/4 and at L/3 (the hand held still),
+    # through the bridge pickup (its own notch far up): picked at L/3, harmonics 3 and 6 fall; at
+    # L/4, 4 and 8.
+    def harms(frm):
+        fs, x = note(40, 90, {'PJ_EGTR_DI': '1', 'PJ_JAZZ_MOVE': '0', 'PJ_JAZZ_PLACE': str(frm / 1.15), 'PJ_JAZZ_PICKUP': '1'})
+        f, P = power(x, fs, 0.01, 0.31)
+        return np.array([10 * math.log10(P[(f > fk * 0.98) & (f < fk * 1.02)].max() + 1e-30)
+                         for fk in (82.41 * k * math.sqrt(1 + 3.5e-4 * k * k) for k in range(1, 11))])
+    dd = harms(0.628 / 4) - harms(0.628 / 3)
+    notch = lambda k: dd[k - 1] - 0.5 * (dd[k - 2] + dd[k])
+    check(f'{inst}: the pick\'s place moves its comb (L/4 against L/3)', notch(3) >= 5 and notch(6) >= 10 and notch(4) <= -3 and notch(8) <= -10,
+          f'harmonic 3 {notch(3):+.0f}, 6 {notch(6):+.0f} (L/3\'s nodes), 4 {notch(4):+.0f}, 8 {notch(8):+.0f} dB (L/4\'s), against their neighbours')
+    # The speaking strip: one phrase (a line and a chord) at velocity 35 and 110, with and without:
+    # with it the colour's range wider (the 2-5 kHz share and the centroid), the loudness's narrower.
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from levels import k_weight
+    ph = ''.join(f'on {n} {{v}} wait 0.16 off {n} ' for n in (62, 64, 65, 67, 69, 67, 65, 64, 62, 61, 62, 57))
+    ph += 'on 53 {v} on 57 {v} on 60 {v} on 64 {v} wait 0.6 off 53 off 57 off 60 off 64 wait 0.3'
+    res = {}
+    for strip in ('1', '0'):
+        for v in (35, 110):
+            fs, x = render(ph.format(v=v), {'PJ_JAZZ_STRIP': strip})
+            c, s25, _ = colour(x, fs, 0, len(x) / fs)
+            res[strip, v] = (c, s25, -0.691 + 10 * math.log10(np.mean(k_weight(x, fs) ** 2) + 1e-30))
+    rng = {s: (res[s, 110][0] / res[s, 35][0], res[s, 110][1] - res[s, 35][1], res[s, 110][2] - res[s, 35][2]) for s in ('1', '0')}
+    check(f'{inst}: the strip: the touch in colour, not in loudness', rng['1'][0] > rng['0'][0] and rng['1'][1] > rng['0'][1] + 3 and rng['1'][2] <= rng['0'][2],
+          f'soft to hard, with / without: centroid x{rng["1"][0]:.2f} / x{rng["0"][0]:.2f}, 2-5 kHz share {rng["1"][1]:+.1f} / {rng["0"][1]:+.1f} dB, '
+          f'loudness {rng["1"][2]:+.1f} / {rng["0"][2]:+.1f} dB')
+    # A short chord let go: -40 dB within 60 ms of the key (the left hand's choke; FluidR3's recorded
+    # release 30-60 ms, research 7; the strings themselves in ~20, the archtop's own sound in the
+    # room a little after).
+    on = ' '.join(f'on {n} 60' for n in (55, 59, 62, 65))
+    fs, x = render(f'{on} wait 0.15 ' + ' '.join(f'off {n}' for n in (55, 59, 62, 65)) + ' wait 0.5')
+    e = 10 * np.log10(np.convolve(x * x, np.ones(96) / 96, 'same') + 1e-30)
+    below = np.where(e[int(0.15 * fs):] < e[:int(0.15 * fs)].max() - 40)[0]
+    t40 = 1000 * below[0] / fs if len(below) else 999
+    check(f'{inst}: a short chord choked (-40 dB within 60 ms of its keys)', t40 <= 60, f'{t40:.0f} ms')
+    # The archtop's own sound in the room: 20 +- 5 dB under the amp on a chord, A-weighted.
+    seq = 'on 48 70 on 55 70 on 59 70 on 64 70 wait 1 off 48 off 55 off 59 off 64'
+    fs, a = render(seq, {'PJ_JAZZ_ACOUSTIC': '-200'})
+    fs, b = render(seq)
+    f1, f2, f3, f4 = 20.598997, 107.65265, 737.86223, 12194.217
+    den = np.polymul(np.polymul(np.polymul([1, 4 * np.pi * f4, (2 * np.pi * f4) ** 2], [1, 4 * np.pi * f1, (2 * np.pi * f1) ** 2]), [1, 2 * np.pi * f3]), [1, 2 * np.pi * f2])
+    bb, aa = bilinear([(2 * np.pi * f4) ** 2 * 10 ** (1.9997 / 20), 0, 0, 0, 0], den, fs)
+    aw = lambda y: 10 * math.log10(np.mean(lfilter(bb, aa, y) ** 2) + 1e-30)
+    share = aw(b - a) - aw(a)
+    check(f'{inst}: the acoustic share (-20 +- 5 dB under the amp, A-weighted)', -25 <= share <= -15, f'{share:+.1f} dB')
+    # The user's file (research 6.1: louisiana.mid, channel 7): every chord playable, no top note
+    # dropped, <= 5 % of the notes dropped, no open string in a chord of 3+, the hand's mean move
+    # <= 2 frets.
+    lou = os.path.expanduser('~/Music/midi/bushgrafts/louisiana.mid')
+    if os.path.exists(lou):
+        with tempfile.TemporaryDirectory() as d:
+            b = open(lou, 'rb').read()
+            ntr, div = struct.unpack('>HH', b[10:14])
+            i, tracks = 14, []
+            for _ in range(ntr):
+                n = struct.unpack('>I', b[i + 4:i + 8])[0]
+                tr, j, st, outb, carry = b[i + 8:i + 8 + n], 0, 0, b'', 0
+                i += 8 + n
+                def vlq_read(j):
+                    v = 0
+                    while True:
+                        c = tr[j]; j += 1; v = (v << 7) | (c & 0x7f)
+                        if not c & 0x80: return v, j
+                def vlq(v):
+                    o = [v & 0x7f]; v >>= 7
+                    while v: o.insert(0, 0x80 | (v & 0x7f)); v >>= 7
+                    return bytes(o)
+                while j < len(tr):
+                    dt, j = vlq_read(j)
+                    carry += dt
+                    c = tr[j]
+                    if c == 0xFF:
+                        ln, k = vlq_read(j + 2); ev = tr[j:k + ln]; j = k + ln; keep = ev[1] != 0x2F
+                    elif c in (0xF0, 0xF7):
+                        ln, k = vlq_read(j + 1); ev = tr[j:k + ln]; j = k + ln; keep = False
+                    else:
+                        if c & 0x80: st = c; j += 1
+                        ln = 1 if (st & 0xF0) in (0xC0, 0xD0) else 2
+                        ev = bytes([st]) + tr[j:j + ln]; j += ln
+                        keep = (st & 0x0F) == 6
+                    if keep:
+                        outb += vlq(carry) + ev; carry = 0
+                tracks.append(outb + vlq(carry) + b'\xff\x2f\x00')
+            mid = os.path.join(d, 'ch7.mid')
+            open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 1, len(tracks), div) + b''.join(b'MTrk' + struct.pack('>I', len(t)) + t for t in tracks))
+            r = run(['-play', mid, '-director', 'off', '-o', os.path.join(d, 'ch7.wav')], env={'PJ_JAZZ_STATS': '1'})
+        m = re.search(r'(\d+) chords, (\d+) notes asked, (\d+) dropped \(([\d.]+) %\), (\d+) top notes dropped, (\d+) unplayable, (\d+) open strings in chords of 3\+, the hand\'s mean move ([\d.]+) frets', r.stderr)
+        if not m:
+            check(f'{inst}: louisiana ch7 voiced', False, r.stderr.strip()[-300:])
+        else:
+            pct, top, unp, opn, mv = float(m.group(4)), int(m.group(5)), int(m.group(6)), int(m.group(7)), float(m.group(8))
+            check(f'{inst}: louisiana ch7 voiced as a guitarist would', pct <= 5 and top == 0 and unp == 0 and opn == 0 and mv <= 2,
+                  f'{m.group(1)} chords, {m.group(3)} of {m.group(2)} notes dropped ({pct:.1f} %), {top} top notes dropped, {unp} unplayable, '
+                  f'{opn} open strings in chords of 3+, the hand moves {mv:.2f} frets')
+    else:
+        info(f'{inst}: louisiana ch7', 'the file is not here')
+    r = run(['-inst', inst, '-fuzz', '10', '1'])
+    check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())
+    ns = cpu_time(['-inst', inst, '-room', 'dry', '-seq', 'on 48 100 on 52 100 on 55 100 on 59 100 on 62 100 wait 4 off 48 off 52 off 55 off 59 off 62'], env={'PJ_NOCAL': '1'}) / (4 * 48000) * 1e9
+    check(f'real-time margin ({inst}: a five-note chord)', ns < 2000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
+
 def electric_bass():
     """The electric bass (-inst electric-bass, GM 34; src/ebass.cc; research/bass_section.md):
     in tune; the open strings ring long (the fundamental's T60 well over 10 s); both J pickups
@@ -1761,6 +2015,8 @@ def slap_bass():
     # Thumb against pop on the same note (D2, G2, C3; PJ_SLAP_FORCE 1 / 2): the pop brighter above
     # 2 kHz at 30-100 ms (FluidR3, the same notes recorded both ways: +4..+9 dB); after the 1176
     # the two within ~4 dB (research/bass_amps.md 10.6 item 7).
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import levels
     hi, bal = [], []
     for m in (38, 43, 48):
         r = {}
@@ -1768,13 +2024,13 @@ def slap_bass():
             fs, x, _ = render('slap-bass-1', f'on {m} 100 wait 1 off {m}', dict(di, PJ_SLAP_FORCE=tech))
             o = onset(x, fs)
             _, y, _ = render('slap-bass-1', f'on {m} 100 wait 1 off {m}', {'PJ_SLAP_FORCE': tech})
-            r[tech] = (band(x, fs, o + 0.03, o + 0.1, 2000, 20000), lvl(y, fs))
+            r[tech] = (band(x, fs, o + 0.03, o + 0.1, 2000, 20000, True), lvl(levels.k_weight(y, fs), fs))
         hi.append(r['2'][0] - r['1'][0])
         bal.append(r['2'][1] - r['1'][1])
     check('slap-bass-1: the pop brighter than the thumb', np.mean(hi) > 3 and min(hi) > -1,
-          'above 2 kHz at 30-100 ms, D2 / G2 / C3: ' + ' / '.join(f'{v:+.1f}' for v in hi) + ' dB (FluidR3: +4..+9)')
-    check('slap-bass-1: thumb and pop balanced after the 1176', max(abs(v) for v in bal) < 4.5,
-          'the pop against the thumb, v100, D2 / G2 / C3: ' + ' / '.join(f'{v:+.1f}' for v in bal) + ' dB (within ~4)')
+          'the share above 2 kHz at 30-100 ms, D2 / G2 / C3: ' + ' / '.join(f'{v:+.1f}' for v in hi) + ' dB (FluidR3, its levels alike: +4..+9)')
+    check('slap-bass-1: thumb and pop balanced after the 1176', max(abs(v) for v in bal) < 5 and abs(np.mean(bal)) < 3.5,
+          'the pop against the thumb, v100, D2 / G2 / C3: ' + ' / '.join(f'{v:+.1f}' for v in bal) + ' dB, K-weighted, 125 ms (research: within ~4)')
     # Velocity: level and brightness (E1, thumbed): at the DI and after the chain.
     lv, c0 = {}, {}
     for v in (40, 120):
@@ -1897,6 +2153,307 @@ def slap_bass():
     check('real-time margin (slap-bass)', ns < 2.5 * nf + 20 and na < 1500,
           f'the strings, the frets and the DI {ns:.0f} ns/sample (the finger bass\'s {nf:.0f}); 38 with its chain {na:.0f} ({na / 20833 * 100:.1f} % of a core)')
 
+
+def fretless_bass():
+    """The fretless bass (-inst fretless-bass, GM 36; src/fretless.cc, src/band.h; research/
+    fretless_bass.md 8.6, its fifteen tests): the board under the finger makes the mwah (the
+    partials of 0.3-1 kHz peaking 80-400 ms after a hard pluck, the fretted Jazz Bass's at the
+    attack), soft notes are clean, open strings never touch, a lower action touches longer; the
+    fingertip's loss; 48 kHz as 96 kHz and the glide's kept action (tools/fretlessboard.cc); a slide
+    has no new attack, a short overlap is a new pluck; a walking line in a jazz file does not slide;
+    the scoop's shape; the late vibrato; the bass tuned by ear against the band (-play: a bare
+    third, a full chord, a shell, the clamp, nothing to hear, a chord changing over it); the band's
+    registry (the sustain pedal, an organ); the jazz-band rule keeps GM 36 on the double bass; real
+    time."""
+    import struct
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt
+    inst = 'fretless-bass'
+    base = {'PJ_FRETLESS_ERR': '0', 'PJ_FRETLESS_SCOOP': '0', 'PJ_FRETLESS_VIB': '0', 'PJ_FRETLESS_LOG': '1'}
+    def render(seq, env=None, secs_dry=True):
+        e = dict(base)
+        e.update(env or {})
+        with tempfile.TemporaryDirectory() as d:
+            wav = os.path.join(d, 'f.wav')
+            r = run(['-inst', inst, '-room', 'dry', '-seq', seq, '-o', wav], env=e)
+            fs, x = wavfile.read(wav)
+        x = x.astype(float)
+        return fs, (x.mean(1) if x.ndim > 1 else x), r.stderr
+    def contact(err):
+        m = re.search(r'board contact (\d+) of (\d+) samples \(([\d.]+) %\), the last at ([-\d.]+) s', err)
+        return (float(m.group(3)), float(m.group(4))) if m else (None, None)
+    def fingers(err):
+        return np.array([[float(m.group(i)) for i in range(1, 6)]
+                         for m in re.finditer(r'finger t=([\d.]+) string \d+ cents ([-+\d.]+) band ([-+\d.]+) to ([-+\d.]+) at ([\d.]+)', err)])
+    def tracks(x, fs, f1, B, K=24):
+        on = int(np.argmax(np.abs(x) > 0.05 * np.abs(x).max()))
+        win = int(4 * fs / f1); hop = int(0.01 * fs)
+        t = np.arange(win) / fs; wv = np.hanning(win)
+        E = [np.exp(-2j * np.pi * k * math.sqrt(1 + B * k * k) * f1 * t) for k in range(1, K + 1)]
+        T, H = [], []
+        for s in range(max(0, on - win // 2), min(len(x) - win, on + int(1.2 * fs)), hop):
+            fr = x[s:s + win] * wv
+            H.append([2 * abs(np.dot(fr, e)) / wv.sum() for e in E]); T.append((s + win / 2 - on) / fs)
+        return np.array(T), 20 * np.log10(np.array(H) + 1e-15)
+
+    # 1. The mwah: a hard stopped A1 (the E string's 5th position) against the same note fretted
+    # (the board off, the fret's end instead of the fingertip's): its partials of 0.3-1 kHz peak
+    # late, the fretted ones at the attack; the board fills them in (the pluck's notches).
+    late, band = {}, {}
+    for name, env in (('fretless', {}), ('fretted', {'PJ_FRETLESS_BOARD': '0', 'PJ_FRETLESS_FINGER': '0'})):
+        fs, x, err = render('on 33 100 wait 1.5 off 33', dict(env, PJ_FRETLESS_STRING='1'))
+        T, H = tracks(x, fs, 55.0, 2e-4)
+        ks = [k for k in range(24) if 300 <= (k + 1) * 55 <= 1000]
+        tm = T[np.argmax(H[:, ks], 0)]
+        late[name] = [k + 1 for k, t in zip(ks, tm) if 0.08 <= t <= 0.4]
+        P = 10 ** (H[:, ks] / 10)
+        band[name] = 10 * np.log10(P.sum(1)) - H[:, 0].max()
+        if name == 'fretless': cf = contact(err)
+    mid = (T >= 0.15) & (T <= 0.35)
+    fill = float(np.mean(band['fretless'][mid] - band['fretted'][mid]))
+    check('fretless: the mwah', len(late['fretless']) >= 3 and len(late['fretted']) <= 1 and fill > 4,
+          f"A1 v100 stopped: partials of 0.3-1 kHz peaking 80-400 ms: fretless h{late['fretless']}, fretted h{late['fretted']}; "
+          f"that band over 0.15-0.35 s {fill:+.1f} dB against the fretted; the board touched {cf[0]:.2f} % "
+          f"of the samples, the last at {cf[1]:.2f} s")
+    # 2. Soft is clean.
+    fs, x, err = render('on 33 30 wait 1.0 off 33', {'PJ_FRETLESS_STRING': '1'})
+    c30 = contact(err)[0]
+    T, H = tracks(x, fs, 55.0, 2e-4)
+    ks = [k for k in range(24) if 300 <= (k + 1) * 55 <= 1000]
+    pk = T[np.argmax(10 * np.log10((10 ** (H[:, ks] / 10)).sum(1)))]
+    check('fretless: a soft note is clean', c30 < 0.5 and pk < 0.08, f'A1 v30: the board touched {c30:.2f} % of the samples; its 0.3-1 kHz band peaks at {pk * 1000:.0f} ms')
+    # 3. Open strings never touch.
+    worst = max(contact(render(f'on 28 {v} wait 1.0 off 28')[2])[0] for v in (40, 80, 127))
+    check('fretless: the open E never touches', worst == 0, f'v40/80/127: {worst:.3f} % of the samples')
+    # 4. The action: lower, longer.
+    lo = contact(render('on 33 100 wait 1.5 off 33', {'PJ_FRETLESS_STRING': '1', 'PJ_FRETLESS_ACTION': '0.6'})[2])
+    hi = contact(render('on 33 100 wait 1.5 off 33', {'PJ_FRETLESS_STRING': '1', 'PJ_FRETLESS_ACTION': '1.4'})[2])
+    check('fretless: a lower action grazes longer', lo[1] >= 1.4 * hi[1] and lo[0] >= 2 * hi[0],
+          f'A1 v100, action x0.6: the last contact at {lo[1]:.2f} s ({lo[0]:.1f} % of the samples); x1.4: {hi[1]:.2f} s ({hi[0]:.1f} %)')
+    # 5. The fingertip's loss: above 1 kHz the stopped note dies faster than fretted; the
+    # fundamental a little (FluidR3's recorded fretless: -4 to -7 dB/s).
+    rates = {}
+    for name, env in (('fretless', {'PJ_FRETLESS_BOARD': '0'}), ('fretted', {'PJ_FRETLESS_BOARD': '0', 'PJ_FRETLESS_FINGER': '0'})):
+        fs, x, _ = render('on 33 70 wait 2.0 off 33', dict(env, PJ_FRETLESS_STRING='1', PJ_EBASS_DI='1'))
+        on = int(np.argmax(np.abs(x) > 0.05 * np.abs(x).max()))
+        out = []
+        for lo_, hi_ in ((50, 60), (1000, 3000)):
+            y = sosfiltfilt(butter(2, [lo_, hi_], 'band', fs=fs, output='sos'), x)
+            e = 10 * np.log10(np.convolve(y * y, np.ones(2400) / 2400, 'same') + 1e-20)
+            t = (np.arange(len(e)) - on) / fs
+            m = (t > 0.1) & (t < 0.6 if lo_ > 100 else t < 1.8)
+            out.append(-np.polyfit(t[m], e[m], 1)[0])
+        rates[name] = out
+    hiRatio, fund = rates['fretless'][1] / rates['fretted'][1], rates['fretless'][0] / rates['fretted'][0]
+    check('fretless: the fingertip takes the top', hiRatio >= 1.5 and 0.7 < fund < 1.6 and 3.5 <= rates['fretless'][0] <= 7.5,
+          f"A1 v70 (no board): 1-3 kHz {rates['fretless'][1]:.0f} dB/s against the fretted {rates['fretted'][1]:.0f} (x{hiRatio:.1f}); "
+          f"the fundamental {rates['fretless'][0]:.1f} against {rates['fretted'][0]:.1f} dB/s (x{fund:.2f})")
+    # 6, 8. The board and the glide in Guitar alone.
+    exe = os.path.join(ROOT, 'tools', '.fretlessboard')
+    b = subprocess.run(['g++', '-O2', '-std=c++17', '-Isrc', 'tools/fretlessboard.cc', 'src/guitar.cc', 'src/bassspec.cc', 'src/fretlessspec.cc', '-o', exe],
+                       capture_output=True, text=True, cwd=ROOT)
+    if b.returncode != 0:
+        check('fretless: tools/fretlessboard.cc builds', False, b.stderr.strip()[-300:])
+    else:
+        r = subprocess.run([exe], capture_output=True, text=True, cwd=ROOT)
+        for line in r.stdout.splitlines():
+            if line[:4] in ('ok  ', 'FAIL'):
+                name, _, detail = line[6:].partition(': ')
+                check(name, line.startswith('ok'), detail)
+        os.remove(exe)
+    # 7. A slide: C2 held into D2 on the A string for 100 ms: the finger glides (monotonic, 120-160 ms
+    # end to end), no new attack (the level over 1 kHz does not jump); 20 ms of overlap: a new pluck.
+    sl = {'PJ_FRETLESS_STRING': '2', 'PJ_FRETLESS_SLIDES': '2', 'PJ_FRETLESS_WAIT': '0.06', 'PJ_FRETLESS_LOG': '2'}
+    fs, x, err = render('on 36 90 wait 0.6 on 38 90 wait 0.1 off 36 wait 0.8 off 38', sl)
+    f = fingers(err)
+    slid = 'fretless slide' in err
+    seg = f[(f[:, 0] >= 0.5) & (f[:, 0] <= 1.1)]
+    absPos = seg[:, 4]
+    mono = np.all(np.diff(absPos) >= -0.002)
+    start = seg[np.argmax(absPos > 3 + 0.005), 0]
+    end = seg[np.argmax(absPos > 5 - 0.005), 0]
+    on = int(np.argmax(np.abs(x) > 0.05 * np.abs(x).max()))
+    y = sosfiltfilt(butter(2, 1000, 'high', fs=fs, output='sos'), x)
+    e = 10 * np.log10(np.convolve(y * y, np.ones(480) / 480, 'same') + 1e-20)
+    at = on + int(0.6 * fs)
+    jump = e[at:at + int(0.08 * fs)].max() - e[at - int(0.03 * fs):at].max()
+    _, _, err2 = render('on 36 90 wait 0.6 on 38 90 wait 0.02 off 36 wait 0.8 off 38', sl)
+    check('fretless: a slide, no new attack', slid and mono and 0.12 <= end - start <= 0.16 and jump < 1 and 'fretless slide' not in err2,
+          f'C2 to D2 held over 100 ms: {"slid" if slid else "plucked"}, the finger {"monotonic" if mono else "not monotonic"}, '
+          f'0.5 c off C2 to 0.5 c from D2 in {1000 * (end - start):.0f} ms; over 1 kHz {jump:+.1f} dB as it begins; '
+          f'with 20 ms of overlap: {"a slide" if "fretless slide" in err2 else "a new pluck"}')
+    # 9. A walking line in a jazz trio's file (the user's Autumn Leaves, its GM 36 forced onto the
+    # fretless): hardly any slides.
+    al = os.path.expanduser('~/Music/midi/bushgrafts/AutumnLeaves.mid')
+    if os.path.exists(al):
+        with tempfile.TemporaryDirectory() as d:
+            r = run(['-play', al, '-reinstrument', 'double-bass=fretless-bass', '-room', 'dry', '-director', 'off', '-o', os.path.join(d, 'a.wav')],
+                    env={'PJ_FRETLESS_LOG': '1', 'PJ_THREADS': '4'})
+        m = re.search(r'fretless: (\d+) struck, (\d+) slid', r.stderr)
+        n, s = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+        check('fretless: no false slides in a walking line', n > 50 and s < 0.05 * (n + s), f'Autumn Leaves: {n} plucked, {s} slid')
+    else:
+        info('fretless: no false slides in a walking line', 'no Autumn Leaves file here')
+    # 10. The scoop: lands 25-35 c flat, crosses its note at 40-80 ms, overshoots 5-15 c, within 2 c by 300 ms.
+    fs, x, err = render('on 36 100 wait 1.0 off 36', {'PJ_FRETLESS_STRING': '2', 'PJ_FRETLESS_SCOOP': '2', 'PJ_FRETLESS_LOG': '2'})
+    f = fingers(err)
+    c = f[:, 1]
+    t = f[:, 0] - f[0, 0]
+    cross = t[np.argmax(c >= 0)]
+    over = c[t < 0.3].max()
+    settle = np.abs(c[(t >= 0.3) & (t < 0.6)]).max()
+    check('fretless: the scoop', -35 <= c[0] <= -25 and 0.04 <= cross <= 0.08 and 5 <= over <= 15 and settle < 2,
+          f'C2 v100: lands {c[0]:+.1f} c, crosses at {1000 * cross:.0f} ms, overshoots {over:+.1f} c, after 0.3 s within {settle:.1f} c')
+    # 11. The vibrato: nothing before 200 ms; then 4.5-5.5 Hz, +-8-15 c.
+    fs, x, err = render('on 40 90 wait 2.0 off 40', {'PJ_FRETLESS_STRING': '1', 'PJ_FRETLESS_VIB': '1', 'PJ_FRETLESS_LOG': '2'})
+    f = fingers(err)
+    t, c = f[:, 0] - f[0, 0], f[:, 1]
+    early = np.abs(c[t < 0.2]).max()
+    w = c[(t > 0.8) & (t < 1.95)]
+    tw = t[(t > 0.8) & (t < 1.95)]
+    zc = np.where(np.diff(np.sign(w - w.mean())) > 0)[0]
+    rate = (len(zc) - 1) / (tw[zc[-1]] - tw[zc[0]]) if len(zc) > 1 else 0
+    depth = 0.5 * (w.max() - w.min())
+    check('fretless: the late vibrato', early < 0.5 and 4.5 <= rate <= 5.5 and 8 <= depth <= 15,
+          f'E2 held 2 s: before 200 ms at most {early:.2f} c; then {rate:.2f} Hz, +-{depth:.1f} c')
+    # 12. Tuned by ear against the band (-play; the piano's channel heard by the bass's registry).
+    def play(events, env, solo=None):
+        with tempfile.TemporaryDirectory() as d:
+            mid, wav = os.path.join(d, 'b.mid'), os.path.join(d, 'b.wav')
+            ev = sorted(events, key=lambda e: e[0])
+            if solo is not None:  # (the other channel's fader down: it is heard by the bass but not rendered)
+                ev = [(0.0, bytes([0xB0 | (1 - solo), 7, 0]))] + ev
+            trk, last = b'', 0
+            trk += b'\x00\xff\x51\x03' + struct.pack('>I', 500000)[1:]
+            def vlq(n):
+                o = [n & 127]; n >>= 7
+                while n: o.append((n & 127) | 128); n >>= 7
+                return bytes(reversed(o))
+            for tt, by in ev:
+                k = int(round(tt * 960)); trk += vlq(k - last) + by; last = k
+            trk += b'\x00\xff\x2f\x00'
+            open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+            e = dict(base, PJ_FRETLESS_LOG='2', PJ_THREADS='2')
+            e.update(env)
+            r = run(['-play', mid, '-reinstrument', 'double-bass=fretless-bass', '-room', 'dry', '-director', 'off', '-o', wav], env=e)
+            fs, xx = wavfile.read(wav)
+        return fs, xx.astype(float).mean(1), r.stderr
+    def held(bass, others, t1=3.0, prog=0):
+        ev = [(0.0, bytes([0xC0, 35])), (0.0, bytes([0xC1, prog]))]
+        for k in others: ev += [(0.5, bytes([0x91, k, 80])), (0.5 + t1, bytes([0x81, k, 0]))]
+        ev += [(0.5, bytes([0x90, bass, 90])), (0.5 + t1, bytes([0x80, bass, 0]))]
+        return ev
+    def settled(err, t=(0.8, 3.0)):
+        f = fingers(err)
+        m = (f[:, 0] - f[0, 0] > t[0] - 0.5) & (f[:, 0] - f[0, 0] < t[1] - 0.5)
+        return f[m, 1].mean(), f
+    _, xb, err = play(held(36, [52]), {}, solo=0)
+    ca, f = settled(err)
+    t300 = f[np.argmin(np.abs(f[:, 0] - f[0, 0] - 0.3)), 1]
+    fs, xp, _ = play(held(36, [52]), {}, solo=1)
+    def peak(x, lo, hi):
+        seg = x[int(1.0 * fs):int(3.2 * fs)]
+        X = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 1 << 20))
+        fr = np.fft.rfftfreq(1 << 20, 1 / fs)
+        m = (fr > lo) & (fr < hi)
+        return fr[m][np.argmax(X[m])]
+    fb5, fp2 = peak(xb, 320, 335), peak(xp, 322, 337)
+    check('fretless: a bare third above, the bass leans in', 10 <= ca <= 15 and 8 <= t300 and abs(fb5 - fp2) < 0.5,
+          f'C2 under the piano\'s E3: {ca:+.1f} c ({t300:+.1f} at 300 ms); its 5th partial {fb5:.2f} Hz against the piano\'s 2nd {fp2:.2f}: beating {abs(fb5 - fp2):.2f} Hz')
+    _, _, err = play(held(36, [48, 52, 55]), {})
+    cb, _ = settled(err)
+    _, _, err = play(held(31, [47, 53]), {})
+    cc, f = settled(err)
+    cmax = f[:, 1].max()
+    _, _, err = play(held(36, [52]), {'PJ_FRETLESS_JI_LIM': '8'})
+    cl, f = settled(err)
+    clmax = f[:, 1].max()
+    check('fretless: a full chord holds it, the limits hold', abs(cb) <= 2 and cmax <= 15.01 and clmax <= 8.01,
+          f'C2 under C3 E3 G3: {cb:+.1f} c; G1 under B2 F3 (a G7 shell): {cc:+.1f} c, at most {cmax:+.1f}; the bare third with the limit at 8 c: {cl:+.1f}, at most {clmax:+.1f}')
+    # (d) Nothing to hear: exactly in tune; with the player's own error, its landings.
+    fs, x, err = render('on 36 90 wait 1.0 off 36', {'PJ_FRETLESS_STRING': '2', 'PJ_FRETLESS_LOG': '2'})
+    f = fingers(err)
+    alone = np.abs(f[:, 1]).max()
+    seq = ' '.join(f'on {36 + (i * 5) % 12} 70 wait 0.25 off {36 + (i * 5) % 12} wait 0.05' for i in range(200))
+    _, _, err = render(seq, {'PJ_FRETLESS_ERR': '8'})
+    e0 = np.array([float(m.group(1)) for m in re.finditer(r'fretless note .* fret [1-9]\d* e0 ([-+\d.]+) ', err)])
+    bias = float(re.search(r'bias ([-+\d.]+)', err).group(1))
+    check('fretless: alone, in tune; the landings', alone == 0 and len(e0) > 100 and abs(e0.mean()) <= 1 and 6 <= e0.std() <= 12,
+          f'C2 with no error: at most {alone:.2f} c; {len(e0)} stopped landings with the error on: mean {e0.mean():+.2f} c off the aim '
+          f'(the player\'s bias {bias:+.1f}), sd {e0.std():.1f} c')
+    # (e) A chord changing over a held note: the finger at most 1 c/ms, small changes let be.
+    ev = [(0.0, bytes([0xC0, 35])), (0.0, bytes([0xC1, 0])), (0.5, bytes([0x90, 36, 90])), (4.0, bytes([0x80, 36, 0])),
+          (0.5, bytes([0x91, 52, 80])), (1.8, bytes([0x81, 52, 0])),
+          (1.8, bytes([0x91, 48, 80])), (1.8, bytes([0x91, 52, 80])), (1.8, bytes([0x91, 55, 80])), (4.0, bytes([0x81, 48, 0])),
+          (4.0, bytes([0x81, 52, 0])), (4.0, bytes([0x81, 55, 0]))]
+    _, _, err = play(ev, {})
+    f = fingers(err)
+    m = f[:, 0] - f[0, 0] > 0.5
+    speed = np.abs(np.diff(f[m, 1]) / np.diff(f[m, 0])).max() / 1000
+    tos = f[m, 3]
+    steps = np.abs(np.diff(tos))
+    small = [(round(a, 2), round(b, 2)) for a, b, st in zip(tos[:-1], tos[1:], steps) if 1e-6 < st < 2]
+    check('fretless: following a chord change', speed <= 1.0 and len(small) == 0 and abs(f[-1, 1]) < 3,
+          f'C2 held, E3 then C3 E3 G3 above: the finger at most {speed:.2f} c/ms, {len(small)} aims moved by under 2 c {small[:4]}; ends {f[-1, 1]:+.1f} c')
+    # 13. The registry: a piano note let go under the pedal stays and falls; without, it leaves; an organ's at once.
+    def bandlog(ev):
+        with tempfile.TemporaryDirectory() as d:
+            mid = os.path.join(d, 'r.mid')
+            trk, last = b'\x00\xff\x51\x03' + struct.pack('>I', 500000)[1:], 0
+            def vlq(n):
+                o = [n & 127]; n >>= 7
+                while n: o.append((n & 127) | 128); n >>= 7
+                return bytes(reversed(o))
+            for tt, by in sorted(ev, key=lambda e: e[0]):
+                k = int(round(tt * 960)); trk += vlq(k - last) + by; last = k
+            trk += b'\x00\xff\x2f\x00'
+            open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+            r = run(['-play', mid, '-room', 'dry', '-director', 'off', '-o', os.path.join(d, 'r.wav')], env={'PJ_BAND_LOG': '1', 'PJ_THREADS': '2'})
+        return [(float(m.group(1)), m.group(2)) for m in re.finditer(r'band ([\d.]+):(.*)', r.stderr)]
+    lg = bandlog([(0.0, bytes([0xC0, 0])), (0.0, bytes([0xC1, 16])), (0.3, bytes([0xB0, 64, 127])), (0.5, bytes([0x90, 60, 100])),
+                  (1.0, bytes([0x80, 60, 0])), (1.8, bytes([0x91, 72, 100])), (1.85, bytes([0x81, 72, 0])), (2.0, bytes([0xB0, 64, 0])), (2.5, bytes([0x90, 64, 100])), (3.0, bytes([0x80, 64, 0])),
+                  (3.5, bytes([0x91, 67, 100])), (4.0, bytes([0x81, 67, 0])), (4.5, bytes([0xB0, 0, 0]))])
+    def at(t):
+        s = ''
+        for tt, v in lg:
+            if tt <= t: s = v
+        return s
+    kept = '0:60~' in at(1.82)
+    fell = re.search(r'0:60~\(([\d.]+)\)', at(1.82))
+    gone = '0:60' not in at(2.1) and '0:64' not in at(3.1) and '1:67' in at(3.9) and '1:67' not in at(4.1)
+    check('fretless: the band\'s registry', kept and fell and float(fell.group(1)) < 0.3 and gone,
+          f'a piano C4 let go under the pedal: {"kept" if kept else "gone"} (level {fell.group(1) if fell else "?"} at 1.8 s, 0.70 when struck); '
+          f'gone when the pedal lifts, a note let go without it gone at once, an organ\'s too: {"yes" if gone else "no"}')
+    # 14. The jazz-band rule.
+    def chans(ev):
+        with tempfile.TemporaryDirectory() as d:
+            mid = os.path.join(d, 'j.mid')
+            trk, last = b'\x00\xff\x51\x03' + struct.pack('>I', 500000)[1:], 0
+            def vlq(n):
+                o = [n & 127]; n >>= 7
+                while n: o.append((n & 127) | 128); n >>= 7
+                return bytes(reversed(o))
+            for tt, by in sorted(ev, key=lambda e: e[0]):
+                k = int(round(tt * 960)); trk += vlq(k - last) + by; last = k
+            trk += b'\x00\xff\x2f\x00'
+            open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+            r = run(['-play', mid, '-room', 'dry', '-director', 'off', '-o', os.path.join(d, 'j.wav')], env={'PJ_THREADS': '2'})
+        return r.stderr
+    jazz = chans([(0.0, bytes([0xC0, 35])), (0.0, bytes([0xC1, 0])), (0.2, bytes([0x90, 36, 90])), (0.2, bytes([0x91, 60, 80])),
+                  (0.8, bytes([0x80, 36, 0])), (0.8, bytes([0x81, 60, 0]))])
+    rock = chans([(0.0, bytes([0xC0, 35])), (0.0, bytes([0xC1, 29])), (0.2, bytes([0x90, 36, 90])), (0.2, bytes([0x91, 60, 80])),
+                  (0.8, bytes([0x80, 36, 0])), (0.8, bytes([0x81, 60, 0]))])
+    check('fretless: the jazz-band rule', 'playing: double-bass' in jazz and 'fretless' not in jazz and 'playing: fretless-bass' in rock,
+          f'GM 36 with a piano: {"the double bass" if "playing: double-bass" in jazz else "?"}; with an overdriven guitar: '
+          f'{"the fretless" if "playing: fretless-bass" in rock else "?"}')
+    # 15. Real time: a busy line with the chorus against the Jazz Bass's.
+    line = ' '.join(f'on {k} {v} wait 0.12 off {k} wait 0.005' for k, v in zip([36, 38, 40, 43, 45, 48, 47, 45, 43, 40] * 8, [70, 95, 80, 110, 60] * 16))
+    nf = cpu_time(['-inst', inst, '-room', 'dry', '-seq', line], env={'PJ_NOCAL': '1', 'PJ_FRETLESS_CHORUS': '1'})
+    ne = cpu_time(['-inst', 'electric-bass', '-room', 'dry', '-seq', line], env={'PJ_NOCAL': '1'})
+    check('fretless: real time', nf <= 1.3 * ne, f'a busy line with the chorus {nf:.2f} s of CPU against the Jazz Bass\'s {ne:.2f} s (x{nf / ne:.2f})')
+    r = run(['-inst', inst, '-fuzz', '10', '1'])
+    check('fuzz 10 s (fretless-bass)', r.returncode == 0, r.stdout.strip())
 
 def clavinet():
     """The Clavinet (-inst clavinet, src/clavinet.cc): in tune, no blow-up, real time, and the
@@ -5385,10 +5942,240 @@ def fx_echoes():
     ns = cpu_time(['-inst', inst, '-room', 'dry', '-seq', 'on 48 100 on 55 100 on 60 100 on 64 100 on 67 100 on 72 100 on 76 100 on 79 100 wait 4']) / (4 * 48000) * 1e9
     check(f'real-time margin ({inst}: eight notes)', ns < 6000, f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
+def brass_section():
+    """The brass section (-inst brass-section, GM 62; src/brasssect.cc; research/brass_section.md
+    11.5): the voicer (no crossing, every note in its seat's range, no mud under the low interval
+    limits, the lead always the top key, small motion over a ii-V-I); the dealing; the section
+    beats; in tune, the seats a few cents apart; tight stabs (-play); velocity is brightness and
+    loudness; the balance against one trumpet; falls smeared over the players; fuzz; real time."""
+    import random, struct
+    import numpy as np
+    from scipy.io import wavfile
+    from scipy.signal import butter, sosfiltfilt, hilbert
+    inst = 'brass-section'
+    LIL = {1: 55, 2: 53, 3: 53, 4: 52, 5: 47, 6: 48, 7: 34, 8: 43, 9: 41, 10: 41, 11: 41}  # (src/brasssect.cc)
+    SEATS = {'pop': [(58, 82), (55, 81), (54, 79), (40, 74), (38, 72)],
+             'bigband': [(58, 82), (55, 81), (54, 79), (54, 77), (41, 74), (40, 72), (40, 70), (36, 65)],
+             'orchestral': [(58, 82), (55, 79), (45, 77), (45, 77), (43, 72), (41, 70), (40, 72), (40, 70), (36, 65), (28, 58)]}
+
+    def voice(spec):
+        r = run(['-brassvoice', spec])
+        out = []
+        for line in r.stdout.splitlines():
+            parts = line.split('|')
+            keys = [int(k) for k in parts[2].split('->')[0].split()[1:]]
+            out.append((parts[0].strip().replace(' ', ''), parts[1].strip(), keys, parts[2].split('->')[1].split(':')[0].strip(),
+                        [int(v) for v in parts[4].split()[1:]], int(parts[3].split()[1])))
+        return out
+
+    # The voicer: random chords as written, and random melodies over chords to voice, in every mode.
+    rng = random.Random(62)
+    syms = ['C', 'Dm7', 'G7', 'Cmaj7', 'Am', 'F6', 'Bb7', 'Ebmaj7', 'F#m7b5', 'E7', 'Gsus4', 'Dm']
+    bad, n, voiced = [], 0, 0
+    for mode in ('pop', 'bigband', 'orchestral'):
+        steps = []
+        for _ in range(60):
+            if rng.random() < 0.5:
+                top = rng.randint(64, 84)
+                steps.append('chord %s %d' % (rng.choice(syms), top))
+            else:
+                k = sorted({rng.randint(36, 84) for _ in range(rng.randint(1, 5))})
+                steps.append(' '.join(map(str, k)))
+        for m, chord, keys, how, notes, motion in voice('mode %s; ' % mode + '; '.join(steps)):
+            n += 1
+            seats = SEATS[m]
+            play = [(i, v) for i, v in enumerate(notes) if v >= 0]
+            def fold(k, lo=min(a for a, _ in seats), hi=max(b for _, b in seats)):  # (a key beyond every seat: by octaves)
+                while k > hi: k -= 12
+                while k < lo: k += 12
+                return k
+            top = max(fold(k) for k in keys)
+            if any(play[j][1] < play[j + 1][1] for j in range(len(play) - 1)): bad.append(f'{m} {keys}: crossing {notes}')
+            if any(not seats[i][0] <= v <= seats[i][1] for i, v in play): bad.append(f'{m} {keys}: out of range {notes}')
+            if not play or max(v for _, v in play) != top: bad.append(f'{m} {keys}: the lead {max(v for _, v in play) if play else None} not {top}')
+            # (every key of three or fewer; of more, the top and the bottom: an inner key goes when more
+            # keys lie in a register than seats reach there)
+            must = keys if len(keys) <= 3 else [max(keys, key=fold), min(keys, key=fold)]
+            if not all(any(v == fold(k) for _, v in play) for k in must):
+                bad.append(f'{m} {keys}: a key not sounded {notes}')
+            if chord != '?' and how not in ('unison', 'octaves', 'dealt', 'unison, the low brass 8vb'):
+                voiced += 1
+                v = sorted(set(x for _, x in play))
+                for a, b in zip(v, v[1:]):
+                    if b - a < 12 and a < LIL[b - a]: bad.append(f'{m} {chord} {keys}: {a}-{b} under the low interval limit ({how})')
+                if any(b - a in (1, 13) for a in v for b in v): bad.append(f'{m} {chord} {keys}: a minor 2nd or 9th ({how})')
+    check('brass-section: the voicer (no crossing, in range, the lead on top, every key, no mud)', not bad and voiced > 20,
+          f'{n} voicings, {voiced} harmonised' + (f'; {bad[:4]}' if bad else ''))
+    # A ii-V-I: under a melody (big band) and as written (pop): every seat moves little.
+    lines = voice('mode bigband; chord Dm7 77; chord G7 77; chord Cmaj7 76') + voice('mode pop; 62 65 69 72; 62 65 67 71; 60 64 67 72')
+    moves = [l[5] / max(1, sum(v >= 0 for v in l[4])) for l in lines[1:3] + lines[4:6]]
+    check('brass-section: the voice leading over a ii-V-I (at most 2.5 semitones a seat on average)', max(moves) <= 2.5,
+          ' '.join(f'{v:.1f}' for v in moves) + ' semitones a seat; ' + '; '.join(f'{l[1]}: {l[3]}' for l in lines[:3]))
+    # The dealing: C4 E4 G4 C5: trumpet 1 on C5, the lowest trombone on C4.
+    r = run(['-inst', inst, '-seq', 'on 60 100 on 64 100 on 67 100 on 72 100 wait 0.3 off 60 off 64 off 67 off 72'], env={'PJ_BRASS_SHOW': '1'})
+    deal = [l for l in r.stderr.splitlines() if l.startswith('brass: keys')]
+    ok = deal and 'tp1 C5' in deal[-1] and deal[-1].rstrip().endswith('tb2 C4')
+    check('brass-section: C4 E4 G4 C5 dealt (tp1 on C5, the lowest trombone on C4)', bool(ok), deal[-1] if deal else 'no deal line')
+
+    def render(seq, env=None, ins=inst):
+        with tempfile.TemporaryDirectory() as d:
+            wav = os.path.join(d, 'b.wav')
+            run(['-inst', ins, '-room', 'dry', '-seq', seq, '-o', wav], env=dict(env or {}, PJ_THREADS='4'))
+            fs, x = wavfile.read(wav)
+        x = x.astype(float)
+        return fs, (x.mean(1) if x.ndim > 1 else x)
+
+    def pitch(x, fs, f, a, b):
+        s = x[int(a * fs):int(b * fs)]
+        S = np.abs(np.fft.rfft(s * np.hanning(len(s)), 1 << 20)) ** 2
+        fr = np.fft.rfftfreq(1 << 20, 1 / fs)
+        w = fsum = 0
+        for h in (1, 2, 3):
+            m = (fr > h * f * 0.97) & (fr < h * f * 1.03)
+            k = np.argmax(S[m])
+            w += S[m][k]
+            fsum += S[m][k] * fr[m][k] / h
+        return 1200 * math.log2(fsum / w / f)
+
+    # The section beats: F4 held by all five (no octave), each harmonic's amplitude moving.
+    f0 = 440 * 2 ** (-4 / 12)
+    seq = 'on 65 100 wait 3 off 65'
+    fs, x = render(seq, {'PJ_BRASS_OCTAVE': '0'})
+    am, rate = [], []
+    for h in range(1, 7):
+        y = sosfiltfilt(butter(4, [(h - 0.4) * f0, (h + 0.4) * f0], 'bandpass', fs=fs, output='sos'), x)[int(0.8 * fs):int(2.8 * fs)]
+        db = 20 * np.log10(np.abs(hilbert(y))[::480] + 1e-12)
+        am.append(np.std(db))
+        sp = np.abs(np.fft.rfft((db - db.mean()) * np.hanning(len(db)), 2048))
+        fr = np.fft.rfftfreq(2048, 0.01)
+        rate.append(fr[fr > 0.2][sp[fr > 0.2].argmax()])
+    check('brass-section: the section beats (F4: each of h2-h6 3.5 dB or more, h2-h3 at 0.5-3 Hz; one trumpet 0.2-0.8)',
+          min(am[1:6]) >= 3.5 and all(0.5 <= v <= 3 for v in rate[1:3]),
+          'AM sd ' + ' '.join(f'{v:.1f}' for v in am) + ' dB at ' + ' '.join(f'{v:.1f}' for v in rate) + ' Hz')
+    # In tune: the unison where the lone trumpet is (the trumpet's own few cents), the seats a few cents apart.
+    whole = pitch(x, fs, f0, 1.0, 2.8)
+    fs, xt = render(seq, ins='trumpet')
+    tp = pitch(xt, fs, f0, 1.0, 2.8)
+    seats = [pitch(render(seq, {'PJ_BRASS_OCTAVE': '0', 'PJ_BRASS_ONLY': str(s)})[1], fs, f0, 1.0, 2.8) for s in range(1, 6)]
+    check('brass-section: in tune (F4 unison within 3 c of the lone trumpet, 6 c of the key; the seats sd 2-5 c)',
+          abs(whole - tp) <= 3 and abs(whole) <= 6 and 2 <= np.std(seats) <= 5,
+          f'unison {whole:+.1f} c (trumpet {tp:+.1f}); seats ' + ' '.join(f'{c:+.1f}' for c in seats) + f', sd {np.std(seats):.1f} c')
+
+    def midi(path, tracks):  # tracks: [(beat, channel, key, velocity, beats) or (beat, channel, 'pc', program)]
+        body = []
+        for tr in tracks:
+            ev = []
+            for e in tr:
+                if e[2] == 'pc': ev.append((int(e[0] * 480), 0, bytes([0xC0 | e[1], e[3]])))
+                else:
+                    ev.append((int(e[0] * 480), 1, bytes([0x90 | e[1], e[2], e[3]])))
+                    ev.append((int((e[0] + e[4]) * 480), 0, bytes([0x80 | e[1], e[2], 0])))
+            ev.sort(key=lambda q: (q[0], q[1]))
+            data, last = b'', 0
+            for t, _, b in ev:
+                dt, v = t - last, []
+                v.append(dt & 0x7f)
+                dt >>= 7
+                while dt: v.insert(0, (dt & 0x7f) | 0x80); dt >>= 7
+                data += bytes(v) + b
+                last = t
+            data += bytes([0, 0xFF, 0x2F, 0])
+            body.append(b'MTrk' + struct.pack('>I', len(data)) + data)
+        open(path, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 1, len(body), 480) + b''.join(body))
+
+    def play(tracks, env=None):
+        with tempfile.TemporaryDirectory() as d:
+            mid, wav = os.path.join(d, 'b.mid'), os.path.join(d, 'b.wav')
+            midi(mid, tracks)
+            run(['-play', mid, '-room', 'dry', '-director', 'off', '-o', wav], env=dict(env or {}, PJ_PLAY_TAIL='0.2'))
+            fs, y = wavfile.read(wav)
+        y = y.astype(float)
+        return fs, y.mean(1)
+
+    # Tight stabs (-play: the players start ahead by their instruments' speaking times): six
+    # 0.15 s stabs on C5, each seat alone.
+    stabs = [[(0, 0, 'pc', 61)] + [(0.5 + i, 0, 72, 110, 0.3) for i in range(6)]]
+    ons = {}
+    for s in range(1, 6):
+        fs, y = play(stabs, {'PJ_BRASS_ONLY': str(s)})
+        e = np.sqrt(np.convolve(y ** 2, np.ones(48) / 48, 'same'))
+        if e.max() < 1e-7:
+            continue
+        ons[s] = []
+        for i in range(6):
+            a = int((0.15 + 0.5 * i) * fs)
+            seg = e[a:a + int(0.3 * fs)]
+            ons[s].append((a + np.argmax(seg > 0.3 * seg.max())) / fs)
+    spans = [1000 * (max(ons[s][i] for s in ons) - min(ons[s][i] for s in ons)) for i in range(6)]
+    sds = [1000 * np.std([ons[s][i] for s in ons]) for i in range(6)]
+    lead = sum(ons[1][i] <= np.median([ons[s][i] for s in ons]) for i in range(6))
+    fs, y = play(stabs)
+    e = 20 * np.log10(np.sqrt(np.convolve(y ** 2, np.ones(240) / 240, 'same')) + 1e-12)
+    seg = e[int(2.1 * fs):int(2.6 * fs)]
+    above = np.where(seg > seg.max() - 40)[0]
+    ring = (above[-1] - above[0]) / fs
+    check('brass-section: tight stabs (the seats within 10-30 ms, sd 4-10 ms, the lead never behind; no longer than 0.35 s above -40 dB)',
+          len(ons) >= 4 and 10 <= np.mean(spans) <= 30 and 4 <= np.mean(sds) <= 10 and lead == 6 and ring <= 0.35,
+          f'{len(ons)} seats; span {np.mean(spans):.0f} ms, sd {np.mean(sds):.1f} ms, the lead at or before the median {lead}/6; {ring:.2f} s')
+    # Velocity is brightness: G4 (no octave), the 4 kHz octave against the 1 kHz one, velocity 64 -> 112.
+    def band(s, fs, lo, hi):
+        S = np.abs(np.fft.rfft(s * np.hanning(len(s)))) ** 2
+        fr = np.fft.rfftfreq(len(s), 1 / fs)
+        return 10 * np.log10(S[(fr >= lo) & (fr < hi)].sum() + 1e-30)
+    br = []
+    for v in (64, 112):
+        fs, x = render(f'on 67 {v} wait 1.5 off 67', {'PJ_BRASS_OCTAVE': '0'})
+        s = x[int(0.5 * fs):int(1.4 * fs)]
+        br.append(band(s, fs, 2828, 5657) - band(s, fs, 707, 1414))
+    check('brass-section: velocity is brightness (4 kHz re 1 kHz up 8 dB or more from velocity 64 to 112)', br[1] - br[0] >= 8,
+          f'{br[0]:+.1f} -> {br[1]:+.1f} dB')
+    # The balance (-play, one file: it is scaled to its peak): a unison key 1-3 dB over the trumpet,
+    # four keys 5-9 dB over one; the level over velocity 40 .. 127 10-16 dB.
+    segs = [(0, [67], 100), (1, [67], 100), (1, [60], 100), (1, [60, 64, 67, 72], 100), (1, [67], 40), (1, [67], 127)]
+    tr = [[(0, 0, 'pc', 56)], [(0, 1, 'pc', 61)]]
+    for i, (ch, keys, v) in enumerate(segs):
+        for k in keys: tr[ch].append((1 + 3 * i, ch, k, v, 2))
+    fs, y = play(tr)
+    L = [10 * np.log10(np.mean(y[int((0.9 + 1.5 * i) * fs):int((1.5 + 1.5 * i) * fs)] ** 2) + 1e-20) for i in range(len(segs))]
+    check('brass-section: the balance (-play: a key 1-3 dB over a trumpet; four keys 5-9 dB over one; velocity 40 -> 127 10-16 dB)',
+          1 <= L[1] - L[0] <= 3 and 5 <= L[3] - L[2] <= 9 and 10 <= L[5] - L[4] <= 16,
+          f'{L[1] - L[0]:+.1f}, {L[3] - L[2]:+.1f}, {L[5] - L[4]:.1f} dB')
+    # Falls: a full bend down over 0.15 s on a held C5: every player falls (two semitones: the GM
+    # bend), not in parallel: their half-way times 10-60 ms apart.
+    seq = 'on 72 100 wait 0.8 bend -0.25 wait 0.05 bend -0.5 wait 0.05 bend -0.75 wait 0.05 bend -1 wait 0.6 off 72 bend 0'
+    halves, depth = [], []
+    for s in range(1, 4):
+        fs, x = render(seq, {'PJ_BRASS_ONLY': str(s), 'PJ_BRASS_OCTAVE': '0'})
+        f0 = 523.25
+        y = sosfiltfilt(butter(4, [0.6 * f0, 1.3 * f0], 'bandpass', fs=fs, output='sos'), x)
+        zc = np.where((y[:-1] < 0) & (y[1:] >= 0))[0]
+        t = zc[1:] / fs
+        c = np.convolve(1200 * np.log2(fs / np.diff(zc) / f0), np.ones(9) / 9, 'same')
+        pre, post = np.median(c[(t > 0.5) & (t < 0.78)]), np.median(c[(t > 1.25) & (t < 1.4)])
+        depth.append(post - pre)
+        th = t[(t > 0.78) & (c < (pre + post) / 2)]
+        halves.append(th[0] if len(th) else 9)
+    spread = 1000 * (max(halves) - min(halves))
+    check('brass-section: falls (each trumpet two semitones down; the players 10-60 ms apart)',
+          max(depth) < -150 and 10 <= spread <= 60, ' '.join(f'{d:+.0f}' for d in depth) + f' c; half-way {spread:.0f} ms apart')
+    r = run(['-inst', inst, '-fuzz', '10', '1'])
+    check('fuzz 10 s (brass-section)', r.returncode == 0, r.stdout.strip())
+    # Real time: a five-key chord held 10 s, one thread; the pop section and the orchestral one.
+    held = 'on 48 100 on 60 100 on 64 100 on 67 100 on 72 100 wait 10 off 48 off 60 off 64 off 67 off 72'
+    for mode, lim in (('pop', 1500), ('orchestral', 3000)):
+        env = {'PJ_BRASS_MODE': mode}
+        with tempfile.TemporaryDirectory() as d:
+            wav = os.path.join(d, 'b.wav')
+            cpu_time(['-inst', inst, '-room', 'dry', '-seq', 'wait 0.01', '-o', wav], env)  # (its calibration cached)
+            base = cpu_time(['-inst', inst, '-room', 'dry', '-seq', 'wait 0.01', '-o', wav], env)
+            ns = (cpu_time(['-inst', inst, '-room', 'dry', '-seq', held, '-o', wav], env) - base) / (10.6 * 48000) * 1e9
+        check(f'real-time margin (brass-section, {mode}: {5 if mode == "pop" else 10} players)', ns < lim,
+              f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
+
 if __name__ == '__main__':
     t0 = time.time()
     for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, modals, electric_grand, electric_pianos, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, electric_bass, pick_bass, slap_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, timpani, harp, choir, voice_oohs, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes):
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes):
         f()
     print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
     sys.exit(1 if failures else 0)

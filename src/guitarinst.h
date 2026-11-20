@@ -45,7 +45,7 @@ class GuitarModel : public Tube {
   // (GM 27: the archtop's radiated sound mixed under the amp; its scale: Pa to the amp's units,
   // ~20 dB under it on a chord, A-weighted: research/jazz_guitar.md 2.5.)
   float kAcoustic_ = 0;
-  static constexpr double kAcousticCal_ = 0.0168;
+  static constexpr double kAcousticCal_ = 0.083;
  public:
   GuitarAmp* amp() { return amp_.get(); }
 };

@@ -26,6 +26,10 @@ class HornPlayer : public Performer {
   void setHold(bool h) override;
   void render(float* out, int n) override;
   void seed(unsigned s) override;
+  // One of a brass section (src/brasssect.cc): its own pitch a few cents off (the lips aim
+  // there: the players beat as a section's do), its own attack.
+  void vary(unsigned seat) override;
+  double seatCents() const { return seatCents_; }
 
  private:
   enum Attack { kSlur, kBreath, kDa, kTa, kAccent };
@@ -54,6 +58,8 @@ class HornPlayer : public Performer {
   double kSlideTongue_;
   int prevPartial_ = -1;
   uint32_t rng_ = 4242;
+  bool section_ = false;   // (vary: a section's player)
+  double seatCents_ = 0;   // its own offset from the note (c)
   double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0;
   double urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; }
 };

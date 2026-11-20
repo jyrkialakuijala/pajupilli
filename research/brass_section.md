@@ -1,8 +1,8 @@
 # The brass section (GM 62 "Brass Section"): research
 
-Status: research only (2026-11-19). Nothing here is implemented. In `src/midifile.cc` (kGm table,
-line 200) GM program 62 (counted from 1) is `{"brass-section", "horn", "trumpet"}`. No instrument is
-called "brass-section", so the part is played by one horn, or failing that one trumpet. The single
+Status: built (2026-11-20): `-inst brass-section`, `src/brasssect.{h,cc}`; section 14 says what
+was built and where it departs from this plan. (Before it, in `src/midifile.cc`'s kGm table GM
+program 62 was `{"brass-section", "horn", "trumpet"}` with no "brass-section" built: one horn.) The single
 brass voices exist and are physical models with players: `horn`, `trumpet`, `trombone`, `tuba`,
 `muted-trumpet` (`src/brass.cc`, `src/horn.cc`, `src/hornplayer.cc`). Sections built from single
 players exist too: the string ensembles (`src/stringsect.cc`), the choir (`src/choir.cc`) and the
@@ -769,3 +769,95 @@ It holds:
 - `tools/sim.py` (the N-player beating simulation);
 - `tools/corpus.py`, `cstats.py`, `bends.py` (MIDI corpus statistics);
 - `mid/`, `wav/`, `raw/` (renders and extracted samples).
+
+---
+
+## 14. As built (2026-11-20)
+
+`-inst brass-section` (GM 62): `src/brasssect.h`, `src/brasssect.cc`; hooks in `src/ensemble.*`
+(`initBrass`, `brassAssign`, `brassOn/Off`, `brassRender`), `src/hornplayer.cc`
+(`HornPlayer::vary`), `src/horn.cc` (`Horn::vary`), `src/midifile.cc` (the plan, the hints, CC 11),
+`src/voice.cc` (`BrassSectionModel` for `-note`, `-seq`, `-fuzz`), `src/main.cc` (`-brassvoice`).
+README "Brass section" has the rules and worked examples.
+
+**What follows the plan.**
+- 11.1: the three make-ups as tabled (pop 3 tp + 2 tb, big band 4 + 4 with a bass trombone,
+  orchestral 2 tp, 4 hn, 3 tb, tuba), chosen by `planBrassSection` from the table of 4.3 (median
+  note length, the share of 3+ and 4–5-key onsets, chord span, the 2nd-percentile key, the
+  director's style, the other channels' programs) plus swing (off-beats on the triplet's third).
+- 11.2: one key per seat at most; every written key sounded; spares to the lead, then the bottom;
+  no key moved by an octave except one no seat reaches; the lead seat on the top key; the least
+  motion from the last voicing. A monotone dynamic programme over the seats (top down), so no
+  voice crosses, with a cap of players a key.
+- 11.3: per-seat cents (±4 c, stratified: sd 2.4 c), the lips aiming there (feedforward, slope
+  600 c a unit of log, as the ear's own) and the ear's target moved with them; attack push ±15 %,
+  its decay ±20 %; cup volume ±5 %, lip Q ±10 %, brassiness ±12 % (`Horn::vary`). Onset and
+  release scatter, velocity jitter ±4, lead +1.5 dB, vibrato rules as tabled.
+- 11.4: one ensemble of the seats (`kids_[0]`), dealt by the section; the director's cues to every
+  player, its vibrato depth scaled per seat; pitch bend read per player (falls, doits); the
+  intonation at half strength (`PJ_BRASS_JI` 0.5); the gain set on a unison key.
+
+**Where it departs, and why.**
+- **Voicing beyond dealing** (5.2 said "must not re-harmonise"). Asked for "beautiful and practical
+  voicing", the section adds notes in two cases only. (a) A unison line at G4 or above is doubled
+  an octave down by the low brass (the trombones; the horns too in the orchestra), unless the part
+  writes its own octaves (15 % or more of its onsets). Arrangers do this (5.1); the GM sample does
+  not, which is why it stops at G4 (the octave stays at G3 or above, clear of the bass) and why it
+  goes when the file has octaves of its own. (b) A sparse part is harmonised where the song's other
+  channels show a clear chord under 60 % of it and 75 % of its notes fit that chord (chord tones,
+  9, 11 on minor, 13): pop voices only held notes (0.3 s up), big band every chord note (4-way
+  close, drop-2, planing passing notes); orchestral parts never. A blues line's flat third over a
+  major chord, a riff over an unclear harmony, a part with its own chords: as written. In the
+  local corpus's sense (3) this leaves most stab riffs and lines alone.
+- **The big band's trombones** double a close written chord (2–4 keys within an octave) an octave
+  down where no interval falls under its low interval limit: the section's own doubling.
+- **Speaking times** (not in the plan). The players speak at different speeds (measured: trumpet
+  20–33 ms, trombone 27–50, horn up to 85, tuba ~40), so the trombones landed 20–40 ms after the
+  trumpets. Played from a file the keys come 90 ms early (`noteLead`) and each player starts its
+  own speaking time ahead; live, they act on the key (the trumpets first).
+- **Velocity and breath.** The trumpet alone hardly brightens below velocity 127 (1.1); a section
+  player's breath spans 1.6× a soloist's (`PJ_BRASS_VELDYN`), which took 11.5's check 5 from
+  +7.6 dB to +17 dB; the farther breath pulls the trumpets 5–15 c flat, so a section player's
+  ear reaches 2 % of the lips' tension (`PJ_BRASS_EAR`; a soloist keeps 0.8 %).
+- **Lip resonance ratio ±3 %** (11.3) was not used: the lips' tension sets the pitch (1 % ≈ 6 c),
+  so it would be a ±18 c scatter; the seat cents do that job. **Bell flare ±2 %** was not built
+  (the bore is fixed at construction); the cup, the lip Q and the brassiness vary instead.
+- **Falls** reach the GM bend's ±2 semitones (the file player does not read RPN 0); past a
+  semitone each player glides its valves or slide a semitone at a time, the lips bending the rest
+  (their roll reaches only ~30 c). The players' half-way times lie ~50 ms apart (11.5's 10–40 ms;
+  the glides' own physics adds to the set 3–20 ms delays).
+- **Balance.** The key weight in the mix is k^0.7 (+ 0.3 a voiced note): four keys 8.6 dB over
+  one, the GM section +7 to +9. `levels_data.h` has the measured trim (+4.8 dB against the median,
+  `levels.py` `measure()`), and `PJ_BRASS_GAIN` 0.72 puts a unison key 2 dB over a trumpet in
+  `-play` (the trim's `-note` measure plays a soft default velocity, where the wider breath makes
+  the section quieter). Velocity row: `velcurve` `render()` / `gain_curve()` on C4.
+- **Check 2** (in tune): the unison follows the lone trumpet, which itself is +5 c at F4 and +7 c
+  at A4 (a property of the trumpet model, not the section); the check asks for the unison within
+  3 c of the trumpet and 6 c of the key.
+
+**Measured** (`tools/test.py` `brass_section`; dry; one thread for cost):
+
+| Check (11.5) | Result | Target |
+|---|---|---|
+| 1 beating, F4 unison of 5 | harmonic AM sd 4.9–5.7 dB (h1–h6), 0.5–2.3 Hz; one trumpet 0.3–0.8 dB | ≥ 3.5 dB, 0.5–3 Hz |
+| 2 tuning | unison +4.4 c (trumpet alone +5.0); seats −3.0 … +5.7, sd 3.1 c | 2–5 c |
+| 3 stabs (`-play`, six C5 stabs) | seats within 14 ms, sd 5.2 ms, lead never behind; 0.33 s above −40 dB | 10–30, 4–10 ms; ≤ 0.35 s |
+| 4 dealing | C4 E4 G4 C5: tp1 C5 … tb2 C4; E4 alone: f0/2 74 dB under f0 | |
+| 5 velocity | 4 kHz re 1 kHz −28.8 → −12.0 dB (64 → 112); level 13 dB over 40 → 127 | ≥ 8 dB; 10–16 dB |
+| 6 balance | unison +2.0 dB over a trumpet; four keys +8.6 dB over one | +1…+3; +5…+9 |
+| 7 falls | each trumpet −215 c; half-way 49 ms apart | ≤ −150 c (GM range); 10–60 ms |
+| 8 real time | pop 0.66 µs/sample (3.2 %), orchestral 1.2 µs (5.9 %) | < 1.5, < 3 µs |
+| 9 fuzz | 10 s, no NaN, peak 4.6 | |
+
+**Against FluidR3's Brass Section** (TiMidity, explicit `%font` config, same MIDI, dry; held F4,
+velocity 100): FluidR3 octave bands 250 Hz–8 kHz −5 −6 0 −2 −8 −18 dB (centroid 1.5 kHz), ours
+−3 −5 0 −14 −27 −37 (0.84 kHz): ours is much darker above 2 kHz at mf, the trumpet model's gap
+(12) at velocities under ~110. Four keys over one: FluidR3 +6.9 dB, ours +9.0. Attack: FluidR3's
+looped sample is at once, ours speaks in ~20 ms. A 0.15 s stab rings 0.18 s above −40 dB on
+FluidR3, 0.33 s here (the players' tongue stops, the bells' tails). Stereo: FluidR3 is
+pseudo-stereo (L/R correlation 0.39); ours is placed players in the room (−0.11 in the hall, mono
+dry).
+
+**Not done.** Shakes (not inferable, 7.3); "Brass + Reed" and the muted section; RPN bend ranges;
+seats thinned in dense passages (not needed: 10 players cost 6 % of a core); the orchestral
+section's softer ±6 c spread (11.3) — one spread for all.

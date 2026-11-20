@@ -109,11 +109,14 @@ class BrassVoicer {
   int mode() const { return mode_; }
 
  private:
-  struct Key { int k; bool added; bool lowThird; };
+  // A note to deal: its key; not one of the given keys (the voicing's); an octave under the lead
+  // (the low brass's doubling, never the trumpets'); a third low down (not doubled).
+  struct Key { int k; bool added; bool lowThird; bool octave = false; };
   double deal(const std::vector<Key>& keys, const std::vector<int>& prev, const std::vector<bool>* unison,
               std::vector<int>* out) const;
   bool harmonise(int lead, int other, const BrassHint& h, const std::vector<int>& prev, std::vector<int>* out,
                  std::string* how) const;
+  std::vector<int> compact(std::vector<int> o) const;
   int mode_, n_;
   const BrassSeatDef* s_;
 };

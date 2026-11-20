@@ -87,6 +87,7 @@ extern const int kNumModals;
 extern const Instrument kOrchestraHit;  // (src/orchhit.cc)
 extern const Instrument kStringEnsemble1, kStringEnsemble2, kStringTremolo, kStringPizzicato;  // (src/orchhit.cc, src/stringsect.cc)
 extern const Instrument kChoirInstruments[];  // (src/choir.cc)
+extern const Instrument kBrassSection;  // (src/brasssect.cc)
 extern const int kNumChoirInstruments;
 
 // The instruments at a common loudness: each one's trim (tools/levels.py),
@@ -138,8 +139,15 @@ double noteLead(const Instrument& inst) {
       std::strcmp(inst.name, "tremolo-strings") == 0)
     return kPizz;  // (pizzicato-strings: no wait, every key plucked at once)
   // (the slap basses: a pop's hook before its snap, and a look at the short notes: src/ebass.cc)
+  // (the fretless: a look at whether the last key is held on over the next, a slide: src/fretless.cc)
+  static const double kFretless = knob("PJ_FRETLESS_LEAD", 0.06);
+  if (std::strcmp(inst.name, "fretless-bass") == 0) return kFretless;
   static const double kSlap = knob("PJ_SLAP_LEAD", 0.09);
   if (std::strcmp(inst.name, "slap-bass-1") == 0 || std::strcmp(inst.name, "slap-bass-2") == 0) return kSlap;
+  // (the brass section's players start each by its instrument's speaking time ahead of the beat,
+  // as section players do: the horns' long bores up to 85 ms: src/brasssect.cc)
+  static const double kBrass = knob("PJ_BRASS_LEAD", 0.09);
+  if (std::strcmp(inst.name, "brass-section") == 0) return kBrass;
   return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
 }
 
@@ -151,7 +159,11 @@ bool& noteLeadsApplied() {
 bool velocityAsGain(const Instrument& inst) {
   return !inst.oneVoice() || std::strcmp(inst.name, "fiddle") == 0 || std::strcmp(inst.name, "contrabass") == 0 ||
          std::strcmp(inst.name, "cello") == 0 || std::strcmp(inst.name, "viola") == 0 ||
-         std::strcmp(inst.name, "violin") == 0;
+         std::strcmp(inst.name, "violin") == 0 ||
+         // (the slap basses: one line, its velocity the player's (thumb or pop, ghost, how hard);
+         // the frets cap how loud a slap rings, so the GM curve's level is a gain: src/ebass.cc)
+         std::strcmp(inst.name, "slap-bass-1") == 0 || std::strcmp(inst.name, "slap-bass-2") == 0 ||
+         std::strcmp(inst.name, "brass-section") == 0;  // (its players' gains: src/brasssect.cc)
 }
 
 // The instrument's own loudness at velocity u is the GM curve's less the
@@ -185,6 +197,7 @@ const Instrument* findInstrument(const std::string& name) {
   if (name == kStringPizzicato.name) return &kStringPizzicato;
   for (int k = 0; k < kNumChoirInstruments; ++k)
     if (name == kChoirInstruments[k].name) return &kChoirInstruments[k];
+  if (name == kBrassSection.name) return &kBrassSection;
   return nullptr;
 }
 
@@ -202,6 +215,7 @@ std::string instrumentNames() {
   s += ", " + std::string(kStringEnsemble1.name) + ", " + std::string(kStringEnsemble2.name) + ", " + std::string(kStringTremolo.name) +
        ", " + std::string(kStringPizzicato.name);
   for (int k = 0; k < kNumChoirInstruments; ++k) s += ", " + std::string(kChoirInstruments[k].name);
+  s += ", " + std::string(kBrassSection.name);
   return s;
 }
 

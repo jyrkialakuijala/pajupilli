@@ -156,6 +156,25 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
   controlStep();
 }
 
+// One of a section (research/brass_section.md 11.3): no two instruments and mouthpieces alike.
+// The cup's volume +-5 %, the lips' Q +-10 % (another player's lips), the brassiness +-12 %
+// (another bore's taper, another player's loud buzz).
+void Horn::vary(unsigned seat) {
+  uint64_t r = 0xd1b54a32d192ed03ull * (seat + 1) + 0x5eedull;
+  auto u = [&]() {  // (splitmix64: the seats' draws independent)
+    uint64_t z = (r += 0x9e3779b97f4a7c15ull);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return double((z ^ (z >> 31)) >> 11) * (2.0 / 9007199254740992.0) - 1;
+  };
+  bore_.addVolume(0, 0.05 * lp_.cup * u());
+  bore_.update();
+  kQ_ *= 1 + 0.10 * u();
+  const double nl = 1 + 0.12 * u();
+  nlK0_ *= nl;
+  nlK_ *= nl;
+}
+
 void Horn::setValveCoefs(Valve& v) {
   if (v.s <= 1e-3) {
     v.cw = v.cp = 0;

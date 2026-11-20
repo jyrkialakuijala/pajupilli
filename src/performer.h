@@ -12,6 +12,8 @@
 
 namespace pajupilli {
 
+class SoundingSet;  // (src/band.h)
+
 // A player's vibrato: a rotating complex number z (a phasor), turned each
 // block by its angle, an amplitude loop holding |z| at 1; its real part is the
 // lung pressure's pulse (the abdomen and the throat). Being a rotation, not a
@@ -60,6 +62,11 @@ class Performer {
   // (-play) How much the other parts are playing in this instrument's register just now (0:
   // nothing, ~1: a full texture). A soloist plays with more drama over less (the harmonica's hands).
   virtual void setAccompaniment(double /*busy*/) {}
+  // (-play) What the other channels sound (src/band.h; `self`: this part's channel, left out),
+  // read at the start of each block; and what this player tunes its key to now (cents against
+  // equal temperament), written back into it (0: a fixed pitch). The fretless bass listens.
+  virtual void setBand(const SoundingSet* /*band*/, int /*self*/) {}
+  virtual double tuning(int /*key*/) const { return 0; }
   // (-play) The director's cue for the next key (director.h): its vector of intentions. Here
   // what every player can do with it: a harder or softer attack for the emphasis, the vibrato's
   // depth and speed. A player that can do more (the bow's own vibrato and its delay) adds that.

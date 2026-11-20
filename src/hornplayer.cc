@@ -55,6 +55,30 @@ void HornPlayer::seed(unsigned s) {
   flutterPhase_ = M_PI * (1 + urand());
 }
 
+// A section's player (research/brass_section.md 11.3), fixed for its seat: its mean pitch spread
+// over +-4 c (sd 2.4 c) (the GM section sample's players 2-4 c apart; PJ_BRASS_CENTS), the attack's
+// push +-15 % and its decay +-20 %.
+void HornPlayer::vary(unsigned seat) {
+  static const double kCents = knob("PJ_BRASS_CENTS", 4);
+  uint64_t r = 0x9e3779b97f4a7c15ull * (seat + 1) + 0x1234567ull;
+  auto u = [&]() {  // (splitmix64: the seats' draws independent)
+    uint64_t z = (r += 0x9e3779b97f4a7c15ull);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return double((z ^ (z >> 31)) >> 11) * (2.0 / 9007199254740992.0) - 1;
+  };
+  section_ = true;
+  // (stratified, not drawn: five players drawn at random can all land within a cent or two)
+  static const double kSpread[10] = {0.7, -0.8, 0.2, -0.35, 0.95, -0.55, 0.45, -0.95, 0.05, -0.15};
+  seatCents_ = kCents * kSpread[(seat + 9) % 10];
+  kAtkP_ *= 1 + 0.15 * u();
+  kAtkT_ *= 1 + 0.2 * u();
+  // (a section's stab is played from the chest: velocity spans more of the breath, so the loud
+  // keys reach the brassy ff the sampled sections have; tools/test.py checks the 4 kHz band)
+  static const double kVelDyn = knob("PJ_BRASS_VELDYN", 1.6);
+  kVelDyn_ *= kVelDyn;
+}
+
 void HornPlayer::setHold(bool h) {
   hold_ = h;
   if (!h && stackTop_ == 0) blowing_ = false;
@@ -215,6 +239,7 @@ void HornPlayer::applyNote(Attack a) {
 }
 
 void HornPlayer::render(float* out, int n) {
+  static const double kSectionEar = knob("PJ_BRASS_EAR", 0.02);
   constexpr int kBlock = 16;
   const LipParams& lp = *inst_.design->lip;
   for (int i = 0; i < n; i += kBlock) {
@@ -257,6 +282,9 @@ void HornPlayer::render(float* out, int n) {
       // The lips: calibrated per note and dynamics; the bend; the ear.
       double fl = f * lp.fl * kFl_ * coverAt(note_, dyn) * glideCover(note_, dyn) * std::exp(-kDynLip_ * (dyn - 0.5) + kRollLip_ * roll_);
       if (ear_) fl *= std::exp(earCorr_);
+      // (a section's player: the lips set for its own pitch and the chord's tuning at once, the
+      // ear then trimming: ~600 c for the lips' factor's log, as the ear's own slope)
+      if (section_) fl *= std::exp((earCents_ + seatCents_) / 600);
       fl *= 1 + 0.004 * wander_ * w2b_;
       // ... then they come into the note from a little below: above, the
       // oscillation can stay on the sharp side of a jump in the slot.
@@ -291,8 +319,10 @@ void HornPlayer::render(float* out, int n) {
     // calibration keeps 2 % from where the note would flip or crack (and
     // sustained, a note flips sooner than from silence).
     if (ear_ && note_ >= 0 && earClock_ > 0.2) {
-      listen(out + i, m, earCorr_, earCents_, earClock_, 600, kEarTau_, 5);
-      earCorr_ = std::clamp(earCorr_, -0.008, 0.008);
+      listen(out + i, m, earCorr_, earCents_ + seatCents_, earClock_, 600, kEarTau_, 5);
+      // (a section's player, its breath reaching further at ff, lips its note up further: 2 %)
+      const double reach = section_ ? kSectionEar : 0.008;
+      earCorr_ = std::clamp(earCorr_, -reach, reach);
     }
   }
 }
