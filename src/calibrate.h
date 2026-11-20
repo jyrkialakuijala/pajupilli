@@ -7,6 +7,8 @@
 
 #include "instrument.h"
 
+struct stat;
+
 namespace pajupilli {
 
 struct Calibration {
@@ -38,5 +40,10 @@ constexpr double kCalDynHi = 0.85;
 
 // Sounding MIDI notes lo..hi (default: the instrument's whole range).
 Calibration calibrate(const Instrument& inst, double a4, FILE* log, int lo = -1, int hi = -1);
+
+// stat() of the file this code was loaded from, for the calibration caches
+// to key on: /proc/self/exe on Linux; on macOS (no /proc) the program, or the
+// plug-in the sources are linked into. False if there is none.
+bool statSelf(struct stat* st);
 
 }  // namespace pajupilli
