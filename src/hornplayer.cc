@@ -71,10 +71,24 @@ void HornPlayer::noteOn(int midi, int velocity) {
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_ || caught);
   const Articulation art = articulate(midi, velocity, legato);
   note_ = midi;
+  // A key softer (or harder) than the note can be played: the dynamics stop at the note's
+  // calibrated range, and the attack with them (reedplayer.cc). A soft key's slow breath on a
+  // low note that only speaks from mezzo-forte let a higher partial start first, and it stayed
+  // (the tuba's F#1..B1 from a key of 30: a twelfth and more up).
+  if (art != kArtGlide && kVelDyn_ > 0) {
+    const double want = dyn_ + breathCtl_ + kVelDyn_ * (velocity - 64) / 63.0;
+    const double got = std::clamp(want, dynLo[midi], std::max(dynLo[midi], dynHi[midi]));
+    const int v = int(std::lround(velocity - 63 * (want - got) / kVelDyn_));
+    velocity = want > got ? std::clamp(v, std::min(velocity, 64), velocity)
+                          : std::clamp(v, velocity, std::max(velocity, 64));
+  }
   keyVel_ = velocity;
+  // (... and a breath attack is a soft key's: a key brought up to the note's softest dynamics
+  // is tongued, as the calibration played it there.)
+  const bool breath = art == kArtBreath && velocity < 35 * hardness_;
   const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
                    : art == kArtTongueLegato || art == kArtDu ? kDa
-                   : art == kArtBreath ? kBreath
+                   : breath ? kBreath
                    : art == kArtAccent ? kAccent : kTa;
   // (A glide's soft key is its sign, not a diminuendo.)
   if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;

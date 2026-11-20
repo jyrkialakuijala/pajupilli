@@ -110,7 +110,11 @@ extern const BassSpec kViolaSpec = {
     0.039, 0.046, 0.37 / 6, 0.055, 0.010, 45.0, 6e-6, 17.0, &kViolaBodyData,
     22.0, 3.27, 0.062, 31.3, 0.60, 1.22, kViolaBowLevels, kViolaBowLevelLo, kViolaBowLevelN,
     0.65, 12, 0, 72, 2.5, {0.0587, 0.0391, 0.0196, 0}, knob("PJ_PIZZ_MS", 100) / 1000, 0.002,
-    knob("PJ_ARCO_ATTACK", 0.2), 0.9};  // (the bow to 6.9 kHz: the real violas' shine, ~/Music/viola4.wav)
+    knob("PJ_ARCO_ATTACK", 0.2), 0.9,  // (the bow to 6.9 kHz: the real violas' shine, ~/Music/viola4.wav)
+    // (Viola.md: two steps of the strings a sample; the bow's reach with its force; the body's
+    // upper resonances)
+    // (the bow's reach on middle C: 2.1 kHz at pp, 3.3 at p, 5.2 at mf, 7.5 from f on)
+    int(knob("PJ_VIOLA_OS", 2)), knob("PJ_VIOLA_BRIGHT", 0.75), knob("PJ_VIOLA_BANK", 14)};
 
 // The violin: the viola's construction at its size (tools/bassbody.py -violin, 356 mm), its body
 // fitted to recorded violins; a violin bridge, 33 mm high, 41 mm feet, the strings 11 mm apart,
@@ -127,7 +131,14 @@ extern const BassSpec kViolinSpec = {
     0.65, 12, 0, 72, 2.5, {0.0392, 0.0196, 0, -0.0196}, knob("PJ_PIZZ_MS", 100) / 1000, 0.0015,
     knob("PJ_ARCO_ATTACK", 0.2), 0.9};
 
-Bass::Bass(double fs, const BassSpec& sp) : spec_(sp), fs_(fs), dt_(1 / fs), body_(fs, *sp.body) {
+Bass::Bass(double fs, const BassSpec& sp)
+    : spec_(sp), fs_(fs * std::max(1, sp.oversample)), dt_(1 / fs_), fsOut_(fs), dtOut_(1 / fs),
+      os_(std::max(1, sp.oversample)), body_(fs, *sp.body) {
+  noiseK_ = float(1 - std::pow(0.7, 1.0 / os_));  // (the rosin's flicker: the same band at any rate)
+  if (sp.bankGain > 0) {
+    bank_.init(fs);
+    bankG_ = float(sp.bankGain);
+  }
   micTop_ = float(knob("PJ_MIC_TOP", micTop_));  // (the top by the bridge in the mix; tests: 0 to hear the rest)
   kBridgeM = float(sp.bridgeM);
   kKy = kBridgeM * float(std::pow(2 * M_PI * sp.bridgeFy, 2));
@@ -188,6 +199,30 @@ Bass::Bass(double fs, const BassSpec& sp) : spec_(sp), fs_(fs), dt_(1 / fs), bod
   for (const Str& s : str_) {
     sumEAL_ += float(s.def.ea / s.def.length);
     sumEALa_ += float(s.def.ea / kAfterLen_);
+  }
+}
+
+void Bass::vary(unsigned seat) {
+  uint32_t r = seat * 2654435761u + 977u;
+  auto u = [&]() {  // -1 .. 1
+    r = r * 1664525u + 1013904223u;
+    return (r >> 8) * (2.0 / 16777216.0) - 1;
+  };
+  body_.setVariation(1 + 0.12 * u(), 1 + 0.08 * u());
+  body_.setDamping(body_.dampRate() * (1 + 0.25 * u()), body_.dampStiff() * (1 + 0.25 * u()), body_.dampAir() * (1 + 0.25 * u()));
+  kBridgeM *= float(1 + 0.08 * u());
+  micFar_ *= float(1 + 0.2 * u());
+  micHole_ *= float(1 + 0.2 * u());
+  micPickup_ *= float(1 + 0.2 * u());
+  micTop_ *= float(1 + 0.2 * u());
+  // Its upper resonances its own. (A violin alone has no bank of them yet: in a section each
+  // gets one, a violin's higher and wider apart than the viola's, so that the section's violins
+  // differ above 1 kHz too, where recorded violins differ as much as below.)
+  const bool violin = spec_.strings[0].f0 > 150;
+  if (bankG_ <= 0 && violin) bankG_ = 14;
+  if (bankG_ > 0) {
+    bankG_ *= float(1 + 0.3 * u());
+    bank_.init(fsOut_, violin ? 1100 : 900, violin ? 10000 : 9000, violin ? 95 : 80, 35 * (1 + 0.15 * u()), 7 + seat);
   }
 }
 
@@ -305,7 +340,10 @@ void Bass::bowShape(Str& s) {
     // them, and a force held for a sample is too coarse.)
     static const double kWmaxEnv = knob("PJ_BOW_WMAX", 0);
     // (A high note, fundamental 400 .. 800 Hz, back to 0.5: driven further it plays flat.)
-    const double wTop = kWmaxEnv > 0 ? kWmaxEnv : spec_.bowWmax;
+    // (bowWmax is what a step turns at 48 kHz; a step here is 1 / oversample of that. The bow's
+    // force moves it, BassSpec::bowBright, never past 0.5 rad a step at more than one step a sample.)
+    const double wRef = (kWmaxEnv > 0 ? kWmaxEnv : spec_.bowWmax) / os_;
+    const double wTop = os_ > 1 ? std::min(0.5, wRef * s.bowBright) : wRef;
     const double kWmax = wTop <= 0.5 ? wTop : wTop - (wTop - 0.5) * std::clamp((s.w[0][0] / (2 * M_PI) - 400) / 400, 0.0, 1.0);
     const double taper = 1 / (1 + std::pow(s.wdt[0][i] / kWmax, 6));
     // (Under a finger lying at 1/n of the string only every n-th mode lives:
@@ -317,6 +355,7 @@ void Bass::bowShape(Str& s) {
   }
   s.bowSum = float(sum);
   s.bowBr = float(br);
+  s.bowBrightAt = s.bowBright;
   // The twist's wave resistance: kTors x the string's own, sqrt(T mu).
   const double mu = s.def.tension / std::pow(2 * s.def.length * s.def.f0, 2);
   static const double kTors = knob("PJ_BOW_TORS", 2.0);
@@ -357,7 +396,13 @@ double Bass::bowForce(int si, double speed, double where, double pressure, int h
 
 void Bass::bow(int si, double speed, double force, double where, double rise, double riseForce) {
   Str& s = str_[si];
-  if (force > 0 && (!s.bowOn || std::fabs(where - s.bowDist) > 0.002)) {
+  // The force against a forte stroke's (40 cm/s) at this place: how sharp the string's corner
+  // leaves the hair (BassSpec::bowBright).
+  if (spec_.bowBright > 0 && force > 0) {
+    const double ref = bowForce(si, 0.40, where, 0.5, s.touchN);
+    s.bowBright = float(std::clamp(std::pow(force / std::max(1e-6, ref), spec_.bowBright), 0.3, 3.0));
+  }
+  if (force > 0 && (!s.bowOn || std::fabs(where - s.bowDist) > 0.002 || std::fabs(s.bowBright / s.bowBrightAt - 1) > 0.04f)) {
     s.bowDist = where;
     bowShape(s);
   }
@@ -394,6 +439,7 @@ void Bass::reset() {
   uy_ = vy_ = uz_ = vz_ = ay_ = az_ = ut_ = vt_ = at_ = prevVy_ = prevVz_ = 0;
   floorY_ = floorV_ = floorLp_ = 0;
   ux_ = vx_ = xt_ = vxt_ = 0;
+  bank_.reset();
   body_.reset();
 }
 
@@ -583,6 +629,45 @@ void Bass::control() {
 }
 
 float Bass::sample(float testForce) {
+  feetYSum_ = footBSum_ = footTSum_ = 0;
+  for (int k = 0; k < os_; ++k) stepStrings();
+  const float inv = 1.0f / os_;
+  const float feetY = feetYSum_ * inv;
+  footForce_ = footBSum_ * inv;
+  float far = body_.step(footForce_ + testForce, footTSum_ * inv);
+  if (bankG_ > 0) {  // (the body's upper resonances: src/bodybank.h)
+    bank_.step(footForce_ + testForce, footTSum_ * inv);
+    far += bankG_ * bank_.out();
+  }
+  // The stage floor under the endpin: a resonance driven by the force the bridge puts into the
+  // body (both feet: feetY); heard is the floor's velocity around its resonance (it passes
+  // little above: the pin and the body's mass hold the higher frequencies back).
+  if (floorG_ > 0) {
+    const float a = floorW_ * floorW_ * (feetY - floorY_) - floorD_ * floorV_;
+    floorV_ += a * float(dtOut_);
+    floorY_ += floorV_ * float(dtOut_);
+    floorLp_ += floorW_ * float(dtOut_) * (floorD_ * floorV_ - floorLp_);  // (and less still above it)
+    far -= floorG_ * floorLp_;  // (in phase with the body's own sound under its air resonance)
+  }
+  // What is heard, as a jazz bass is recorded: a pickup at the bridge's bass
+  // foot (its velocity), a microphone close to an f-hole, and a little of
+  // the room (far away: the whole body's volume flow, where the plates and
+  // the f-holes partly cancel under the air resonance). Each scaled to a
+  // like level (a 6 mm pluck of an open string: ~1).
+  // The two sides of the bass differ (bassbody.h: sideSound): left = this +
+  // side, right = this - side.
+  side_ = width_ * body_.sideSound() / farLevel_;
+  // A microphone close to the top by the bridge hears the top's acceleration
+  // there (the pluck's definition, the fingerboard's click).
+  const float v = body_.bassFootV();
+  const float topAcc = (v - prevFootV_) * float(fsOut_);
+  prevFootV_ = v;
+  return micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
+}
+
+// One step of the strings, the bow, the tailpiece and the bridge (BassSpec::oversample of them a
+// sample), against the body as the last sample left it.
+void Bass::stepStrings() {
   if (ctl_ == 0) control();
   ctl_ = (ctl_ + 1) & 15;
   const float dt = float(dt_);
@@ -641,7 +726,7 @@ float Bass::sample(float testForce) {
         // The rosin is not even along the hair: the grip flickers (the bow's
         // hiss), a noise through a low-pass.
         rng_ = rng_ * 1664525u + 1013904223u;
-        s.bowNoise += 0.3f * (((rng_ >> 8) * (2.0f / 16777216.0f) - 1) - s.bowNoise);
+        s.bowNoise += noiseK_ * (((rng_ >> 8) * (2.0f / 16777216.0f) - 1) - s.bowNoise);
         static const float kBowNoise = float(knob("PJ_BOW_NOISE", 0.5));
         float Fn = s.bowF * (1 + kBowNoise * s.bowNoise);
         if (s.bowTurn > 0) {
@@ -830,32 +915,9 @@ float Bass::sample(float testForce) {
   }
   // y presses both feet (each string more on its side); z rocks the bridge.
   const float tilt = moment / float(kFeet_);
-  footForce_ = 0.5f * feetY + lever * feetZ - tilt;
-  float far = body_.step(footForce_ + testForce, 0.5f * feetY - lever * feetZ + tilt);
-  // The stage floor under the endpin: a resonance driven by the force the bridge puts into the
-  // body (both feet: feetY); heard is the floor's velocity around its resonance (it passes
-  // little above: the pin and the body's mass hold the higher frequencies back).
-  if (floorG_ > 0) {
-    const float a = floorW_ * floorW_ * (feetY - floorY_) - floorD_ * floorV_;
-    floorV_ += a * float(dt_);
-    floorY_ += floorV_ * float(dt_);
-    floorLp_ += floorW_ * float(dt_) * (floorD_ * floorV_ - floorLp_);  // (and less still above it)
-    far -= floorG_ * floorLp_;  // (in phase with the body's own sound under its air resonance)
-  }
-  // What is heard, as a jazz bass is recorded: a pickup at the bridge's bass
-  // foot (its velocity), a microphone close to an f-hole, and a little of
-  // the room (far away: the whole body's volume flow, where the plates and
-  // the f-holes partly cancel under the air resonance). Each scaled to a
-  // like level (a 6 mm pluck of an open string: ~1).
-  // The two sides of the bass differ (bassbody.h: sideSound): left = this +
-  // side, right = this - side.
-  side_ = width_ * body_.sideSound() / farLevel_;
-  // A microphone close to the top by the bridge hears the top's acceleration
-  // there (the pluck's definition, the fingerboard's click).
-  const float v = body_.bassFootV();
-  const float topAcc = (v - prevFootV_) * float(fs_);
-  prevFootV_ = v;
-  return micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
+  feetYSum_ += feetY;
+  footBSum_ += 0.5f * feetY + lever * feetZ - tilt;
+  footTSum_ += 0.5f * feetY - lever * feetZ + tilt;
 }
 
 }  // namespace pajupilli

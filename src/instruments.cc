@@ -85,6 +85,9 @@ extern const int kNumPlucked;
 extern const Instrument kModals[];
 extern const int kNumModals;
 extern const Instrument kOrchestraHit;  // (src/orchhit.cc)
+extern const Instrument kStringEnsemble1, kStringEnsemble2, kStringTremolo, kStringPizzicato;  // (src/orchhit.cc, src/stringsect.cc)
+extern const Instrument kChoirInstruments[];  // (src/choir.cc)
+extern const int kNumChoirInstruments;
 
 // The instruments at a common loudness: each one's trim (tools/levels.py),
 // as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
@@ -130,6 +133,13 @@ double noteLead(const Instrument& inst) {
   // (the cello's keys sound 100 ms late, for its pizzicato: src/bassinst.cc)
   static const double kPizz = knob("PJ_PIZZ_MS", 100) / 1000;
   if (std::strcmp(inst.name, "cello") == 0 || std::strcmp(inst.name, "viola") == 0 || std::strcmp(inst.name, "violin") == 0) return kPizz;
+  // (the string ensembles' players are those: src/stringsect.cc)
+  if (std::strcmp(inst.name, "strings") == 0 || std::strcmp(inst.name, "slow-strings") == 0 ||
+      std::strcmp(inst.name, "tremolo-strings") == 0)
+    return kPizz;  // (pizzicato-strings: no wait, every key plucked at once)
+  // (the slap basses: a pop's hook before its snap, and a look at the short notes: src/ebass.cc)
+  static const double kSlap = knob("PJ_SLAP_LEAD", 0.09);
+  if (std::strcmp(inst.name, "slap-bass-1") == 0 || std::strcmp(inst.name, "slap-bass-2") == 0) return kSlap;
   return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
 }
 
@@ -169,6 +179,12 @@ const Instrument* findInstrument(const std::string& name) {
   for (int k = 0; k < kNumModals; ++k)
     if (name == kModals[k].name) return &kModals[k];
   if (name == kOrchestraHit.name) return &kOrchestraHit;
+  if (name == kStringEnsemble1.name) return &kStringEnsemble1;
+  if (name == kStringEnsemble2.name) return &kStringEnsemble2;
+  if (name == kStringTremolo.name) return &kStringTremolo;
+  if (name == kStringPizzicato.name) return &kStringPizzicato;
+  for (int k = 0; k < kNumChoirInstruments; ++k)
+    if (name == kChoirInstruments[k].name) return &kChoirInstruments[k];
   return nullptr;
 }
 
@@ -183,6 +199,9 @@ std::string instrumentNames() {
   for (int k = 0; k < kNumPlucked; ++k) s += ", " + std::string(kPlucked[k].name);
   for (int k = 0; k < kNumModals; ++k) s += ", " + std::string(kModals[k].name);
   s += ", " + std::string(kOrchestraHit.name);
+  s += ", " + std::string(kStringEnsemble1.name) + ", " + std::string(kStringEnsemble2.name) + ", " + std::string(kStringTremolo.name) +
+       ", " + std::string(kStringPizzicato.name);
+  for (int k = 0; k < kNumChoirInstruments; ++k) s += ", " + std::string(kChoirInstruments[k].name);
   return s;
 }
 

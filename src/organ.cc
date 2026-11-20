@@ -299,7 +299,11 @@ ReedVoicing reedVoicing(Family f, double hz) {
   ReedVoicing v;
   // (the bass near its tongue's closing: a quick, blaring speech, ~50 ms at 185 Hz; the treble lower: near
   // closing, its wind falling at the key's release passed through a louder swing, a blat)
-  v.pressure = knob("PJ_REED_P", 0.9) - 0.2 * std::clamp(std::log2(hz / 300), 0.0, 1.0);
+  // (the bass nearer still, 0.95 below 100 Hz: at 0.9 a 16' reed's heavy tongue grew from rest over 150 ..
+  // 300 ms, a short pedal note over before it spoke; at 0.95 within ~60 .. 100 ms, as a Posaune's does.
+  // Its smaller gap passes less wind, made up in its level; 0.97 and more choked it on a long note)
+  const double p0 = knob("PJ_REED_P", 0.9) - 0.2 * std::clamp(std::log2(hz / 300), 0.0, 1.0);
+  v.pressure = p0 + knob("PJ_REED_BASSP", 0.05) * std::clamp(std::log2(200 / hz), 0.0, 1.0);
   v.zeta = knob("PJ_REED_Z", 1.0);
   v.tongueQ = knob("PJ_REED_TQ", 20);
   v.tongueRatio = knob("PJ_REED_TR", 1.03);
@@ -357,6 +361,7 @@ ReedVoicing reedVoicing(Family f, double hz) {
   v.rollHz = std::max(v.rollHz, knob("PJ_REED_TREBLE_ROLL", 6.0) * hz);
   const double up = std::log2(hz / 262), line1 = f == kOboe ? 4 : 12, line2 = f == kOboe ? 5 : 6;
   v.level = std::pow(10.0, -knob("PJ_REED_LINE", 1.0) * (line1 * std::clamp(up, 0.0, 1.0) + line2 * std::max(0.0, up - 1)) / 20);
+  if (v.pressure > p0 && p0 < 1) v.level *= std::pow((1 - p0) / (1 - v.pressure), 0.91);
   return v;
 }
 
@@ -803,8 +808,11 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
   for (int i = 0; i < int(pipes_.size()); ++i) encPipes_[pipes_[i].enc].push_back(i);
   encOut_.assign(enc_.size(), {});
   encDemand_.assign(enc_.size(), {});
-  const int threads = int(knob("PJ_ORGAN_RENDER_THREADS", 3));
+  // (Its swell boxes side by side: on the shared pool by default, where -play's parts and other
+  // voices are too; PJ_ORGAN_RENDER_THREADS > 1: a pool of its own of that many; 1: one thread.)
+  const int threads = int(knob("PJ_ORGAN_RENDER_THREADS", 0));
   if (threads > 1 && pipes_.size() > 100) pool_ = std::make_unique<WorkPool>(threads);
+  sharedPool_ = threads == 0 && pipes_.size() > 100;
 }
 
 namespace {
@@ -2068,6 +2076,8 @@ void OrganModel::renderBlock() {
   const int n = int(enc_.size());
   if (pool_) {
     pool_->run(n, [this](int e) { renderEnclosure(e); });
+  } else if (sharedPool_) {
+    TaskPool::shared().run(n, [this](int e) { renderEnclosure(e); });
   } else {
     for (int e = 0; e < n; ++e) renderEnclosure(e);
   }
@@ -2079,6 +2089,8 @@ void OrganModel::renderBlock() {
     const bool late = naveOn_ && room_;  // (its own nave: a third job)
     if (pool_) {
       pool_->run(late ? 3 : 2, [this](int m) { m < 2 ? scatterPaths(m) : runNave(); });
+    } else if (sharedPool_) {
+      TaskPool::shared().run(late ? 3 : 2, [this](int m) { m < 2 ? scatterPaths(m) : runNave(); });
     } else {
       scatterPaths(0);
       scatterPaths(1);

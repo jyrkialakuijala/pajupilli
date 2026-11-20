@@ -37,6 +37,7 @@ class BassModel : public Tube {
     return dipOut_[k].data();
   }
   const float* dipoleAxes() const override { return axes_; }
+  void vary(unsigned seat) override { bass_.vary(seat); }
   void resetAir() override;
 
  private:
@@ -137,6 +138,7 @@ class BowPlayer : public BassPlayer {
   void render(float* out, int n) override;
   void setHold(bool h) override;
   void seed(unsigned s) override;
+  void vary(unsigned seat) override;
   // The director's cue: the left hand's own vibrato scaled, and when in the note it begins.
   void direct(const Cue& c) override {
     Performer::direct(c);
@@ -145,6 +147,8 @@ class BowPlayer : public BassPlayer {
     vibDelay_ = c.v[kCueVibDelay];
     m_.bass().setMute(c.v[kCueMute] > 0.5f);
   }
+  // Every key plucked (pizzicato strings): no wait, no bow. false: as the instrument's own.
+  void setPizzicatoOnly(bool on) { wait_ = on ? 0 : waitOwn_; }
   static double bowPlace(double brightness);  // the bow's place, a share of the sounding length
   static const char* bowPlaceName(double brightness);
 
@@ -170,8 +174,16 @@ class BowPlayer : public BassPlayer {
   void strike(int midi, int velocity);
   void letGo(int midi);
   void due(double dt);
-  double wait_ = 0;
+  double wait_ = 0, waitOwn_ = 0;
   double vibScale_ = 1, vibDelay_ = 0;
+  // One of a section (vary): its stops this much off (cents), its bow's speed x and pressure +,
+  // its vibrato beginning this much later (s).
+  double seatCents_ = 0, seatSpeed_ = 1, seatPress_ = 0, seatVibDelay_ = 0;
+  // ... and its bow: the share of the hair it uses before it turns, and (seated_) each stroke begun
+  // somewhere else in the bow, so that a section's bow changes are staggered.
+  double seatBow_ = 1;
+  bool seated_ = false;
+  uint32_t seatRng_ = 1;
   std::vector<Pending> pend_;
 };
 

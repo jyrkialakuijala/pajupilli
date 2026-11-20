@@ -19,7 +19,7 @@ double urand(uint32_t& s) { return (next(s) >> 8) * (1.0 / 16777216.0); }  // 0 
 Membrane::Membrane(double fs, const HeadSpec& spec) : spec_(spec), fs_(fs), dt_(1 / fs) {
   const double R = spec.radius, c = std::sqrt(spec.tension / spec.sigma);
   const double jmax = 2 * kPi * spec.top * R / c;
-  struct Mode { double f; int m, fam, kind; double norm, vol, c0, s0; };
+  struct Mode { double f; int m, fam, kind; double norm, vol, c0, s0; int n; double split; };
   std::vector<Mode> modes;
   uint32_t rng = 9001u + 7919u * spec.seed;
   int fam = 0;
@@ -44,7 +44,9 @@ Membrane::Membrane(double fs, const HeadSpec& spec) : spec_(spec), fs_(fs), dt_(
       continue;
     }
     maxM_ = m;
-    for (double j : zeros) {
+    for (size_t zi = 0; zi < zeros.size(); ++zi) {
+      const double j = zeros[zi];
+      const int nc = int(zi) + 1;
       const double f0 = j * c / (2 * kPi * R);
       const double j1 = std::cyl_bessel_j(double(m + 1), j);
       double mass = spec.sigma * kPi * R * R * j1 * j1 * (m == 0 ? 1.0 : 0.5);
@@ -60,11 +62,11 @@ Membrane::Membrane(double fs, const HeadSpec& spec) : spec_(spec), fs_(fs), dt_(
       for (int i = 0; i <= kRadii; ++i) tab_[size_t(fam) * (kRadii + 1) + i] = float(std::cyl_bessel_j(double(m), j * i / kRadii));
       const double nrm = 1 / std::sqrt(mass);
       if (m == 0) {
-        modes.push_back({f, 0, fam, 0, nrm, vol * nrm, 1, 0});
+        modes.push_back({f, 0, fam, 0, nrm, vol * nrm, 1, 0, nc, 1});
       } else {
         const double th0 = 2 * kPi * urand(rng), d = spec.split * urand(rng);
-        modes.push_back({f * (1 - 0.5 * d), m, fam, 1, nrm, 0, std::cos(m * th0), std::sin(m * th0)});
-        modes.push_back({f * (1 + 0.5 * d), m, fam, 2, nrm, 0, std::cos(m * th0), std::sin(m * th0)});
+        modes.push_back({f * (1 - 0.5 * d), m, fam, 1, nrm, 0, std::cos(m * th0), std::sin(m * th0), nc, 1 - 0.5 * d});
+        modes.push_back({f * (1 + 0.5 * d), m, fam, 2, nrm, 0, std::cos(m * th0), std::sin(m * th0), nc, 1 + 0.5 * d});
       }
       ++fam;
     }
@@ -73,14 +75,14 @@ Membrane::Membrane(double fs, const HeadSpec& spec) : spec_(spec), fs_(fs), dt_(
   n_ = int(modes.size());
   const int pad = (n_ + 15) / 16 * 16;
   freq_.resize(n_);
-  m_.resize(n_); fam_.resize(n_); kind_.resize(n_);
+  m_.resize(n_); fam_.resize(n_); kind_.resize(n_); nc_.resize(n_); split_.resize(n_); massX_.assign(n_, 1.0);
   norm_.assign(pad, 0); c0_.assign(pad, 0); s0_.assign(pad, 0);
   q_.assign(pad, 0); v_.assign(pad, 0); f_.assign(pad, 0); vol_.assign(pad, 0); w2_.assign(pad, 0);
   a11_.assign(pad, 0); a12_.assign(pad, 0); a21_.assign(pad, 0); a22_.assign(pad, 0); alpha_.assign(pad, 0);
   for (int k = 0; k < n_; ++k) {
     const Mode& md = modes[k];
     freq_[k] = md.f;
-    m_[k] = md.m; fam_[k] = md.fam; kind_[k] = md.kind;
+    m_[k] = md.m; fam_[k] = md.fam; kind_[k] = md.kind; nc_[k] = md.n; split_[k] = md.split;
     norm_[k] = float(md.norm); c0_[k] = float(md.c0); s0_[k] = float(md.s0);
     vol_[k] = float(md.vol);
     const double w = 2 * kPi * md.f;
@@ -105,6 +107,19 @@ void Membrane::coefs() {
     a12_[k] = float(g * s / w);
     a21_[k] = float(-g * (w0 * w0 / w) * s);
     a22_[k] = float(g * (c - a / w * s));
+  }
+}
+
+void Membrane::setMode(int k, double hz, double t60, double mass) {
+  const double f = hz * split_[k], w = 2 * kPi * f;
+  freq_[k] = f;
+  w2_[k] = float(w * w);
+  alpha_[k] = float(6.907755 / std::max(t60, 1e-3));  // (amplitude: ln 1000 / T60)
+  if (mass != massX_[k]) {
+    const double g = std::sqrt(massX_[k] / mass);
+    norm_[k] = float(norm_[k] * g);
+    vol_[k] = float(vol_[k] * g);
+    massX_[k] = mass;
   }
 }
 

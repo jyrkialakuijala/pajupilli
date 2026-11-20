@@ -21,6 +21,15 @@
 #include "bassinst.h"
 #include "pianoinst.h"
 #include "clavinet.h"
+#include "dx7.h"
+#include "rhodes.h"
+#include "scifi.h"
+#include "rain.h"
+#include "soundtrack.h"
+#include "atmosphere.h"
+#include "brightness.h"
+#include "goblins.h"
+#include "echoes.h"
 #include "cp80.h"
 #include "ensemble.h"
 #include "lead.h"
@@ -133,7 +142,7 @@ bool openMidi(Midi& m) {
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked() && !grandPiano(inst) && !electricGrand(inst) && !clavinet(inst)), bowed_(inst.plucked() && bowedBass(inst)) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked() && !grandPiano(inst) && !electricGrand(inst) && !clavinet(inst) && !dx7Piano(inst) && !rhodes(inst) && !sciFi(inst) && !fxRain(inst) && !fxSoundtrack(inst) && !fxAtmosphere(inst) && !fxBrightness(inst) && !fxGoblins(inst) && !fxEchoes(inst)), bowed_(inst.plucked() && bowedBass(inst)) {
     singing_ = std::strcmp(inst.name, "pad-choir") == 0;
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();
@@ -222,7 +231,9 @@ class Controls {
   }
   void cc(int num, int v) {
     const double x = v / 127.0;
-    // (an instrument's own use of a knob first: the Hammond's drawbars on K1-K4, its Leslie on K5)
+    // (an instrument's own use of a knob first: the Hammond's drawbars on K1-K4, its overdrive on K5,
+    // its Leslie on K6; the choirs' vowel on K2, dark u .. bright i, and their openness on K3, closed
+    // and breathy .. the jaw open and clear: src/choir.h, as pad-choir's K2 vowel and K3 breath)
     if (num >= 70 && num <= 77 && p_.instrumentKnob(num - 70, x)) {
       if (o_.verbose) std::fprintf(stderr, "cc %d = %d\n", num, v);
       return;

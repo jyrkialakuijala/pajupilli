@@ -9,6 +9,7 @@
 
 #include "knob.h"
 #include "lead.h"
+#include "parallel.h"
 
 namespace pajupilli {
 
@@ -64,10 +65,19 @@ Ensemble::Ensemble(const std::vector<Member>& members, bool verbose, const RoomS
 Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose,
                    const RoomSpec* room)
     : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
+  if (std::strcmp(inst.family, "choir") == 0) {  // (the choir: its parts' singers, src/choir.cc)
+    std::fill(owner_, owner_ + 128, -1);
+    std::fill(pitch_, pitch_ + 128, -1);
+    initChoir(inst, room);
+    return;
+  }
   if (std::strcmp(inst.family, "orchestra") == 0) {  // (the orchestra hit: sections, src/orchhit.cc)
     std::fill(owner_, owner_ + 128, -1);
     std::fill(pitch_, pitch_ + 128, -1);
-    initOrchestra(room);
+    if (std::strcmp(inst.name, "strings") == 0 || std::strcmp(inst.name, "slow-strings") == 0 ||
+        std::strcmp(inst.name, "tremolo-strings") == 0 || std::strcmp(inst.name, "pizzicato-strings") == 0)
+      initStrings(inst, room);
+    else initOrchestra(room);
     return;
   }
   // (A plucked instrument is one voice: its player takes the keys to its strings.)
@@ -128,7 +138,7 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
     for (int i = 0; i < n; ++i) order[i] = i;
     std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return f_[a].rank > f_[b].rank; });
     std::vector<double> x(n);
-    const double gap = n > 6 ? 0.8 : 1.0;
+    const double gap = n > 16 ? 0.45 : n > 6 ? 0.8 : 1.0;  // (a string section: 24 players in 10 m)
     for (int k = 0; k < n; ++k) x[order[k]] = (k - (n - 1) / 2.0) * gap;
     // The channels' rooms: small is smaller than the main one, large larger
     // (or the same where the main one already is the smallest or largest).
@@ -383,6 +393,8 @@ int Ensemble::reach(int key) const {
 }
 
 void Ensemble::noteOn(int key, int velocity) {
+  if (choir_) { choirOn(key, velocity); return; }
+  if (strings_) { sectOn(key, velocity); return; }
   if (!kids_.empty()) { hitOn(key, velocity); return; }
   key = reach(key);
   if (key < 0 || key > 127) return;
@@ -431,6 +443,8 @@ void Ensemble::noteOn(int key, int velocity) {
 }
 
 void Ensemble::noteOff(int key) {
+  if (choir_) { choirOff(key); return; }
+  if (strings_) { sectOff(key); return; }
   if (!kids_.empty()) { hitOff(std::clamp(key, lo_, hi_), true, false); return; }
   key = reach(key);
   if (key < 0 || key > 127 || owner_[key] < 0) return;
@@ -776,6 +790,8 @@ void Ensemble::retune() {
 }
 
 void Ensemble::render(float* left, float* right, int n) {
+  if (choir_) { choirRender(left, right, n); return; }
+  if (strings_) { sectRender(left, right, n); return; }
   if (!kids_.empty()) { hitRender(left, right, n); return; }
   // In blocks of Room::kBlock (the room's coupling step), queued.
   for (int done = 0; done < n;) {
@@ -851,11 +867,21 @@ void Ensemble::block(float* left, float* right, int n) {
   // Circuits on one board couple sample by sample (wires, rail, ground):
   // render them interleaved, 4 samples at a time.
   const int step = circuits ? 4 : n;
-  for (int j = 0; j < n; j += step) {
-    const int m = std::min(step, n - j);
-    for (int i : go) {
-      Slot& s = f_[i];
-      s.v->render(buf_[i].data() + j, m, room_ ? s.room.data() + j : nullptr);
+  static const bool kVoicePar = knob("PJ_VOICE_THREADS", 1) > 0;
+  if (!circuits && kVoicePar && go.size() > 1) {
+    // Each voice on its own until the room couples them (next block): side by side on the shared
+    // pool (src/parallel.h), each into its own buffer, mixed below in their order as before.
+    TaskPool::shared().run(int(go.size()), [&](int k) {
+      Slot& s = f_[go[k]];
+      s.v->render(buf_[go[k]].data(), n, room_ ? s.room.data() : nullptr);
+    });
+  } else {
+    for (int j = 0; j < n; j += step) {
+      const int m = std::min(step, n - j);
+      for (int i : go) {
+        Slot& s = f_[i];
+        s.v->render(buf_[i].data() + j, m, room_ ? s.room.data() + j : nullptr);
+      }
     }
   }
   for (int i : go) playing += f_[i].v->player().busy();

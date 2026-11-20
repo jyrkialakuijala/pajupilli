@@ -52,6 +52,8 @@
 
 namespace pajupilli {
 
+struct ChoirState;  // (the choir's dealing: src/choir.cc)
+
 class Ensemble {
  public:
   struct Member {
@@ -172,6 +174,35 @@ class Ensemble {
   void hitOff(int key, bool all, bool force);
   void hitRender(float* left, float* right, int n);
   bool quiet_ = false;  // (a section of the hit: says nothing of its tuning or who plays)
+  // The string ensembles (src/stringsect.cc): one ensemble of 24 players (kids_[0]), each
+  // player's key dealt by the section.
+  struct SectPlayer {
+    int slot, sec;
+    int cur, want;   // the key it plays; the key it is to play (-1: none)
+    double at;       // ... from when
+    int vel;
+    bool late;       // (a double bass: held back by the others' pizzicato wait)
+    double habit;    // its seat's own lateness (s)
+  };
+  void initStrings(const Instrument& inst, const RoomSpec* room);
+  void drive(int slot, int pitch, int velocity, bool on);
+  void sectAssign();
+  void sectOn(int key, int velocity);
+  void sectOff(int key);
+  void sectRender(float* left, float* right, int n);
+  bool strings_ = false, slow_ = false, tremolo_ = false, pizzOnly_ = false;
+  std::vector<SectPlayer> sp_;
+  // The choir (src/choir.cc, src/choir.h): one ensemble of singers (kids_[0]), each singer's key
+  // dealt by its voice part.
+  void initChoir(const Instrument& inst, const RoomSpec* room);
+  void choirAssign();
+  void choirTune();  // (the chord tuned by the spectra: src/choir.cc)
+  void choirOn(int key, int velocity);
+  void choirOff(int key);
+  void choirRender(float* left, float* right, int n);
+  std::shared_ptr<ChoirState> choir_;
+  int sheld_[128] = {};  // the held keys' velocities (0: up)
+  unsigned srng_ = 2026;
   std::vector<Section> kids_;
   std::vector<std::unique_ptr<Calibration>> kidCals_;
   std::vector<Hit> hits_;

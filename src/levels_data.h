@@ -55,9 +55,12 @@ constexpr LevelTrim kLevelTrims[] = {
     {"viola", -5.1f},  // (measured against the cello; tools/levels.py -emit will redo it)
     {"violin", -4.7f},  // (measured against the viola; tools/levels.py -emit will redo it)
     {"grand-piano", 9.8f},
+    {"bright-piano", 4.6f},  // (tools/levels.py's measure(): -32.8 LUFS untrimmed against the median -28.2 of the others with their trims)
     {"upright-piano", 6.2f},
     {"honky-tonk", 5.4f},  // (measured 0.8 dB over the upright: brighter, harder hammers and tacks, in its closed case)
     {"clavinet", -3.5f},
+    {"electric-piano-2", -9.9f},
+    {"electric-piano-1", 1.0f},
     {"clavinet-e7", -4.0f},
     {"clavinet-c", -9.4f},
     {"brush-snare", 12.0f},
@@ -70,6 +73,17 @@ constexpr LevelTrim kLevelTrims[] = {
     {"music-box", 23.0f},
     {"dulcimer", 16.0f},
     {"nylon-guitar", 23.0f},
+    {"steel-guitar", 22.5f},  // (3 dB over the nylon guitar on the same picked and strummed passage, K-weighted)
+    {"clean-guitar", 10.3f},  // (measured -38.5 LUFS at three notes)
+    {"jazz-guitar", 0.0f},  // (measured -28.3 LUFS at three notes against the median -28.2; its level is in the model, src/guitarinst.cc)
+    {"overdriven-guitar", -4.5f},  // (measured -23.7 LUFS at three notes)
+    {"distortion-guitar", -11.2f},  // (measured -17.0 LUFS at three notes)
+    {"guitar-harmonics", 15.1f},  // (tools/levels.py's measure(): -43.3 LUFS untrimmed, the median -28.2)
+    {"electric-bass", 9.7f},  // (measured -37.9 LUFS at three notes, through the B-15, the DI and the LA-2A; the bare DI -34.7)
+    {"pick-bass", 10.8f},  // (tools/levels.py's measure(): -39.0 LUFS untrimmed through the SVT, the DI and the 1176; the median -28.2)
+    {"slap-bass-1", 9.2f},  // (tools/levels.py's measure(): -37.4 LUFS untrimmed through the slap DI, the 4x10 and the 1176; the median -28.2)
+    {"slap-bass-2", 8.1f},  // (-36.3 LUFS untrimmed: the active J popped, the same chain)
+    {"muted-guitar", 8.6f},  // (-44.4 LUFS by the 1 s rule: a muted note is short; set so its strokes are as loud as the clean guitar's over 100 ms)
     {"harpsichord", 24.0f},
     {"harpsichord-8", 26.0f},
     {"harpsichord-full", 20.0f},
@@ -90,6 +104,8 @@ constexpr LevelTrim kLevelTrims[] = {
     {"crash-cymbal-2", 24.3f},
     {"splash-cymbal", 31.8f},
     {"china-cymbal", 26.0f},
+    {"timpani", -2.9f},  // (measured -25.3 LUFS at three notes)
+    {"harp", 7.1f},  // (measured -35.3 LUFS at three notes, the median -28.2)
     {"tom-10", 2.5f},
     {"tom-12", -0.7f},
     {"tom-13", -2.7f},
@@ -105,11 +121,20 @@ constexpr LevelTrim kLevelTrims[] = {
     {"pad-warm", -0.6f},
     {"pad-polysynth", -1.4f},
     {"pad-choir", -5.2f},
+    {"choir", 3.7f},  // (measured against flute, oboe, clarinet, trumpet, viola, synth-strings-1, pad-choir; tools/levels.py -emit will redo it)
+    {"voice-oohs", 9.8f},  // (levels.py measure() untrimmed: 6.1 dB under choir's -31.4 LUFS; tools/levels.py -emit will redo it)
     {"pad-bowed", 1.5f},
     {"pad-metallic", 10.8f},
     {"pad-halo", -5.3f},
     {"pad-sweep", 0.7f},
     {"fx-crystal", -4.9f},
+    {"fx-sci-fi", 1.8f},
+    {"fx-rain", 1.1f},  // (tools/levels.py's measure(): -29.3 LUFS untrimmed, the median -28.2)
+    {"fx-soundtrack", 2.7f},  // (tools/levels.py's measure(): -30.9 LUFS untrimmed, the median -28.2; it blooms over ~1 s of the 1.5 s note)
+    {"fx-atmosphere", -5.7f},  // (tools/levels.py's measure(): -22.5 LUFS untrimmed, the median -28.2)
+    {"fx-brightness", 0.1f},  // (tools/levels.py's measure(): -28.3 LUFS untrimmed, the median -28.2)
+    {"fx-goblins", 1.6f},  // (tools/levels.py's measure(): -29.8 LUFS untrimmed, the median -28.2; it swells over seconds)
+    {"fx-echoes", -3.4f},  // (tools/levels.py's measure(): -24.8 LUFS untrimmed, the median -28.2; its echoes in the loudest second)
     {"perc-extras", 10.1f},  // (12 dB under the common level, by hand: small sounds, and their clicks peak high)
     {"stick-snare", -1.0f},  // (by hand: 2 dB under the common level, so an accent (velocity 127) peaks near 1.2)
     {"vibraphone-25r", -0.8f},  // (the vibraphone with Balter 25R mallets: brighter and louder at velocity 90)

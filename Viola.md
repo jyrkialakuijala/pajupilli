@@ -187,6 +187,69 @@ in the dip between the resonances at 403 and 488 Hz.
 4. **F-holes over three cells (finding 7).**
 5. **The post at about 17 mm and a fresh bow-evening table (finding 11).**
 
+## Fixed on 2026-11-19, after the review
+
+The five items of "What to fix first", all viola-only through new fields of `BassSpec` and
+`BodyData` whose defaults leave the bass, the cello and the violin as they were (their A3 renders
+are unchanged to four digits). Measured, not judged by ear.
+
+1. **Louder is brighter (findings 2, 3).** `BassSpec::bowBright` (0.75): the bow drives the
+   string's modes up to `bowWmax` x (the bow's force against a forte stroke's, 40 cm/s at the
+   same place) to that power, and `bowWmax` is now a frequency (what it was at 48 kHz) whatever
+   the step. On middle C the bow reaches 2.1 kHz at pp, 3.3 at p, 5.2 at mf, 7.5 kHz from f on.
+
+   | Velocity | Level | 2 - 4 kHz share | 4 - 8 kHz share |
+   |---|---|---|---|
+   | 25 | -44.3 dB | -19.2 dB | -61.9 dB |
+   | 50 | -38.1 | -5.5 | -50.6 |
+   | 75 | -34.6 | -8.7 | -25.5 |
+   | 100 | -30.2 | -8.9 | -24.0 |
+   | 125 | -26.6 | -10.3 | -24.1 |
+
+   From f to ff nothing more is gained: the reach stops at 0.5 rad a step (7.6 kHz at two steps
+   a sample). The centroid still falls a little from p to ff (1565 to 1269 Hz): the band below
+   2 kHz grows faster than the one above. `PJ_VIOLA_BRIGHT`.
+2. **Convergence (finding 1).** `BassSpec::oversample` (2): the strings, the bow, the tailpiece
+   and the bridge take two steps a sample, the body one with the feet's mean force
+   (`Bass::stepStrings`). Tuning of five notes at 1, 2 and 4 steps: C3 +1 / +5 / +8 cents, A3
+   +4 / +7 / +9, E4 -5 / +4 / +5, A4 -3 / 0 / +2, E5 0 / +2 / +4: two steps are within 3 cents
+   of four. The high notes' bow no longer falls back to 3.8 kHz. Cost: 29 % of a core (22 %
+   before). `PJ_VIOLA_OS`.
+3. **The body above 1 kHz (findings 5, 6).** `src/bodybank.h`, `BassSpec::bankGain` (14): a bank
+   of about 100 resonances from 900 Hz to 9 kHz, one per 80 Hz, each a little off its place, all
+   of Q 35, driven by the bridge feet's sum and difference in its own shares, each with its own
+   share of the sound heard all round and of the three directional parts. Its level against the
+   far sound: about -10 dB at 2 kHz falling to -24 dB at 7 kHz, re the main resonance. A
+   stand-in, not physics: fixed resonances, and the bridge does not feel them. In the full mix
+   the count of separate peaks rose only from 2 to 5 between 2 and 5 kHz: the resonances overlap
+   (their width is about their spacing, as on a real body), and the top-by-the-bridge share of
+   the sound (finding 9) lies over them. `PJ_VIOLA_BANK`.
+4. **F-holes over three cells (finding 7).** `BodyData::holeCells` (3): each f-hole takes its air
+   from the bridge's cell and its two neighbours (a quarter, a half, a quarter) and feels their
+   pressures in the same shares. The 4.9 kHz resonance is gone without the extra air loss (F5's
+   share there -23.6 dB with `PJ_AIR_HF=0`, -10.4 dB with one cell), so that loss was lowered to
+   0.7e-6 s. The air resonance moved from 224 to 225-229 Hz. `PJ_VIOLA_HOLES`.
+5. **The post and the bow-evening table (finding 11).** The post 17 mm behind the treble foot
+   (0.65 of a node, set in `kViolaBodyData`, not in the generated header), and
+   `src/violabowlevels_data.h` regenerated. Loudness against the range's median: standard
+   deviation 1.8 dB (2.8 before); open A4 -1.3 dB, G4 -0.6, A#4 -1.3 (A4 was -5.2). Main wood
+   resonance now 350 Hz (Q 26), air resonance 225 Hz (Q 20).
+
+Also checked after the fixes: 10 s fuzz with two seeds, no resets; D#4 to F#4 keep their
+fundamental (-5.1 dB against the second harmonic at worst; the test's limit is -15); a pizzicato
+falls 30 dB in 0.8 s; the earlier shine notes' share at 4.85 to 4.99 kHz is -43 dB or less (F5
+-27 dB).
+
+**A correction to finding 11:** the notes more than 10 cents off (D#3 +19, A#3 +16, F4 +15,
+C#5 -14) are not errors. They are the player's ring intonation (`PJ_RING_TUNE`, `stopLength` in
+`src/bassinst.cc`): a stop moved by up to 15 cents so that the note rings with an open string.
+With it off they play +8, +2, +1 and 0 cents.
+
+**Still open:** findings 4 (the string's response to the bow), 8 (one-sample lag between the
+parts), 9 (the close parts of the sound go out alike all round), 10 (borrowed constants); the
+brightness from f to ff (needs three steps a sample or a different limit); none of it heard or
+compared with a recording.
+
 ## Changed on 2026-11-19 (not part of the review, but they affect its numbers)
 
 - **Two f-holes:** the air in two halves side by side, each with its own plug, and cross flow

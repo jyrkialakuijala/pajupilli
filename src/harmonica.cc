@@ -242,9 +242,8 @@ float HarmonicaModel::step() {
 
 float HarmonicaModel::sample() {
   static const double kOut = knob("PJ_HARP_OUT", 1.0);
-  static int count = 0;
-  if (++count >= 256) {
-    count = 0;
+  if (++refreshCount_ >= 256) {  // (each voice its own count: voices render side by side)
+    refreshCount_ = 0;
     refreshActive();
   }
   const float a = step(), b = step();

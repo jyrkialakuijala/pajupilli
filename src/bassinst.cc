@@ -79,12 +79,35 @@ extern const Instrument kPlucked[] = {
     {"violin", 0, 55, 105, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "violin"},
     // The concert grand (src/piano.cc, src/pianoinst.cc): A0 .. C8.
     {"grand-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The bright piano (General MIDI 2): a Shigeru Kawai SK-7, the 229 cm grand (src/sk7.cc).
+    {"bright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // A 121 cm upright (src/upright.cc): its scale and board.
     {"upright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The honky-tonk (General MIDI 4): the upright out of tune, its hammers worn (src/pianoinst.cc).
     {"honky-tonk", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The Yamaha CP-80 electric grand (src/cp80.cc): A0 .. C8.
     {"electric-grand", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The Fender Rhodes (src/rhodes.cc), General MIDI 5: the 88's harp, A0 .. C8.
+    {"electric-piano-1", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The DX7's E.PIANO 1 (src/dx7.cc), General MIDI 6: A0 .. C8.
+    {"electric-piano-2", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // FX 8 (sci-fi) (src/scifi.cc), General MIDI 104: a folded discharge and an FM'd filter ping, A0 .. C8.
+    {"fx-sci-fi", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 1 (rain) (src/rain.cc), General MIDI 97: rain on tuned glass bowls, A0 .. C8.
+    {"fx-rain", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 2 (soundtrack) (src/soundtrack.cc), General MIDI 98: a keyed aeolian harp, A0 .. C8.
+    {"fx-soundtrack", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 4 (atmosphere) (src/atmosphere.cc), General MIDI 100: a keyed psaltery with magnetic
+    // resonators, A0 .. C8.
+    {"fx-atmosphere", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 5 (brightness) (src/brightness.cc), General MIDI 101: a keyboard of singing arcs, A0 .. C8.
+    {"fx-brightness", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 6 (goblins) (src/goblins.cc), General MIDI 102: a pyrophone (singing flames in glass
+    // pipes), A0 .. C8.
+    {"fx-goblins", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
+    // FX 7 (echoes) (src/echoes.cc), General MIDI 103: a tuning-fork keyboard into a tape echo,
+    // A0 .. C8.
+    {"fx-echoes", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
     // The Hohner Clavinet D6, E7 and C (src/clavinet.cc): F1 .. E6.
     {"clavinet", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     {"clavinet-e7", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
@@ -104,6 +127,25 @@ extern const Instrument kPlucked[] = {
     {"music-box", 0, 36, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "music box"},
     // The classical guitar (src/guitar.cc): E2 .. B5; notes outside are moved in by octaves.
     {"nylon-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    {"clean-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    // The steel-string acoustic (GM 26; src/guitar.cc steelGuitar()): a dreadnought, flatpicked.
+    {"steel-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    // The jazz guitar (GM 27; src/guitar.cc jazzGuitar(), src/jazzguitar.cc): an ES-175, flatwounds, into a
+    // clean jazz amp; E2 .. C6 (notes outside folded in by octaves).
+    {"jazz-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    {"muted-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    {"overdriven-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    // The electric bass (src/ebass.cc): a Jazz Bass, fingerstyle; E1 .. D#4, notes outside moved in by octaves.
+    {"electric-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
+    // GM 35 (src/ebass.cc PickBassPlayer): a Precision Bass played with a pick, into an SVT; E1 .. D#4.
+    {"pick-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
+    // GM 37, 38 (src/ebass.cc SlapBassPlayer): the Jazz Bass slapped and popped, its frets
+    // struck; 38 active, stainless, pop-forward; E1 .. D#4.
+    {"slap-bass-1", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
+    {"slap-bass-2", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
+    {"distortion-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
+    // GM 32: the clean Strat in harmonics (src/guitarinst.cc HarmonicsPlayer): E3 .. G#7 as heard.
+    {"guitar-harmonics", 0, 52, 104, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
     // The harpsichord (src/harpsichord.cc, on the piano's strings): F1 .. F6; 8' + 8', the back 8'
     // alone, and all four choirs (16' 8' 8' 4').
     {"harpsichord", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "harpsichord"},
@@ -134,6 +176,10 @@ extern const Instrument kPlucked[] = {
     {"tom-14", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"tom-16", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"tom-16-low", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // The timpani (src/timpani.cc): five kettledrums, C2 .. E4 (32 in. to 20 in.); outside, the outer drums.
+    {"timpani", 0, 28, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "timpani"},
+    // The concert harp (src/harp.cc, src/harpinst.cc): 47 strings, C1 .. G7; outside, moved in by octaves.
+    {"harp", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "harp"},
     // The triangle and the cowbell (src/metalperc.cc): General MIDI's drum keys 80, 81 and 56.
     {"triangle", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"cowbell", 0, 36, 84, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
@@ -213,6 +259,9 @@ BassModel::BassModel(const Instrument& inst) : Tube(inst), bass_(inst.fs, specOf
   static const float kStanding[9] = {-1, 0, 0, 0, 0, -1, 0, 1, 0};
   static const float kUnderChin[9] = {0, 0.866f, -0.5f, -1, 0, 0, 0, 0.5f, 0.866f};
   std::copy_n(std::strcmp(inst.name, "viola") == 0 || std::strcmp(inst.name, "violin") == 0 ? kUnderChin : kStanding, 9, axes_);
+  // (tests: PJ_SEAT n: this instrument built as a section's n-th, Bass::vary)
+  static const int kSeat = int(knob("PJ_SEAT", 0));
+  if (kSeat > 0) bass_.vary(unsigned(kSeat));
 }
 
 void BassModel::resetAir() {
@@ -501,7 +550,7 @@ const char* BowPlayer::bowPlaceName(double brightness) {
        : w > 0.055 ? "towards the bridge" : "at the bridge (sul ponticello)";
 }
 
-BowPlayer::BowPlayer(BassModel& m) : BassPlayer(m), wait_(m.bass().spec().pizzWait) {}
+BowPlayer::BowPlayer(BassModel& m) : BassPlayer(m), wait_(m.bass().spec().pizzWait), waitOwn_(wait_) {}
 
 void BowPlayer::seed(unsigned s) {
   BassPlayer::seed(s);
@@ -509,6 +558,41 @@ void BowPlayer::seed(unsigned s) {
   vib_.rateMul = 1 + 0.08 * urand();
   vib_.depthMul = 1 + 0.15 * urand();
   vib_.setPhase(M_PI * (1 + urand()));
+}
+
+// One of a section: no two players stop a note at quite the same place (up to 6 cents either
+// way, fixed for the player: open strings are what they are), shake alike (the vibrato's rate
+// 12 % either way: 5.3 to 6.7 Hz on a violin; its depth 30 %; beginning up to 0.15 s later), or
+// draw the bow alike (speed and pressure 10 %). Each is somewhere else in its bow, so the
+// section's bow changes never fall together.
+void BowPlayer::vary(unsigned seat) {
+  uint32_t r = seat * 2246822519u + 4099u;
+  auto u = [&]() {  // -1 .. 1
+    r = r * 1664525u + 1013904223u;
+    return (r >> 8) * (2.0 / 16777216.0) - 1;
+  };
+  seatCents_ = 6 * u();
+  vib_.rateMul = 1 + 0.12 * u();
+  vib_.depthMul = 1 + 0.3 * u();
+  seatVibDelay_ = 0.075 * (1 + u());
+  seatSpeed_ = 1 + 0.1 * u();
+  seatPress_ = 0.1 * u();
+  seatBow_ = 0.85 + 0.15 * u();  // (70 to 100 % of the hair)
+  travel_ = 0.5 * (1 + u()) * seatBow_ * m_.bass().spec().bowLength;
+  dir_ = u() > 0 ? 1 : -1;
+  seated_ = true;
+  seatRng_ = r | 1;
+  // Its section's habits, shared by the players of one kind of instrument and different from
+  // the other sections': the vibrato's rate (7 % either way) and depth (15 %), when it begins,
+  // the bow's speed (8 %: so its turning points) and pressure.
+  r = uint32_t(m_.bass().spec().strings[0].f0 * 16) * 2654435761u + 977u;
+  u();
+  vib_.rateMul *= 1 + 0.07 * u();
+  vib_.depthMul *= 1 + 0.15 * u();
+  seatVibDelay_ += 0.03 * (1 + u());
+  seatSpeed_ *= 1 + 0.08 * u();
+  seatPress_ += 0.05 * u();
+  seatBow_ = std::min(1.0, seatBow_ * (1 + 0.08 * u()));
 }
 
 void BowPlayer::setHold(bool h) {
@@ -693,6 +777,11 @@ void BowPlayer::strike(int midi, int velocity) {
   if (!chord) {  // a new stroke: the other way (after a rest: a down-bow)
     dir_ = sinceAny_ > 1.0 ? 1 : -dir_;
     travel_ = 0;
+    if (seated_) {  // (one of a section: anywhere in the first 3/4 of its bow, and either way)
+      seatRng_ = seatRng_ * 1664525u + 1013904223u;
+      travel_ = 0.75 * ((seatRng_ >> 8) / 16777216.0) * seatBow_ * m_.bass().spec().bowLength;
+      if (sinceAny_ > 1.0 && (seatRng_ & 0x80000000u)) dir_ = -1;
+    }
   }
   place(s, midi, stopNote, harmonic);
   if (on_[s]) b.damp(s, 60);
@@ -789,7 +878,7 @@ void BowPlayer::render(float* out, int n) {
       // The bow's speed: 5 cm/s (pp) to ~50 cm/s (ff), with the dynamics knob
       // and the joystick's swell.
       double speed = (0.05 + b.spec().bowSpeed * v * v) * (0.6 + 0.8 * dyn_) * (1 + 1.3 * std::max(0.0, breathCtl_)) *
-                     (1 + 0.05 * wander_ * drift_);
+                     (1 + 0.05 * wander_ * drift_) * seatSpeed_;
       if (trem) speed *= 0.75;
       // By ear: a note the bass answers weakly gets more bow, a booming one
       // less (tools/bowlevels.py: 70 % of the difference, at most 6 dB).
@@ -805,7 +894,7 @@ void BowPlayer::render(float* out, int n) {
       // Its pressure, the air knob; a hard key bites at the start (martele);
       // a harmonic wants a light, fast bow.
       const double bite = std::clamp((vel_[s] - 100) / 27.0, 0.0, 1.0) * std::max(0.0, 1 - strokeT_[s] / 0.07);
-      double pressure = std::clamp(0.5 + 1.1 * (air_ - 0.35) + 0.3 * bite, -0.3, 1.2);
+      double pressure = std::clamp(0.5 + 1.1 * (air_ - 0.35) + 0.3 * bite + seatPress_, -0.3, 1.2);
       if (harm_[s]) pressure -= 0.15;
       // How fast the stroke starts: a soft key eases in over ~130 ms, a hard
       // one in ~12 ms (the hardness knob scales it); a change of direction
@@ -824,14 +913,16 @@ void BowPlayer::render(float* out, int n) {
       // the shorter string up the neck, to 3.5 x)
       static const double kVibOwn = knob("PJ_ARCO_VIB", 1.0);  // (the player's own vibrato x; 0: none)
       const double own = kVibOwn * b.spec().vibNat * std::min(3.5, b.openLength(s) / std::max(0.05, b.length(s))) * vib * vibScale_ *
-                         std::clamp((since_[s] - vibDelay_) / 0.15, 0.0, 1.0);
-      b.bend(s, key_[s] > open_[s] && !harm_[s] ? cents + own + 200 * roll_ + kTremor * wander_ * tremor_ : 0.0);
+                         std::clamp((since_[s] - vibDelay_ - seatVibDelay_) / 0.15, 0.0, 1.0);
+      b.bend(s, key_[s] > open_[s] && !harm_[s] ? cents + own + 200 * roll_ + kTremor * wander_ * tremor_ + seatCents_ : 0.0);
     }
     // The bow has a length (~55 cm of hair): used up, it turns.
     travel_ += fastest * bdt;
     if (turned) travel_ = 0;
-    if (travel_ > b.spec().bowLength && !trem) {
+    if (travel_ > seatBow_ * b.spec().bowLength && !trem) {
       dir_ = -dir_;
+      static const bool kLog = std::getenv("PJ_BOW_LOG") != nullptr;  // (the bow changes, for the tests)
+      if (kLog) std::fprintf(stderr, "bowturn %.0f Hz %p %.3f\n", b.spec().strings[0].f0, (void*)this, sinceAny_);
       travel_ = 0;
     }
     m_.process(out + i, m);

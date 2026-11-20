@@ -54,6 +54,9 @@ class Performer {
   // Its own breath wander, and its own vibrato and flutter: rate, phase and
   // depth differ from player to player, so an ensemble never pulses together.
   virtual void seed(unsigned s) = 0;
+  // One of many alike in a section (src/stringsect.cc): this player's own ways, fixed for its
+  // seat (seat 1, 2, ...): how true it stops, its vibrato, its bow. A player alone is not varied.
+  virtual void vary(unsigned /*seat*/) {}
   // (-play) How much the other parts are playing in this instrument's register just now (0:
   // nothing, ~1: a full texture). A soloist plays with more drama over less (the harmonica's hands).
   virtual void setAccompaniment(double /*busy*/) {}

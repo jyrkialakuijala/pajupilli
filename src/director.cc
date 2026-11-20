@@ -217,6 +217,63 @@ Direction direct(const DirInput& in) {
       if (sig[p][i] - sig[p][i - 1] != sig[p - 1][i] - sig[p - 1][i - 1]) return false;
     return true;
   };
+  // A phrase said again: its keying a little different each time, for interest (the player's
+  // touch, not the dynamics). Twice: long, then shorter; three times: mid, short, long; more:
+  // long first and last, short and mid between. Found by bars, not by the phrases above (their
+  // ends rarely fall on a repeat): four, two or one bars of the melody said again at once, the
+  // same rhythm and the same steps within a semitone (a sequence a step higher or lower counts:
+  // Bach's melodies are rarely said again exactly, but often so), at least four notes, the
+  // longest first. The short notes (up to two beats) of each statement, not the
+  // phrase's last (the breath), in every part; PJ_DIRECTOR_REPEAT (1) scales it.
+  const long nbars = lastOff / bar + 1;
+  std::vector<std::vector<std::pair<long, int>>> bsig(static_cast<size_t>(nbars));
+  for (const DirNote& x : nt)
+    if (x.ch == melody && x.tick / bar < nbars) bsig[size_t(x.tick / bar)].push_back({x.tick % bar, x.key});
+  auto same = [&](long a, long b, int w) {
+    if (b + w > nbars) return false;
+    int count = 0, pa = -1, pb = -1;
+    for (int k = 0; k < w; ++k) {
+      const auto& A = bsig[size_t(a + k)];
+      const auto& B = bsig[size_t(b + k)];
+      if (A.size() != B.size()) return false;
+      for (size_t q = 0; q < A.size(); ++q) {
+        if (A[q].first != B[q].first) return false;
+        // (each step within a semitone of the first statement's: a diatonic sequence's steps
+        // turn major into minor and back)
+        if (pa >= 0 && std::abs((B[q].second - pb) - (A[q].second - pa)) > 1) return false;
+        pa = A[q].second;
+        pb = B[q].second;
+        ++count;
+      }
+    }
+    return count >= 4;
+  };
+  std::vector<int> rep(static_cast<size_t>(nbars), 0), run(static_cast<size_t>(nbars), 1);
+  int repeated = 0;
+  for (int w : {4, 2, 1})
+    for (long b = 0; b + w < nbars;) {
+      long e = b + w;
+      while (same(b, e, w)) e += w;
+      bool free = e - b >= 2 * w;
+      for (long k = b; k < e && free; ++k) free = run[size_t(k)] == 1;
+      if (!free) { ++b; continue; }
+      const int L = int((e - b) / w);
+      for (long k = b; k < e; ++k) {
+        rep[size_t(k)] = int((k - b) / w);
+        run[size_t(k)] = L;
+      }
+      repeated += L - 1;
+      b = e;
+    }
+  static const double kRep = kAll * knob("PJ_DIRECTOR_REPEAT", 1.0);
+  auto keying = [&](long tick) {
+    const size_t k = size_t(std::clamp(tick / bar, 0L, nbars - 1));
+    const int L = run[k], r = rep[k];
+    constexpr double kShort = 0.86, kMid = 0.93;
+    const double f = L < 2 ? 1 : L == 2 ? (r == 0 ? 1 : kShort) : L == 3 ? (r == 0 ? kMid : r == 1 ? kShort : 1)
+                   : (r == 0 || r == L - 1) ? 1 : (r % 2 ? kShort : kMid);
+    return 1 + (f - 1) * kRep;
+  };
 
   // --- The arc. Baroque: terraces (the full texture forte, the thin one piano, an echo softer,
   // a small swell into the cadence). Otherwise hairpins: up to each phrase's climax and down
@@ -318,6 +375,7 @@ Direction direct(const DirInput& in) {
       const double breath = 0.12 / lenAt(in.tempo, double(x.tickOff) / div) * div;
       len = std::max(0.6, 1 - std::min(0.25 * dur, breath) / dur);
     }
+    if (!lastOfPhrase && dur <= 2 * div) len *= keying(x.tick);
     c.v[kCueLength] = float(1 + (len - 1) * std::min(1.0, kAll));
     c.v[kCueLegato] = gapless && !lastOfPhrase && len > 0.9 ? 1.0f : 0.0f;
     c.v[kCuePhraseEnd] = lastOfPhrase ? 1.0f : 0.0f;
@@ -454,6 +512,7 @@ Direction direct(const DirInput& in) {
   nb += std::snprintf(buf + nb, sizeof buf - nb, "final rit. over %g quarters (-%.0f %%), the last chord held\n", ritLen,
                       100 * ritDepth / (1 + ritDepth));
   if (mutedN) nb += std::snprintf(buf + nb, sizeof buf - nb, "  mutes on in %d of the %d phrases\n", mutedN, np);
+  if (repeated) nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d repeats (a bar or more said again at once): keyed long / mid / short in turn\n", repeated);
   std::snprintf(buf + nb, sizeof buf - nb, "  vibrato: %s; articulation: %s  (%s)",
                 baroque ? "an ornament, long notes only" : romantic ? "always, widest at the climaxes" : "light, on the longer notes",
                 baroque ? "detached, leaps and before strong beats more" : "legato, a breath at each phrase end", why);

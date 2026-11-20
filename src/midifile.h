@@ -30,6 +30,10 @@ bool setReinstrument(const std::string& spec);
 // semitones (12: an octave up), as the file is read, before any planning.
 void setPlayTranspose(int semitones);
 
+// -inst's list of the instruments: in General MIDI's order and groups, each with its program
+// number; then those no program reaches, by family.
+std::string instrumentList();
+
 // Returns the process exit code.
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
                  bool verbose, bool roomGiven = true);

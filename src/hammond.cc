@@ -116,18 +116,26 @@ std::string HammondRegistration::text() const {
   return buf;
 }
 
-// research/hammond_b3.md §13.3: 17 the jazz organ's 888 with C3 and the Leslie slow; 18 with the
-// percussion (3rd, fast); 19 the rock organ: four drawbars out, the Leslie fast, the amp hot.
+// research/hammond_b3.md §13.3: 17 the jazz organ's 888000000 with C3 and the Leslie slow; 18 with
+// the percussion (3rd, fast); 19 the rock organ: 688600000 (Jon Lord's), C3, the lower 808000000,
+// the amp hotter, the Leslie slow. Live
+// (-inst) plays these as they are; -play's planner takes them as its starting point, a hint, and
+// adapts from there (the mud, the Leslie's gestures, the ending).
 HammondRegistration hammondPreset(const std::string& name) {
   HammondRegistration r;
   if (name == "percussive-organ") {
     r.perc = true;
     r.vibrato = 0;
-  } else if (name == "rock-organ") {
-    r.upper = {8, 8, 8, 8, 0, 0, 0, 0, 0};
-    r.vibrato = 0;
-    r.leslieFast = true;
-    r.drive = 3.5;
+  } else if (name == "drawbar-organ") {  // (888000000 on the slow Leslie)
+    r.upper = {8, 8, 8, 0, 0, 0, 0, 0, 0};
+    r.leslieFast = false;
+  } else if (name == "rock-organ") {  // (688600000, C3, the amp hotter, the Leslie resting on slow;
+                                       // the left hand's comping 808000000, clear of the bass)
+    r.upper = {6, 8, 8, 6, 0, 0, 0, 0, 0};
+    r.lower = {8, 0, 8, 0, 0, 0, 0, 0, 0};
+    r.vibrato = 6;
+    r.leslieFast = false;
+    r.drive = 5.0;
   }
   hammondOverrides(r);
   return r;
@@ -1233,7 +1241,25 @@ std::array<double, 9> HammondPlayer::drawbarsAt(const double k[4], const char** 
 }
 
 bool HammondPlayer::setKnob(int k, double x) {
-  if (k == 4) {  // K5: the Leslie's half-moon switch: stop (left), slow (middle), fast (right)
+  if (k == 4) {  // K5: the overdrive: the 122's amp driven harder, 1 x (clean, as registered) to 8 x (grit)
+    overdrive_ = std::exp(std::log(8.0) * std::clamp(x, 0.0, 1.0));
+    const int tenths = int(std::lround(10 * overdrive_));
+    if (tenths != lastOverdrive_) {
+      std::fprintf(stderr, "overdrive x %.1f\n", overdrive_);
+      lastOverdrive_ = tenths;
+    }
+    if (knobs_[0] < 0) {
+      knobs_[0] = 6.0 / (kStations - 1);
+      knobs_[1] = knobs_[2] = knobs_[3] = 0.5;
+      baseDrive_ = m_.registration().drive;
+    }
+    HammondRegistration r = m_.registration();
+    r.drive = baseDrive_ * (1 + 1.5 * smooth01((knobs_[0] - 0.7) / 0.3)) * overdrive_;
+    r.leslieFast = leslieFast_;
+    m_.setRegistration(r);
+    return true;
+  }
+  if (k == 5) {  // K6: the Leslie's half-moon switch: stop (left), slow (middle), fast (right)
     const int state = x < 1.0 / 3 ? 0 : x < 2.0 / 3 ? 1 : 2;
     if (state != lastLeslieKnob_) {
       static const char* const kNames[3] = {"stop (brake)", "slow (chorale)", "fast (tremolo)"};
@@ -1255,7 +1281,7 @@ bool HammondPlayer::setKnob(int k, double x) {
   const std::array<double, 9> goal = drawbarsAt(knobs_, &name);
   for (int d = 0; d < 9; ++d) r.upper[d] = int(std::lround(goal[d]));  // (the registration's text)
   // (K1's hard end: the 122 pushed harder too, the grit of a shout)
-  r.drive = baseDrive_ * (1 + 1.5 * smooth01((knobs_[0] - 0.7) / 0.3));
+  r.drive = baseDrive_ * (1 + 1.5 * smooth01((knobs_[0] - 0.7) / 0.3)) * overdrive_;
   r.leslieFast = leslieFast_;
   m_.setRegistration(r);
   m_.setUpperGoal(goal);  // (the sliders glide there, not in steps)

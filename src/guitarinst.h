@@ -1,17 +1,24 @@
-// The guitars as instruments (-inst nylon-guitar): the model (guitar.h)
-// behind the Tube and Performer interfaces, and the guitarist.
+// The guitars as instruments (-inst nylon-guitar; clean-guitar, GM 28; muted-guitar, GM 29;
+// overdriven-guitar, GM 30): the model (guitar.h) behind the Tube and Performer interfaces, and
+// the guitarist. An electric's pickups go into an
+// amp (guitaramp.h): what is heard is the amp's speaker.
 #pragma once
 
 #include <algorithm>
 #include <vector>
 
+#include <memory>
+
 #include "guitar.h"
+#include "guitaramp.h"
 #include "performer.h"
 #include "tube.h"
 
 namespace pajupilli {
 
 bool guitarInstrument(const Instrument& inst);
+bool guitarHarmonics(const Instrument& inst);  // GM 32: the clean Strat played in harmonics
+bool jazzGuitarInstrument(const Instrument& inst);  // GM 27: the ES-175 (src/jazzguitar.h's player)
 
 class GuitarModel : public Tube {
  public:
@@ -31,8 +38,16 @@ class GuitarModel : public Tube {
   void controlStep() override {}
   float sample() override;
   Guitar g_;
+  std::unique_ptr<GuitarAmp> amp_;
+  float kAmpOut_ = 1;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
+  // (GM 27: the archtop's radiated sound mixed under the amp; its scale: Pa to the amp's units,
+  // ~20 dB under it on a chord, A-weighted: research/jazz_guitar.md 2.5.)
+  float kAcoustic_ = 0;
+  static constexpr double kAcousticCal_ = 0.0168;
+ public:
+  GuitarAmp* amp() { return amp_.get(); }
 };
 
 // The guitarist (research/guitars.md 7). MIDI gives notes; a guitar wants a
@@ -122,6 +137,29 @@ class GuitarModel : public Tube {
 //     its major thirteenth 18; a major chord's ninth 4.
 //   - A key let go: the finger lifts off its fret, or the hand lies on the
 //     open string: the note is damped. The sustain pedal lets everything ring.
+// On an electric (research/electric_guitars.md 7) the same left hand, and a pick in the right:
+//   - Single notes are picked down and up in turn while they come quickly (under 0.3 s apart),
+//     down again after a rest; an up stroke a little lighter and the other way across the
+//     string. Notes that come together are one sweep of the pick across the strings (6 ms a
+//     string), down or up as the strumming hand swings (above).
+//   - Velocity is how far the pick pushes the string (0.1-3 mm), at 11 cm from the saddle (the
+//     brightness knob moves it: towards the bridge, brighter); a hard stroke a little nearer
+//     the bridge and quicker off the pick.
+//   - On the muted guitar (GM 29) the side of the picking hand lies on the strings 8-16 mm from
+//     the saddle as each one is picked (8.1): the note thuds, its overtones soon gone,
+//     its fundamental to -30 dB in about a quarter of a second; the harder the stroke the lighter
+//     and nearer the saddle (an accent rings), now and then lighter by itself, never twice the
+//     same. The pick strikes nearer the bridge (~6 cm).
+//   - On the overdriven guitar the hands keep the strings not played muted, and a loud note held
+//     alone (or in a dyad or power chord) sings: the player stands where the amp's sound comes
+//     back in phase with it (feedback). From 0.12 s it holds (its modes below 2.5 kHz); at
+//     1.2-2 s it blooms: a low note
+//     into its octave or twelfth, a middle one swells or goes to its octave, a high one swells;
+//     as long as the key is down (PJ_EGTR_FEEDBACK: 0 none, x the bloom; PJ_EGTR_BLOOM: 2,
+//     how far it swells).
+//   - Pitch bend is the left hand pushing a string: the last note picked bends, the rest of a
+//     chord stays where it is. The fretting hand lifts off a released note and lies on the
+//     string at once (an electric player mutes what is not playing).
 class GuitarPlayer : public Performer {
  public:
   explicit GuitarPlayer(GuitarModel& m);
@@ -138,7 +176,7 @@ class GuitarPlayer : public Performer {
   uint32_t rng_ = 777u;
   struct Asked { int midi, velocity; };
   std::vector<Asked> asked_;
-  struct Due { double in; int string, fret; double depth, angle, nail, where; int strum; double clack; };
+  struct Due { double in; int string, fret; double depth, angle, nail, where; int strum; double clack, palm = 0, palmAt = 0.012; };
   std::vector<Due> due_;
   int note_on_[Guitar::kStrings];   // the MIDI note each string sounds (-1: none)
   bool held_[Guitar::kStrings] = {};  // its key still down
@@ -169,6 +207,72 @@ class GuitarPlayer : public Performer {
   double handSpeed_ = 1.4;  // across the strings (m/s)
   double mend_[Guitar::kStrings] = {}, pull_ = 1;  // a minor third's upper note pulled up (cents now)
   bool bent_[Guitar::kStrings] = {};
+  // The electric's pick: which way it goes next (+1 down), and the string a pitch bend takes.
+  bool electric_ = false, muted_ = false, driven_ = false, distorted_ = false;  // (distorted_: GM 31, driven_ too)
+  // The steel-string acoustic (GM 26; research/steel_guitar_build.md 8.2): a flatpick as the
+  // electric's, over the soundhole; its strums as measured; open strings left to ring.
+  bool steel_ = false;
+  bool idleMuted_[Guitar::kStrings] = {};  // (steel: an unplayed string the hand lies on after the last key's release)
+  // GM 31's palm on chugs: the last stroke's lowest note, its velocity, how long its key was
+  // held (s; -1: still), how many strokes on that note so far; the knobs (palm rule, octave on a
+  // power chord, the lead vibrato's width).
+  int pmRoot_ = -1, pmVel_ = 0, pmRun_ = 0;
+  double pmHeld_ = -1, chug_ = 1, octave_ = 1, wide_ = 1;
+  bool octaveAdded_[Guitar::kStrings] = {};  // (that string's note the added octave: let go with its root)
+  int pickWay_ = 1, bendString_ = -1;
+  double kPalm_ = 5, kRelease_ = 25;
+  // Feedback: whether each held string is being fed, its key's velocity, when it blooms (s).
+  double feedback_ = 1, holdAt_ = 0.12, holdHz_ = 2500, bloomGain_ = 2, bloomAt_[Guitar::kStrings] = {};
+  int fed_[Guitar::kStrings] = {};  // (0 not yet, 1 held, 2 bloomed, 3 the fundamental let go)
+  int bloomK_[Guitar::kStrings] = {};
+  int velOf_[Guitar::kStrings] = {};
+};
+
+// GM 32, Guitar Harmonics (research/electric_guitars.md 2.6, 9): the clean Stratocaster on its
+// middle pickup (the neck pickup sits on the open strings' 4th-harmonic node), into the Twin.
+// Every note is a harmonic, at the pitch written:
+//   - Where: a natural harmonic if there is one (the open string touched at the 12th fret,
+//     n = 2; the 7th, n = 3; the 5th, n = 4), the free strings first; else a touched
+//     ("harp") harmonic, n = 2: the left hand stops the string 12 frets under the note (near
+//     where it already is) and the right hand's index finger touches 12 frets higher; above
+//     the 21st fret's octave n = 3, then n = 4; below E3 an octave up, above C8 an octave down.
+//     The harmonic sounds what the string's n-th mode sounds: its stiffness makes it 0.1-3
+//     cents sharp of n times the fundamental, and that is left as it is (as on a guitar).
+//   - How: the fingertip on the node from just before the pick to 30-60 ms after (it kills what
+//     is not a multiple of n), then lifted; the pick near the bridge, at the harmonic's own
+//     antinode nearest it (never on its node), velocity its depth. A harmonic is weaker the
+//     higher n is (the pluck's share of mode n, and the pickup's ear for it): the player digs
+//     in for the 5th fret's.
+//   - They ring past the key's release, as harmonics do. A string needed again at another fret
+//     is damped first (4 ms; every note waits those 4 ms, so the timing stays even); after a
+//     rest (1.5 s with no key down) the hand lies lightly on the released strings.
+//   - Notes that come together are one sweep of the pick from the low strings up, 8 ms apart.
+class HarmonicsPlayer : public Performer {
+ public:
+  explicit HarmonicsPlayer(GuitarModel& m);
+  void noteOn(int midi, int velocity) override;
+  void noteOff(int midi) override;
+  void render(float* out, int n) override;
+  void setHold(bool h) override { hold_ = h; }
+  void seed(unsigned s) override { rng_ = 919u + 7919u * s; }
+  // Where pitch `midi` is played: string, fret, harmonic (false: nowhere; `taken`: strings in use).
+  bool place(int midi, const bool* taken, int* string, int* fret, int* n) const;
+
+ private:
+  double ur();
+  void play();
+  GuitarModel& m_;
+  uint32_t rng_ = 919u;
+  struct Asked { int midi, velocity; };
+  std::vector<Asked> asked_;
+  struct Due { double in; int string, fret, n; double depth, where, angle, rise, touch, off; };
+  std::vector<Due> due_;
+  int note_on_[Guitar::kStrings];      // the MIDI note each string sounds (-1: none)
+  int fretOf_[Guitar::kStrings] = {}, nOf_[Guitar::kStrings] = {};
+  bool held_[Guitar::kStrings] = {}, rested_[Guitar::kStrings] = {};
+  double age_[Guitar::kStrings] = {};
+  double hand_ = 5, sinceNote_ = 10, gap_ = 10, rate_ = 300, lift_ = 1;
+  int pickWay_ = 1, shift_ = 0;
 };
 
 }  // namespace pajupilli

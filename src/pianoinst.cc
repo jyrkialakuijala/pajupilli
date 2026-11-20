@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "sk7.h"
 
 namespace pajupilli {
 
@@ -20,7 +21,12 @@ static bool upright(const Instrument& inst) { return std::strcmp(inst.name, "upr
 
 static bool dulcimer(const Instrument& inst) { return std::strcmp(inst.name, "dulcimer") == 0; }
 
-bool grandPiano(const Instrument& inst) { return std::strcmp(inst.name, "grand-piano") == 0 || upright(inst) || dulcimer(inst); }
+// The bright piano (General MIDI 2): a Shigeru Kawai SK-7 (src/sk7.cc).
+static bool brightPiano(const Instrument& inst) { return std::strcmp(inst.name, "bright-piano") == 0; }
+
+bool grandPiano(const Instrument& inst) {
+  return std::strcmp(inst.name, "grand-piano") == 0 || brightPiano(inst) || upright(inst) || dulcimer(inst);
+}
 
 // The honky-tonk (General MIDI 4; research/piano_variants.md section 3.3-3.4): the upright, every
 // string of a key its own ~1 Hz off (the outer ones of three either side, the middle one a
@@ -75,6 +81,7 @@ static PianoDesign designFor(const Instrument& inst) {
   if (dulcimer(inst)) return dulcimerDesign();
   if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
   if (honkyTonk(inst) && uprightDesign) return honkyTonkDesign(uprightDesign());
+  if (brightPiano(inst)) return sk7Design();
   return upright(inst) && uprightDesign ? uprightDesign() : grandDesign();
 }
 

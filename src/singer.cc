@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <complex>
 
 #include "knob.h"
+#include "singer_vowels_data.h"
 
 namespace pajupilli {
 namespace {
@@ -98,6 +100,12 @@ void Singer::reset() {
 }
 
 void Singer::shape(double vowel, double len) {
+  if (sung_) {
+    sungShape(vowel, jaw_, lnT_);
+    jawSet_ = jaw_;
+    lenTarget_ = len;
+    return;
+  }
   const Table& t = table();
   const double v = std::clamp(vowel, 0.0, 4.0);
   const int k = std::min(3, int(v));
@@ -149,8 +157,10 @@ void Singer::coefs() {
 void Singer::control(double f0, double vowel, double lung, double breath, double vibDepth, double vibRate,
                      double note, double dt) {
   // The voice part: a bass's tract (18 cm) for low notes, a soprano's (14.5 cm) for high.
-  const double len = lenMul_ * 0.01 * (18.0 - 3.5 * std::clamp((note - 45) / 31, 0.0, 1.0));
-  if (!shaped_ || std::fabs(vowel - vowel_) > 1e-4 || std::fabs(len - lenTarget_) > 1e-6) {
+  // (Sung: the voice part's own, whatever the note.)
+  const double len = sung_ ? sungLength(jaw_) : lenMul_ * 0.01 * (18.0 - 3.5 * std::clamp((note - 45) / 31, 0.0, 1.0));
+  if (!shaped_ || std::fabs(vowel - vowel_) > 1e-4 || std::fabs(len - lenTarget_) > 1e-6 ||
+      std::fabs(jaw_ - jawSet_) > 1e-4) {
     shape(vowel, len);
     vowel_ = vowel;
   }
@@ -189,10 +199,140 @@ void Singer::control(double f0, double vowel, double lung, double breath, double
   f0_ = f0 * std::exp2(cents / 1200);
   // Louder: more of the folds' length opens, the open phase shortens and
   // the closing gets quicker (more high harmonics).
-  const double loud = std::clamp(lung_ / 1000, 0.0, 1.5);
+  // (Sung: a singer's lungs, pp ~250 Pa .. ff ~3.5 kPa, on a log scale.)
+  const double loud = sung_ ? std::clamp(std::log(std::max(lung_, 1.0) / 250) / std::log(14.0), 0.0, 1.3)
+                            : std::clamp(lung_ / 1000, 0.0, 1.5);
   aMax_ = (0.10 + 0.08 * loud) * 1e-4 * (1 - whisper_);
   oq_ = 0.68 - 0.18 * std::min(loud, 1.0);
   cq_ = 0.42 - 0.17 * std::min(loud, 1.0);
+  if (sung_) {  // (a singer's range: pp nearly sinusoidal, ff a quick closure; research/choir.md 5.3)
+    static const double kOq = knob("PJ_SUNG_OQ", 0.3), kCq = knob("PJ_SUNG_CQ", 0.36);
+    oq_ = 0.72 - kOq * std::min(loud, 1.1);
+    cq_ = 0.46 - kCq * std::min(loud, 1.1);
+  }
+}
+
+// --- The sung voice (the choir). ---
+
+namespace {
+
+// A sung row as this singer has it: its own vowel (the hump, the areas), the
+// jaw opened (open: the mouth and the lips wider, the lips' tube shorter, the
+// tongue's gap wider, the pharynx a little narrower).
+template <class Row>
+VowelRow sungRow(const Row& r, const Singer::Voicing& v, bool open) {
+  VowelRow w{r.xc + v.hump, r.ac * v.humpArea, r.wc, r.aLip * v.lip, r.aPh * v.pharynx, r.aOr * v.mouth,
+             r.lLip, r.aLar, r.len};
+  w.xc = std::clamp(w.xc, 0.1, 0.95);
+  if (open) {
+    static const double kMouth = knob("PJ_JAW_MOUTH", 2.5), kLip = knob("PJ_JAW_LIP", 3), kPh = knob("PJ_JAW_PH", 0.5),
+                        kTube = knob("PJ_JAW_TUBE", 0.5), kHump = knob("PJ_JAW_HUMP", 2);
+    w.aOr *= kMouth;
+    w.aLip *= kLip;
+    w.ac *= kHump;
+    w.aPh *= kPh;
+    w.lLip *= kTube;
+  }
+  return w;
+}
+
+}  // namespace
+
+void Singer::setVoicing(const Voicing& v) {
+  const SungVowelRow* rows = v.female ? kSungVowelsFemale : kSungVowelsMale;
+  for (int k = 0; k < kSungRows; ++k)
+    for (int o = 0; o < 2; ++o) {
+      // (past ɑ the bright vowels: the spoken e and i rows, for the vowel knob)
+      const VowelRow r = k < 4 ? sungRow(rows[k], v, o == 1) : sungRow(kVowels[k - 1], v, o == 1);
+      const double dx = r.len / kN;
+      float* ln = o ? sungOpen_[k] : sungLn_[k];
+      for (int i = 0; i < kN; ++i) {
+        double s = 0;
+        for (int j = 0; j < 8; ++j) s += std::exp(lnArea(r, (i + (j + 0.5) / 8) * dx));
+        ln[i] = float(std::log(s / 8 * 1e-4));
+      }
+    }
+  for (auto& t : r1Tab_) std::fill(t, t + 7, 0.0f);
+  sung_ = true;
+  lenSung_ = 0.01 * v.lengthCm;
+  lenMul_ = 1;
+  scatter_ = v.cents;
+  vibRateMul_ = 1;
+  jitMul_ = v.jitter;
+  shimMul_ = v.shimmer;
+  shaped_ = false;
+}
+
+// (the larynx raised and the lips spread with the jaw: the tract a little shorter)
+double Singer::sungLength(double jaw) const {
+  static const double kJawLen = knob("PJ_JAW_LEN", 0.1);
+  return lenSung_ * (1 - kJawLen * std::clamp(jaw, 0.0, 1.6));
+}
+
+void Singer::sungShape(double vowel, double jaw, float* ln) const {
+  const double v = std::clamp(vowel, 0.0, kSungRows - 1.0);
+  const int k = std::min(kSungRows - 2, int(v));
+  const float f = float(v - k), j = float(std::clamp(jaw, -0.5, 1.6));
+  for (int i = 0; i < kN; ++i) {
+    const float a = sungLn_[k][i] + f * (sungLn_[k + 1][i] - sungLn_[k][i]);
+    const float b = sungOpen_[k][i] + f * (sungOpen_[k + 1][i] - sungOpen_[k][i]);
+    ln[i] = a + j * (b - a);
+  }
+}
+
+// The line's transfer from the glottis's flow to the lips' (the glottis
+// closed, each section a lossless tube, the lips into Flanagan's R parallel L)
+// and its k-th peak, searched from 80 Hz in 4 Hz steps and refined on a parabola.
+double Singer::resonance(int k, double vowel, double jaw) const {
+  if (!sung_) return 0;
+  float ln[kN];
+  sungShape(vowel, jaw, ln);
+  const double dx = sungLength(jaw) / kN;
+  using C = std::complex<double>;
+  const double al = std::exp(double(ln[kN - 1]));
+  const double R = 128 * kRho * kC / (9 * kPi * kPi * al), L = 8 * kRho / (3 * kPi * std::sqrt(kPi * al));
+  const double lg = kRho * 0.003 / ((0.015 + 0.09 * breath_) * 1e-4);
+  auto mag = [&](double f) {
+    const double w = 2 * kPi * f, th = w * dx / kC, c = std::cos(th), s = std::sin(th);
+    // (from the lips back to the glottis: [p; u] at the glottis = M [p; u] at the lips)
+    const C zr = C(0, w * L) * R / (R + C(0, w * L));
+    C p = zr, u = 1;
+    for (int i = kN - 1; i >= 0; --i) {
+      const double zc = kRho * kC / std::exp(double(ln[i]));
+      const C p2 = c * p + C(0, zc * s) * u, u2 = C(0, s / zc) * p + c * u;
+      p = p2, u = u2;
+    }
+    // (the glottis: the chink's inertance to the lungs, beside the source)
+    return -std::log(std::abs(u + p / C(0, w * lg)));  // |U_lips / U_source|, log
+  };
+  double a = mag(80), b = mag(84);
+  int found = 0;
+  for (double f = 88; f < 5000; f += 4) {
+    const double c = mag(f);
+    if (b > a && b >= c && ++found == k) {
+      const double d = a - 2 * b + c;
+      return f - 4 + (d < 0 ? 2.0 * (a - c) / d : 0.0);
+    }
+    a = b, b = c;
+  }
+  return 0;
+}
+
+double Singer::jawFor(double vowel, double f) const {
+  static const double kJaw[7] = {-0.3, 0, 0.3, 0.6, 0.9, 1.2, 1.6};
+  const double v = std::clamp(vowel, 0.0, kSungRows - 1.0);
+  const int k = std::min(kSungRows - 2, int(v));
+  const double fr = v - k;
+  double r[7];
+  for (int j = 0; j < 7; ++j) {
+    for (int q = k; q <= k + 1; ++q)
+      if (r1Tab_[q][j] == 0) r1Tab_[q][j] = float(resonance(1, q, kJaw[j]));
+    r[j] = r1Tab_[k][j] + fr * (r1Tab_[k + 1][j] - r1Tab_[k][j]);
+  }
+  if (f <= r[0]) return kJaw[0];
+  for (int j = 1; j < 7; ++j)
+    if (f <= r[j]) return kJaw[j - 1] + (kJaw[j] - kJaw[j - 1]) * (f - r[j - 1]) / std::max(r[j] - r[j - 1], 1.0);
+  return kJaw[6];
 }
 
 double Singer::sample() {
@@ -204,8 +344,8 @@ double Singer::sample() {
     phase_ += f0_ * (1 + jit_) * dts_;
     if (phase_ >= 1) {
       phase_ -= 1;
-      jit_ = 0.003 * urand();          // jitter: a few tenths of a percent per period
-      shim_ = 1 + 0.03 * urand();      // shimmer
+      jit_ = 0.003 * jitMul_ * urand();      // jitter: a few tenths of a percent per period
+      shim_ = 1 + 0.03 * shimMul_ * urand();  // shimmer
     }
     const double op = oq_ * (1 - cq_);
     double g = 0;

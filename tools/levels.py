@@ -44,8 +44,19 @@ def k_weight(x, fs):
 
 def names():
     out = subprocess.run([FLUTE, '-inst', 'nosuch'], capture_output=True, text=True)
-    m = re.search(r'-inst: (.*)', out.stdout + out.stderr)
-    return [n.strip() for n in m.group(1).split(',')]
+    # (the list is in General MIDI's groups: the entries are on the lines indented by four, each
+    # "N name" or "name", some with a remark in brackets; a program not built is not an instrument)
+    got = []
+    for line in (out.stdout + out.stderr).splitlines():
+        if not line.startswith('    '):
+            continue
+        for item in line.split(','):
+            item = re.sub(r'^\s*\d+\s+', '', item.strip())
+            if not item or '(' in item:
+                continue
+            if item not in got:
+                got.append(item)
+    return got
 
 
 def measure(inst, env):

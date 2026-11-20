@@ -16,7 +16,7 @@
 // Not only a thump: as on the page, the piccolo and the first flute run up into their note and the piano
 // rolls its chord (hitOn).
 //
-// Not built yet, so not playing: the timpani and the harp (the taiko stands in for the bass drum; the
+// Not built yet, so not playing: the harp (the timpani are built but not yet in the hit; the taiko stands in for the bass drum; the
 // cello plays the violas' notes too; one fiddle the violins').
 #include <algorithm>
 #include <cstdlib>
@@ -73,6 +73,18 @@ const SectionDef kSections[] = {
 
 extern const Instrument kOrchestraHit = {"orchestra-hit", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0,
                                          Kind::kModal, &kHitDesign, "orchestra"};
+
+// The string ensembles (General MIDI 49, 50; src/stringsect.cc): E1 .. G7, sounding.
+extern const Instrument kStringEnsemble1 = {"strings", 0, 28, 103, 1, 1, 1, 48000, 0, false, false, 0, 1.0,
+                                            Kind::kModal, &kHitDesign, "orchestra"};
+extern const Instrument kStringEnsemble2 = {"slow-strings", 0, 28, 103, 1, 1, 1, 48000, 0, false, false, 0, 1.0,
+                                            Kind::kModal, &kHitDesign, "orchestra"};
+// ... and the same section in tremolo (GM 45: every bow shaking back and forth, each player on its
+// own clock) and pizzicato (GM 46: every key plucked, the nail; a few dB under the bowed section).
+extern const Instrument kStringTremolo = {"tremolo-strings", 0, 28, 103, 1, 1, 1, 48000, 0, false, false, 0, 1.0,
+                                          Kind::kModal, &kHitDesign, "orchestra"};
+extern const Instrument kStringPizzicato = {"pizzicato-strings", 0, 28, 103, 1, 1, 1, 48000, 0, false, false, 0, 1.0,
+                                            Kind::kModal, &kHitDesign, "orchestra"};
 
 void Ensemble::initOrchestra(const RoomSpec* room) {
   static const double kGain = knob("PJ_HIT_GAIN", 0.45);

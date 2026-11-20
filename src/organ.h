@@ -282,6 +282,7 @@ class OrganModel : public Tube {
   float church_[kBlock] = {}, windNow_[4] = {1, 1, 1, 1};
   int blockPos_ = kBlock;
   std::unique_ptr<WorkPool> pool_;
+  bool sharedPool_ = false;  // (its boxes on TaskPool::shared())
   OrganWind wind_;
   bool windOn_ = true;
   float xoverA_ = 0;

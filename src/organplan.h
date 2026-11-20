@@ -51,6 +51,9 @@ struct OrganPlan {
   // clear in the church, the strong beat accented) or held (a romantic
   // pedal point, a meditative piece: its full length).
   bool pedalDetached = true;
+  // The ticks where its sections begin (the tempo's changes, the general
+  // pauses): a note before one ends a part, held to its length.
+  std::vector<long> partStarts;
 };
 
 // notes: the organ part's notes, by track; tpq: ticks a quarter; barTicks:

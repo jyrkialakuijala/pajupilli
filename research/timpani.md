@@ -1,8 +1,10 @@
 # Timpani (orchestral kettledrums): research
 
-Status: research only (2026-11-18). Nothing here is implemented. GM "Timpani" is program 47
-counting from 0 (48 counting from 1). Today `src/midifile.cc` sends "timpani" to the taiko and
-`src/orchhit.cc` notes that the timpani is not built. The existing head model is `src/membrane.h`
+Status: built 2026-11-19 as `src/timpani.cc` (-inst timpani): sections 12.1-12.7 and 12.8 in
+part (the far field toward the hall; no classical-pair detector, no stick changes by passage, no
+sympathetic ringing between the drums, the pedal retuning at the stroke). GM "Timpani" is
+program 47 counting from 0 (48 counting from 1). Before, `src/midifile.cc` sent "timpani" to
+the taiko. The existing head model is `src/membrane.h`
 (ideal-membrane modes, air mass on the m = 0 modes only, pair splitting, tension stretch,
 `DrumAir` for two heads on a shell).
 
@@ -1010,6 +1012,19 @@ extrapolated: no decay data exist for the 23 and 20 in. A calf-head option: all 
   A crescendo roll speeds up with the level.
 - **fp:** one loud stroke, 0.5–1 s of ring, then the roll from pp [L].
 - **End:** last stroke on the next beat if tied to a note; otherwise stop and let ring or damp.
+
+### 12.6b The two hands (Jyrki's guidance, 2026-11-19)
+
+"If timpani is hit repeatedly fast, it is rolled with two hands, the hammers hit in slightly
+different positions, with slightly different excitation and tone, making it like pupopupopupo
+instead of pupupupupupu." And: "every second hit is a bit different from the every second, if the
+same drum (midi key) is hit twice or more in a row."
+
+In the model (src/timpani.cc): a key struck again takes the other hand; another key begins with
+the leading hand. The leading hand strikes 2 % of the radius further in, 4 % faster, with the
+harder mallet (stiffness x1.3 against x0.77). `PJ_TIMP_HANDS` scales the differences (0: alike).
+Measured on A2 at 0.5 s spacing: alternate strokes about 1 dB apart in level and 2 to 4 dB apart
+in the share above 400 Hz.
 
 ### 12.7 Note-off and damping
 

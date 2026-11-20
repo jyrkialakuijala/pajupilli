@@ -50,6 +50,7 @@
 #include <cstdint>
 
 #include "bassbody.h"
+#include "bodybank.h"
 
 namespace pajupilli {
 
@@ -106,6 +107,20 @@ struct BassSpec {
   double attackScale = 1;    // the stroke's ease-in against the bass's (a light string speaks sooner)
   double bowWmax = 0.5;      // the bow drives the modes turning up to about this much a sample (rad;
                              // 0.5: 3.8 kHz at 48 kHz), the higher ones less and less
+  // (Viola.md, findings 1 to 3.) The strings, the bow and the bridge are stepped this many times
+  // a sample (the body once, with the feet's mean force): at one step a sample the bowed string
+  // had not converged (the same note at twice the rate played 6 to 9 cents sharper, its overtones
+  // up to 10 dB otherwise), and the bow could not be let drive a high note's upper modes. bowWmax
+  // stays what it is at 48 kHz (a frequency: x 7.6 kHz).
+  int oversample = 1;
+  // The bow's force sharpens the string's corner as it passes under the hair: the bow drives the
+  // modes up to bowWmax x (its force against the force of a forte stroke, 40 cm/s at the same
+  // place) to this power (0: always bowWmax; 0.75: pp 0.3 x, mf 0.76 x, f and above 1.1 x), no
+  // further than a step can follow (0.5 rad a step). Louder is brighter, as under a real bow.
+  double bowBright = 0;
+  // The body above its grid (src/bodybank.h): the level of a bank of resonances from about 1 kHz
+  // up, against the far sound (0: none).
+  double bankGain = 0;
 };
 extern const BassSpec kDoubleBassSpec, kCelloSpec, kViolaSpec, kViolinSpec;
 
@@ -168,6 +183,12 @@ class Bass {
   // resonances and holds the upper overtones back from the body (veiled, softer).
   void setMute(bool on) { kBridgeM = float(spec_.bridgeM + (on ? spec_.muteM : 0.0)); }
   void setSkin(double toughness) { skin_ = toughness; }  // 0 soft fingertip .. 1 calloused
+  // One of a section's instruments (seat 1, 2, ...): its own build, as instruments of one
+  // design differ (17 recorded violins: their levels per third of an octave 4 to 5 dB apart,
+  // standard deviation, recording and player included): the plates up to 12 % stiffer or softer
+  // (the wood resonances up to 6 % off), the air 8 %, the losses 25 % and the bridge's mass
+  // 8 %, its upper resonances its own (BodyBank), and where it is heard from.
+  void vary(unsigned seat);
   // The strings' height over the fingerboard, x the instrument's (1): low (0.4)
   // and the strings graze the board (the growl); high (1.4): clean.
   void setAction(double scale);
@@ -178,7 +199,7 @@ class Bass {
   float sample(float testForce = 0);
   float side() const { return side_; }
   // The body's sound along its three axes (BassBody::dipole), on the far sound's scale.
-  float dipole(int k) const { return dipScale_ * body_.dipole(k) / farLevel_; }
+  float dipole(int k) const { return dipScale_ * (body_.dipole(k) + bankG_ * bank_.dipole(k)) / farLevel_; }
   float footForce() const { return footForce_; }  // the bridge's bass foot on the top (N)  // left = sample + side, right = sample - side
   void reset();  // everything at rest (after a NaN)
   BassBody& body() { return body_; }
@@ -205,6 +226,7 @@ class Bass {
     alignas(64) float bowShape[kModes] = {};
     float bowSum = 0, bowBr = 0, bowV = 0, bowF = 0, bowVTo = 0, bowFTo = 0, bowK = 0.01f, bowKF = 0.01f, bowSin = 0, bowCos = 1;
     float bowNoise = 0, bowTors = 0, bowTw = 0, bowTwR = 0;
+    float bowBright = 1, bowBrightAt = 1;  // the bow's reach against bowWmax now; as the shape was made
     float bowTurn = 0;  // (a change of direction under way: the speed it came from)
     double bowDist = 0;
     bool bowOn = false, slipping = true;
@@ -218,6 +240,7 @@ class Bass {
   };
   void tune(Str& s);     // the modes' coefficients at the present length
   void bowShape(Str& s);
+  void stepStrings();    // one step of the strings, the bow, the tailpiece and the bridge
   void control();        // every 16 samples: slides, vibrato, which strings sound
   const BassSpec& spec_;
   // (the instrument's constants, from its spec: named as when they were the bass's alone)
@@ -225,8 +248,14 @@ class Bass {
   double kHair, kBridgeH_, kFeet_, kAfterLen_, kBoardEnd_;
   float farLevel_, holeLevel_, pickupLevel_, topLevel_;
   float floorG_ = 0, floorW_ = 0, floorD_ = 0, floorY_ = 0, floorV_ = 0, floorLp_ = 0;  // the stage floor under the endpin
-  double fs_, dt_;
+  double fs_, dt_;        // the strings' rate and step (the sample rate x oversample)
+  double fsOut_, dtOut_;  // the sample rate: the body, what is heard
+  int os_ = 1;
+  float feetYSum_ = 0, footBSum_ = 0, footTSum_ = 0;  // (the steps of one sample, summed)
+  float noiseK_ = 0.3f;
   BassBody body_;
+  BodyBank bank_;      // the body's upper resonances (BassSpec::bankGain)
+  float bankG_ = 0;
   Str str_[kStrings];
   int ctl_ = 0;
   // The bridge's top (a mass on the legs) and the tailpiece.

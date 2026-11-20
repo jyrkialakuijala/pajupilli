@@ -100,6 +100,7 @@ class HarmonicaModel : public Tube {
   double earMean_ = 0, earPrev_ = 0, earPeriod_ = 1e9, earAge_ = 1e9;
   uint32_t rng_ = 99991;
   long violations_ = 0;
+  int refreshCount_ = 0;  // samples since the active reeds were last looked at
   bool check_ = false;
   float last_ = 0;
   HalfBand down_;

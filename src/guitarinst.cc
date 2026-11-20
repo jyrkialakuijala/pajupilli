@@ -14,16 +14,81 @@ namespace {
 constexpr double kPiHalf = 1.5707963267948966;
 }
 
-bool guitarInstrument(const Instrument& inst) { return std::strcmp(inst.name, "nylon-guitar") == 0; }
+bool guitarInstrument(const Instrument& inst) {
+  return std::strcmp(inst.name, "nylon-guitar") == 0 || std::strcmp(inst.name, "clean-guitar") == 0 ||
+         std::strcmp(inst.name, "muted-guitar") == 0 || std::strcmp(inst.name, "overdriven-guitar") == 0 ||
+         std::strcmp(inst.name, "distortion-guitar") == 0 || guitarHarmonics(inst) ||
+         std::strcmp(inst.name, "steel-guitar") == 0 || jazzGuitarInstrument(inst);
+}
 
-GuitarModel::GuitarModel(const Instrument& inst) : Tube(inst), g_(inst.fs) {}
+bool jazzGuitarInstrument(const Instrument& inst) { return std::strcmp(inst.name, "jazz-guitar") == 0; }
+
+bool guitarHarmonics(const Instrument& inst) { return std::strcmp(inst.name, "guitar-harmonics") == 0; }
+
+namespace {
+GuitarSpec specFor(const Instrument& inst) {
+  if (std::strcmp(inst.name, "steel-guitar") == 0) return steelGuitar();
+  if (jazzGuitarInstrument(inst)) return jazzGuitar();
+  return std::strcmp(inst.name, "nylon-guitar") == 0 ? classicalGuitar() : electricGuitar(inst.name);
+}
+}  // namespace
+
+GuitarModel::GuitarModel(const Instrument& inst) : Tube(inst), g_(inst.fs, specFor(inst)) {
+  // (PJ_EGTR_DI=1: the pickups' EMF itself, no amp: for looking at the guitar alone.)
+  if (!g_.electric() || knob("PJ_EGTR_DI", 0) > 0) return;
+  if (jazzGuitarInstrument(inst)) {
+    // GM 27 (research/jazz_guitar.md 9.1-9.2): the jazz amp; the humbucker with the guitar's tone
+    // control rolled back (the tone pot's resistance PJ_JAZZ_TONE kOhm in series with 22 nF across
+    // the pickup), a 600 pF cable. And the archtop's own sound in the room, ~20 dB under the amp
+    // (PJ_JAZZ_ACOUSTIC, dB re that; -60: none).
+    amp_.reset(new GuitarAmp(inst.fs, GuitarAmp::jazz()));
+    const GuitarSpec& s = g_.spec();
+    const GuitarSpec::Pickup& p = s.pickups[s.select[0]];
+    const int n = s.select[1] >= 0 ? 2 : 1;
+    GuitarAmp::Source src{p.L / n, p.R / n, p.C * n, s.pots};
+    src.Rt = 1e3 * knob("PJ_JAZZ_TONE", 45);
+    src.Ct = 22e-9;
+    amp_->connect(src, knob("PJ_JAZZ_CABLE", 600e-12));
+    // (The jazz amp's output is ~37 dB under the Twin's at its settings: brought up here, past the
+    // strip, whose levels are the amp's own, to the common loudness, the rest in levels_data.h.)
+    constexpr double kJazzLevel = 74.0;
+    kAmpOut_ = float(kJazzLevel * knob("PJ_EGTR_OUT", 1.0));
+    kAcoustic_ = float(kJazzLevel * kAcousticCal_ * std::pow(10.0, knob("PJ_JAZZ_ACOUSTIC", 0) / 20));
+    return;
+  }
+  // The amp: a clean Fender Twin for GM 28; with a compressor in front for GM 29; a Marshall
+  // JCM800 at crunch for GM 30; a Soldano SLO into a V30 4x12, gated, for GM 31. What is plugged
+  // in: the selected pickups' coils (two in parallel: half the inductance and resistance, twice
+  // the capacitance), the pots.
+  amp_.reset(new GuitarAmp(inst.fs, std::strcmp(inst.name, "muted-guitar") == 0        ? GuitarAmp::twinComp()
+                                    : std::strcmp(inst.name, "overdriven-guitar") == 0 ? GuitarAmp::jcm800()
+                                    : std::strcmp(inst.name, "distortion-guitar") == 0 ? GuitarAmp::slo()
+                                                                                        : GuitarAmp::twin()));
+  const GuitarSpec& s = g_.spec();
+  const GuitarSpec::Pickup& p = s.pickups[s.select[0]];
+  const int n = s.select[1] >= 0 ? 2 : 1;
+  amp_->connect({p.L / n, p.R / n, p.C * n, s.pots}, knob("PJ_EGTR_CABLE", 470e-12));
+  kAmpOut_ = float(knob("PJ_EGTR_OUT", 1.0));
+}
 
 void GuitarModel::resetAir() {
   Tube::resetAir();
   g_.reset();
+  if (amp_) amp_->reset();
 }
 
 float GuitarModel::sample() {
+  if (amp_ && kAcoustic_ > 0) {
+    // (The jazz archtop: the amp, and the guitar's own sound under it.)
+    last_ = amp_->process(g_.sample()) * kAmpOut_ + kAcoustic_ * g_.acoustic();
+    side_.push_back(0.0f);
+    return finish(last_);
+  }
+  if (amp_) {
+    last_ = amp_->process(g_.sample()) * kAmpOut_;
+    side_.push_back(0.0f);
+    return finish(last_);
+  }
   last_ = g_.sample();
   side_.push_back(float(outScale()) * g_.side());
   return finish(last_);
@@ -36,6 +101,25 @@ GuitarPlayer::GuitarPlayer(GuitarModel& m) : Performer(m), m_(m) {
   handSpeed_ = knob("PJ_GUITAR_STRUMSPEED", 1.4);  // the strumming hand across the strings (m/s)
   strumFree_ = knob("PJ_GUITAR_STRUMFREE", 0.05);  // how often a strum goes against the hand's swing
   sameAsLastBar_ = knob("PJ_GUITAR_STRUMBAR", 0.3);  // how often the last bar's way at this place wins over a different reading
+  electric_ = m.guitar().electric();
+  steel_ = std::strcmp(m.instrument().name, "steel-guitar") == 0;
+  muted_ = std::strcmp(m.instrument().name, "muted-guitar") == 0;
+  distorted_ = std::strcmp(m.instrument().name, "distortion-guitar") == 0;
+  driven_ = distorted_ || std::strcmp(m.instrument().name, "overdriven-guitar") == 0;
+  chug_ = knob("PJ_EGTR_CHUG", 1.0);      // (GM 31: the palm on chugs, x its weight; 0: never)
+  octave_ = knob("PJ_EGTR_OCTAVE", 1.0);  // (GM 31: the octave added to a power chord's root and fifth; 0: not)
+  wide_ = knob("PJ_EGTR_WIDE", 1.0);      // (GM 31: the lead's wide vibrato, x 40-100 cents)
+  // (Loud and driven, a string left free would ring up from the amp: the hands keep the strings
+  // not being played muted.)
+  if (driven_)
+    for (int s = 0; s < Guitar::kStrings; ++s) m.guitar().damp(s, 60);
+  if (electric_) handSpeed_ = knob("PJ_EGTR_STRUMSPEED", 1.75);  // a pick across the strings: 6 ms a string
+  kPalm_ = knob("PJ_EGTR_PALM", 5.0);  // the palm's hold on an open string's fundamental (1/s)
+  kRelease_ = knob("PJ_EGTR_MUTEDRELEASE", 25.0);
+  feedback_ = knob("PJ_EGTR_FEEDBACK", 1.0);  // (the overdriven guitar's: 0 none, 1 as found)
+  bloomGain_ = knob("PJ_EGTR_BLOOM", 2.0);
+  holdAt_ = knob("PJ_EGTR_HOLDAT", 0.12);  // (when the note starts to be held, s)
+  holdHz_ = knob("PJ_EGTR_HOLDHZ", 2500.0);  // (its modes held below this)
 }
 
 double GuitarPlayer::ur() {
@@ -44,6 +128,16 @@ double GuitarPlayer::ur() {
 }
 
 void GuitarPlayer::noteOn(int midi, int velocity) {
+  if (steel_)
+    for (int s = 0; s < Guitar::kStrings; ++s)
+      if (!held_[s] && (idleMuted_[s] || note_on_[s] < 0)) {
+        // (The hand lifts, but the strings not played are still touched lightly by the hands:
+        // free, an open string answers a fretted note of its pitch nearly as loud as the note,
+        // and stays where it is under a bend. PJ_STEEL_IDLE: its damping, 1/s.)
+        static const double kIdle = knob("PJ_STEEL_IDLE", 3.0);
+        idleMuted_[s] = false;
+        m_.guitar().damp(s, kIdle);
+      }
   articulate(midi, velocity, false);
   note_ = midi;
   blowing_ = true;
@@ -59,11 +153,27 @@ void GuitarPlayer::noteOn(int midi, int velocity) {
 void GuitarPlayer::noteOff(int midi) {
   for (size_t i = 0; i < asked_.size(); ++i)
     if (asked_[i].midi == midi) { asked_.erase(asked_.begin() + i); return; }  // (let go before it was played)
+  if (distorted_ && midi == pmRoot_ && pmHeld_ < 0) pmHeld_ = sinceNote_;  // (GM 31: how short it was)
   for (int s = 0; s < Guitar::kStrings; ++s)
-    if (note_on_[s] == midi && held_[s]) {
+    if ((note_on_[s] == midi || (octaveAdded_[s] && note_on_[s] == midi + 12)) && held_[s]) {
       held_[s] = false;
-      if (!hold_) m_.guitar().damp(s, 45);
+      // (On the muted guitar the palm is already on the string: the lifting finger lets it go
+      // more gently.)
+      // (Steel: while strumming the hands only ease off, the chord rings into the next. An open
+      // string is stopped too, by the side of the picking hand: Jyrki, "G3 doesn't damp when I
+      // release the key".)
+      if (steel_) { if (!hold_) m_.guitar().damp(s, strumming_ > 0 ? 20 : 45); continue; }
+      if (!hold_) m_.guitar().damp(s, muted_ ? kRelease_ : electric_ ? 60 : 45);
     }
+  if (steel_ && !hold_ && strumming_ <= 0) {
+    // The last key let go: the picking hand's side comes down on all the strings, also those
+    // that only rang along (a lone G3 is fretted on the D string, and the open G string answers
+    // it for seconds on steel; Jyrki: "G3 doesn't damp when I release the key").
+    bool any = false;
+    for (int s = 0; s < Guitar::kStrings; ++s) any = any || held_[s];
+    if (!any && asked_.empty())
+      for (int s = 0; s < Guitar::kStrings; ++s) { m_.guitar().damp(s, 45); idleMuted_[s] = true; }
+  }
 }
 
 void GuitarPlayer::setHold(bool h) {
@@ -104,7 +214,42 @@ void GuitarPlayer::play() {
   static const int kOpen[Guitar::kStrings] = {40, 45, 50, 55, 59, 64};
   const int top = kOpen[5] + g.frets();
   std::sort(asked_.begin(), asked_.end(), [](const Asked& a, const Asked& b) { return a.midi < b.midi; });
-  if (asked_.size() > size_t(Guitar::kStrings)) asked_.resize(Guitar::kStrings);
+  // More notes than strings: keep the bass and the top (the melody), drop inner voices, a note
+  // whose pitch class sounds elsewhere in the chord first.
+  while (asked_.size() > size_t(Guitar::kStrings)) {
+    size_t drop = 1;
+    for (size_t i = 1; i + 1 < asked_.size(); ++i) {
+      bool doubled = false;
+      for (size_t j = 0; j < asked_.size(); ++j)
+        if (j != i && asked_[j].midi % 12 == asked_[i].midi % 12) doubled = true;
+      if (doubled) { drop = i; break; }
+    }
+    asked_.erase(asked_.begin() + drop);
+  }
+  // The distortion guitar (GM 31: research/distortion_guitar.md 8.1-8.2). A root and its fifth
+  // low on the neck are a power chord: he adds the octave on the next string. And the palm on
+  // the chugs: with no marks to read, he hears them from the notes. A low note (below A3) struck
+  // again on the same root within 0.4 s, when the last stroke was let go early (held under
+  // 0.25 s, or under 0.6 of the gap): the palm on the strings; not on an accent (15 steps louder
+  // than the last), not while bending, not on a full chord. The first stroke of a run rings open.
+  bool palm31 = false;
+  int added = -1;  // (the octave he added)
+  if (distorted_ && !asked_.empty()) {
+    if (octave_ > 0 && asked_.size() == 2 && asked_[1].midi - asked_[0].midi == 7 && asked_[0].midi < 57) {
+      added = asked_[0].midi + 12;
+      asked_.push_back({added, asked_[1].velocity});
+    }
+    int vmax = 0;
+    for (const Asked& a : asked_) vmax = std::max(vmax, a.velocity);
+    const int root = asked_[0].midi;
+    const bool again = root == pmRoot_ && gapBefore_ < 0.4;
+    const bool clipped = pmHeld_ >= 0 && (pmHeld_ < 0.25 || pmHeld_ < 0.6 * gapBefore_);
+    pmRun_ = again ? pmRun_ + 1 : 0;
+    palm31 = chug_ > 0 && root < 57 && again && clipped && vmax < pmVel_ + 15 && std::fabs(roll_) < 0.02 && asked_.size() <= 3;
+    pmRoot_ = root;
+    pmVel_ = vmax;
+    pmHeld_ = -1;
+  }
   // Strumming? Many strings at once is a strum; so is a chord of three or
   // more while the hand is already strumming. (Strings that come one after
   // another within 60 ms are found stroke by stroke, below.)
@@ -275,11 +420,70 @@ void GuitarPlayer::play() {
       depthNow *= down ? 1.0 + 0.15 * (5 - best) / 5.0 : 1.05 * (1 + 0.12 * mid) * (best == 5 ? 0.82 : 1.0);  // (the soft pad needs more of the string for its sound)
       if (together) delay = place * (0.0105 / handSpeed_) * (0.9 + 0.2 * ur());   // the strings 10.5 mm apart
     }
-    due_.push_back({delay, best, fret, depthNow, angleNow, nailNow, where, strum ? (strumWay_ > 0 ? 1 : 2) : 0, clack});
+    if (electric_ || steel_) {
+      // The pick. Notes together: one sweep, the strumming hand's way; a single note: down and
+      // up in turn while they come quickly, down after a rest.
+      int way;
+      if (count > 1 || strum) {
+        way = strum ? strumWay_ : 1;
+        if (!together && !strum) delay = order * (0.0105 / handSpeed_) * (0.9 + 0.2 * ur());
+      } else {
+        if (order == 0) pickWay_ = gapBefore_ < 0.3 ? -pickWay_ : 1;
+        way = pickWay_;
+      }
+      // How far: 0.1-3 mm, a strum's much evened; up strokes lighter. Where: 11 cm from the
+      // saddle, a hard stroke nearer the bridge. Down: along the top and a little into it.
+      const double vv = strum ? 0.3 + 0.5 * (together ? chordVel : strumVel_) : v;
+      depthNow = (0.1e-3 + 2.9e-3 * std::pow(vv, 1.5)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.92 + 0.16 * ur()) * (way > 0 ? 1.0 : 0.85);
+      where = (1.1 - 0.25 * v) * (0.93 + 0.14 * ur()) / 1.2;
+      angleNow = way > 0 ? 0.25 + 0.1 * ur() : kPiHalf * 2 + 0.08 + 0.08 * ur();
+      nailNow = std::clamp(0.0012 - 0.0006 * v, 0.0004, 0.002);  // (here: the pick's rise, s)
+      if (steel_) {
+        // The flatpick on steel: 0.1-2.7 mm, up strokes lighter; 10-13 cm from the saddle (the
+        // soundhole's lower edge), the hardest nearer; a strum over the soundhole (15-16 cm),
+        // its depth the chord's evened velocity, up strokes 2 dB under.
+        const double dynK = (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.92 + 0.16 * ur());
+        if (strum) {
+          depthNow = (0.2e-3 + 2.0e-3 * std::pow(vv, 1.3)) * dynK * (way > 0 ? 1.0 : 0.8);
+          where = 1.3 * (0.95 + 0.1 * ur());
+          // (a hand taking more strings moves faster: 8.6 ms a string at three, 5.5 at six)
+          if (together) delay = (strumWay_ > 0 ? order : int(count) - 1 - order) * (0.0105 / (handSpeed_ * (1 + 0.12 * (double(count) - 3)))) * (0.9 + 0.2 * ur());
+        } else {
+          depthNow = (0.1e-3 + 2.6e-3 * std::pow(v, 1.5)) * dynK * (way > 0 ? 1.0 : 0.85);
+          where = (1.08 - 0.25 * v - 0.17 * std::clamp((v - 0.85) / 0.15, 0.0, 1.0)) * (0.95 + 0.1 * ur());
+        }
+      }
+      if (order == 0) bendString_ = -1;
+      if (fret > 0) bendString_ = best;  // (an open string cannot be pushed: the highest fretted note bends)
+    }
+    double palm = 0, palmAt = 0.012;
+    if (muted_) {
+      // The palm, laid on as the string is picked: the harder the stroke the lighter it lies and
+      // the nearer the saddle (the hand lifts and draws back for an accent: from 1.4x at the
+      // softest to 0.35x at the hardest); now and then (one stroke in six) it rests lighter by
+      // itself; its place and weight a little different each time. The pick nearer the bridge.
+      palm = kPalm_ * (1.6 - 1.25 * v) * (0.8 + 0.4 * ur()) * (ur() < 1.0 / 6 ? 0.45 + 0.2 * ur() : 1.0);
+      palmAt = std::max(0.004, 0.009 + 0.008 * ur() - 0.005 * v);
+      where *= 0.6;
+    } else if (driven_) {
+      where *= distorted_ ? 0.55 : 0.65;  // (a rock player picks over the bridge pickup: ~6 cm; a metal one ~4)
+      if (palm31) {
+        // GM 31's palm: right at the saddle (3-8 mm: lighter than the funk player's, the amp must
+        // still hear a pitch), 0.9 of GM 29's weight; heavier as the run goes on, lighter when
+        // picked hard; never twice the same.
+        palm = chug_ * kPalm_ * 0.9 * (1.6 - 1.25 * v) * (0.85 + 0.3 * ur()) * (pmRun_ >= 2 ? 1.15 : 1.0);
+        palmAt = 0.003 + 0.005 * ur();
+      }
+    }
+    due_.push_back({delay, best, fret, depthNow, angleNow, nailNow, where, strum ? (strumWay_ > 0 ? 1 : 2) : 0, electric_ || steel_ ? 0.0 : clack, palm, palmAt});
     strokeAgo_[2] = strokeAgo_[1]; strokeString_[2] = strokeString_[1];
     strokeAgo_[1] = strokeAgo_[0]; strokeString_[1] = strokeString_[0];
     strokeAgo_[0] = 0; strokeString_[0] = best;
     note_on_[best] = a.midi;
+    octaveAdded_[best] = a.midi == added;
+    fed_[best] = 0;
+    velOf_[best] = a.velocity;
+    bloomAt_[best] = 1.2 + 0.8 * ur();
     held_[best] = true;
     age_[best] = 0;
     fretOf_[best] = fret;
@@ -288,6 +492,10 @@ void GuitarPlayer::play() {
     const double neck = std::clamp((fret - 2) / 5.0, 0.15, 1.0) * (fret > 0 ? 1 : 0);
     const bool will = lone ? kString[best] * neck > 0.1 : ur() < 0.35 + 0.55 * kString[best] * neck;
     vibCents_[best] = will ? vibrato_ * 14 * kString[best] * neck * (0.6 + 0.8 * ur()) : 0;
+    // (GM 31's lead: a single fretted note from E3 up, held, gets the rock player's wide vibrato,
+    // the string bent up and back by a quarter to a whole tone: distortion_guitar.md 8.5.)
+    if (distorted_ && count == 1 && a.midi >= 52 && fret > 0)
+      vibCents_[best] = vibrato_ * wide_ * (40 + 60 * ur()) * (best < 2 ? 0.6 : 1.0);
     vibHz_[best] = 5.0 + 1.2 * ur();
     vibPh_[best] = 0;
     ++order;
@@ -314,7 +522,34 @@ void GuitarPlayer::render(float* out, int n) {
     if ((++vibTick_ & 3) == 0) {
       const double step = 4 * m / fs_;
       static const double kPull[Guitar::kStrings] = {0.0, 0.3, 0.8, 1.0, 1.0, 0.8};  // how well each string can be pulled
+      int heldNow = 0;
+      for (int s = 0; s < Guitar::kStrings; ++s) heldNow += held_[s] ? 1 : 0;
       for (int s = 0; s < Guitar::kStrings; ++s) {
+        // Feedback (the overdriven guitar): a loud note held alone (or in a dyad or power chord),
+        // the player standing where it sings. From 0.12 s it holds (its modes below 2.5 kHz given
+        // back what they lose); at its bloom time (1.2-2 s) it blooms: a low note into its octave or
+        // twelfth, a middle one swells or goes to its octave, a high one swells.
+        if (driven_ && feedback_ > 0 && held_[s] && heldNow <= 3 && velOf_[s] >= 50) {
+          if (fed_[s] == 0 && age_[s] > holdAt_) {
+            fed_[s] = 1;
+            g.hold(s, holdHz_, 1.0, 4.0);
+          } else if (fed_[s] == 1 && age_[s] > bloomAt_[s]) {
+            fed_[s] = 2;
+            const double f = g.frequency(s);
+            int k = 1;
+            if (f < 150) k = ur() < 0.55 ? 2 : 3;
+            else if (f < 300) k = ur() < 0.6 ? 1 : 2;
+            // (Grown towards where the note began: bloomGain_ times what the fundamental has
+            // now; a harmonic to 0.8 of that, the rest still held while it grows, then let go a
+            // second and a half later: the note turns into its harmonic.)
+            if (k == 1) g.sustain(s, 1, 1, bloomGain_ * feedback_, 1.5, 0);
+            else g.sustain(s, k, 1, 0.8 * bloomGain_ * feedback_, 2.5, 1);
+            bloomK_[s] = k;
+          } else if (fed_[s] == 2 && bloomK_[s] > 1 && age_[s] > bloomAt_[s] + 1.5) {
+            fed_[s] = 3;
+            g.hold(s, 0, 0, 0);
+          }
+        }
         // It comes in once the note has been sounding a while with nothing
         // else played since (what came within 150 ms of its start belongs to
         // the same gesture): after 0.6 s; sooner, 0.45 s, when the music has
@@ -378,10 +613,14 @@ void GuitarPlayer::render(float* out, int n) {
             if (pc[r] && pc[(r + 4) % 12] && ((p - r) % 12 + 12) % 12 == 2) want = std::max(want, pull_ * kPull[s] * 4.0);
         }
         mend_[s] += (want - mend_[s]) * std::min(1.0, step / (want > mend_[s] ? 0.25 : 0.06));
-        if (vib_[s] <= 0 && mend_[s] < 0.05) { if (vibPh_[s] != 0 || bent_[s]) { g.bend(s, 0); vibPh_[s] = 0; bent_[s] = false; } continue; }
+        // (A pitch bend: the left hand pushing the last string picked; up to two semitones.)
+        // (Steel: only up, there is no bar: a wheel rocked both ways is a finger vibrato that
+        // returns to the note and never goes under it. Jyrki: "only up the pitch, never down".)
+        const double pushed = (electric_ || steel_) && s == bendString_ ? 200 * (steel_ ? std::max(0.0, roll_) : roll_) : 0.0;
+        if (vib_[s] <= 0 && mend_[s] < 0.05 && std::fabs(pushed) < 0.5) { if (vibPh_[s] != 0 || bent_[s]) { g.bend(s, 0); vibPh_[s] = 0; bent_[s] = false; } continue; }
         vibPh_[s] += 2 * M_PI * vibHz_[s] * step;
         // (Pushed up and let back: never flat. On a mended note the vibrato is shallower.)
-        g.bend(s, mend_[s] + vib_[s] * vibCents_[s] * (mend_[s] > 1 ? 0.6 : 1.0) * (0.5 - 0.5 * std::cos(vibPh_[s])));
+        g.bend(s, pushed + mend_[s] + vib_[s] * vibCents_[s] * (mend_[s] > 1 ? 0.6 : 1.0) * (0.5 - 0.5 * std::cos(vibPh_[s])));
         bent_[s] = true;
       }
     }
@@ -391,7 +630,169 @@ void GuitarPlayer::render(float* out, int n) {
         g.fret(d.string, d.fret);
         // Where the hand plucks: 12 cm from the bridge, nearer for a brighter sound.
         const double from = std::clamp(0.12 * std::pow(2.0, 1 - brightness_) * d.where, 0.03, 0.24);
-        g.pluck(d.string, d.depth, from, d.angle, d.nail, d.strum, d.clack);
+        if (steel_) g.pick(d.string, d.depth, from, d.angle, d.nail);
+        else if (electric_) {
+          // (The palm lies across all six: the strings not played do not ring along either.)
+          for (int s = 0; s < Guitar::kStrings; ++s) g.mute(s, d.palm, d.palmAt);
+          g.pick(d.string, d.depth, from, d.angle, d.nail);
+        }
+        else g.pluck(d.string, d.depth, from, d.angle, d.nail, d.strum, d.clack);
+        due_.erase(due_.begin() + j);
+      } else {
+        ++j;
+      }
+    }
+    m_.process(out + i, m);
+  }
+  blowing_ = !g.asleep() || !due_.empty();
+}
+
+// GM 32 (guitarinst.h): every note a harmonic.
+HarmonicsPlayer::HarmonicsPlayer(GuitarModel& m) : Performer(m), m_(m) {
+  std::fill(note_on_, note_on_ + Guitar::kStrings, -1);
+  rate_ = knob("PJ_GHARM_TOUCH", 300.0);  // the fingertip's hold on a mode moving under it (1/s)
+  lift_ = knob("PJ_GHARM_LIFT", 1.0);     // how long it stays (x 30-60 ms)
+  shift_ = int(std::lround(knob("PJ_GHARM_SHIFT", 0.0)));
+}
+
+double HarmonicsPlayer::ur() {
+  rng_ = rng_ * 1664525u + 1013904223u;
+  return (rng_ >> 8) * (1.0 / 16777216.0);
+}
+
+void HarmonicsPlayer::noteOn(int midi, int velocity) {
+  articulate(midi, velocity, false);
+  note_ = midi;
+  blowing_ = true;
+  if (asked_.empty()) gap_ = sinceNote_;
+  asked_.push_back({midi, velocity});
+  sinceNote_ = 0;
+}
+
+void HarmonicsPlayer::noteOff(int midi) {
+  for (size_t i = 0; i < asked_.size(); ++i)
+    if (asked_[i].midi == midi) { asked_.erase(asked_.begin() + i); return; }
+  // (A harmonic rings on: the key's release lifts nothing.)
+  for (int s = 0; s < Guitar::kStrings; ++s)
+    if (note_on_[s] == midi) held_[s] = false;
+}
+
+bool HarmonicsPlayer::place(int midi, const bool* taken, int* string, int* fret, int* n) const {
+  static const int kOpen[Guitar::kStrings] = {40, 45, 50, 55, 59, 64};
+  static const int kUp[5] = {0, 0, 12, 19, 24};  // n-th harmonic: semitones over the stopped note
+  const int frets = m_.guitar().frets();
+  double best = 1e9;
+  for (int s = 0; s < Guitar::kStrings; ++s) {
+    if (taken && taken[s]) continue;
+    // (A string still sounding: a held note is cut only if nothing else will do; a released one
+    // that has rung a while is free.)
+    const double busy = held_[s] ? 6.0 : note_on_[s] >= 0 && age_[s] < 0.6 ? 1.0 : 0.0;
+    for (int k = 2; k <= 4; ++k) {
+      const int f = midi - kOpen[s] - kUp[k];
+      if (f < 0 || f > frets) continue;
+      double c;
+      if (f == 0) c = 0.5 * (k - 2);  // natural: the 12th fret's, the 7th's, the 5th's
+      else {
+        // Touched: n = 2 anywhere, then n = 3 (past the 21st fret's octave), then n = 4. The
+        // left hand near where it is, not too high up the neck (the right hand needs room).
+        c = (k == 2 ? 3.5 : k == 3 ? 8.0 : 10.0) + 0.12 * std::fabs(f - hand_) + (f > 12 ? 0.1 * (f - 12) : 0.0);
+      }
+      // (Where the pickup lies near the harmonic's node, the harmonic is thin: elsewhere if can be.)
+      const GuitarSpec& sp = m_.guitar().spec();
+      const double len = sp.scale * std::exp2(-f / 12.0);
+      c += busy + 8 * std::max(0.0, 0.4 - std::fabs(std::sin(k * M_PI * sp.pickups[sp.select[0]].at[s] / len)));
+      if (c < best) { best = c; *string = s; *fret = f; *n = k; }
+    }
+  }
+  return best < 1e8;
+}
+
+void HarmonicsPlayer::play() {
+  Guitar& g = m_.guitar();
+  const GuitarSpec& spec = g.spec();
+  std::sort(asked_.begin(), asked_.end(), [](const Asked& a, const Asked& b) { return a.midi < b.midi; });
+  if (asked_.size() > size_t(Guitar::kStrings)) asked_.erase(asked_.begin() + 1, asked_.end() - (Guitar::kStrings - 1));
+  bool taken[Guitar::kStrings] = {};
+  const size_t count = asked_.size();
+  int order = 0;
+  for (const Asked& a : asked_) {
+    // (Below E3 an octave up; above C8 an octave down. PJ_GHARM_SHIFT: semitones up, as some sets
+    // play it: FluidR3's sounds two octaves over the key, 24.)
+    int midi = a.midi + shift_;
+    while (midi < 52) midi += 12;
+    while (midi > 108) midi -= 12;
+    int s = -1, fret = 0, n = 2;
+    while (!place(midi, taken, &s, &fret, &n) && midi > 52) midi -= 12;
+    if (s < 0) continue;
+    taken[s] = true;
+    if (fret > 0) hand_ += 0.5 * (fret - hand_);
+    const double v = std::clamp(a.velocity, 1, 127) / 127.0;
+    const double len = spec.scale * std::exp2(-fret / 12.0);
+    // The pick on the harmonic's antinode nearest the bridge (len / 2n; at most 16 cm: over the
+    // neck pickup), nowhere near its node; there mode 2n has its node too, and mode n is heard
+    // above its octave.
+    const double where = std::clamp(len / (2 * n), 0.035, 0.16) * (0.95 + 0.1 * ur());
+    // How much of mode n the pick and the pickup give (the selected pickup's place on the
+    // stopped string); the player evens the harmonics out by ear: he digs in where they are weak
+    // (an open string, the pickup near the node) and goes lightly high up the neck (the shorter
+    // the string, the more of the stroke goes into mode n). (Fitted to the levels of all 53
+    // notes played alike: about 1 dB a fret, the ear 0.73 of its dB; within 1.5 dB rms.)
+    const GuitarSpec::Pickup& pu = spec.pickups[spec.select[0]];
+    const double ear = std::fabs(std::sin(n * M_PI * pu.at[s] / len)) * std::fabs(std::sin(n * M_PI * where / len));
+    const double weak = 0.967 * fret - 6 - 0.046 * (midi - 76) + 0.73 * 20 * std::log10(std::max(ear, 0.05)) +
+                        (n == 3 ? 1.98 : n == 4 ? 4.03 : fret == 0 ? 1.76 : 0.0);
+    const double dig = knob("PJ_GHARM_EVEN", 1.0) > 0 ? std::clamp(std::pow(10.0, -weak / 20), 0.12, 2.2) : 1.0;
+    // Single notes down and up in turn while they come quickly; a chord one sweep down.
+    int way = 1;
+    if (count == 1) { pickWay_ = gap_ < 0.3 ? -pickWay_ : 1; way = pickWay_; }
+    const double depth = std::min(5e-3, (0.12e-3 + 2.4e-3 * std::pow(v, 1.5)) * dig * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
+                                            (0.93 + 0.14 * ur()) * (way > 0 ? 1.0 : 0.88));
+    const double angle = way > 0 ? 0.25 + 0.1 * ur() : M_PI + 0.08 + 0.08 * ur();
+    // A rounder stroke than the clean guitar's (the pick pushed over 2-3.5 ms, not 0.6-1.2): on the
+    // antinode, the stroke's quick edge would ring the harmonic's 3rd partial as loud as itself.
+    const double rise = std::clamp((0.0035 - 0.0015 * v) * knob("PJ_GHARM_RISE", 1.0), 0.0005, 0.004);
+    // The fingertip: on the node from the pick to 30-60 ms after; a little off it (+-0.7 mm).
+    const double touch = (0.03 + 0.03 * ur()) * lift_, off = (ur() - 0.5) * 0.0014;
+    // A string sounding at another fret is stopped first (the pick comes 4 ms after the asking,
+    // always, so the timing stays even).
+    if (note_on_[s] >= 0 && fretOf_[s] != fret) g.damp(s, 1500);
+    due_.push_back({0.004 + (count > 1 ? order * 0.008 * (0.9 + 0.2 * ur()) : 0.0), s, fret, n, depth, where, angle, rise, touch, off});
+    note_on_[s] = a.midi;
+    fretOf_[s] = fret;
+    nOf_[s] = n;
+    held_[s] = true;
+    rested_[s] = false;
+    age_[s] = 0;
+    if (std::getenv("PJ_GHARM_DEBUG"))
+      std::fprintf(stderr, "harmonic %d: string %d fret %d n %d (%s), pick %.0f mm, depth %.2f mm, ear %.3f\n", a.midi, s + 1, fret, n,
+                   fret ? "touched" : "natural", where * 1000, depth * 1000, ear);
+    ++order;
+  }
+  hand_ = std::clamp(hand_, 1.0, 14.0);
+  asked_.clear();
+}
+
+void HarmonicsPlayer::render(float* out, int n) {
+  constexpr int kBlock = 16;
+  Guitar& g = m_.guitar();
+  if (!asked_.empty()) play();
+  for (int i = 0; i < n; i += kBlock) {
+    const int m = std::min(kBlock, n - i);
+    const double dt = m / fs_;
+    tick(dt);
+    sinceNote_ += dt;
+    bool anyHeld = false;
+    for (int s = 0; s < Guitar::kStrings; ++s) { age_[s] += dt; anyHeld = anyHeld || held_[s]; }
+    // A rest: the hand lies lightly on the strings let go (they fade in a second or so).
+    if (!anyHeld && !hold_ && sinceNote_ > 1.5)
+      for (int s = 0; s < Guitar::kStrings; ++s)
+        if (note_on_[s] >= 0 && !rested_[s]) { g.damp(s, 5); rested_[s] = true; }
+    for (size_t j = 0; j < due_.size();) {
+      if ((due_[j].in -= dt) <= 0) {
+        const Due& d = due_[j];
+        g.fret(d.string, d.fret);
+        g.touch(d.string, d.n, d.touch, rate_, 0.004, d.off);
+        g.pick(d.string, d.depth, d.where, d.angle, d.rise);
         due_.erase(due_.begin() + j);
       } else {
         ++j;

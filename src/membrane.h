@@ -47,6 +47,13 @@ class Membrane : public Surface {
   double radius() const override { return spec_.radius; }
   double frequency(int k) const { return freq_[k]; }  // Hz, as loaded by the air
   int diameters(int k) const { return m_[k]; }
+  int circles(int k) const { return nc_[k]; }  // its nodal circles, the rim counted (1: (m, 1))
+  // Re-voice mode k (a timpani's air and kettle, research/timpani.md 12.1): its family's frequency
+  // (Hz: a pair's two members keep their split about it), its decay (T60, s), its mass x `mass`
+  // (the air riding on it); then update() once for all.
+  void setMode(int k, double hz, double t60, double mass = 1);
+  void update() { coefs(); }
+  double split(int k) const { return split_[k]; }  // (a pair member's frequency x its family's)
   // Each mode's share at the point (r from the centre, m; theta, rad) into
   // phi[modes()]: the head's height there is the sum of phi[k] q[k].
   void shape(double r, double theta, float* phi) const override;
@@ -67,7 +74,8 @@ class Membrane : public Surface {
   double fs_, dt_;
   int n_ = 0;
   std::vector<double> freq_;
-  std::vector<int> m_, fam_, kind_;        // diameters; the radial table's row; 0: m = 0, 1: cos, 2: sin
+  std::vector<int> m_, fam_, kind_, nc_;   // diameters; the radial table's row; 0: m = 0, 1: cos, 2: sin; circles
+  std::vector<double> split_, massX_;      // a pair member's frequency x; its mass x so far
   std::vector<float> norm_, c0_, s0_;      // 1 / sqrt(mass); the pair's own angle
   std::vector<float> tab_;                 // [family][kRadii + 1]: J_m(j r / R)
   std::vector<float> q_, v_, f_, vol_, w2_;

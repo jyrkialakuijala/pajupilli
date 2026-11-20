@@ -26,8 +26,13 @@ static_assert(violadata::kNX == kNX && violadata::kNY == kNY && violadata::kOffs
 extern const BodyData kViolaBodyData = {violadata::kTopK, violadata::kTopInvM, violadata::kBackK, violadata::kBackInvM,
                                         violadata::kNodeArea, violadata::kRowY, violadata::kColX, violadata::kAirK,
                                         violadata::kSlugArea, violadata::kSlugInv, violadata::kPlugArea, violadata::kPlugInvM,
-                                        violadata::kPostBehind, violadata::kBridgeI, violadata::kBassJ, violadata::kTrebleJ,
-                                        710, 2000, 3, 0.038f, float(knob("PJ_AIR_HF", 2.2e-6))};  // (Q 15 at 4.9 kHz, 320 at A0)
+                                        // (The post 17 mm behind the treble foot, 0.65 of a node, not the design's 7 mm
+                                        // (violadata::kPostBehind 0.26): on this grid a post that near pins the foot, and the
+                                        // A string, which presses that foot most, came out weak: the open A 5 dB under the
+                                        // range's median, 2.4 dB at 17 mm. Viola.md, finding 11.)
+                                        0.65f, violadata::kBridgeI, violadata::kBassJ, violadata::kTrebleJ,
+                                        710, 2000, 3, 0.038f, float(knob("PJ_AIR_HF", 0.7e-6)),  // (Q 46 at 4.9 kHz, 1000 at A0)
+                                        int(knob("PJ_VIOLA_HOLES", 3))};
 static_assert(violindata::kNX == kNX && violindata::kNY == kNY && violindata::kOffsets == kOffsets, "the same grid");
 // (The violin's top is 0.75 x the viola's: its sides differ from 1.15 x the viola's frequencies on.)
 extern const BodyData kViolinBodyData = {violindata::kTopK, violindata::kTopInvM, violindata::kBackK, violindata::kBackInvM,
@@ -110,7 +115,7 @@ float BassBody::stepOne(float bassFoot, float trebleFoot) {
       float* f = f_[p][j];
       float* fp = fPrev_[p][j];
       for (int i = 0; i < kNX; ++i) {
-        const float fk = f[i];
+        const float fk = plateK_ * f[i];
         f[i] = fk + stiff_ / dt_ * (fk - fp[i]);
         fp[i] = fk;
       }
@@ -125,14 +130,20 @@ float BassBody::stepOne(float bassFoot, float trebleFoot) {
     for (int i = 0; i < kNX; ++i)
       vol[s][i] += 0.5f * (kSlugArea[i] * slugW_[s][i + 1] - (i > 0 ? kSlugArea[i - 1] : 0.0f) * slugW_[s][i]) +
                    (s == 0 ? crossArea_ : -crossArea_) * crossW_[i];
-    vol[s][kBridgeI] += 0.5f * kPlugArea * plugW_[s];
+    if (d_.holeCells >= 3) {
+      vol[s][kBridgeI - 1] += 0.125f * kPlugArea * plugW_[s];
+      vol[s][kBridgeI] += 0.25f * kPlugArea * plugW_[s];
+      vol[s][kBridgeI + 1] += 0.125f * kPlugArea * plugW_[s];
+    } else {
+      vol[s][kBridgeI] += 0.5f * kPlugArea * plugW_[s];
+    }
   }
   for (int i = 0; i < kNX; ++i) {
     if (sides_) {
-      press[0][i] = -2 * kAirK[i] * vol[0][i];
-      press[1][i] = -2 * kAirK[i] * vol[1][i];
+      press[0][i] = -2 * airKs_ * kAirK[i] * vol[0][i];
+      press[1][i] = -2 * airKs_ * kAirK[i] * vol[1][i];
     } else {
-      press[0][i] = press[1][i] = -kAirK[i] * (vol[0][i] + vol[1][i]);
+      press[0][i] = press[1][i] = -airKs_ * kAirK[i] * (vol[0][i] + vol[1][i]);
     }
   }
   press[0][kNX] = press[1][kNX] = 0;
@@ -244,7 +255,10 @@ float BassBody::stepOne(float bassFoot, float trebleFoot) {
   // heard all round), or in at one and out at the other (heard to the sides, with opposite signs).
   fhole_ = 0;
   for (int s = 0; s < 2; ++s) {
-    const float a = press[s][kBridgeI] * kPlugArea * kPlugInvM;
+    // (a long hole feels its cells' pressures as it takes its air from them)
+    const float ph = d_.holeCells >= 3 ? 0.25f * press[s][kBridgeI - 1] + 0.5f * press[s][kBridgeI] + 0.25f * press[s][kBridgeI + 1]
+                                       : press[s][kBridgeI];
+    const float a = ph * kPlugArea * kPlugInvM;
     const float q = 0.5f * kPlugArea * a;
     accel += q;
     fhole_ += q;

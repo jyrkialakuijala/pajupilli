@@ -50,6 +50,11 @@ struct BodyData {
   // bounces on their plugs with almost no loss (the viola: at 4.9 kHz, Q over 1000): every note
   // with an overtone there (D#4, E4, F4, B4, F5) rang with a metallic shine. 0: none.
   float airHf = 0;
+  // The f-holes are long: each opens from this many cells of its half of the air (1: the
+  // bridge's cell alone; 3: that and its two neighbours, a quarter, a half and a quarter of the
+  // hole: a viola's 78 mm holes over its 26 mm cells). Opening from one thin slice, the hole's
+  // air and the slice made a resonance of their own (Viola.md, finding 7).
+  int holeCells = 1;
 };
 extern const BodyData kBassBodyData, kCelloBodyData, kViolaBodyData, kViolinBodyData;
 
@@ -96,6 +101,12 @@ class BassBody {
   void setDamping(double rate, double stiff, double air = 14) {
     rate_ = float(rate); stiff_ = float(stiff); airRate_ = float(air);
   }
+  double dampRate() const { return rate_; }
+  double dampStiff() const { return stiff_; }
+  double dampAir() const { return airRate_; }
+  // Another instrument of the same design: its plates this much stiffer (x; its wood
+  // resonances move by the square root of it) and its air (the ribs a little higher or lower).
+  void setVariation(double plates, double air) { plateK_ = float(plates); airKs_ = float(air); }
 
  private:
   const BodyData& d_;
@@ -117,6 +128,7 @@ class BassBody {
   float crossArea_ = 0, holeY_ = 0;
   bool sides_ = true;  // (PJ_AIR_SIDES 0: one column of air and one plug for both f-holes, as before)
   float dip_[3] = {}, dip1_[3] = {}, momPrev_[3] = {};
+  float plateK_ = 1, airKs_ = 1;
   float pressPrev_[2][bassdata::kNX + 1] = {};
   float dt_, rate_ = 18, stiff_ = 3e-6f, airRate_ = 14;
 };

@@ -231,7 +231,8 @@ class HammondPlayer : public Performer {
   // A plan's nudge of the slow Leslie on a long note (the slow speed x b; 1 back to it).
   void setLeslieBoost(double b) { m_.setLeslieBoost(b); }
   void setThin(double t) { m_.setThin(t); }
-  // (live) K5: the Leslie (stop / slow / fast, as the half-moon switch). K1-K4: the upper
+  // (live) K5: the overdrive (the 122's amp driven 1 x .. 8 x); K6: the Leslie (stop / slow /
+  // fast, as the half-moon switch). K1-K4: the upper
   // manual's drawbars along the tradition's own paths: K1 soft to hard through the classic
   // registrations (each a detent: the whisper of the 8' alone, the ballad 838, the jazz 888, the
   // gospel 8888, full organ; the 122 driven harder at the end), K2 hollow (the odd harmonics) to
@@ -288,6 +289,8 @@ class HammondPlayer : public Performer {
   int lastLeslieKnob_ = -1;
   bool laterDone_ = false;
   double baseDrive_ = 1;
+  double overdrive_ = 1;     // (live) K5's push of the 122's amp
+  int lastOverdrive_ = 10;
   double knobs_[4] = {-1, -1, -1, -1};  // (the drawbar knobs' last positions; -1: not yet moved)
   double printed_[9] = {-9, -9, -9, -9, -9, -9, -9, -9, -9};
   const char* lastName_ = "";

@@ -82,9 +82,13 @@ void ReedPlayer::noteOn(int midi, int velocity) {
                           : std::clamp(v, velocity, std::max(velocity, 64));
   }
   keyVel_ = velocity;
+  // (... and a breath attack is a soft key's: a key brought up to the note's softest dynamics
+  // is tongued, as the calibration played it there. The alto saxophone's E3, playable at
+  // mezzo-forte only, spoke an octave up from a key of 30: a breath attack at that breath.)
+  const bool breath = art == kArtBreath && (bag_ || velocity < 35 * hardness_);
   const Attack a = art == kArtSlur || art == kArtGlide ? kSlur
                    : art == kArtTongueLegato || art == kArtDu ? kDu
-                   : art == kArtBreath ? kBreath
+                   : breath ? kBreath
                    : art == kArtAccent ? kAccent : kTu;
   // (A glide's soft key is its sign, not a diminuendo.)
   if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;

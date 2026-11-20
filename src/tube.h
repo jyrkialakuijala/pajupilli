@@ -62,6 +62,9 @@ class Tube {
   // y towards the listener, z up), or null if it has none. The room gives every reflection its
   // own mix of them (Room::setAxes).
   virtual const float* takeDipole(int /*n*/, int /*k*/) { return nullptr; }
+  // One of many alike in a section: this instrument's own build, fixed for its seat (no two
+  // violins have their resonances in the same places).
+  virtual void vary(unsigned /*seat*/) {}
   virtual const float* dipoleAxes() const { return nullptr; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then

@@ -425,14 +425,16 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       return f.single >= 0.6 && f.legato < 0.45 && f.rate >= 1.5 ? 1 : 0;
     };
     const bool gm18 = instrument == "percussive-organ";
-    bool global = gm18 || (style == "jazz" && suits(first, last + 1) == 1);
+    // (the rock organ too: its staccato riffs punched by the percussion, at the normal volume)
+    const bool riffs = style == "jazz" || style == "rock";
+    bool global = gm18 || (riffs && suits(first, last + 1) == 1);
     r.perc = global;
     r.percThird = true;
     r.percFast = true;
     // (the jazz organ's setting soft: Jimmy Smith's 888, 3rd, fast, soft; the ping over the line
     // without the normal setting's drop of the whole manual. The percussive organ's preset normal.)
-    r.percSoft = !gm18;
-    std::string onText = gm18 ? "on (3rd, fast)" : "on (3rd, fast, soft)";
+    r.percSoft = !gm18 && style != "rock";
+    std::string onText = gm18 || style == "rock" ? "on (3rd, fast)" : "on (3rd, fast, soft)";
     // A ballad's tune of single, spaced notes, high enough to ring: the 2nd, slow and soft, a bell
     // under each note (the 8''s octave), its slow decay through the note.
     if (!gm18 && style == "ballad") {
@@ -447,7 +449,7 @@ HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double b
       }
     }
     percText = global ? onText : "off";
-    if (!gm18 && style == "jazz") {
+    if (!gm18 && riffs) {
       // Eight-bar stretches (4/4 assumed when the file says nothing finer).
       const long window = 32L * tpq;
       std::vector<int> w;

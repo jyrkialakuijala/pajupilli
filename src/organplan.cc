@@ -78,6 +78,7 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
     }
     std::sort(partStarts.begin(), partStarts.end());
   }
+  plan.partStarts = partStarts;
   auto bpmAt = [&](long tick) {
     double b = tempo.empty() ? 100 : tempo[0].second;
     for (auto& [t, v] : tempo)

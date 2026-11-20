@@ -534,7 +534,7 @@ int main(int argc, char** argv) {
       // General MIDI's drum keys; the keyboard's own instrument stays silent.)
       if (std::string(nm) == "drums") { kitOnKeys = padDrums = true; nm = "taiko"; }
       gInst = findInstrument(nm);
-      if (!gInst) { std::fprintf(stderr, "-inst: %s\n", instrumentNames().c_str()); return 1; }
+      if (!gInst) { std::fprintf(stderr, "-inst: the instruments\n%s", instrumentList().c_str()); return 1; }
     }
     else if (a == "-cfoot") cfoot = true;
     else if (a == "-note") note = std::atoi(next());
@@ -633,6 +633,7 @@ int main(int argc, char** argv) {
     return playMidiFile(playFile, out, room, lopt.device, lopt.verbose, roomGiven);
   }
   if (!roomGiven && std::strcmp(gInst->family, "organ") == 0) room = findRoom("church");  // an organ plays in a church
+  if (!roomGiven && std::strcmp(gInst->family, "choir") == 0) room = findRoom("church");  // a choir sings in a church (src/choir.h)
   if (cfoot && gInst == findInstrument("flute")) gInst = findInstrument("flute-c");
   const int lo = gInst->lo + gInst->transpose, hi = gInst->hi + gInst->transpose;
   if (cal) { calibrate(*gInst, 440, stdout); return 0; }
@@ -881,8 +882,25 @@ int main(int argc, char** argv) {
         double s = 0;
         is >> s;
         play(s);
+      } else if (w == "knob") {  // (an instrument's own knob, as -live's K1..K8: knob K X, X 0..1)
+        int k = 0;
+        double x = 0;
+        is >> k >> x;
+        if (!pl.setKnob(k - 1, x)) std::fprintf(stderr, "-seq: K%d is not this instrument's own\n", k);
+      } else if (w == "wheel") {  // (the mod wheel, 0..1, as -play's CC 1)
+        double x = 0;
+        is >> x;
+        pl.setFlutter(x);
+      } else if (w == "expr") {  // (the expression, 0..1, as -play's CC 11: 0.5 as written)
+        double x = 0;
+        is >> x;
+        pl.setBreath(x - 0.5);
+      } else if (w == "bend") {  // (the pitch bend, -1..1, as -play's)
+        double x = 0;
+        is >> x;
+        pl.setLipRoll(x);
       } else {
-        std::fprintf(stderr, "-seq: on N V, off N, wait S (not %s)\n", w.c_str());
+        std::fprintf(stderr, "-seq: on N V, off N, wait S, knob K X, wheel X, expr X, bend X (not %s)\n", w.c_str());
         return 1;
       }
     }

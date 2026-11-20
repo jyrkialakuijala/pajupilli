@@ -340,7 +340,7 @@ resonance at 365 Hz (F♯4), each about a semitone wide (Q 19 and 24). The lowes
 under it, the viola's veiled colour. The back is twice as stiff as the top, so the main resonance
 rocks the bridge as the bow drives it (with the back as soft as the top the notes D♯4–F♯4 lost
 their fundamental to a mode at 685 Hz). Held under the chin: no floor. The body steps twice a
-sample (a small body's grid rings to 16 kHz); about 28 % of a core. A pizzicato, there and on the
+sample (a small body's grid rings to 16 kHz); about 28 % of a core. The strings and the bow take two steps a sample, the bow reaches higher overtones the harder it presses, the f-holes open from three cells of the air, and a bank of resonances stands for the body above the grid's reach (`Viola.md`, `src/bodybank.h`). A pizzicato, there and on the
 cello, is the nail's: velocity sets only how far it pulls the string (`PJ_PIZZ_FLESH`: below this
 velocity the fingertip's flesh instead).
 
@@ -370,6 +370,20 @@ directional parts (0: none). Limits: the moments stand for the lobes only up to 
 as large as the wavelength; and the close parts of the sound (the top by the bridge, the f-hole,
 the pickup), a large share on the viola, still go out alike all round.
 
+`-inst strings` and `-inst slow-strings` (GM 49 and 50, String Ensemble 1 and 2;
+`src/stringsect.cc`) are a string orchestra of 24 of these instruments: 12 violins, 6 violas,
+3 cellos, 3 double basses, seated across the stage, violins left, basses right. A key is its
+sounding note (E1 to G7). Each section plays the held keys in its register and divides between
+them as a section does; when the keys change, as few players move as will do, and a player
+moving slurs in its bow. Nothing is chorused: the section's sound is 24 players, no two alike
+(fixed for each seat: its stops a few cents off, its own vibrato rate, depth and delay, its own bow
+speed and pressure and place in the bow, and its own instrument, built a little differently, as
+recorded violins differ), each starting at its own moment (about 20 ms give or take 15 after the
+key, the back desks a little later). Ensemble 1 starts together within 40 ms, firmly,
+the bow nearer the bridge; ensemble 2 ("slow strings") comes in player by player over 300 ms
+with soft strokes, the bow towards the fingerboard, and leaves over 350 ms. All 24 are computed
+all the time in a room: about real time on a 16-core machine (`PJ_THREADS`).
+
 `-inst contrabass` is the same bass under the bow (GM 44), E1 to G4, harmonics to C6:
 
 - **Bow:** the hair grips the string by friction and lets it slip back once a period; the string
@@ -384,6 +398,94 @@ the pickup), a large share on the viola, still go out alike all round.
   pressure, the joystick forward a swell, the mute pad held a tremolo, vibrato the fingertip.
 - **By ear:** the stopping finger trembles by a few cents, and the player evens weak and booming
   notes with the bow (`tools/bowlevels.py`).
+
+### Choir (Choir Aahs)
+
+`-inst choir` (GM 53, Choir Aahs; `src/choir.h`, `src/choir.cc`; `research/choir.md`) is a choir
+of 24 singers, each a vocal tract as in puhuja (`src/singer.h`, the pad-choir's singer) on a glottis
+at its own pitch. They stand in six parts across the stage, sopranos on the left, basses on the
+right:
+
+| part | range | at ease | tract | vowel rows |
+|---|---|---|---|---|
+| bass | G1–E4 (oktavists below D2) | E2–A3 | 17.8 cm | male |
+| baritone | A2–A4 | A2–D4 | 17.3 cm | male |
+| tenor | C3–C5 | D3–G4 | 16.8 cm | male |
+| alto | F3–F5 | G3–C5 | 15.5 cm | female |
+| mezzo-soprano | A3–A5 | B3–E5 | 15.0 cm | female |
+| soprano | C4–C6 | E4–A5 | 14.5 cm | female |
+
+- **Keys:** a key is its sounding note, G1 to C7. Below D2 only the oktavists reach (two basses in
+  four, down to G1); the other basses double them an octave up, softer. Above C6 the sopranos sing
+  an octave down.
+- **Tuned by the spectra** (the pajupilli intonation, as the organ's; `PJ_CHOIR_JI=0` or `PJ_JI=0`
+  turns it off): each sung note's spectrum is its voice's harmonics, falling ~6 dB an octave, with
+  the band of the first two resonances (~300–1500 Hz) stronger. Every two notes' partials within
+  36 c of each other pull their interval to where they meet, by the weaker one's level over the higher
+  harmonic number squared (the ear tunes by the low, resolved partials). A chord struck together
+  is placed together, its mean on equal temperament; a note already sounding (150 ms) moves at most
+  3 c a change; at most ±25 c (`PJ_CHOIR_JI_LIM`). Each singer follows in ~80 ms. C major: the third
+  10.6 c under its root, the fifth +1.8 c (`PJ_CHOIR_TUNEDBG=1` prints each chord's tuning).
+- **A key alone** is sung in unison by the parts at ease on it: C3 by the basses and baritones, C4 by
+  the baritones, tenors, altos and mezzos, A4 by the altos, mezzos and sopranos.
+- **A chord** is spread over the parts by pitch, the basses on its lowest key and the sopranos on its
+  highest. A key no part chose is taken by the nearest part, which divides (at most three keys a
+  part).
+- **Moving between chords:** as few singers move as will do, and a moving singer slurs. Near the top
+  of a part's range only some of its singers reach, so the part thins out (one soprano sings C6).
+- **Each singer is its own**, fixed for its seat: tract length (±4 %), vowel (R1 ±8 %, R2 ±6 %),
+  pitch (sd 6 c), vibrato rate (5.3 ± 0.35 Hz), extent (±35 c ± 12; basses 0.7×, sopranos 1.2×) and
+  delay (0.3 ± 0.1 s), level (sd 2.5 dB, one in six a strong voice at f) and breath.
+- **Each note:** a fresh offset (sd 4 c), a start a little flat gliding in, and an entry ~25 ms after
+  the key, give or take 20 (plus the singer's habit and the part's moment). The release is by
+  breath, 1.5 times as scattered. In a long note each singer breathes on its own clock, every
+  8–15 s.
+- **Nothing is chorused.** Measured on a six-part chord: the singers' mean pitches 4–7 c apart within
+  a part, 17–32 c of dispersion with the vibratos, and the onsets spread over 80 ms.
+- **The vowel** is a dark choral [ɑ], from rows refitted on the singer's own line
+  (`src/singer_vowels_data.h`, `tools/choirvowels.cc`): R1/R2 720/1185 Hz for the basses and
+  840/1320 Hz for the sopranos.
+- **Resonance tuning:** the women open the jaw to keep R1 just above f0 once f0 nears it (sopranos
+  from ~A5: R1 905 Hz at A5, 1050 Hz at C6). The men nudge R1 onto 2 f0 when it is near.
+- **The lungs** run from ~0.4 kPa (pp) to 3.5 kPa (ff), 1.4× an octave above a part's middle (to
+  5 kPa). The glottal pulse closes faster as the voice grows: pp to ff is ~18 dB, and the 3 kHz
+  region rises ~6 dB more than the whole.
+- **Levels:** each singer's level is evened by its note, so a lone key's choir rises only gently
+  from E2 to C6 (`PJ_CHOIR_EVEN`; the physics alone rose 35 dB).
+- **Room:** it sings in the church unless `-room` says otherwise (in a MIDI file, the file's room).
+- **Knobs** (live, or `-seq`'s `knob K X`), the same for every choir:
+  - K2 is the vowel, from dark to bright: u, ʊ, ɔ, ɑ (at 0.6), e, i;
+  - K3 is the openness: closed and breathy to the left, the jaw open and the tone clear to the
+    right.
+
+  Both glide in ~40 ms, and each singer keeps its own vowel on top.
+- **Cost:** about 0.8 % of a core per singing singer; 24 singing take ~12–19 % of a core dry, ~25 %
+  in the church. Silent singers are not computed. `PJ_CHOIR_N` sets the singers per part (4).
+- **Variants:** another choir instrument (Voice Oohs) is a row of `kChoirVariants` (`src/choir.h`).
+  It sets the vowel per part, the attack, the softness, which parts sing, a soft "d" onset and a
+  hum. The parts, singers, dealing and room are shared.
+
+### Voice Oohs
+
+`-inst voice-oohs` (GM 54, Voice Oohs) is the same choir of 24 singers on "ooh", as a variant of
+`choir` (`src/choir.cc`):
+
+- **The women lead.** The men sing only keys below C4: a lone key or chord tone from C4 up goes to
+  the altos, mezzos and sopranos.
+- **The vowel** is a rounded choral [u] for the sopranos and mezzos, moving toward [ʊ] through the
+  altos, tenors and baritones to the basses. The rows were refitted on the singer's own line
+  (`src/singer_vowels_data.h`, `tools/choirvowels.cc`): R1/R2 ~300/800 Hz for men, ~360/900 for
+  women; the old singer's /u/ was a fronted [ʉ] with F2 ~1370. The women's top opens toward [ɔ]
+  from D5 to G5, as sopranos do when a rounded [u] cannot keep R1 up with f0.
+- **Softer and slower** than the aahs: lower pressures, the lungs rising with τ ≈ 0.2 s at mf (half level at
+  ~110 ms against the aahs' ~65), breathier (×1.3), less vibrato (×0.8). Firmer keys start with a
+  soft "d", as Roland's "dooh" does.
+- **Dark:** the band 1.5–5 kHz is ~28 dB under the lows on A4, against ~10 dB for the aahs. Before
+  its level trim it is ~6 dB quieter than the aahs.
+- **Hum:** `src/hum.h` closes the lips into a hum ("mmm", GM2 Humming). It is a nasal pole (270 Hz)
+  and a zero gliding up to 1 kHz on a singer's output, ~15 multiply-adds a sample instead of a
+  nasal line (`tools/humtest.cc`). It is off in Voice Oohs: on the new [u] even a little of it
+  dulls the voice further.
 
 ### Concert grand
 
@@ -422,6 +524,38 @@ the pickup), a large share on the viola, still go out alike all round.
   x1.6 (`PJ_PIANO_TOPH2`), the board's share unchanged. `PJ_PIANO_TOPHI` does the same for the
   partials above it (1: off).
 - **Cost:** about 9 % of a core for a single note, 32 % with the pedal down.
+
+### Bright piano (Shigeru Kawai SK-7)
+
+`-inst bright-piano` (GM 2, Bright Acoustic Piano; `src/sk7.cc`, research/shigeru_kawai_sk7.md),
+A0 to C8: the grand's strings, hammers and dampers built as a Shigeru Kawai SK-7, Kawai's 229 cm
+semi-concert grand, and miked close as a studio or pop grand is. The brightness comes from the
+instrument, not from an EQ:
+
+- **Scale:** a 229 cm case: wound strings 1.66 m at A0 to 1.16 m at E2, plain strings from
+  1.44 m at F2 reaching the grand's own lengths at C5. The shorter bass and low tenor are stiffer
+  (B 1.0e-4 at C1, 2.3e-4 at C3, against the grand's 7e-5 and 1.1e-4): their upper partials stand
+  sharper and stronger, and the tuning stretches further (C1 about 15 c flat, the grand's 7).
+- **Hammers:** Kawai presses its felt dense and needles only the shoulders, with no hardeners:
+  the felt twice as stiff as the grand's at C4 and 2.5 times from C6 (`PJ_SK7_HARD`, `_HARDTOP`),
+  its loose outer nap half as thick (`PJ_SK7_NAP`). A middling blow is already bright (above
+  2 kHz C4 at velocity 64: −35 dB, the grand's −61); the softest notes stay round (under −50 dB).
+- **Board:** the grand's board drawn in at the tail to the shorter case, 1.77 m² (`tools/sk7board.py`
+  → `src/sk7board_data.h`), its own loss ×0.7 (`PJ_SK7_ETA`: the aged spruce and hard rim the
+  makers credit with a long sustain). Middle C falls 40 dB in 9.6 s (the grand 5.7), C5 in 3.6 s
+  (4.7); the bass a little shorter than the concert grand's, as a smaller grand's is.
+- **Sound:** the grand's crossed figure-of-eight pair 30 cm over the strings and 40 cm from the
+  belly rail (`PJ_SK7_MICZ`, `_MICX`), placed for evenness from key to key (as even as the
+  grand: 0.8 / 1.1 / 2.7 dB rms off the neighbours, bass / middle / top); the room hears it
+  without the grand's extra reverb send.
+- **Against the grand,** on a solo piano file (the first 75 s of a jazz ballad): 7.8 dB more
+  above 2 kHz, 3.7 dB more at 4-8 kHz, 1.3 dB above 8 kHz: presence, not hiss.
+- **Against FluidR3's Bright Acoustic Piano** (TiMidity++): its velocity curve within 1.5 dB of
+  FluidR3's after the velocity gain; FluidR3's is the same sample as its grand, 3 dB louder, its
+  brightness fixed at about −15 dB above 2 kHz at every velocity; here the share grows with the
+  blow (C4: −53 dB at velocity 40, −24 at 127), and the notes sustain longer.
+- **Cost:** as the grand's: about 16 % of a core for a single note, 55-60 % with the pedal down
+  (both measured on a loaded machine, where the grand's read 15 % and 56 %).
 
 ### Upright piano
 
@@ -507,6 +641,52 @@ research/cp80.md), a different piano as data (`PianoDesign`):
   middle and upper registers sits about 5 dB over the model, which no hammer or strike point
   reaches (perhaps the recordings' EQ, perhaps a resonance of the pickup's mount).
 - **Cost:** about 0.5 % of a core for a note; with the pedal down about 0.45 of the grand's work.
+
+### Electric piano 1 (the Fender Rhodes)
+
+`-inst electric-piano-1` (GM 5), A0 to C8 (`src/rhodes.*`, research/rhodes.md): the Rhodes as its
+parts, key by key, then its electronics.
+
+- **Tines:** lengths from the factory's cutting sheet, the swaged tine's mode ratios with its
+  spring (5.8 .. 9 and 17.6 .. 28 x f0; modes 2 and 3 gone in tens of ms), the fundamental's Q from
+  Shear's measurements (T60 ~11 s at C4, ~4 s at C6), the factory's stretch tuning (-20 c at A0 to
+  +30 c at C8), a weak sideways polarisation 0.02 .. 0.3 Hz apart (the slow swirl); the tonebar a
+  lossy mode far under the note, moving the tine (Muenster & Pfeifle).
+- **Hammers:** a Hunt-Crossley contact with the tip of its zone (Shore 30/50/70/90, the wrapped
+  maple core at the top) against the tine's place and speed as they are: 5-7 ms in the middle (6.4
+  measured); a key struck again meets the moving tine. Each key's action is calibrated so that a
+  mezzo-forte leaves the tip at 3 m/s from C3 up (the even touch: C3 swings ~3 mm, C6 ~0.5 mm), the
+  bass's swing levelling at ~3 mm.
+- **Pickup:** the flux a bell of the tip's height over the pole's edge, its derivative on the full
+  tip motion every sample: soft notes nearly sines, harder ones barking (the bass first: E2's 2nd
+  harmonic -19 dB under the fundamental at velocity 30, +9 dB over it at 120), the fundamental
+  folding back and blooming as a hard bass note decays. Gaps 1.6 / 0.8 mm, the offsets as the
+  factory voiced them; every key's gap, offset, strike, tuning and Q a little its own.
+- **Electronics:** the harp (1.4 kOhm, 0.65 H, the cable) into its load; the Peterson Suitcase by
+  default (preamp, the stereo vibrato's lamps and CdS cells, the power amplifier's sagging rails,
+  the 4 x 12 in cabinet), or the Stage straight out (`PJ_RHODES_SUITCASE=0`); a trace of hum.
+- **Knobs:** `PJ_RHODES_VIB` (0.5; 0: off), `PJ_RHODES_VIB_HZ` (4.5), `PJ_RHODES_GAP`,
+  `PJ_RHODES_VOICING` (x the offsets: smaller is more bell), `PJ_RHODES_WEAR` (1; 0: as the tables, 3:
+  road-worn), `PJ_RHODES_HUM`, `PJ_MAINS_HZ` (50). Live: K3 the vibrato's speed, K4 its intensity.
+- **Not yet:** sympathetic ringing through the rail, the pickups' crosstalk, the tine against the
+  pole or the damper at ff, the Mark I/II damper snap-back, a near-tuned tonebar (Moog's picture),
+  the Stage's amplifiers. About 1.3 % of a core for a held note.
+
+### Electric piano 2 (the DX7's E.PIANO 1)
+
+`-inst electric-piano-2` (GM 6), A0 to C8 (`src/dx7.*`, research/electric_pianos.md section 6):
+the Yamaha DX7's factory voice E.PIANO 1 (ROM1A voice 11), its 128 bytes from the factory bank,
+played by the reverse-engineered DX7 engine's arithmetic (MSFA, as in Dexed): six operators in
+algorithm 5 (1 <- 2 at 14:1, the tine's clank; 3 <- 4 and 5 <- 6 at 1:1, the bark, 6 feeding
+back), the integer envelopes stepping every 64 samples, the output-level, velocity, rate- and
+level-scaling tables, the measured detune, free-running phases (key sync off). Velocity works as
+on a DX7: mostly the timbre (a soft key nearly a sine, a hard one barking), the level only a few dB.
+
+Unlike a DX7, each key is a piano's unison: three whole DX7 voices from C3 up, two from C2, one
+below (that one exactly the DX7's), 1/7 Hz apart, each with its own output levels (+-0.4 dB) and
+envelope speeds (+-3 %). Knobs: `PJ_DX_ONE`/`PJ_DX_TWO` (36, 48: the lowest key with two, three),
+`PJ_DX_SPREAD` (1: x 1/7 Hz), `PJ_DX_VARY` (1; 0: the generators alike), `PJ_DX_POLY` (32 notes).
+The sustain pedal holds; pitch bend +-2 semitones.
 
 ### Clavinet (Hohner D6, E7, C)
 
@@ -713,6 +893,412 @@ classical guitar with nylon strings. E2–B5; notes outside are moved in by octa
   or harmonics. The ring was lengthened by ear (`PJ_GUITAR_RING`; `PJ_GUITAR_RING23` for the first
   and second overtones, `PJ_GUITAR_RING45` for the third and fourth, lengthened less). 0.9 % of a core.
 
+### Electric guitars (clean, muted, overdriven, distortion)
+
+`-inst steel-guitar` (GM 26; `research/steel_guitar.md`, `research/steel_guitar_build.md`,
+`src/guitar.cc` `steelGuitar()`): the steel-string acoustic, a dreadnought with phosphor-bronze
+12-53 strings, flatpicked. The same strings-on-a-bridge model as the nylon guitar with:
+
+- **The strings:** twice the nylon's tension and far less loss, 96 modes each to 10 kHz. Measured
+  on open strings: the overtones' loss rises about linearly with frequency (3 to 8 dB/s per kHz),
+  and at 3 kHz a note still takes 2 to 3.5 s to fall 60 dB.
+- **The body:** the air and top resonances at 98, 183 and 204 Hz, two dipoles that radiate little,
+  then plate resonances to 10 kHz with masses set to the measured mean bridge mobility. Nothing
+  is measured above 3.6 kHz; the plates simply go on.
+- **The pick:** the electric guitars' pick, 10 to 13 cm from the saddle, a strum over the
+  soundhole, with its own click (a burst of noise as the string leaves the edge, a rattle over
+  the wrap on the four wound strings; `PJ_STEEL_CLICK`).
+- **The hands:** a strum takes 5.5 ms a string over six strings and 8.6 ms over three; the key's
+  release stops the string, open or fretted; while strumming it is only eased off.
+
+Not built yet: fingerstyle, the up stroke leaving out the lowest strings, the 12-string. Knobs:
+`PJ_STEEL_LOSS`, `PJ_STEEL_LOSSHIGH`, `PJ_STEEL_BODYMASS`, `PJ_STEEL_BODY` (1: an OM),
+`PJ_STEEL_RADHIGH`, `PJ_STEEL_OUT`.
+
+`-inst clean-guitar` (GM 28), `-inst muted-guitar` (GM 29), `-inst overdriven-guitar` (GM 30) and
+`-inst distortion-guitar` (GM 31; `research/electric_guitars.md`, `research/distortion_guitar.md`,
+`src/guitar.cc`, `src/guitaramp.cc`): a Stratocaster played with a pick into a clean Fender Twin;
+the muted one is the same guitar with the picking hand's palm on the strings and a compressor in
+front of the amp; the overdriven one a Les Paul's bridge humbucker through a compressor into a
+Marshall JCM800 at crunch; the distortion one the same Les Paul into a Soldano SLO-100's
+overdrive channel, gated, and a closed 4×12 of Vintage 30s. The same six strings and guitarist as the
+classical guitar, in steel, heard through pickups; the amp is a module of its own after the jack.
+- **The strings:** 10–46 on 648 mm, tensions from the maker's chart, the plain G the most
+  inharmonic; up to 96 modes (8 kHz on the low E). They ring 14 s on the low E, 5 s on the high
+  one (not yet fitted to recordings: `PJ_EGTR_LOSS`, `PJ_EGTR_LOSSHIGH`). Each string's two
+  directions of swing are a little askew (`PJ_EGTR_TILT`, 0.35 rad, each mode its own) and a
+  little apart in pitch (`PJ_EGTR_SPLIT`): a pick throws the string mostly along the top, the
+  pickup hears what lies towards it, and the two beat slowly: the note blooms and breathes.
+- **The neck:** two resonances under the strings' ends (`PJ_EGTR_DEADHZ`, 212 Hz; `PJ_EGTR_NECK`):
+  a dead spot, G#3 losing ~10 dB more in its first 0.4 s than its neighbours. The body is still
+  and adds nothing of its own.
+- **The pick:** a 0.8 mm edge pushing the string 0.1–3 mm aside (the velocity) over a millisecond
+  and letting it slip off in 0.15 ms, ~10 cm from the saddle (a hard stroke nearer the bridge;
+  the brightness knob moves it); it passes, so what the string was sounding goes on. Single notes
+  are picked down and up in turn while they come within 0.3 s, down after a rest; an up stroke a
+  little lighter, the other way across the string. Chords are one sweep (6 ms a string,
+  `PJ_EGTR_STRUMSPEED`), down or up as the strumming hand swings.
+- **The pickups:** measured positions on a Stratocaster (the bridge pickup slanted, 38–49 mm from
+  the saddle; middle ~100; neck ~158): each hears the string where it stands, so each has its
+  comb (on the open low E the neck pickup is deaf to the 4th harmonic, the bridge one to the
+  13th), over the field's width (`PJ_EGTR_WIDTH`, a 6 mm Gaussian), through the magnet's field
+  (the on-axis field of its pole piece: a string swinging close grows an even harmonic), each
+  string in proportion to the steel in its section (otherwise the thin plain strings would be
+  loudest: `PJ_EGTR_STEELEXP`). The five-way selector (`PJ_EGTR_PICKUP` 1 bridge … 5 neck; 4,
+  middle + neck, the in-between "quack", for GM 28; 2, bridge + middle, for GM 29): two pickups
+  together are two sources in parallel. 0.15–0.25 V peaks per note, ~0.5 V for a hard strum. `PJ_EGTR_DI=1`: the pickups' EMF
+  itself, without the amp.
+- **The palm** (GM 29): the side of the picking hand lies across all six strings 8–16 mm from the
+  saddle as each stroke is picked, a lossy patch 12 mm wide: each mode loses in proportion to how
+  much it moves under the hand, up to 30 times what the fundamental loses (soft flesh takes only
+  so much; `PJ_EGTR_PALMSAT`). Matched to FluidR3's recorded palm-muted guitar (the first
+  version, from an estimate, was 3–5 times too muted): the fundamental to −30 dB in about 0.25 s
+  (`PJ_EGTR_PALM`, 5/s on an open string's fundamental), the 2nd harmonic in 0.1–0.16 s, the 4th
+  in 50–60 ms, the 8th in 12–25 ms. The harder the stroke the lighter the palm lies and the nearer
+  the saddle (1.4 times at the softest, 0.35 at the hardest: at velocity 127 the fundamental rings
+  0.5–0.75 s, at 40 about 0.25 s), and one stroke in six it rests lighter by itself; never twice the same;
+  the pick nearer the bridge (~6 cm); the strings not played do not ring along; a released note
+  let go more gently than on the clean guitar (`PJ_EGTR_MUTEDRELEASE`, 25/s), the palm already
+  on it. Its level is set so its strokes are as loud as the clean guitar's over 100 ms (the usual
+  one-second measure would push short notes up by 8 dB more).
+- **The amp** (`src/guitaramp.h`): the pickup's coil (2.2 H, 6.5 kΩ, 110 pF; two in parallel: half
+  of it) with the cable (`PJ_EGTR_CABLE`, 470 pF) and the pots and the amp's 1 MΩ, solved as
+  one: the single coil's resonance at 4–6 kHz. For GM 29 a compressor pedal next (the Dyna Comp's
+  kind: ratio 4 above 50 mV, 3 ms to clamp, 0.2 s to let go; `PJ_AMP_COMP`, `PJ_AMP_COMPAT`).
+  Then a triode (nearly straight until its grid
+  conducts at +1.4 V, cut-off softer at −2.8 V, a slight even curve), the Fender blackface tone
+  stack, exact from its parts (Yeh and Smith's closed form, checked against a nodal solve to 0.01
+  dB; `PJ_AMP_TREBLE` 0.6, `PJ_AMP_MID` 0.5, `PJ_AMP_BASS` 0.4), the volume (`PJ_AMP_VOLUME`,
+  0.2), the second triode, a push-pull power stage whose supply sags under a loud passage
+  (`PJ_AMP_CLIP`), and the 12" speakers in an open-back cabinet as a filter (resonance, a lift at
+  2–4 kHz, breakup, nothing above ~7 kHz; `PJ_AMP_CAB`). Clean: a hard strum compresses about 1 %.
+  The overdriven and high-gain amps (GM 30, 31) are these blocks driven harder, oversampled
+  (below).
+- **The Les Paul** (GM 30): 628 mm, 22 frets (the same strings 6 % slacker, 13 % more
+  inharmonic); two humbuckers, each two coils 18 mm apart in series (twice a coil's signal, and
+  the pair's own comb), the bridge one hot (8 H, 13.5 kΩ: its resonance near 2 kHz), 500 k pots;
+  the three-way switch (`PJ_EGTR_PICKUP` 1 bridge, 2 both, 3 neck; GM 30: the bridge). A single
+  note gives ~0.5 V, a hard power chord 1.3 V. Its overtones ring twice as long as the Strat's
+  (`PJ_EGTR_LPRING`, 0.5 of the loss). The pick over the bridge pickup (~6 cm).
+- **Feedback** (GM 30): loud and driven, a held note sings as long as it is held. The player
+  stands where the amp's sound comes back in phase with the note: from 0.12 s every mode of the
+  string below 2.5 kHz is given back what it loses (`PJ_EGTR_HOLDAT`, `PJ_EGTR_HOLDHZ`), so the
+  note keeps its level instead of falling out of the amp's clipping after a second; at 1.2–2 s
+  it blooms: a low note grows its octave or twelfth and turns into it, a middle one swells or
+  goes to its octave, a high one swells (`PJ_EGTR_BLOOM`, 2). Single notes, dyads and power
+  chords played at velocity 50 or more; let go or picked again, it stops at once. The hands keep
+  the strings not played muted (else they would ring up). `PJ_EGTR_FEEDBACK=0`: none (the note
+  then falls 20-30 dB in 2-4 s). An acoustic loop through the air (the speaker's sound shaking
+  the body, 2 m away) was tried first: at most distances it squealed at the speaker's 2 kHz or
+  fought the note, as it does for a player who has not found the spot.
+- **The Marshall** (GM 30; `jcm800` in `src/guitaramp.cc`): a compressor pedal first (ratio 2.5
+  above 0.2 V: a held note keeps driving the amp, 5 dB stronger 2 s on; `PJ_AMP_COMP=1`: none),
+  then V1A (gain 50), the preamp gain with its 470 pF bright capacitor (`PJ_AMP_GAIN`, 0.08: the
+  lower the gain, the more of the treble passes it), V1B biased cold (it clips its lower half
+  first; the Miller roll-off from 7 kHz), the Marshall tone stack after the clipping
+  (`PJ_AMP_TREBLE` 0.7, `PJ_AMP_MID` 0.6, `PJ_AMP_BASS` 0.5), the master (`PJ_AMP_MASTER`, 0.6),
+  the EL34s, a closed 4×12 of Greenbacks (the closed box's thump, forward upper mids, nothing
+  above ~6 kHz). A stage driven past its grid's conduction draws grid current and its bias
+  slides cold for ~20 ms (the bloom of a cranked amp). Crunch: soft picking comes through
+  nearly clean, a hard stroke drives the cold stage well past its knee; from velocity 30 to 120
+  the pickup's 17 dB come out as 6 dB, the rest goes into distortion. The stages run 4×
+  oversampled (an 8th-order elliptic up and down, `tools/oversample.py`; `PJ_AMP_OS=1` to
+  compare: at crunch the soft knees alias little). 2.4–3.7 % of a core.
+- **The high-gain amp** (GM 31; `slo` in `src/guitaramp.cc`): a Soldano SLO-100's overdrive
+  channel, four triode stages in a row (the stages are a list of up to five, each with its
+  coupling capacitor, Miller roll-off, a partly bypassed cathode as a low shelf, a divider into
+  the next, a cathode follower after). V1A (gain 60, its bass 3 dB under the treble below
+  ~170 Hz), the gain pot behind a 470 k with 2000 pF across it (the bass a further 5.6 dB down;
+  `PJ_AMP_GAIN`, 0.1: about 4 of 10), V1B (40, its bass 4.5 dB under), V2A the cold clipper
+  (biased near cut-off, gain 2.4, its plate rolled off from 1.6 kHz), V2B (75, its coupling
+  capacitor small: 72 Hz, the bass kept out) into the DC-coupled cathode follower (it squashes
+  V2B's cut-off swing: `PJ_AMP_FOLLOWER`), then the Marshall stack after all of it
+  (`PJ_AMP_TREBLE` 0.6, `PJ_AMP_MID` 0.5, `PJ_AMP_BASS` 0.6), the master low (`PJ_AMP_MASTER`,
+  0.4), 6L6s with a softer knee than the EL34s, resonance (+4 dB at 100 Hz, `PJ_AMP_RESONANCE`)
+  and presence (+3 dB from 3 kHz, `PJ_AMP_PRESENCE`). A humbucker's note is some 35 dB past the
+  last stage's knee, a soft one 20: everything distorts fully; from velocity 40 to 127 the level
+  grows 2 dB and the attack brightens (its first 30 ms' centroid +14 to +73 % on E2, A2, A3).
+  Grid current charges the coupling capacitors five times slower than in the Marshall (the
+  Soldano's grid stoppers; `PJ_AMP_GRID`, 0.2): faster, every hard attack pushed the stages cold,
+  thin pulses and a dark, blocked attack. A power chord comes out as loud as one note (+0.4 dB;
+  FluidR3's samples add up, +3.8), a triad with more lines between the harmonics than a power
+  chord. A held note stays within 1 dB for 2 s (without feedback −3.5 dB at 4 s).
+- **Antialiasing:** the stages run 2× oversampled (a second elliptic table in
+  `tools/oversample.py`) and each stage's curve is averaged over the sample (first-order
+  antiderivative antialiasing, the curve's integral tabulated and in closed form beyond;
+  `PJ_AMP_ADAA`, `PJ_AMP_OS` 1, 2 or 4): a held A5's energy off its harmonic grid is −79 dB (2×
+  alone −48, neither −29). 3.3 % of a core with the guitar (4× would be 4.3 %).
+- **Noise and the gate** (GM 31): the pickup and the first stage hiss (`PJ_AMP_HISS`, 8 µV rms)
+  and the coils and the amp's heaters hum (`PJ_AMP_HUM`, 250 µV peak at the input, its odd
+  harmonics to 1 kHz, buzzy; `PJ_AMP_HUMHZ`, 50): ungated, a rest sits 45 dB under a held note.
+  The gate is the ISP Decimator's kind: it listens to the guitar before the amp (`PJ_AMP_GATE`,
+  2 mV) and opens and closes the preamp's output, closing 6 dB lower after a hold
+  (`PJ_AMP_GATEHOLD`, 15 ms) over `PJ_AMP_GATEREL` (80 ms to −80 dB). Its release adapts: a note
+  that falls quickly 20 dB under its attack (a palm-muted chug, a released string;
+  `PJ_AMP_GATEDROP`) closes it at once, four times as fast, and only a new attack opens it again;
+  a string decaying by itself keeps it open (a 6 s note: one close, at its release).
+  `PJ_AMP_GATEDEBUG=1` prints each open and close.
+- **A Tube Screamer** in front, if wanted (`PJ_AMP_TS`, its level; `PJ_AMP_TSDRIVE`,
+  `PJ_AMP_TSTONE`): the clean signal and, added to it, its part above 720 Hz amplified and clipped
+  by two diodes. Off: with the gate it did not tighten the chugs further.
+- **The V30 cabinet:** a closed 4×12 of Vintage 30s, an SM57 close: nine filters, started from
+  Celestion's plot and fitted to FluidR3's distortion-guitar samples (their pooled harmonic
+  envelope within 5.5 dB from 200 Hz to 8 kHz: the presence pair at 2.6 and 3.25 kHz, +5 dB over
+  1 kHz; −9 dB at 5 kHz, −25 at 8, −39 at 10). The strong low mids at 350 Hz and the wide hollow at
+  900 Hz are the recording's, not the bare speaker's (`PJ_AMP_CAB`, `PJ_AMP_BREAKUP`).
+- **The guitarist on GM 31:** he picks over the bridge pickup (~4 cm). A root and its fifth low
+  on the neck become a power chord with the octave on the next string (`PJ_EGTR_OCTAVE=0`: as
+  written). Chugs: with no marks in a MIDI file, a low note (below A3) struck again on the same
+  root within 0.4 s, when the last stroke was let go early (under 0.25 s, or 0.6 of the gap),
+  gets the palm, at the saddle (3–8 mm), 0.9 of GM 29's weight, heavier as the run goes on; not on
+  an accent (15 steps louder), not while bending, not on a full chord; the first stroke of a run
+  rings open (`PJ_EGTR_CHUG`, its weight; 0: never). Sixteenths at 160 bpm: 46 dB between the
+  strokes (the gate), the chug's centroid near 590 Hz (without the palm 1.7 kHz). A single fretted
+  note from E3 up, held, gets the rock player's wide vibrato, 40–100 cents up and back
+  (`PJ_EGTR_WIDE`). Feedback as on GM 30.
+- **The left hand** as on the classical guitar (frets, vibrato, the mended thirds); the fretting
+  hand mutes a released note at once. A pitch bend (`-play`; `-seq`'s `bend X`) pushes the
+  highest fretted string of what was last picked, up to two semitones; the rest of the chord stays.
+- Not yet: the dead strokes of funk (the fretting hand's scratch), the archtop (27), pinch
+  harmonics, drop tunings (notes under E2 are folded up), the other high-gain
+  presets (a Rectifier, a boosted JCM800, distortion pedals), fret buzz, string squeak, slides
+  over frets, chorus and spring reverb, hum on the clean amps; a bass line on GM 29 (louisiana's channel 6) is folded up into the guitar's range, where
+  an electric bass belongs. 2.6 % of a core.
+
+### Guitar harmonics
+
+`-inst guitar-harmonics` (GM 32; `research/electric_guitars.md` 2.6, 9; `src/guitarinst.cc`
+`HarmonicsPlayer`, `Guitar::touch`): the clean Stratocaster and Twin of GM 28, every note played as
+a harmonic, at the pitch written (E3 .. G#7; below an octave up, above an octave down).
+- **The pickup:** the middle one alone. The neck pickup lies on the open strings' 4th-harmonic
+  node (the 5th fret's harmonic would be nearly gone); the middle one has no node near harmonics
+  2–5 of an open string.
+- **The touch:** a fingertip (4 mm, ±0.7 mm off the node) lies on the string at 1/n of its
+  sounding length from just before the pick until 30–60 ms after; each mode loses 300/s times its
+  shape squared there (as `Bass::touch`), so every mode not a multiple of n dies, and n, 2n, 3n …
+  ring on. It lifts gradually (its hold halved every 6 ms: a sudden lift sets free what the bridge
+  forced the touched modes to). The string's fundamental ends 45–80 dB under the harmonic, every
+  other non-multiple 40–60 dB.
+- **Where:** a natural harmonic if there is one (the 12th fret, n = 2; the 7th, n = 3; the 5th,
+  n = 4), a free string first; else a touched ("harp") harmonic, n = 2: the left hand stops the
+  string 12 frets under the note, near where it already is, the right hand touches 12 frets
+  higher; past the 21st fret's octave n = 3, then n = 4. Not n = 5 (the 4th fret's, 14 c flat).
+  The harmonic is the string's n-th mode, as it is on a guitar: stiffness makes it 0–3 c sharp of n
+  times the fundamental, n = 3 is a pure twelfth (+2 c), and near the neck's dead spot (212 Hz) the
+  neck pulls the A string's octave and the low E's twelfth up 4–6 c more; left so.
+- **The pick:** on the harmonic's antinode nearest the bridge (len/2n, 3.5–16 cm: never its node;
+  there mode 2n has its node too), a rounder stroke than GM 28's (pushed over 2–3.5 ms) so that
+  the harmonic is not drowned in its own 3rd partial; velocity is its depth (30 to 120: 14–15 dB).
+  The player evens the harmonics out by ear (digging in on open strings and where the pickup is
+  near the node, light high up the neck: fitted to all 53 notes, 1.5 dB rms). Notes together are
+  one sweep from the low strings, 8 ms a string.
+- **Ringing:** a harmonic rings past its key's release; a string needed again at another fret is
+  damped 4 ms first (every note waits those 4 ms); after 1.5 s with no key down the hand lies
+  lightly on the strings. Natural harmonics ring for seconds (the low E's octave 2 s to −40 dB);
+  FluidR3's samples are cut at 0.2–1.5 s.
+- **Against FluidR3:** its Guitar Harmonics sounds two octaves above the key (E3 plays E5):
+  `PJ_GHARM_SHIFT=24` plays it so. Level even over the range in both (FluidR3 ±0.8 dB; here
+  1.5 dB rms, ±4 at worst). Knobs: `PJ_GHARM_TOUCH` (300/s), `PJ_GHARM_LIFT` (×30–60 ms),
+  `PJ_GHARM_RISE`, `PJ_GHARM_EVEN=0` (no evening out), `PJ_GHARM_DEBUG=1` (string, fret, n).
+- Not yet: pinch and tapped harmonics, the tremolo bar's dives, chorus; the pitch wheel does
+  nothing. 2.4 % of a core.
+
+### Electric bass
+
+`-inst electric-bass` (GM 34, Electric Bass (finger); `research/bass_section.md`, `src/ebass.cc`):
+a Fender Jazz Bass played fingerstyle, on the electric guitar's string and pickup model with four
+strings.
+- **The strings:** 34 in. (864 mm), 20 frets, D'Addario EXL170 (45-65-80-100) roundwounds, 155-216
+  N; stiffness from the measured G (B 3.5e-5) to ~2e-4 on the E. Each partial's loss from the
+  string's internal damping (Fleischer's fitted values) and the neck's support: the open strings'
+  fundamentals ring 17-27 s, the partials die about in proportion to their frequency
+  (`PJ_EBASS_LOSS`, `PJ_EBASS_LOSSHIGH`); modes to 5 kHz (`PJ_EBASS_TOP`), ~120 on the open E. The
+  neck's second and third bending modes (147 and 290 Hz; `PJ_EBASS_DEADHZ`, `PJ_EBASS_NECK`): D3
+  on the G string rings about half as long as its neighbours.
+- **The pickups:** two J single coils, 156 and 55 mm from the saddle, both full up (GM 34; the
+  "both up" scoop: the open E's 7th-8th harmonics ~10 dB down against the neck pickup alone),
+  `PJ_EBASS_PICKUP` 1 bridge, 2 both, 3 neck; each string heard in proportion to its steel; the
+  coils (3.3 H, 7.4 kΩ, 90 pF; two in parallel), the pots (two volumes, one tone) and the cable
+  (`PJ_EBASS_CABLE`, 700 pF) into the input: a resonance near 4.4 kHz.
+- **The amp, the DI and the compressor** (`research/bass_amps.md` 10.1, the amp module's preset
+  "b15-di" in `src/guitaramp.cc`), as 1970s-90s records have a fingered bass: the pickups on a
+  splitter into an active DI and an Ampeg B-15N (0.9 MΩ between them).
+  - The B-15N's 1966 channel from Piazza's drawing: two 6SL7 stages (~30x each, their cathodes
+    unbypassed: a grid swing four times a 12AX7's), the volume, the **James (passive Baxandall)
+    stack** exact from its parts (an admittance matrix solved at eight points of s, its fourth-order
+    numerator and denominator read off and taken to z root by root; bass 1 MΩ with 220 k / 22 k and
+    1 / 10 nF, treble 1 MΩ with 470 pF / 4.7 nF; flat at noon, 23 dB down; bass full +15 dB at
+    40 Hz, treble full +18.9 dB at 5 kHz: the research's nodal solve to 0.2 dB), the phase splitter,
+    two 6L6s on a sagging 5AR4 supply. Coupling corners of 3-16 Hz and the output's at 8 Hz: E1's
+    fundamental loses 0.8 dB to them. Clean: what its curves add to a v100 open E is -43 dB; at v127
+    no stage passes 0.4 of its knee (`PJ_AMP_PEAKS=1` prints them; `PJ_AMP_LINEAR` 1 straightens
+    every curve, 2 the power stage's).
+  - Its 1x15 miked with an RE20 at ~15 cm: -4 dB at 40 Hz, +7 dB near 1.9 kHz, -23 dB at 5 kHz.
+  - The DI with its top 2 dB down above 5 kHz, blended half and half with the mic
+    (`PJ_BAMP_BLEND`), level-matched at 200 Hz and lined up as an engineer does it: the polarity
+    and a second-order allpass on the DI that turn its phase to the mic's at the low end (the
+    cabinet's high-pass turns the mic's by up to half a turn near 40 Hz: unaligned, the blend
+    would lose 13 dB there; aligned it is nowhere under 30 Hz-2 kHz more than 0.7 dB below the
+    louder of the two alone; `PJ_BAMP_ALIGN`, `PJ_BAMP_POLARITY`, `PJ_BAMP_MICDELAY` in samples).
+  - An LA-2A after the blend: RMS over two 10 ms poles (it does not follow a 41 Hz wave: a held E1
+    sine gains 0.013 % THD), 3:1, a 6 dB soft knee, attack 10 ms, half the gain reduction let go in
+    60 ms and half over a second (the opto cell's tail after a long hold); about 3.5 dB of gain
+    reduction on a mf line, 6 on a ff one (`PJ_BAMP_THRESHOLD` 0.023 V rms, `PJ_BAMP_RATIO`,
+    `PJ_BAMP_MAKEUP` 4 dB; `PJ_BAMP_STUDIO=0` none). Its tone: `PJ_BAMP_TREBLE` 0.45,
+    `PJ_BAMP_BASS` 0.6, `PJ_BAMP_VOLUME` 0.15.
+  - `PJ_EBASS_DI=1`: the bare DI as before (the coils into 1 MΩ, nothing after).
+  - Against FluidR3's Fingered Bass (E1 at v120, the first 100 ms in octave bands, dB under the
+    strongest): ours -16 -5 0 -9 -12 -37 -50 -92 from 20-60 Hz up to 4-8 kHz, FluidR3's -4 -1 0
+    -12 -28 -36 -55 -65. Above 1 kHz both are dark (here the cabinet and the strings' own losses,
+    modes to 5 kHz); ours has the J's growl at 250 Hz-1 kHz (both pickups up, roundwounds) 10-16 dB
+    stronger and the open E's fundamental 11 dB weaker against its 2nd-4th harmonics (the pickup
+    hears the string's velocity); FluidR3's is a boomier, P-like or tone-rolled-off sample. Ours
+    brightens with velocity (the first 100 ms's centroid 141 / 154 / 173 Hz at v40 / 80 / 120),
+    FluidR3's does not move.
+  - Prepared in the module, not yet played ("svt" is GM 35's: Pick bass, below): "slap-di"
+    (GM 37: the DI 75 % with the VPF scoop, a clean solid-state head's EQ into a 4x10 with a horn,
+    an 1176) and "slap-squash" (GM 38: a stomp compressor, a SansAmp-like drive on the DI, the 1176
+    at 8:1). `tools/bassamp.cc` checks the module's bass blocks on their own.
+- **The bassist:** each note to a string and fret near the hand, low on the neck, open strings
+  welcome; index and middle fingers in turn while notes come within 0.4 s (the middle a little
+  deeper, a few mm further along), rest strokes ~10 cm from the saddle between the pickups (a hard
+  one nearer the bridge; the brightness knob moves the hand), the calloused pad 10 mm wide slipping
+  off in about a millisecond, a hard stroke snapping off the fingertip's firm edge (at v127 a
+  0.6 ms slip and a 1.7 ms rise: +5 to +10 dB above 1 kHz in the attack; `PJ_EBASS_SNAP`, 0.4,
+  0 as before); velocity the depth (0.4-5 mm). A line is one voice: a new note on
+  another string stops the last even if its key is still down (MIDI's legato overlaps), unless they
+  came together; a released note is stopped; the strings not played are kept muted. Pitch bend
+  bends the last fretted note. Notes below E1 or above D#4 are moved in by octaves.
+- Not yet: slap (37, 38; the pick is GM 35's, below), fret buzz, slides, hammer-ons, ghost notes
+  as their own stroke; bass lines written on guitar programs (louisiana's channel 6) still go to the
+  guitar. The bassist's velocity is narrower than a sample set's (E1 v40 to v120: 10 dB at the DI,
+  6 after the LA-2A; FluidR3 16): `-play`'s velocity gain makes up the difference. 2.2 % of a core
+  with the amp (the bare DI 1.5 %).
+
+### Pick bass
+
+`-inst pick-bass` (GM 35, Electric Bass (pick); `research/pick_bass.md`, `src/ebass.cc`,
+`src/bassspec.cc`): a Fender Precision played with a pick into an Ampeg SVT, as 1970s rock records
+have it. The finger bass's strings, neck and fretting hand; a new pickup, a new right hand and the
+amp module's "svt".
+- **The Precision** (`precisionBass()`): one split coil, the E/A half 149 mm from the saddle and the
+  D/G half 124 mm, each string under one half; 6.4 H, 10.5 kΩ, 30 pF, wound hotter than a J coil
+  (`PJ_PBASS_VOLTS`); its field along the string a Gaussian of 5 mm (`PJ_PBASS_WIDTH`: what a pick's
+  top keeps above 3 kHz); one 250 k volume and a 250 k tone with 0.047 µF (`PJ_PBASS_TONE`, 1 open:
+  the R-C branch as a parallel R and C at 1.2 kHz); with the 700 pF cable a resonance near 2.3 kHz.
+  Picked over the E/A coil the open E loses its 6th harmonic (the pick's comb and the coil's at
+  once). `PJ_PBASS_FLATS=1`: flatwounds (the overtones' loss x2.5, `PJ_PBASS_FLATLOSS`; B x1.2;
+  10 % more tension): the open E's decay from 4.5 to 6 dB/s, the attack unchanged.
+- **The pick** (`Guitar::pickContact`, new): not a force but a place. The hand carries the pick's
+  tip aside along a raised cosine; the tip is a spring (6 kN/m for a 1 mm pick, `PJ_PICK_MM`: ~t^2.6)
+  against the string where it is now, pushing only; at the end of the push (or when a thin pick has
+  bent 1.5 mm) the string slips off the edge in 0.1-0.3 ms. A slow push and a quick slip: the
+  string leaves near its static shape (its fundamental as strong as a finger pulling as far, where
+  `Guitar::pick`'s 1 ms force pulse gave 15 dB less) and leaves it sharply (+19 dB above 2 kHz over
+  GM 34's finger). The slip is the brightness, the push the level: halving the slip adds 4 dB above
+  2 kHz and moves 40-100 Hz by 0.1 dB. It passes: a string still ringing keeps what it had, and a
+  pick meeting it mid-swing catches it early or late. Stable over 1000 random picks (2-20 kN/m,
+  0.3-4 mm, 4-27 cm).
+- **The bassist** (`PickBassPlayer`, on the finger bass's `BassLinePlayer`: the same string and fret
+  choice, one voice, double stops, note-off damping, bends):
+  - velocity the depth, 0.2 + 3.2 mm·(v/127)^1.8 (v40 0.6, v80 1.6, v120 3.1 mm; `PJ_PICK_VELEXP`),
+    and the speed: a push of 12 ms at pp to 3 ms at ff (`PJ_PICK_PUSHPP`, `PJ_PICK_PUSHFF`), the
+    slip with the hand's speed (0.3 ms at pp, under 0.1 at ff). At the DI E1 v40 to v120 is 16 dB
+    and its attack 24 % brighter;
+  - 10 cm from the saddle, over the coil's bridge end, ±6 mm a stroke (`PJ_PICK_PLACE`; the
+    brightness knob moves it);
+  - down strokes (along the body and a little into it), and up strokes between them while notes
+    come within 0.3 s (along it and a little out: 30 % deeper, `PJ_PICK_UP`, and still 2.4 dB
+    weaker); `PJ_PICK_DOWN=1` downstrokes only;
+  - the palm (`PJ_PICK_MUTE` 0..1: up to depth 8 at 12 mm, lifted a little on accents): the open
+    E's 4th harmonic gone in 0.11 s, its fundamental thudding on to -30 dB at 0.46 s. Carol Kaye's
+    felt (`PJ_PICK_FELT=1`, depth 2 at 10 mm under all four strings): 20 dB/s;
+  - `PJ_PICK_CHORDS=1`: strings ring into each other (drones, Lemmy's chords).
+- **The amp:** "svt" (`research/bass_amps.md` 10.2; `src/guitaramp.cc`): the SVT's 12AU7-like and
+  12AX7 stages with its James stack, +3 dB at 800 Hz, six 6550s at 4x into an 8x10 with a D112,
+  the DI 35 % lined up, an 1176 at 4:1 (its threshold now 0.04 V: a mf line hardly touched, a ff one
+  ~2.5 dB; E1 v40 to v120 11 dB after it). The hardest attack (E1 v127) is at 4 % distortion in its
+  first 100 ms, a mf note under 1 %: the preamp's triodes, not the power stage.
+- **Against FluidR3's Picked Bass** (a real P-like bass sampled string by string): E1 v120, the first
+  100 ms in octave bands from 20-60 Hz to 4-8 kHz, ours -19 -2 0 -10 -19 -21 -30 -66, FluidR3's -9
+  -4 0 -14 -12 -21 -29 -42. Alike from 120 Hz to 4 kHz (the pick's bark at 1-4 kHz within 1 dB);
+  above 4 kHz ours is far darker (the P's coil resonance into the cable, the 8x10); A2's centroid
+  344 Hz (FluidR3 373). Decays 1.3-4.1 dB/s on E1-A3 (FluidR3 1.9-5.4; the open A1 rings longest, its fall slowed by the 1176). FluidR3's samples change
+  only in level with velocity; ours brightens.
+- Not yet: fret clank on hard strokes (the string against the frets: much of a real pick bass's
+  growl), the Rickenbacker and the StingRay, the "svt-flat" session chain, XG's muted pick bass on
+  bank 28 (the files' bank select is not passed on), a click of the pick itself (through a pickup
+  there is none to speak of). 0.6 % of a core for the strings and the DI, 2.4 % with the SVT at 4x.
+
+### Concert harp
+
+`-inst harp` (GM 47, Orchestral Harp; `research/harp.md`, `src/harp.cc`, `src/harpinst.cc`,
+`tools/harpboard.py`): a pedal harp of 47 strings, C1–G7; notes outside are moved in by octaves.
+
+- **Strings:** the Elysian's lengths and gut gauges, Camac's wires and Galli's tensions: nylon at
+  the top (F6–G7), gut in the middle (A2–E6), steel wound with silvered copper below (C1–G2), all
+  tuned flat on their full length (the pedals up: C-flat major) but the three without discs (C1,
+  D1, G7). Each string is its modes up to 8 kHz (the wires 6 kHz) in two directions: in the
+  strings' plane, where it pulls on the board at 35°, and across it, which only the board's
+  turning under the eyelet takes (10–15 dB less). Across, each partial lies 0.05–0.3 % above the
+  other, so a string plucked between the two swings in an ellipse that collapses and swells. It
+  loses to the air (Stokes) and in its material as it bends (gut and nylon: some ten partials
+  live), to its ends (`PJ_HARP_NECKR`, 700 kg/s: fitted, with the board, to the one string
+  measured, C-flat 3, 10 s), and to the board. A swinging string is tighter: a loud note starts a
+  few cents sharp and settles, and the tension's swing pulls on the board along the string, at
+  twice each partial and their sums (the "phantom partials" that fill in what a pluck in the
+  middle leaves out). Gut is alive: each partial a few cents off, its loss ±25 %.
+- **Pedals:** seven, one for each letter in every octave; the natural disc shortens a string by a
+  semitone, the sharp disc by another, retuning its modes where they stand (a pedal moved under a
+  sounding string bends it).
+- **Board:** spruce, 1.42 m, 50 to 10 cm wide, 11.5 to 2.25 mm thick, the grain across, a string
+  bar down its middle, on a grid of 1 cm, coupled with the 29 litres of air in the box breathing
+  through its five back holes. Fitted to Le Carrou's measurements: T1 153.5 Hz and A0 172 Hz, the
+  air two thirds of A0, 200 g on the board lowering them 6.3 and 4.0 Hz (measured 5 and 3.5);
+  broad resonances above 2.4 kHz. Every string meets the board at its own point on the centre
+  line: what one string gives the board every other feels, and those whose partials meet ring
+  along (the halo). The sound: the board in 5 cm patches and the holes' air, each heard after its
+  own distance by two microphones 2 m in front. The strings at T1 and A0 (D3–F3) are the loud,
+  short ones; the lowest wires are heard by their overtones.
+- **The pluck:** the finger pad (2 cm) takes the string in the middle (0.37–0.42 of its length
+  from the board), draws it 0.5 mm × 18^(velocity/127) aside (a string shorter than 17.6 cm less),
+  mostly in the strings' plane (the thumb 17° off it, the fingers 20–26°, each pluck its own),
+  and lets it slip in 2–3.5 ms, carrying it 0.3–1.5 mm further: it leaves with both displacement
+  and speed. A finger landing on a sounding string stops it first. The brightness control from
+  1.6 plucks près de la table (0.06–0.12 of the length: brittle, guitar-like).
+- **The harpist:** each pitch on the string that already gives it, else on the letter whose
+  pedal moving disturbs least (not one whose strings ring or were just played): E sharp or F, B
+  sharp or C, as the pedals stand; the pedals set to the song's key first (`PJ_HARP_PEDALS`, C to
+  B as `b`, `n` or `#`: the harpist's own setting). A ringing string whose pedal must move is
+  damped first. The left hand takes the bass, the right the treble, four fingers each (the thumb on
+  the highest note). Chords of three or more notes are rolled up from the bass, 18–30 ms from
+  string to string (louder, quicker; `PJ_HARP_ROLL`), unless they come under 0.25 s apart; two
+  notes together. Single notes under 60 ms apart, each 1–4 semitones on, are a glissando from the
+  third: the finger slides across without stopping, every string between two notes of the run
+  sounds, and the strings it passes over are set, if their pedals are free, to pitches of the
+  run (a diminished-seventh glissando sounds four pitches to the octave on every string). A lone
+  note at velocity 20 or less, between E3 and A6, is an octave harmonic of the string below (the
+  side of the hand at its middle, the thumb plucking; `PJ_HARP_HARMVEL`).
+- **Damping:** the strings ring on when keys are let go. The palms damp the strings below C5 at a
+  rest (no key held for a beat; `PJ_HARP_REST`) and every string at the song's end; the left hand
+  stops the bass strings it played that are not in the new harmony when the bass moves; a note let
+  go within 0.1 s of its pluck, not in a quick passage, is étouffé. The sustain pedal: laissez
+  vibrer, no damping. `PJ_HARP_VERBOSE=1` prints every pluck (and its pedal), every glissando.
+- Measured (`tools/test.py`): in tune within 4 cents C1–G7 once a loud pluck has settled; decays
+  C2 11 s, A2 9, C4 7, A4 4, C6 2.5, C7 and G7 0.9 s (research's 10–20, 10–15, 7–9, 5–6, 2–3,
+  0.5–1); 33 dB from velocity 16 to 127 (FluidR3 30). Against FluidR3's Orchestral Harp (a sample
+  set, each zone levelled): as even from E1 to B5 and as much quieter at the top (FluidR3 15–18 dB
+  under its middle from B5 up; here 8–24 dB from A6 up), but the T1/A0 strings (D3–F3) up to 14 dB
+  over the middle and C1–D1 10–18 dB under it (FluidR3: within 5 dB); brighter in the middle
+  register (C4–G5: the second to fourth partials 8–37 dB under the fundamental, FluidR3's 21–64);
+  longer in the bass and middle (A2 10 s, C4 8 s against 5 and 3.4: the research has 10–15 and
+  7–9) and shorter at the top (C7 0.9 s against 3.4: the research has 0.5–1).
+  Not yet: pedal glissandi, xylophonic sounds, nails, bisbigliando as a written tremolo, disc
+  buzz, the box's standing air waves above 250 Hz, measured directivity. About 17 % of a core with
+  every string ringing (the strings are always computed while the harp sounds: the halo).
+
+      ./pajupilli -inst harp -seq "on 36 80 on 48 80 on 55 80 on 64 80 on 72 80 wait 2 on 72 15 wait 1.5"
+
 ### Church organ (first ranks)
 
 The church organ's first three ranks (`src/organ.cc`, `src/organpipe.h`, `src/organbox.h`,
@@ -785,7 +1371,11 @@ modes fade out over the last six, else the last one rang the harmonic above it, 
     GrandOrgue's Trompette 8′ and Hautbois 8′. The treble (C5–C7 at 8′): the band rides on the 2nd
     harmonic once the pitch reaches half of it (a small resonator's top radiates higher), so the top
     keeps the middle's spectrum instead of thinning to a sine, and every pipe from middle C up is
-    regulated to an even line (it rose ~27 dB to C7). The Clairon breaks back at c‴ (key 84): its top
+    regulated to an even line (it rose ~27 dB to C7). The bass's wind nearer the tongue's closing,
+    0.95 of it below 100 Hz (0.9 from 200 Hz; `PJ_REED_BASSP`, 0.05): at 0.9 a 16′ reed's heavy
+    tongue grew from rest over 150–300 ms, a short pedal note over before the Posaune spoke; now it
+    reaches −6 dB within ~40–100 ms, its narrower gap's lesser wind made up in its level (0.97 and
+    more choked it on a long note). The Clairon breaks back at c‴ (key 84): its top
     octave a reprise at 8′, no reed above C7. A reed does not hear the room (its boot's pressure is
     hundreds of times the field at its top). Its pitch follows a retuning unevenly (a plateau, then
     steep; a 16′ reed's bistable at places): calibrated by secant steps and, where that fails, the best
@@ -1018,7 +1608,11 @@ long melody note (1 s or more, C4 up, within 7 s), a note rising above the previ
 softer, the more the leap, the more it stands above the recent high notes (their mean, their spread),
 the quieter the playing (`PJ_ORGAN_LIVETOUCH`); a high note held long released softly. In `-play` also
 from the score: a long high note (G4 .. C6, 0.5 .. 2 s), a phrase's last note (a rest of 250 ms after
-it: on the Hauptwerk 0.6, elsewhere 0.35). The bass is played ahead, as organists anticipate their big pipes'
+it: on the Hauptwerk 0.6, elsewhere 0.35). That phrase's last note is also lifted early, the
+organist's breath before the next phrase: a fifth of the note, 80 .. 250 ms (the romantic's legato
+0.7 of it; `PJ_ORGAN_BREATH` scales it). The line's last note (the piece's end) is held to its
+length, and so is a note before a new part (a section of the plan, at a tempo change or a general
+pause, begins before the line's next note). The bass is played ahead, as organists anticipate their big pipes'
 slow speech (~75 ms at middle C, ~ (262 / f)^0.6 longer below): the pedal's notes half the difference
 early, a manual's bass a third of it, at most 60 ms (the pedal's C 60 ms, its G 30; the manuals' C 29;
 nothing from middle C up; half of it into silence, nothing held or released within 1.5 s; never
@@ -1534,7 +2128,7 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
 
     Played live, the player rides it by the music's intensity instead.
   - The `PJ_HAMMOND_*` overrides apply over the plan.
-- **Live, the MPK's knobs (K1-K5):**
+- **Live, the MPK's knobs (K1-K6):**
   - **K1-K4 draw the upper manual** along the tradition's own paths (not a linear map):
     - **K1, soft to hard:** 16 of the most used registrations in the order an organist pulls them as
       a tune grows, piecewise linear between them, in whole steps:
@@ -1567,7 +2161,9 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       registration changes glide too.
     - The registration is printed as it changes, with the station's name when it is one.
       `PJ_HAMMOND_KNOBS=k1,k2,k3,k4` sets them offline.
-  - **K5 is the Leslie's half-moon:** stop (brake) to the left, slow in the middle, fast to the
+  - **K5 is the overdrive:** the Leslie 122's amplifier driven harder, from as registered (left)
+    to 8 x (right): its valves' grit, the level kept near (the amp's output falls as its drive^0.3).
+  - **K6 is the Leslie's half-moon:** stop (brake) to the left, slow in the middle, fast to the
     right.
 - 2.8 % of a core for a five-note chord with the Leslie.
 
@@ -1669,6 +2265,428 @@ al. measured; most keep their own rhythm, some seek the beat: slower, their phas
 their nearest fellow seekers' and the hall's, so a rhythm emerges in the wash as Neda et al. found;
 the key sets the crowd's size), `gunshot` (the bullet's N-wave, then the muzzle blast as Friedlander's
 wave and its ground reflection; lower keys a larger calibre).
+
+### FX 1 (rain)
+
+`-inst fx-rain` (GM 97), A0 to C8 (`src/rain.*`; research in `research/fx_sounds.md`): rain
+falling on tuned glass bowls. The classic patch ("Ice Rain") is a pad under a glassy ping
+re-struck from a short sample loop; here the rain itself strikes the glass.
+
+- **The bowls:** each key sets out four thin glass bowls, on its note, the octave, the twelfth
+  and two octaves (K4: one to five). Each rings in its bending modes n = 2..5 (1, 2.83, 5.42,
+  8.77 × its pitch; the wall thinned, as a handbell's, to put n = 3 on 3.0, so it does not lie
+  a semitone under the 3× bowl). Each mode is a doublet split a little by the glass's flaws,
+  so it beats slowly. T60 is ~4 s at middle C, shorter up the keyboard. A smaller bowl catches
+  fewer drops.
+- **The rain:** drops arrive at random. Their sizes follow Marshall and Palmer
+  (N(D) ~ exp(−4.1 R^−0.21 D)), weighted by their fall speed, the largest growing with the
+  rate. Velocity is the rain rate, 0.3 to 90 mm/h: a drizzle of small drops to a downpour with
+  large ones. The wind's gusts (±35 %, over seconds) move the rate for every key alike.
+- **A drop on the glass** gives its momentum (D³v) to the modes, through a pulse lasting D/v
+  (0.25–0.5 ms, so large drops are duller). Where it lands decides which modes ring: the angle
+  splits each doublet, the height on the wall favours the low modes. The impact also ticks.
+- **A drop into the water** pushes the bowl weakly. A 0.8–1.2 mm drop always traps a bubble
+  (13–21 kHz); a drop over 2 mm often traps a larger one (1–10 kHz). Each bubble is a van den
+  Doel bubble (Minnaert's pitch, damped, chirping up), as in `seashore`.
+
+The large drops are the plinks; the many small ones keep the bowls ringing between them, a
+soft bed of the chord. On the key, a single large drip strikes the note's bowl near its rim,
+sized by the touch. On release the rain on those bowls stops and a hand damps them (≤ 1.5 s).
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_RAIN_DENSITY`,
+`PJ_RAIN_WATER`, `PJ_RAIN_RING`, `PJ_RAIN_BOWLS`):
+
+| Knob | Sets |
+|---|---|
+| K1 | the drops' density on the note's bowl, 25 to 800 a second (default 140) |
+| K2 | the water: bubbles and ticks, 0 to 2× (default 1×) |
+| K3 | the bowls' ring, × 0.25 to 4 (default 1) |
+| K4 | bowls per key, 1 to 5 (default 4) |
+
+The sustain pedal holds; pitch bend ±2 semitones.
+
+Against FluidR3's Ice Rain (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2 as the
+references): the droplets here are on the key and random, where FluidR3's are a periodic ping
+train (~14–24 Hz) that barely follows the key (20 c per key). The held level falls alike (~6 dB/s
+at first). Here is noisier above 6 kHz (the bubbles), with a much sharper onset (a drop on
+glass), 4 dB of key-to-key level scatter (each note its own rain, against their ~0.5 dB), and a
+little darker when played harder (large drops strike longer).
+
+### FX 2 (soundtrack)
+
+`-inst fx-soundtrack` (GM 98), A0 to C8 (`src/soundtrack.*`; research in
+`research/fx_sounds.md`): a keyed aeolian harp, strings sung by the wind. The classic patch is
+Roland's D-50 "Soundtrack": a dark, chorused pad of the note and its fifth. Every GM set keeps
+it as a string pad layered with a copy a fifth up.
+
+- **The strings:** each key has a course of four nylon strings. Three are on the note, a few
+  cents apart (they beat: the chorus), and one is on its fifth. Each string rings in up to six
+  modes (T60 ~3.5 s at middle C, longer down the keyboard).
+- **The wind:** a blower gives a steady wind, shared by every key (gusts ±0.3 %, over
+  seconds). The key slides a shutter that lets the wind across its course: as far and as quickly
+  as the touch, the whole travel in ~0.8 s at the hardest.
+- **The wake:** vortices shed alternately off each string at the Strouhal frequency, which is
+  tuned to the string's first mode. Each stretch of string has a wake oscillator (Facchinetti,
+  de Langre and Biolley's van der Pol model: ε = 0.3, A = 12; its lift from the string's mass
+  ratio, μ ≈ 750 for nylon in air), coupled both ways with the string. The wake locks onto the
+  string's own mode (vortex-induced vibration), so the note is the string's pitch. The string
+  blooms over ~1/(ζω), half a second or so, behind the shutter.
+- **Dark to bright:** as the shutter slides it first uncovers the main stretch (the first
+  mode). Then, one after another, it uncovers short side slots where the wind is 2 to 5 times
+  faster, each across the antinode of the mode it locks. The tension's swing (∝ the swing²)
+  also reaches the bridge along the string: the octave. A soft key sounds the fundamental and
+  its fifth; a hard one adds the harmonics. The note opens over its first second and then
+  settles a little. The slots hiss faintly.
+- **Release:** the shutter closes, and its felt edge rests on the strings (T60 ≤ ~2.5 s at
+  middle C).
+
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_AEOLIAN_GUSTS`,
+`PJ_AEOLIAN_SWELL`, `PJ_AEOLIAN_FIFTH`, `PJ_AEOLIAN_RING`):
+
+| Knob | Sets |
+|---|---|
+| K1 | the gusts, 0.04 to 2.4 % (default 0.3 %; a wake catches its lock only within ~±2 %) |
+| K2 | the swell (the shutter's travel time), × 0.25 to 4 |
+| K3 | the fifth's string, 0 to 2× (default 1×, ~6 dB under the note) |
+| K4 | the strings' ring, × 0.25 to 4 |
+
+The sustain pedal holds the keys. Pitch bend is ±2 semitones.
+
+**Against FluidR3's Soundtrack** (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2
+as the references):
+
+- **What is alike:** the partials up to the fifth harmonic at velocity 100, within ~5 dB. The
+  fifth sits ~6 dB under the note (FluidR3's is 10 dB under; TimGM6mb and Jnsgm2 put it 4 dB
+  under). The mean spectrum is within ±5 dB up to 6 kHz. The release is 0.85 s against 1.2 s.
+- **Where it differs:**
+  - It speaks later: an onset delay of ~0.8 s against 0.1–0.24 s, because the strings bloom.
+  - It is purer and smoother (Plomp–Levelt).
+  - Its partials move together.
+  - Its velocity range is narrower on 2 s notes (it has not bloomed fully).
+  - Key-to-key levels scatter by ~3 dB (each note's beating).
+  - It brightens with the touch, where the samples do not.
+
+### FX 4 (atmosphere)
+
+`-inst fx-atmosphere` (GM 100), A0 to C8 (`src/atmosphere.*`; research in
+`research/fx_sounds.md`): a keyed psaltery with magnetic resonators. The classic patch goes back
+to the D-50's "Nylon Atmosphere": a plucked string with a pad behind it. FluidR3, TimGM6mb and
+Jnsgm2 all layer a nylon guitar over synth strings. Here one physical system is both layers: a
+plucked string that feedback keeps singing, as an EBow or McPherson's Magnetic Resonator Piano
+does.
+
+- **The pluck:** each key plucks a course of three steel strings, a few cents apart, with a soft
+  leather plectrum about a quarter of the way along: a round, nylon-like pluck. The plectrum
+  presses the string aside (3–8 ms, shorter when harder) and slips off it (0.1–0.4 ms; the
+  quicker, the brighter). It meets the three strings a few milliseconds apart. Each string rings
+  in up to 28 slightly stiff modes. Their losses grow as ω², so the upper partials die within a
+  second (T60 ~9 s for the fundamental at middle C).
+- **The magnets:** over each string a pickup senses its velocity. An amplifier, tuned to the note
+  by a band-pass (Q 6), drives an electromagnet a little further along. The amplifier saturates
+  (tanh), and the magnet's current lags it (its inductance). In phase with the velocity, the pull
+  is a negative damping: the fundamental grows, or decays, until the saturated drive just pays
+  for its losses (a limit cycle). The amplifier's limit, set by the touch, holds it ~7–9 dB
+  under the pluck's peak. The saturated, square-ish current also feeds the third partial. The
+  magnet pulls but never pushes: its force goes as the flux squared, which adds a little octave.
+- **The pad:** the pluck's upper partials fade and the held fundamental stays. The magnet sits
+  over the middle string; the side strings feel it weaker. So the course sustains on the middle
+  string, and the others beat with it slowly: a chorus that breathes by 1–2 dB.
+- **The octave (K2):** a second amplifier channel, tuned to the second partial, holds the octave
+  too. It needs its own channel: through one saturating amplifier the fundamental starves it.
+- **Release:** the magnets let go (20 ms), and a felt damper rests on the course (T60 ~2.4 s at
+  middle C).
+- **Voicing:** the top octave is lifted (its few, short modes). The bass's magnets are set a
+  little weaker, since its plucked string rings long by itself.
+
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_ATMO_SUSTAIN`,
+`PJ_ATMO_HARMONIC`, `PJ_ATMO_PLUCK`, `PJ_ATMO_CHORUS`). K1 and K2 also act on held notes.
+
+| Knob | Sets |
+|---|---|
+| K1 | the sustain: the amplifiers' limit, 0 to 1.2× the pluck's fundamental (default 0.6×). At 0 it is a plain psaltery; turned up, the note swells after the pluck |
+| K2 | the octave held, 0 to a quarter of the note (default an eighth) |
+| K3 | the plectrum's hardness: its slip ×3 to ×⅓ (darker to brighter) |
+| K4 | the chorus: the course's spread, 0 to 2× (default ±0.5–1.5 c) |
+
+The sustain pedal holds the keys and their magnets. Pitch bend is ±2 semitones.
+
+**Against FluidR3's Atmosphere** (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2 as
+the references):
+
+- **What is alike:**
+  - It speaks at once: an onset delay of 15 ms against 8–23 ms.
+  - The level 2 s into a held note is −14 dB re the peak, against −17, −11 and −10 dB.
+  - The release is 0.78 s against 0.63–1.04 s.
+  - The velocity curve is within ~2 dB.
+  - The overall brightness is within the references' range.
+- **Where it differs:**
+  - Its attack is sharper (17 dB/ms against 6.5–11). Its pluck is duller than its body by
+    1.2 ERB, where FluidR3's nylon is brighter.
+  - It is purer: the held note is a few locked partials, the samples' pads a detuned cluster.
+    Its noisiness is −61 dB against −36 to −50, and its partials are more jagged.
+  - It is wider in stereo (coherence 0.29 against 1). This comes mostly from the room.
+  - Key-to-key levels scatter by ~3 dB (each course beats in its own way).
+  - It brightens a little with the touch, where the samples do not.
+  - It has no vibrato (4 c of wobble from the beating, against 14–30 c of LFO).
+  - FluidR3's patch decays to silence (~7 dB/s); this one holds while the key is held, as
+    TimGM6mb's and Jnsgm2's do. K1 at 0 gives FluidR3's decay.
+
+### FX 5 (brightness)
+
+`-inst fx-brightness` (GM 101), A0 to C8 (`src/brightness.*`; research in
+`research/fx_sounds.md`): a keyboard of singing arcs. The classic patch (Roland's "Brightness",
+"a Fairlight type of sound") is a bright, held tone whose octave is as strong as the note and
+whose partials fall steadily, speaking at once. FluidR3 layers a chorused "Bright" sample over
+synth strings; TimGM6mb and Jnsgm2 a "Solo Vox" over synth strings. Here the tone comes from
+William Duddell's singing arc (1900), which Duddell played from a keyboard.
+
+- **The arc:** a carbon arc fed from a DC supply through a ballast resistor (nearly a constant
+  current), with a tuned circuit (a coil and a capacitor in series: the tank) across it. The
+  arc's voltage falls as its current rises (a negative resistance), so it feeds the tank, which
+  oscillates. The arc is Mayr's model: its conductance follows, with a thermal lag, what its own
+  power would hold; its loss is a column (the share set by its length) plus the electrode falls.
+- **The sound:** the arc is its own loudspeaker. Its power swings with the current, the hot
+  column swells and shrinks, and the pressure goes as the rate of change of the power. Power is
+  current times voltage, so its swing carries the note and, nearly as strongly, the octave. The
+  arc's lag and the ballast round the swing into a limit cycle whose partials fall steadily: at
+  the default touch the octave ~−1 dB, the third and fourth −10 to −14 dB, the tenth ~−30 dB.
+- **Even over the keyboard:** every arc is the same circuit scaled to its note (the tank, the
+  arc's time constant and its power go with the period), so the spectrum over f0 is the same
+  from A0 to C8 (centroid 1.88–1.90 × f0 at C3, C4, C6).
+- **Tuning:** the arc's own lag is a reactance in the loop: it sings at ~0.62 of its tank's
+  frequency, depending on its length. Each tank is tuned so that its arc sings on the note, from
+  a table made at start by running the circuit. Measured: within ±1.2 c from A0 to C8.
+- **Two arcs a key:** a large one on the note and a small one (0.35 of its sound) a few cents off
+  (K2), panned apart. They beat by a dB or so over seconds: the chorus of the sets' L/R samples.
+- **The touch:** each arc burns silently while its key is up (a steady arc makes no sound). The
+  key hands the arc's voltage to the tank through a slide-wire (~1 ms), so the tank rings at
+  once, and a rheostat brings the current up (3–7 ms). Velocity is the current (the loudness)
+  and the arc's length: a longer arc has a steeper characteristic and a fiercer, brighter limit
+  cycle. Soft notes near the arc's threshold take ~20 ms to bloom in the treble.
+- **Release:** the rheostat runs the current down (to −60 dB in 2 s by default), the arc keeping
+  its shape, so the pitch and timbre hold as it fades.
+- **The plasma flickers** (K3): the column's loss swings by a few per cent, low-passed at
+  ~3 kHz: a faint hiss and roughness.
+- **Integration:** at 4× the sample rate (the tank by the trapezoid, the arc's conductance
+  relaxed exactly over a step), then the guitar amp's elliptic low-pass back down. What lies off
+  the harmonics is 66–93 dB under the whole from C6 to C8: no aliasing.
+
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_ARC_LENGTH`,
+`PJ_ARC_CHORUS`, `PJ_ARC_HISS`, `PJ_ARC_RELEASE`). K1 and K2 act on new notes.
+
+| Knob | Sets |
+|---|---|
+| K1 | the arc's length (the brightness): the column's share ±0.15. At C4, velocity 100: the centroid 1.58 × f0 at 0, 1.88 at the default, 2.42 at 1 |
+| K2 | the chorus: the small arc 0 to 12 c off the note (default ~4–6 c) |
+| K3 | the flicker: 0 to 4 % RMS of the column's loss (default 1 %) |
+| K4 | the release: 0.5 to 8 s to −60 dB (default 2 s) |
+
+The sustain pedal holds the keys. Pitch bend is ±2 semitones. Eight notes cost ~1.3 µs a sample
+(6 % of a core).
+
+**Against FluidR3's Brightness** (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2 as
+the references):
+
+- **What is alike:**
+  - The brightness: the centroid at velocity 96 is 10 ERB (FluidR3 10, TimGM6mb 10, Jnsgm2
+    11); the mean spectrum is within 2 dB of FluidR3's up to 6 kHz.
+  - The partials: the fundamental's share 0.48 (FluidR3 0.52); odd against even −5.8 dB
+    (−7 to −12).
+  - It holds as FluidR3's does (−5.7 dB re the peak after 2 s, against −8.4; TimGM6mb and
+    Jnsgm2 decay to −28).
+  - The velocity curve (within 0.5 dB), the loudness range (16 dB against 16–17), the release
+    (0.88 s for 30 dB, against 0.79–1.11 s) and the noisiness (−40 dB, as FluidR3).
+- **Where it differs:**
+  - It is smoother (Plomp-Levelt −4.3 against −1.8 to −2.8): its partials are exact
+    harmonics, where the samples are detuned clusters with a 25–54 c LFO wobble (here 5 c).
+  - Its onset is sharper (11 dB/ms against 5–8) and a little later (18 ms against 4–8, with
+    the room): the tank is struck at once, and soft treble notes bloom.
+  - It brightens a little with the touch (0.7 ERB from velocity 40 to 127; the samples do not).
+  - Keys scatter by ~1.7 dB in level and ~1.2 ERB in brightness: the two arcs beat, each key in
+    its own phase.
+  - Above 6 kHz it is 4 dB darker than FluidR3.
+
+### FX 6 (goblins)
+
+`-inst fx-goblins` (GM 102), A0 to C8 (`src/goblins.*`; research in `research/fx_sounds.md`): a
+pyrophone, a keyboard of singing flames. The classic patch ("Goblin" in GS and the three
+SoundFonts, "Goblins" in XG) is a dark synth voice that swells in over most of a second and then
+opens slowly: a low-pass driven by a modulation envelope with an ~9 s attack (from ~200 Hz in
+FluidR3 and ~100–200 Hz in TimGM6mb and Jnsgm2, resonant there), with a 5–9 Hz warble in the upper
+partials (TimGM6mb's and Jnsgm2's sitar layer has a six-semitone vibrato at 8.5 Hz, FluidR3's vox
+layer a ±1-semitone growl at 33 Hz) and some wind. Here the tone comes from Frédéric Kastner's
+pyrophone (1873): a glass pipe a key with a gas flame inside, which the player's keys controlled.
+
+- **The pipe sings thermoacoustically:** each pipe is open at both ends, with its flame a little
+  under a quarter of the way up. The flame's heat release follows the air's motion past it with a
+  lag. When the lag is near a quarter period, the heat swells as the pressure does (Rayleigh's
+  criterion), and the pipe sings.
+- **The model:** the pipe's modes (its harmonics, damped by the walls and the radiation) are
+  driven by the rate of the flame's heat release at its place. The flame sees the air's velocity
+  there, a lag ago. The heat release follows Heckl's law for the Rijke tube, √|u0/3 + u|: it
+  saturates where the flow past the flame reverses, so the oscillation settles into a limit cycle.
+  The flame's response is a low-pass whose corner is set by the flame's length over the flow.
+- **It swells in:** the gas lighting (a soft thump over 4 ms) and the flame's roar set the pipe
+  ringing, and the oscillation grows out of them. At C4 it is within 12 dB of the held level by
+  ~0.8 s, the bass by ~1.5 s.
+- **It opens as the pipe warms** (K1, ~6 s by default), which drives three changes at once:
+  - the draft grows, so the flame's lag shrinks to the quarter period (from 1.25 × it): the pitch
+    rises a few cents into tune, most in the bass (A0 −4 c to +2 c);
+  - the flame shortens in the faster flow, so its response opens from the note to 2.5–7 × it (by
+    the flame's size), and the upper partials brighten: at C4 the centroid is 1.16 × f0 over
+    0.5–1.5 s and 1.70 × f0 over 6–10 s, with the fifth partial up ~17 dB;
+  - the walls stop quenching the flame's edges, so the gain grows and the limit cycle saturates
+    further; the flow grows too, so the level swells ~6 dB from 1 s to 8 s.
+- **It bubbles:** a buoyant flame puffs at a few Hz. Here that is a weakly self-excited oscillator
+  kicked by the turbulence, 5–9 Hz over the keyboard (K2 its depth). It swings the heat and the
+  flame's length, and with it the lag. The upper partials, whose phase through the lag moves
+  most, warble the most: at C4 93–98 % of the level's modulation lies in 3–15 Hz, peaking at
+  ~6.7 Hz.
+- **The touch:** velocity is the gas valve, which sets the flame's size: its gain, its flow, its
+  response's corner and its roar. A C-major chord goes from −28 dB at velocity 20 to −14 dB at
+  127. Once warm, soft notes are darker: at 6–10 s the centroid is 1.44 × f0 at velocity 20,
+  against 1.70 at 96.
+- **Release:** the key closes the valve (K4), and the pipe falls silent once the flame's gain
+  drops below its losses: 30 dB down in ~0.9 s at the default.
+- **Tuning:** the lag pulls a pipe flat by cot(phase)/2Q. Each pipe is cut to sing in tune at
+  40 % of its warmth. Warm, the pipes are within ±2.5 c from A0 to C8.
+
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_PYRO_WARMTH`,
+`PJ_PYRO_PUFF`, `PJ_PYRO_ROAR`, `PJ_PYRO_VALVE`):
+
+| Knob | Sets |
+|---|---|
+| K1 | the pipe's warming, 2 to 16 s (the swell's length; ~6 s by default). At C4, 2–4 s: the centroid 1.71 × f0 at 0, 1.20 at 1 |
+| K2 | the flame's puffing (the bubbling's depth): 0 to 0.6 of the heat's swing (0.3 by default) |
+| K3 | the flame's roar (combustion noise low-passed at ~700 Hz, through the pipe) |
+| K4 | the valve's closing at the release, 0.1 to 3 s (~0.55 s by default) |
+
+The sustain pedal holds the keys. Pitch bend is ±2 semitones. Eight notes cost ~0.8 µs a sample
+(4 % of a core).
+
+**Against FluidR3's Goblin** (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2 as the
+references; 2 s notes). TiMidity++ does not render the patches' slow filter envelope, so the
+references here are the unswept samples.
+
+- **What is alike:**
+  - The velocity curve (within 1 dB) and the loudness range (16–17 dB, as all three).
+  - The attack: −20 to −1 dB in ~0.5 s against 0.73–0.79 s.
+  - The release: 0.91–0.93 s for 30 dB, against 0.61–0.88 s.
+  - The pitch wobble: 14–16 c peak to peak, against 21–40 c.
+  - The fundamental's share: 0.87–0.94, as TimGM6mb's and Jnsgm2's 0.93–0.94; FluidR3's is 0.37.
+- **Where it differs:**
+  - It speaks later: the onset delay is ~0.9 s against 0.54–0.61 s, as the oscillation grows.
+  - Its attack is duller than the held note (−1.7 to −4.5 ERB, against −0.1 to +1.1): it opens
+    over seconds.
+  - It swells where the samples sag: −2 to −2.5 dB re the peak after 2 s, against −7.5 to −9.2.
+  - It is brighter at 2.5–6 kHz (+9–10 dB re FluidR3, level removed): the pipe's upper partials.
+    The centroid is 11–13 ERB against 7.4–9.4.
+  - Odd and even partials are about even (−1 dB), where the vox samples favour the even ones
+    (−17 to −23 dB).
+  - It is noisier and rougher: spectral flatness −25 dB against −34 to −49, Plomp-Levelt −1.2 to
+    −1.8 against −2.7 to −3.9. This comes from the bubbling's sidebands and the roar.
+  - Keys scatter by ~3.8 dB in level and ~1.8–2.5 ERB in brightness. Each flame puffs in its own
+    phase, and the bass is still swelling at 2 s.
+  - In the first 2 s soft notes come out brighter than loud ones (−1.3 ERB from velocity 40 to
+    127, against none in the samples): the lighting and the roar weigh more while a soft pipe is
+    still growing.
+
+### FX 7 (echoes)
+
+`-inst fx-echoes` (GM 103), A0 to C8 (`src/echoes.*`; research in `research/fx_sounds.md`): a
+dulcitone (a keyboard of tuning forks) played into a tape echo. The classic patch (Roland's "Echo
+Drops", Yamaha's "Echoes") turns out not to echo at all: in the three SoundFonts it is a choir
+"aah" and a near-sine synth voice held as a pad, whose looped samples swell and dip every
+0.5–1.2 s (the loop's period, which moves with the key), with a 5 s release and a stereo pair in
+FluidR3. Roland's is described as sweeping chorus-like tones that burst into "drops" at the key-up.
+Here the echoes are real, made by the machine that made echoes in the 1970s (the Echoplex,
+Roland's RE-201 Space Echo).
+
+- **The forks:** each key strikes a tuning fork with a felt hammer; the fork's stem stands on a
+  resonance box tuned to it, and a microphone picks it up. Three bending modes (1, 6.267, 17.55 ×
+  the note), the felt stiffening as it is squeezed (Hertz, δ^2.5): a harder blow is a shorter
+  contact, which brings out the fork's metallic "clang" (−44, −19, −17 dB re the note at C4 at
+  velocities 40, 100, 127) and its octave (a loud fork's stem). The note rings for ~20 s at C4
+  (T60) and the damper stops it in ~0.2 s at the key-up.
+- **The tape:** one machine for all the keys. A tape loop runs past a record head and two
+  playback heads 6 and 12 cm downstream; the second head is fed back to the record head. A short
+  note comes back every 0.335 s at the default speed (head 1 to the left, head 2 to the right,
+  so the repeats alternate sides), each pair of repeats ~8 dB under the one before (6 within
+  30 dB at C5).
+  - **Each pass is darker:** the playback head reads the tape through its spacing, a Poisson
+    kernel along the tape (Wallace's exp(−2π d f / v)): the octave of C5 loses 1.5 dB a pass and
+    the clang 7.7 dB. A slower or a worn tape is darker still.
+  - **The tape saturates** softly (the AC bias's anhysteretic curve, a Langevin function): loud
+    chords and piled-up repeats compress, and past unity loop gain (K2 near its top) the machine
+    runs away into its own oscillation, held by the saturation.
+  - **Wow and flutter:** the capstan, the pinch roller, the loop's splice and scrape flutter
+    wobble the speed, so the repeats come back a few cents off and a held note beating against
+    its own echo sweeps slowly, like a chorus. The motor has inertia: turning the rate glides
+    the echoes already on the tape.
+- **The touch:** velocity is the hammer's speed. A C-major triad goes from −43 dB at velocity 20
+  to −21 dB at 127, brighter as it gets louder.
+- **Tuning:** the forks are exact (within ±1.5 c from A0 to C8); the repeats wander by a few
+  cents with the wow.
+
+Knobs (live's K1–K4, `-seq`'s `knob K X`; their starting places `PJ_ECHO_RATE`,
+`PJ_ECHO_INTENSITY`, `PJ_ECHO_VOLUME`, `PJ_ECHO_WEAR`):
+
+| Knob | Sets |
+|---|---|
+| K1 | the tape's speed, 8 to 40 cm/s: the echo interval 0.75 to 0.15 s (0.335 s by default) |
+| K2 | the intensity (the feedback, 1.2 × K2^1.5): at 0 only the two heads' repeats; 0.8 gives ~19 repeats within 30 dB; near 1 it runs away |
+| K3 | the echo's volume (0 to 1.2 × the heads; 0.6 by default) |
+| K4 | the tape's wear: the head spacing (3 to 11 µm) and the wow and flutter (0.2 to 3.4 × their default depth) |
+
+The sustain pedal holds the dampers off. Pitch bend is ±2 semitones (the forks; what is on the
+tape keeps its pitch). Eight notes cost ~0.35 µs a sample (1.7 % of a core).
+
+**Against FluidR3's Echo Drops** (`tools/synthcompare.py profile`, with TimGM6mb and Jnsgm2 as
+the references; 2 s notes, so the profile sees little of the echoes).
+
+- **What is alike:** the velocity curve (within 1 dB) and the loudness range (15–16 dB against
+  17), the brightness over the keyboard and at velocity 96, the pitch, the level after 2 s held
+  (−9 to −10 dB re the peak against −6 to −10).
+- **Where it differs:**
+  - It is a near-sine where they are voices: the fundamental's share 0.99 against 0.76–0.94, no
+    breath (spectral flatness −81 dB against −29 to −38), smoother (Plomp-Levelt −6.6 to −9
+    against −2 to −3.6), dark above 2.5 kHz (−11 to −16 dB re FluidR3).
+  - It decays (3 dB/s, a struck fork) where the samples hold (~0.4 dB/s).
+  - It speaks at once (−20 to −1 dB in 80–130 ms against 0.2–0.5 s).
+  - Its release is a train of repeats, 30 dB down after ~1.2–1.4 s, against FluidR3's 5 s fade.
+  - In the hall a near-sine and its repeats cancel or add key by key: key-to-key level scatter
+    3.9 dB (0.5 dry).
+  - Its pitch wobble is smaller: 4–6 c (the wow) against 16–31 c.
+
+### FX 8 (sci-fi)
+
+`-inst fx-sci-fi` (GM 104), A0 to C8 (`src/scifi.*`): two voices on every key.
+
+- **The discharge:** a sine falling onto the note from up to three octaves above (0.7 to 3 by
+  the touch; 12 to 120 ms, slower in the bass), pushed into a sine wavefolder, sin(z sin φ + bias)
+  (the bias, each note's own, gives even harmonics). The drive z decays, so the folded harmonics
+  collapse inward onto the note until a plain sine dies away: an energy weapon's shot, a shield's
+  impact. The folder's spectrum is FM's (J_m(z) at m × the sine), so it is band-limited by holding
+  z under what the instantaneous frequency leaves below 20 kHz: no oversampling, no aliasing.
+- **The ping:** a resonant state-variable band-pass at the note, at the edge of self-oscillation
+  (it rings for seconds while held, 0.35 s at most once released), struck by a 1 ms Hann impulse
+  (shorter above 450 Hz; scaled by its spectrum at the note, so every key rings alike). Its
+  cutoff is swung at audio rate by a sine at a ratio of the note. A low ratio is a sonar's pure
+  ping, a ratio of 1 a pitched telemetry beep, a little off an integer crystalline. The ratio
+  drifts 6 % per three octaves away from middle C: the middle beeps, the ends glitter.
+
+Velocity sets the fold's drive (1 up to K1's maximum), the drop, the ping's strength and its FM
+index. The bass is mostly discharge, the treble mostly ping. Knobs (live's K1–K4, `-seq`'s
+`knob K X`; their starting places `PJ_SCIFI_FOLD`, `PJ_SCIFI_RATIO`, `PJ_SCIFI_BALANCE`,
+`PJ_SCIFI_RING`):
+
+| Knob | Sets |
+|---|---|
+| K1 | the fold: the hardest key's drive, 1.5 to 30 (default 6.7) |
+| K2 | the modulator's ratio, 0.05 to 4 (exponential; 0.68 is 1, the default) |
+| K3 | the balance, discharge to ping (default: by the key) |
+| K4 | the ping's ring when held, T60 0.25 to 64 s at middle C (default 2.3 s) |
+
+The sustain pedal holds; pitch bend ±2 semitones.
 
 ### Synth leads (analog circuits)
 
@@ -1891,6 +2909,32 @@ with the drum's pitch in it. About 30 dB from velocity 16 to 127; brushes 6–13
 About 1.6 % of a core per ringing drum.
 
     ./pajupilli -inst tom-14 -seq "on 45 60 wait 0.6 on 45 127 wait 1 on 69 90 wait 1 on 69 12 wait 1"
+
+The timpani (`-inst timpani`, General MIDI program 48; `src/timpani.cc`, `research/timpani.md`):
+five kettledrums (32, 29, 26, 23 and 20 in.) for one timpanist, C2–G♯2, A2–C♯3, D3–F♯3,
+G3–B♭3 and B3–E4 (outside, the outer drums). Each head is a membrane heard as its modes, not
+a grid: what makes the drum pitched is its partials at 1 : 1.50 : 1.98 : 2.44 : 2.90 on the
+(m, 1) modes, which the air on the head and the kettle's air make out of the ideal membrane's
+1 : 1.34 : 1.66 …; each mode is placed where it was measured (the (0,1) held near 65 Hz + 0.46
+of the pitch by the kettle's air spring; the rest stretched by an air load falling with
+frequency), with that air's mass, and decays at its own measured rate: the main tone 3–4 s on
+the low drums and ~1 s at the top, the fifth and the octave longer (D2 to 10 s), the thump of
+the axisymmetric modes 0.3 s. A 28 g felt mallet (F = K x^2.54, the felt's loss) is thrown at
+the head where it is now, a quarter of the way in from the rim, a little further in when louder,
+and bounces off; a hard stroke stretches the film (fff on D2 starts ~+55 c sharp). The head's
+far field is heard towards the hall, each mode's own pattern (the (1,1) a dipole along the line
+from the player through the centre), and the timpani play in the concert hall. A key on a drum
+tuned elsewhere retunes it; a key held 0.22 s or more is damped by the hand 0.15 s after its
+release (unless struck again first), shorter ones ring on. Rolls: strokes under 140 ms apart on
+one drum are a roll, the hands 12 cm apart round the ring (each its own mix of modes), evened
+to ~±0.5 dB and a few ms late at random, each landing on the moving head and adding to its
+swing or taking from it (the main tone moves ~3 dB stroke to stroke); the mod wheel (live: pad 1)
+rolls a held key at the natural rate, 10 (f / 110 Hz)^0.4 strokes a second (8.5 on D2, 13 on
+A3), faster as it gets louder, its depth the roll's level, following the expression;
+`PJ_TIMP_ROLL=1` rolls any key held over 0.6 s. About 1.3 % of a core per ringing drum. `-seq`
+takes `wheel X` and `expr X` (the mod wheel and the expression, 0..1) for such tests.
+
+    ./pajupilli -inst timpani -room concert -seq "on 45 100 wait 1 on 52 100 wait 1.5 wheel 0.5 on 45 60 wait 3 off 45 wheel 0 wait 2"
 
 The hand drums (`-inst conga`, `bongo`, `timbale`; `src/handdrum.cc`, `research/hand_drums.md`):
 each a pair, General MIDI's 62 (mute hi conga), 63 (open hi conga), 64 (low conga), 60, 61
