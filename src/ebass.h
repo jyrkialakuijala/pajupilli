@@ -64,6 +64,8 @@ class ElectricBassModel : public Tube {
   void controlStep() override {}
   float sample() override;
   Guitar g_;
+  int nanSeen_ = 0;  // g_.nanResets() already answered with a resetAir()
+  float strings();   // g_.sample(), with the tests' kick in and a caught NaN answered
   // The amp, the DI and the compressor; or (PJ_EBASS_DI) the bare DI: the coils with their pots
   // and cable into 1 MOhm (a biquad). The level.
   std::unique_ptr<GuitarAmp> amp_;

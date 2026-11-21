@@ -18,12 +18,18 @@ constexpr double kRho = 1.2, kC = 343;
 constexpr double kHole = 2e5;  // an open hole and its chamber's way in (Pa s/m^3; ~60 Pa at 0.3 L/s)
 
 // A harmonica reed (research/harmonica.md §2.3): the accordion's scaling (22 mm at C3, 6.5 at
-// D7), on a 1.05 mm brass plate, no wider than 2.8 mm, in a 0.3-0.4 cm^3 chamber.
+// D7), on a 1.05 mm brass plate, no wider than 2.8 mm, in a 0.3-0.4 cm^3 chamber. Stiffer than
+// the accordion's reed: MB07's 12.95 x 2.1 x 0.11 mm brass tongue (E ~110 GPa, K = 3EI/L^3 ~35-55
+// N/m) needs ~1.8-2.8 kPa to hold its 0.53 mm set at the plate, and the short high tongues are
+// stiffer still. 2.6 kPa at C4, rising as f^0.17 (2.3 kPa at C3, 3.7 at D7), lets every reed
+// speak from ~0.28 kPa and sound up to ~3.1 kPa; the accordion's 1.5 kPa choked them (the tongue
+// held in the slot: silence) from ~1.6-2.7 kPa, the top reeds first.
 FreeReedBuild harmonicaReed(double hz) {
   FreeReedBuild b = accordionReed(hz);
   b.plate = 1.05e-3;
   b.width = std::min(b.width, 2.8e-3);
   b.cell = 0.35e-6 * b.len / 13e-3;
+  b.closeP = 2600 * std::pow(hz / 262, 0.17);
   return b;
 }
 
@@ -255,10 +261,12 @@ float HarmonicaModel::sample() {
 
 HarmonicaPlayer::HarmonicaPlayer(HarmonicaModel& m) : Performer(m), m_(m) {}
 
-// The breath for a velocity (Pa): ~250 at the softest to ~3 kPa (research/harmonica.md §10.3).
+// The breath for a velocity (Pa): ~300 at the softest to ~2.7 kPa (research/harmonica.md §8,
+// §10.3), ~+3.5 dB from v96 to v127. The breath controller adds no more: past ~3 kPa a reed
+// chokes, and the player feels it and holds back.
 double HarmonicaPlayer::pressure(int vel) const {
-  const double v = std::clamp(vel / 127.0 + breathCtl_, 0.0, 1.2);
-  return 250 * std::pow(12.0, v);
+  const double v = std::clamp(vel / 127.0 + breathCtl_, 0.0, 1.0);
+  return 300 * std::pow(9.0, v);
 }
 
 void HarmonicaPlayer::decide(bool attack) {

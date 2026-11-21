@@ -1,0 +1,52 @@
+{
+ "builds": {
+  "40f1eb3b86d6028fe6407018615743d3": {
+   "bin": "/tmp/claude-1000/-home-jyrki-pajupilli/f3f9b7e6-c8bc-4bf3-a7a3-c720f3e9b3d1/scratchpad/gmcmp_pajupilli",
+   "commit": "e872b48245e56f2b5a10206960fb12078f26cf02",
+   "diff_stat": " Makefile          |  5 ++--\n src/bass.cc       | 78 +++++++++++++++++++++++++++++++++++++++++--------------\n src/calibrate.cc  |  8 +++++-\n src/ebass.cc      | 15 ++++++++++-\n src/ebass.h       |  2 ++\n src/fretless.cc   | 15 ++++++++++-\n src/fretless.h    |  2 ++\n src/guitar.cc     |  8 +++---\n src/guitar.h      |  5 ++++\n src/guitarinst.cc | 19 +++++++++++---\n src/guitarinst.h  |  2 ++\n src/main.cc       |  5 ++--\n src/organ.cc      |  3 ++-\n src/pianoinst.cc  |  4 +++\n src/voice.cc      | 13 ++++++++--\n src/voice.h       |  4 +++\n tools/test.py     | 78 ++++++++++++++++++++++++++++++++++++++++++++++++++-----\n 17 files changed, 223 insertions(+), 43 deletions(-)\n",
+   "first_used": "2026-11-20 16:28"
+  },
+  "65333d93c4921042266e4544c7e7d0a4": {
+   "bin": "/tmp/claude-1000/sndgob/pj0",
+   "commit": "e872b48245e56f2b5a10206960fb12078f26cf02",
+   "diff_stat": " Makefile          |  5 ++--\n src/bass.cc       | 78 +++++++++++++++++++++++++++++++++++++++++--------------\n src/calibrate.cc  |  8 +++++-\n src/ebass.cc      | 15 ++++++++++-\n src/ebass.h       |  2 ++\n src/fretless.cc   | 15 ++++++++++-\n src/fretless.h    |  2 ++\n src/guitar.cc     |  8 +++---\n src/guitar.h      |  5 ++++\n src/guitarinst.cc | 19 +++++++++++---\n src/guitarinst.h  |  2 ++\n src/main.cc       |  5 ++--\n src/organ.cc      |  3 ++-\n src/pianoinst.cc  |  4 +++\n src/voice.cc      | 13 ++++++++--\n src/voice.h       |  4 +++\n tools/test.py     | 78 ++++++++++++++++++++++++++++++++++++++++++++++++++-----\n 17 files changed, 223 insertions(+), 43 deletions(-)\n",
+   "first_used": "2026-11-20 22:56"
+  },
+  "3e2636bf8285ccd5670551a3ff23545e": {
+   "bin": "/tmp/claude-1000/sndgob/pj2",
+   "commit": "e872b48245e56f2b5a10206960fb12078f26cf02",
+   "diff_stat": " Makefile          |  5 ++--\n src/bass.cc       | 78 +++++++++++++++++++++++++++++++++++++++++--------------\n src/calibrate.cc  |  8 +++++-\n src/ebass.cc      | 15 ++++++++++-\n src/ebass.h       |  2 ++\n src/fretless.cc   | 15 ++++++++++-\n src/fretless.h    |  2 ++\n src/guitar.cc     |  8 +++---\n src/guitar.h      |  5 ++++\n src/guitarinst.cc | 19 +++++++++++---\n src/guitarinst.h  |  2 ++\n src/main.cc       |  5 ++--\n src/organ.cc      |  3 ++-\n src/pianoinst.cc  |  4 +++\n src/voice.cc      | 13 ++++++++--\n src/voice.h       |  4 +++\n tools/test.py     | 78 ++++++++++++++++++++++++++++++++++++++++++++++++++-----\n 17 files changed, 223 insertions(+), 43 deletions(-)\n",
+   "first_used": "2026-11-20 23:04"
+  },
+  "2da954c16d251ab29eb0622390461503": {
+   "bin": "/tmp/claude-1000/-home-jyrki-pajupilli/f3f9b7e6-c8bc-4bf3-a7a3-c720f3e9b3d1/scratchpad/gmcmp2_pj",
+   "commit": "e872b48245e56f2b5a10206960fb12078f26cf02",
+   "diff_stat": " Makefile                |  5 ++--\n README.md               | 12 ++++----\n research/choir.md       |  4 ++-\n research/synth_leads.md | 14 +++++++++\n src/accordion.cc        | 67 +++++++++++++++++++++++++++++++++++-------\n src/accordion.h         | 15 ++++++----\n src/bass.cc             | 78 +++++++++++++++++++++++++++++++++++++------------\n src/brasssect.cc        |  1 +\n src/calibrate.cc        |  8 ++++-\n src/choir.cc            | 48 +++++++++++++++++++++++++-----\n src/designs.cc          | 11 ++++++-\n src/ebass.cc            | 15 +++++++++-\n src/ebass.h             |  2 ++\n src/ensemble.cc         | 52 +++++++++++++++++++++++++++++++--\n src/ensemble.h          |  1 +\n src/fretless.cc         | 15 +++++++++-\n src/fretless.h          |  2 ++\n src/guitar.cc           |  8 ++---\n src/guitar.h            |  5 ++++\n src/guitarinst.cc       | 19 ++++++++++--\n src/guitarinst.h        |  2 ++\n src/harmonica.cc        | 16 +++++++---\n src/hornplayer.cc       |  3 +-\n src/lead.cc             | 40 ++++++++++++++++++++-----\n src/lead.h              |  3 ++\n src/levels_data.h       |  4 +--\n src/main.cc             |  5 ++--\n src/midifile.cc         |  8 +++--\n src/organ.cc            |  3 +-\n src/pianoinst.cc        |  4 +++\n src/singer.cc           | 15 +++++++---\n src/voice.cc            | 13 +++++++--\n src/voice.h             |  4 +++\n tools/test.py           | 78 ++++++++++++++++++++++++++++++++++++++++++++-----\n 34 files changed, 483 insertions(+), 97 deletions(-)\n",
+   "first_used": "2026-11-21 00:01"
+  }
+ },
+ "tools": {
+  "timidity": [
+   "TiMidity++ version 2.14.0"
+  ],
+  "fluidsynth": "libfluidsynth.so.3",
+  "fonts": {
+   "FluidR3": {
+    "path": "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+    "bytes": 148398306
+   },
+   "TimGM6mb": {
+    "path": "/usr/share/sounds/sf2/TimGM6mb.sf2",
+    "bytes": 5969788
+   },
+   "Jnsgm2": {
+    "path": "/home/jyrki/soundfonts/Jnsgm2.sf2",
+    "bytes": 33187490
+   },
+   "SGM": {
+    "path": "/home/jyrki/soundfonts/SGM-V2.01.sf3",
+    "bytes": 28142197
+   }
+  }
+ }
+}

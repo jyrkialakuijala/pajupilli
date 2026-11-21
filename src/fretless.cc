@@ -69,8 +69,21 @@ const float* FretlessBassModel::takeSide(int n) {
   return sideOut_.data();
 }
 
+// The strings' sample: the tests' kick (testDrive) goes into them; a non-finite state they caught
+// and cleared clears the rest too (the amp, the filters), counted as a reset.
+float FretlessBassModel::strings() {
+  if (testDp_ != 0) { g_.kick(float(testDp_)); testDp_ = 0; }
+  const float x = g_.sample();
+  if (g_.nanResets() != nanSeen_) [[unlikely]] {
+    nanSeen_ = g_.nanResets();
+    resetAir();
+    ++resets_;
+  }
+  return x;
+}
+
 float FretlessBassModel::sample() {
-  const double x = g_.sample();
+  const double x = strings();
   double y;
   if (amp_) {
     y = amp_->process(float(x)) * out_;
@@ -200,43 +213,25 @@ double FretlessBassPlayer::bandPull(int s, int key, double* weight) const {
   const double f0 = 440 * std::exp2((key - 69) / 12.0);
   double pl[16], pw[16], pk[16];
   int np = 0;
-  double pow2 = 0;
   for (int k = 1; k <= 16 && k * f0 < 5000; ++k) {
     pl[np] = std::log2(k * std::sqrt(1 + B * k * k));
     pw[np] = bandPartial(kBandBass, f0, k);
     pk[np] = k;
-    pow2 += pw[np] * pw[np];
     ++np;
   }
-  for (int i = 0; i < np; ++i) pw[i] /= std::sqrt(pow2);
-  double sw = 0, sd = 0;
-  for (const BandNote& o : band_->notes()) {
-    if (o.ch == self_) continue;
-    const double g0 = 440 * std::exp2((o.pitch - 69) / 12.0 + o.cents / 1200);
-    double qw[24], qp = 0;
-    int nq = 0;
-    for (int k = 1; k <= 24; ++k) {
-      qw[k - 1] = bandPartial(o.fam, g0, k);
-      qp += qw[k - 1] * qw[k - 1];
-      if (qw[k - 1] > 0) nq = k;
-    }
-    if (nq == 0) continue;
-    // (A faded note pulls less: the beating's depth.)
-    const double lv = std::min(1.0, 4 * o.level) / std::sqrt(qp);
-    const double rel = 1200 * std::log2(g0 / f0);  // where its fundamental lies against ours (c)
-    for (int i = 0; i < np; ++i)
-      for (int k = 1; k <= nq; ++k) {
-        if (qw[k - 1] <= 0) continue;
-        const double delta = rel + 1200 * (std::log2(double(k)) - pl[i]);
-        if (std::fabs(delta) > 36) continue;
-        const double kq = std::max(pk[i], double(k));
-        const double w = std::min(pw[i], qw[k - 1] * lv) * std::exp(-(delta / 20) * (delta / 20)) / (kq * kq);
-        sw += w;
-        sd += w * delta;
-      }
+  BandListener me;
+  me.self = self_;
+  me.f0 = f0;
+  me.pl = pl;
+  me.pw = pw;
+  me.pk = pk;
+  me.np = np;
+  // (its note's onset: the order of hearing among the parts that tune by ear, src/band.h)
+  if (const BandNote* own = band_->find(self_, line_[s].midi)) {
+    me.at = own->at;
+    me.pitch = own->pitch;
   }
-  *weight = sw;
-  return sw > 0 ? sd / sw : 0;
+  return pajupilli::bandPull(*band_, me, weight);
 }
 
 // Where the finger means to be (c): the band's pull, the note's residue (halved under the

@@ -412,6 +412,81 @@ static double playReed(const Instrument& inst, int m, double a4, double cv, doub
   return worst;
 }
 
+// A reed's note held at lips cv, breath press, dynamics d, with or without the ear: its pitch
+// late in the note (cents) and what the ear has trimmed the lips by; false: silent.
+static bool reedHeld(const Instrument& inst, int m, double a4, double cv, double press, double d, bool ear, double* cents,
+                     double* corr) {
+  Voice v(inst);
+  Performer& pl = v.player();
+  pl.coverTrim[m] = pl.coverLoTrim[m] = pl.coverHiTrim[m] = cv;
+  pl.pressTrim[m] = press;
+  pl.setDynamics(d);
+  pl.setWander(0);
+  pl.setEar(ear);
+  const double f0 = noteFrequency(m, a4);
+  const int n = int(0.9 * std::max(1.0, 261.6 / f0) * kFs), a = int(0.6 * n);
+  std::vector<float> x(n);
+  pl.noteOn(m, 64);
+  v.render(x.data(), n);
+  if (rms(x.data() + a, n - a) < 1e-3) return false;
+  *cents = 1200 * std::log2(estimatePitch(x.data() + a, n - a, kFs, f0 / 2.2, f0 * 2.2) / f0);
+  *corr = pl.earCorr();
+  return true;
+}
+
+// The ear's trim taken into the lips. The notes above are learned as they are played, the ear
+// trimming the lips once the note has spoken: a setting 20 cents off still ends in tune, but
+// every note began those 20 cents off and came right only 0.2 s later (the oboe's B-flat 4 flat,
+// its C5 and A5 sharp: each quick note of a passage out of tune). So: where the ear ends, the
+// lips begin. Taken only if the note then stands by itself as it did with the ear: nearer in
+// tune with the ear off, and still the note from every attack (playReed). Returns the lips.
+static double earIntoLips(const Instrument& inst, int m, double a4, double cv, double press, double d) {
+  double c0 = 0, k = 0;
+  if (!reedHeld(inst, m, a4, cv, press, d, false, &c0, &k)) return cv;
+  double x = cv;
+  for (int it = 0; it < 3; ++it) {
+    double c = 0;
+    if (!reedHeld(inst, m, a4, x, press, d, true, &c, &k) || std::fabs(c) > 12) {
+      if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d at %.2f: with the ear %+.0f c (trim %+.3f): left\n", m, d, c, k);
+      return cv;
+    }
+    if (std::fabs(k) < 0.002) break;
+    x *= std::exp(k);
+  }
+  if (x == cv) return cv;
+  if (std::fabs(std::log(x / cv)) > 0.35) {
+    if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d at %.2f: the ear's trim x%.3f: too far, left\n", m, d, x / cv);
+    return cv;
+  }
+  double c1 = 0;
+  const bool ok = reedHeld(inst, m, a4, x, press, d, false, &c1, &k) && std::fabs(c1) < std::max(4.0, 0.7 * std::fabs(c0)) &&
+                  !std::isnan(playReed(inst, m, a4, x, press, d));
+  if (std::getenv("PJ_CALDEBUG"))
+    std::fprintf(stderr, "  %d at %.2f: the ear's trim x%.4f, alone %+.0f -> %+.0f c%s\n", m, d, x / cv, c0, c1, ok ? "" : " (not taken)");
+  return ok ? x : cv;
+}
+
+static void reedEar(const Instrument& inst, int m, double a4, double press, Calibration* cal) {
+  static const bool kOn = knob("PJ_CALEARLIPS", 1) > 0;
+  if (!kOn || inst.droneLo >= 0) return;  // (a bag has no lips)
+  const double lo = std::max(double(cal->dynLo[m]), 0.15), hi = std::min(kCalDynHi, double(cal->dynHi[m]));
+  // (the lips between the three: coverAt's lines, in the logarithm)
+  // Each of the three by itself: the soft and the loud lips stay where they were learned unless
+  // their own trim holds (the duduk's B3: its mezzo-forte lips x0.79, its loud ones not to be
+  // trimmed; moved along with the others they broke the loud attack).
+  const double mid0 = cal->cover[m], mid = earIntoLips(inst, m, a4, mid0, press, 0.5);
+  cal->cover[m] = mid;
+  if (lo < 0.45) cal->coverLo[m] = earIntoLips(inst, m, a4, cal->coverLo[m], press, lo);
+  else if (lo >= 0.5) cal->coverLo[m] = mid;  // (the softest is mezzo-forte itself)
+  if (hi > 0.55) {
+    const double f = (hi - 0.5) / (kCalDynHi - 0.5);
+    const double at0 = mid0 * std::exp(std::log(cal->coverHi[m] / mid0) * f), at = earIntoLips(inst, m, a4, at0, press, hi);
+    if (at != at0) cal->coverHi[m] = mid * std::exp(std::log(at / mid) / f);
+  } else if (hi <= 0.5) {
+    cal->coverHi[m] = mid;
+  }
+}
+
 static void reedRange(const Instrument& inst, int m, double a4, double best, double press, Calibration* cal) {
   constexpr double kTol = kReedTol;
   auto limit = [best](double cv) { return std::clamp(cv, 0.75 * best, 1.35 * best); };
@@ -544,6 +619,7 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   cal->ok[m] = true;
   if (inst.reed() && !std::getenv("PJ_CALOLDREED")) {
     reedRange(inst, m, a4, bestCover, bestPress, cal);
+    reedEar(inst, m, a4, bestPress, cal);
     return;
   }
   // Softest dynamics: every step from there up to mezzo-forte must hold the
@@ -637,7 +713,13 @@ static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) 
   mix(&st.st_mtime, sizeof st.st_mtime);
   std::vector<std::string> env;
   for (char** e = environ; *e; ++e)
-    if (std::strncmp(*e, "PJ_", 3) == 0) env.emplace_back(*e);
+    if (std::strncmp(*e, "PJ_", 3) == 0) {
+      // (not the settings that do not touch a calibration: the threads, how much of a file plays)
+      bool skip = false;
+      for (const char* k : {"PJ_THREADS=", "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK=", "PJ_PLAY_LEAD="})
+        skip |= std::strncmp(*e, k, std::strlen(k)) == 0;
+      if (!skip) env.emplace_back(*e);
+    }
   std::sort(env.begin(), env.end());
   for (const std::string& e : env) mix(e.data(), e.size() + 1);
   mix(inst.name, std::strlen(inst.name) + 1);

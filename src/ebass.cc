@@ -130,8 +130,21 @@ void ElectricBassModel::resetAir() {
   if (amp_) amp_->reset();
 }
 
+// The strings' sample: the tests' kick (testDrive) goes into them; a non-finite state they caught
+// and cleared clears the rest too (the amp, the filters), counted as a reset.
+float ElectricBassModel::strings() {
+  if (testDp_ != 0) { g_.kick(float(testDp_)); testDp_ = 0; }
+  const float x = g_.sample();
+  if (g_.nanResets() != nanSeen_) [[unlikely]] {
+    nanSeen_ = g_.nanResets();
+    resetAir();
+    ++resets_;
+  }
+  return x;
+}
+
 float ElectricBassModel::sample() {
-  double x = g_.sample();
+  double x = strings();
   if (shelves_) x = shelf_[1].run(shelf_[0].run(x));
   if (amp_) {
     last_ = amp_->process(float(x)) * float(out_);

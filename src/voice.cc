@@ -125,14 +125,23 @@ void Resampler::process(const float* in, float* out, int n) {
   buf_.resize(hist);
 }
 
+const float* Voice::finite(const float* p, int n) {
+  if (!p) return p;
+  bool ok = true;
+  for (int i = 0; i < n; ++i) ok &= std::isfinite(p[i]);
+  if (ok) [[likely]] return p;
+  zeros_.assign(n, 0.0f);
+  return zeros_.data();
+}
+
 const float* Voice::side(int n) {
   if (!rs_.identity()) return nullptr;
-  return model_->takeSide(n);
+  return finite(model_->takeSide(n), n);
 }
 
 const float* Voice::dipole(int n, int k) {
   if (!rs_.identity()) return nullptr;
-  return model_->takeDipole(n, k);
+  return finite(model_->takeDipole(n, k), n);
 }
 
 const float* Voice::dipoleAxes() const { return rs_.identity() ? model_->dipoleAxes() : nullptr; }

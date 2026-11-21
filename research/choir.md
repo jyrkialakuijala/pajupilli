@@ -425,7 +425,9 @@ lowest, middle) **[code]**. The choir follows the same pattern:
   - the singer-to-singer onset scatter from 3.4.
 
   For "Choir Aahs" a moderate attack (the ensemble reaches full level in 150–300 ms); for "Voice
-  Oohs" a softer one (250–400 ms) **[calc]**. Roland's Voice Oohs is described as a "dooh" set
+  Oohs" a softer one (250–400 ms) **[calc]**. (Built so, τ 0.19 s, it measured an attack of 774 ms
+  against the SoundFonts' 40–80 (research/gm_compare.md, 54 Voice Oohs) and dragged in rhythmic
+  parts; it is now τ ≈ 75 ms at mf, a soft onset's 50–150 ms, full in ~0.2 s.) Roland's Voice Oohs is described as a "dooh" set
   **[web, SynthMania]**, so a short soft /d/-like start can be imitated by a constriction release
   (Singer has `setConstriction`) **[code]**.
 

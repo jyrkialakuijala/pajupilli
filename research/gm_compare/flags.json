@@ -1,0 +1,14 @@
+{
+ "p056": "plays 2 semitones low under -play (transpose bug)",
+ "p059": "plays 2 semitones low under -play (transpose bug)",
+ "p060": "plays a fifth low under -play (transpose bug)",
+ "p064": "plays 2 semitones low under -play (transpose bug)",
+ "p065": "plays a major sixth low under -play (transpose bug)",
+ "p066": "plays a ninth low under -play (transpose bug)",
+ "p067": "plays an octave and a sixth low under -play (transpose bug)",
+ "p069": "plays a fifth low under -play (transpose bug)",
+ "p071": "plays 2 semitones low under -play (transpose bug)",
+ "p072": "plays an octave high under -play (transpose bug)",
+ "p045": "bows instead of plucking (pizzicato bug)",
+ "p114": "silent on keys 52-59 (no note areas below C4)"
+}

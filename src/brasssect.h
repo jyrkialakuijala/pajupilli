@@ -40,8 +40,9 @@
 //     seat's habit (+-3 ms) and its section's moment (+-4 ms) on top; a soft, long entry 10 +- 15
 //     ms. Releases: a stab's within ~5 ms (the tongue), a long note's over ~25 ms.
 //   - Pitch (6.2): each seat a few cents off (uniform +-4 c, HornPlayer::vary; the lips aim
-//     there, so the players beat as a section does); the held chord tuned towards just intervals
-//     by the pajupilli intonation at half strength (brass players lean to equal temperament).
+//     there, so the players beat as a section does); the held chord tuned by its partials as the
+//     organ's keys are (Ensemble::retune, spectral_): those that nearly meet pull the interval
+//     to where they do, so the overtones lock. Each player's ear holds its aim within a cent.
 //   - Each player and instrument its own (HornPlayer::vary, Horn::vary): the attack's push and
 //     its decay, the lips' Q, the cup's volume, the brassiness.
 //   - Vibrato (6.3): none under 0.6 s; then the lead a little (x0.5 of the director's depth), the

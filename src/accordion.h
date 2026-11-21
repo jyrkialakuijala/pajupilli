@@ -15,9 +15,11 @@
 //     middle one in the cassotto (the tone chamber: its highs lowered), the
 //     two outside it tuned apart by a few beats a second (PJ_ACC_BEAT);
 //     the keys below C3 the bass, 16' + 8' in the cassotto.
-//   - Bandoneón: two reeds an octave apart on each note (8' + 4'), no
-//     cassotto, no musette; zinc plates nailed on (a quicker, brighter
-//     attack) and a harder arm (tango's marcato).
+//   - Bandoneón: two reeds an octave apart on each note (8' + 4', tuned
+//     a pure octave), no cassotto, no musette; zinc plates nailed on (a
+//     quicker, brighter attack), stiffer tongues and a harder arm (tango's
+//     marcato); the sound out through the wooden reed blocks and end-plate
+//     (darker: PJ_BN_BLOCK).
 //   - Pitch bend down: the player pulls the bellows harder against a
 //     pallet half shut, as on the accordion (EMS21: 10-35 cents down, the
 //     level falling; never up): the duct's air heavier, the pressure higher.
@@ -77,9 +79,10 @@ class AccordionModel : public Tube {
   int dir_ = 1;
   double pb_ = 0, armP_ = 0, armTau_ = 0.03, bend_ = 0, flow_ = 0;
   // The radiation's filters (at 2x): the cassotto's low-pass, the grille's,
-  // the pull side's (the reeds sounding into the bellows).
-  double cass1_ = 0, cass2_ = 0, grille_ = 0, pull_ = 0, pullS_ = 0;
-  double aCass_, aGrille_, aPull_;
+  // the pull side's (the reeds sounding into the bellows); the bandoneón's
+  // reed blocks and box.
+  double cass1_ = 0, cass2_ = 0, grille_ = 0, pull_ = 0, pullS_ = 0, block_ = 0;
+  double aCass_, aGrille_, aPull_, aBlock_ = 1;
   static constexpr int kHalf = 48;
   float histM_[2 * kHalf] = {}, histS_[2 * kHalf] = {};
   int posM_ = 0, posS_ = 0;

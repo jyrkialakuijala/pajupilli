@@ -973,8 +973,6 @@ void Guitar::fretStep(Str& st, int s, float& y0, float& y1) {
   }
   st.fretIdle += dt_;
   if (!fretLive_[s]) return;
-  const float* K = &fretK_[size_t(s) * 4 * kMaxModes];
-  const float *kq0 = K, *kq1 = K + kMaxModes, *kv0 = K + 2 * kMaxModes, *kv1 = K + 3 * kMaxModes;
   const bool elec = electric();
   for (int sweep = 0; sweep < 2; ++sweep) {
     bool hit = false;
@@ -1048,7 +1046,9 @@ void Guitar::reset() {
       if (s_.select[p] >= 0 && s_.select[p] < int(s_.pickups.size())) str_[i].flux[p] = field(s_.select[p], s_.pickups[s_.select[p]].gap[i]);
   for (Body& b : body_) b.x = b.v = 0;
   bridgeV_ = bridgeVz_ = 0;
-  side_ = 0;
+  side_ = acoustic_ = 0;
+  clickX1_ = clickX2_ = clickY1_ = clickY2_ = 0;
+  quiet_ = 0;
   asleep_ = true;
 }
 
@@ -1266,7 +1266,7 @@ float Guitar::run() {
     out = float(s_.select[1] >= 0 ? 0.5 * (emf[0] + emf[1]) : emf[0]);
     side_ = 0;
   }
-  if (!std::isfinite(out)) { reset(); return 0; }
+  if (!std::isfinite(out)) { reset(); ++nanResets_; return 0; }  // (early: before the amp, the side, the room)
   if (!any && std::fabs(out) < 1e-7f) {
     if (++quiet_ > int(0.2 * fs_)) asleep_ = true;
   } else {

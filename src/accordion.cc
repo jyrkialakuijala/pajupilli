@@ -19,12 +19,20 @@ constexpr double kRho = 1.2;
 
 // A reed of the instrument at hz: the accordion's steel on aluminium; the
 // bandoneón's steel on zinc, the plates thicker and nailed (less of the
-// wax's damping: a quicker start).
+// wax's damping: a quicker start). The bandoneón's tongues are also voiced
+// stiffer (a closing pressure of 2.5 kPa against the accordion's 1.5): the
+// tango's fortissimo pushes the bellows to ~2.2 kPa, and a tongue held at
+// 1.5 kPa is then pressed into its thicker plate's slot and stops (the keys
+// above ~G#6 fell silent at velocity 127, the ones below swung about a new
+// centre, their pitch ~10-20 c off); at 2.5 kPa every reed speaks to the top
+// of the arm's range and its pitch falls only ~8 c (C2) to ~1 c (C7) from
+// pianissimo to fortissimo, half the accordion reed's fall.
 FreeReedBuild buildFor(double hz, bool bandoneon) {
   FreeReedBuild b = accordionReed(hz);
   if (bandoneon) {
     b.plate *= 1.3;
     b.q *= 1.25;
+    b.closeP = 2500;
   }
   return b;
 }
@@ -61,6 +69,11 @@ double speakingHz(FreeReed r, double fs, double supply) {
 // brings each reed to its pitch at mezzo-forte. The reed's own pitch is a
 // little above its sounding one (the duct's air and the pressure pull it
 // down, ~25 c); measured once per instrument, interpolated between semitones.
+// The bandoneón is tuned at ~1 kPa, the middle of tango's playing (velocity
+// ~80): its 8' and 4' are a pure octave there, and drift apart by under
+// ~1.3 c from pianissimo to fortissimo (beats of under ~0.5 Hz); tuned at
+// 600 Pa they were ~1 c apart at velocity 96, the highest keys beating at
+// ~1 Hz.
 struct TuneTable {
   double r[121] = {};
   void build(double fs, bool bandoneon) {
@@ -70,7 +83,7 @@ struct TuneTable {
       reed.setup(fs, buildFor(hz, bandoneon));
       double ratio = 1;
       for (int it = 0; it < 2; ++it) {
-        const double got = speakingHz(reed, fs, 600);
+        const double got = speakingHz(reed, fs, bandoneon ? 1000 : 600);
         if (got > 0) ratio *= hz / got;
         reed.tune(ratio);
       }
@@ -123,11 +136,19 @@ AccordionModel::AccordionModel(const Instrument& inst)
         sets.push_back({hz * std::exp2(c / 1200), false});
       }
     }
-    for (const Set& s : sets)
+    double eight[2] = {};  // (the bandoneón: each direction's 8' reed as tuned)
+    for (size_t si = 0; si < sets.size(); ++si)
       for (int dir = 0; dir < 2; ++dir) {
+        const Set& s = sets[si];
         // Each reed its own: the tuner's last scrape within ~1 c, the set
-        // and the plate a little different.
-        const double hzR = s.hz * std::exp2(1.0 * urand() / 1200);
+        // and the plate a little different. The bandoneón's 4' is tuned to
+        // its 8' by ear, a pure octave (research/free_reeds.md §4: "no
+        // beating when well tuned"), within ~0.2 c: scraped to within 1 c
+        // of the fork each on its own, the 4' beat with the 8' reed's
+        // second harmonic at ~0.5-3 Hz, up to 8 dB deep over the held note.
+        const double hzR = bandoneon_ && si == 1 ? 2 * eight[dir] * std::exp2(0.2 * urand() / 1200)
+                                                 : s.hz * std::exp2(1.0 * urand() / 1200);
+        if (si == 0) eight[dir] = hzR;
         FreeReedBuild b = buildFor(hzR, bandoneon_);
         b.set *= 1 + 0.05 * urand();
         b.clear *= 1 + 0.1 * urand();
@@ -141,9 +162,23 @@ AccordionModel::AccordionModel(const Instrument& inst)
   }
   // The radiation (research/free_reeds.md §3.2): the cassotto lowers the
   // highs (two poles at ~1.4 kHz), the grille and the box the very top; on
-  // the pull the reeds sound into the bellows, a little duller.
+  // the pull the reeds sound into the bellows, a little duller. The
+  // bandoneón has no cassotto, but every reed of it sounds into a chamber of
+  // its wooden reed block, out through a leather-valved hole and the
+  // fretwork of the wooden end-plate: one pole at ~500 Hz for that (the
+  // highs falling 6 dB an octave above it; PJ_BN_BLOCK) [design: fitted to
+  // the SoundFonts' bandoneóns, research/gm_compare.md "24 Tango Accordion",
+  // and research/free_reeds.md §4's "a large, deep sound", "sweet and
+  // somewhat dull"]. With the grille alone (3.5 kHz) its spectral centroid
+  // at velocity 96 was ~2 kHz (19.7 on the ERB scale) against the fonts'
+  // 0.9-1.3 kHz (14.3-15.6), 6-17 dB short below 400 Hz; with the blocks
+  // 1.08 kHz (15.3), 2-9 dB short below 150 Hz, 0-8 dB over from 150 Hz to
+  // 6 kHz, 5-10 dB under above it (level removed). Two poles at ~1.6 kHz (a
+  // cassotto) reached the same centroid but left a hump at 0.4-2.5 kHz,
+  // 5-11 dB over the fonts, and 11-17 dB less above 6 kHz.
   auto pole = [&](double hz) { return 1 - std::exp(-2 * M_PI * hz / fs2_); };
   aCass_ = pole(knob("PJ_ACC_CASS", 1400));
+  if (bandoneon_) aBlock_ = pole(knob("PJ_BN_BLOCK", 500));
   aGrille_ = pole(knob("PJ_ACC_GRILLE", bandoneon_ ? 3500 : 5000));
   aPull_ = pole(knob("PJ_ACC_PULL", 3500));
   // The half-band filter (2x down): a Kaiser-windowed sinc, cut at 21 kHz.
@@ -194,7 +229,7 @@ void AccordionModel::resetAir() {
   }
   active_.clear();
   pb_ = 0;
-  cass1_ = cass2_ = grille_ = pull_ = pullS_ = 0;
+  cass1_ = cass2_ = grille_ = pull_ = pullS_ = block_ = 0;
 }
 
 float AccordionModel::half(float* hist, int& pos, float x0, float x1) {
@@ -213,13 +248,21 @@ float AccordionModel::sample() {
   static const double kOut = knob("PJ_ACC_OUT", 1.0);
   // The bend: the pallet this much shut, the duct's air this much heavier, at a full bend.
   static const double kChoke = knob("PJ_ACC_CHOKE", 0.7), kBendDuct = knob("PJ_ACC_BENDDUCT", 1.0);
+  // (The bandoneón's stiffer tongues, buildFor(), are pulled down less by the same air: x1 bent
+  // its A4 -12 c and 1.8 dB louder at half a bend, x2 -23 c and 3.5 dB quieter, as before them.)
+  static const double kBendDuctBn = knob("PJ_BN_BENDDUCT", 2.0);
+  const double bendDuct = bandoneon_ ? kBendDuctBn : kBendDuct;
   static const double kPallet = 1e5;                       // the open pallet's resistance (Pa s/m^3)
   const double dt = 1 / fs2_;
   const double bend = std::clamp(-bend_, 0.0, 1.0);
   const double target = dir_ * (armP_ * (1 + 0.6 * bend) - kSag * flow_);
   const double aArm = 1 - std::exp(-dt / std::max(armTau_, 1e-3));
   // The radiated pressure at 1 m from the flow's rate of change: rho / (4 pi r).
-  const double g = kRho / (4 * M_PI) * kOut;
+  // (The bandoneón x2.97: its reed blocks' pole took 9.5 dB of its loudness
+  // (tools/levels.py: -28.2 to -37.7 LUFS), given back here so that
+  // src/levels_data.h's trim, measured before it, still holds.)
+  double g = kRho / (4 * M_PI) * kOut;
+  if (bandoneon_) g *= 2.97;
   float mid[2], side[2];
   for (int sub = 0; sub < 2; ++sub) {
     pb_ += aArm * (target - pb_);
@@ -238,7 +281,7 @@ float AccordionModel::sample() {
         const double s = (i & 1) ? pull : push;
         if (s == 0 && reed.quiet()) continue;
         sounding = true;
-        reed.setDuct(1 + kBendDuct * bend);
+        reed.setDuct(1 + bendDuct * bend);
         const double y = reed.sample(s, r);
         sum[k.group[i]][i & 1] += y;
         keySum += y;
@@ -258,7 +301,11 @@ float AccordionModel::sample() {
     const double cIn = sum[1][0] + pull_;
     cass1_ += aCass_ * (cIn - cass1_);
     cass2_ += aCass_ * (cass1_ - cass2_);
-    const double y = 1.4 * cass2_ + sum[0][0] + pullS_;
+    double y = 1.4 * cass2_ + sum[0][0] + pullS_;
+    if (bandoneon_) {
+      block_ += aBlock_ * (y - block_);
+      y = block_;
+    }
     grille_ += aGrille_ * (y - grille_);
     mid[sub] = float(g * grille_);
     side[sub] = float(g * sideSum * 0.6);

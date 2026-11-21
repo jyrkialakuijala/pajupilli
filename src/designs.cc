@@ -520,6 +520,15 @@ const Design kShakuhachiDesign = {kShakuhachiBore, 7, kShakuhachiHoles, 5, kShak
 // Alto C ocarina (12 holes), A4..F6
 // A vessel flute: the pitch follows the open holes' total area (Helmholtz);
 // a duct forms the jet.
+// The breath (the jet's last two numbers: Pa at A4 and at F6) follows the
+// vessel's breath curve: every note sounds in tune, steady and clear on one
+// regime only, at 400 Pa on A4 rising to 7000 Pa on F6 (x18, about the square
+// of the pitch, as the jet's travel time across the window must keep pace
+// with the period). Planned at 320..1300 Pa, F5..F6 needed more than the
+// calibration's x2.5 and fell 4x lower onto a weak, breathy side regime
+// (pitch 35..45 c per 5 % breath, against 15 on the main one, breaking at
+// mezzo-forte): 20 dB quieter than E5 and up to 60 c sharp at forte.
+// The level follows the breath: dry, F6 is ~29 dB over A4, rising evenly.
 const BorePoint kOcarinaBore[] = {
     {0.0, 36.00}, {1000.0, 36.00}};
 const HoleDef kOcarinaHoles[] = {
@@ -559,7 +568,7 @@ const NoteInfo kOcarinaNotes[] = {
     {"ooooooooooox", 1},  // 88 E6 (-0 c passive)
     {"oooooooooooo", 1},  // 89 F6 (-0 c passive)
 };
-const Design kOcarinaDesign = {kOcarinaBore, 2, kOcarinaHoles, 12, kOcarinaNotes, 3.73, 70.4, true, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.0009, 0.01, 0.0045, 0.01, 0.003, 0.02, 0.00015, 320, 1300}};
+const Design kOcarinaDesign = {kOcarinaBore, 2, kOcarinaHoles, 12, kOcarinaNotes, 3.73, 70.4, true, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.0009, 0.01, 0.0045, 0.01, 0.003, 0.02, 0.00015, 400, 7000}};
 
 // Pan flute (nai), chromatic, G4..C7
 // One stopped pipe per note, blown across the rim.

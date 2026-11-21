@@ -111,6 +111,10 @@ PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, des
 void PianoModel::resetAir() {
   Tube::resetAir();
   piano_.reset();
+  // (the honky-tonk's filters and case: a NaN held there would come back every block)
+  trebleM_ = trebleS_ = airM_ = airS_ = 0;
+  lpZm_[0] = lpZm_[1] = lpZs_[0] = lpZs_[1] = 0;
+  for (Box* b : {&boxM_, &boxS_}) *b = Box();
 }
 
 float PianoModel::sample() {

@@ -31,9 +31,14 @@ const ChoirVariant kChoirVariants[] = {
     // 53 Choir Aahs: every part on a dark choral [ɑ], a moderate attack (the section full in ~0.2 s).
     {"choir", {3, 3, 3, 3, 3, 3}, -1, 0.07, 0.12, 0, 1, 1, 1, 0x3f, 128, 0, 0, 0},
     // 54 Voice Oohs: the women lead (the men only below C4) on a rounded [u] (sopranos, mezzos) ..
-    // [ʊ] (basses), the women's top opening toward [ɔ] (D5 .. G5); softer and slower (the section
-    // full in ~0.35 s), breathier, less vibrato, a soft "d" on firmer keys (Roland's "dooh").
-    {"voice-oohs", {0.7, 0.6, 0.5, 0.3, 0.2, 0.2}, 2, 0.14, 0.2, 0.5, 1.3, 0.8, 1.1, 0x3f, 60, 0.4, 0, 0},
+    // [ʊ] (basses), the women's top opening toward [ɔ] (D5 .. G5); softer (lower pressures),
+    // breathier, less vibrato, a soft "d" on firmer keys (Roland's "dooh"). The lungs rise with
+    // tau ~75 ms at mf (0.055 x 0.92 x the softness's 1.5): a soft, coordinated onset builds its
+    // pressure in 50-150 ms (research/choir.md 5.1); with the entries' scatter and the room the
+    // section is at half level in ~0.1 s, within 2-3 dB of full in ~0.2 s. (At 0.14, tau 0.19 s,
+    // it was full only after ~0.5 s: an attack of 774 ms against the SoundFonts' 40-80,
+    // research/gm_compare.md p053; rhythmic "ooh" parts dragged.)
+    {"voice-oohs", {0.7, 0.6, 0.5, 0.3, 0.2, 0.2}, 2, 0.055, 0.2, 0.5, 1.3, 0.8, 1.1, 0x3f, 60, 0.4, 0, 0},
 };
 
 const NoteInfo kChoirNotes[128] = {
@@ -336,6 +341,7 @@ struct ChoirState {
     int vel = 64;
     double habit;             // its own lateness (s)
     int lo, hi;               // its own reach
+    double x = 0;             // where it stands across the stage (m, from the audience: - left)
   };
   std::vector<Seat> seats;
   int held[128] = {};
@@ -360,19 +366,42 @@ void Ensemble::initChoir(const Instrument& inst, const RoomSpec* room) {
   // Each seat's reach: the part's range less a few semitones at either end (one singer of the part
   // reaches the whole range, the others fall short by 1 .. 4 semitones at the top, 0 .. 3 at the bottom).
   static const int kTopShort[8] = {0, 3, 1, 4, 2, 3, 1, 2}, kLowShort[8] = {0, 2, 1, 3, 0, 2, 1, 3};
+  // (the basses: two in four oktavists, down to G1; the others from D2 .. E2)
+  static const int kBassLow[8] = {31, 38, 31, 40, 33, 39, 34, 41};
+  // Where they stand (from the audience): the usual four blocks on the risers behind the
+  // orchestra, two rows, each a continuous gradient of pitch from left to right (SSAA in front,
+  // TTBB behind): the first sopranos on the far left (with the first violins: the treble projects
+  // most there), the second sopranos (mezzos), then the altos, the second altos anchoring the far
+  // right; behind, the tenors left (behind the sopranos), the baritones (first basses), the
+  // basses far right (with the cellos and double basses). A row spans the string section's width
+  // (24 players in 10.35 m: src/ensemble.cc), its singers evenly apart; within a part the higher
+  // reaching ones on the left (the oktavists far right), and a divided part's upper line to its
+  // left half (where the held keys are dealt, below). PJ_CHOIR_WIDTH scales it (0: all in the middle). (The rows' depth is
+  // not heard: the room places its sources across the stage only.)
+  static const int kRowOrder[kChoirParts] = {2, 1, 0, 2, 1, 0};  // bass .. soprano: its place in its row
+  static const double width = knob("PJ_CHOIR_WIDTH", 1.0);
+  const double gap = 10.35 / std::max(1, 3 * kPer - 1);
   for (int p = 0; p < kChoirParts; ++p) {
     if (!(C.var->parts >> p & 1)) continue;
+    // (its singers by reach, the highest first: the left of the block)
+    std::vector<int> byReach(kPer);
+    for (int i = 0; i < kPer; ++i) byReach[i] = i;
+    auto reach = [&](int i) {
+      return p == kChoirBass ? kBassLow[i % 8] + kChoirPart[p].hi - kTopShort[i % 8]
+                             : 2 * kChoirPart[p].lo + kLowShort[i % 8] - kTopShort[i % 8];
+    };
+    std::stable_sort(byReach.begin(), byReach.end(), [&](int a, int b) { return reach(a) > reach(b); });
     for (int i = 0; i < kPer; ++i) {
       ChoirState::Seat s;
       s.slot = int(members.size());
       s.part = p;
       s.habit = std::clamp(0.010 * C.gauss(), -0.02, 0.02);
-      // (the basses: two in four oktavists, down to G1; the others from D2 .. E2)
-      static const int kBassLow[8] = {31, 38, 31, 40, 33, 39, 34, 41};
       s.lo = p == kChoirBass ? kBassLow[i % 8] : kChoirPart[p].lo + kLowShort[i % 8];
       s.hi = kChoirPart[p].hi - kTopShort[i % 8];
+      const int at = int(std::find(byReach.begin(), byReach.end(), i) - byReach.begin());
+      s.x = width * gap * (kRowOrder[p] * kPer + at - (3 * kPer - 1) / 2.0);
       C.seats.push_back(s);
-      members.push_back(Member{&kChoirSeat[p], kidCals_.back().get()});
+      members.push_back(Member{&kChoirSeat[p], kidCals_.back().get(), s.x});
     }
   }
   Section s;
@@ -477,10 +506,13 @@ void Ensemble::choirAssign() {
     std::vector<int> who;
     for (int i = 0; i < int(C.seats.size()); ++i)
       if (C.seats[i].part == p) who.push_back(i);
-    const std::vector<int>& ks = pk[p];
+    // (a divided part sings its lines left to right from the highest: its singers taken from the
+    // left, its keys from the top)
+    std::stable_sort(who.begin(), who.end(), [&](int a, int b) { return C.seats[a].x < C.seats[b].x; });
+    std::vector<int> ks(pk[p].rbegin(), pk[p].rend());
     const int nk = int(ks.size());
     std::vector<int> want(nk, nk ? int(who.size()) / nk : 0), have(nk, 0);
-    for (int r = 0; nk && r < int(who.size()) % nk; ++r) want[r] += 1;
+    for (int r = 0; nk && r < int(who.size()) % nk; ++r) want[nk - 1 - r] += 1;  // (the spare singers to the lowest lines)
     auto reaches = [&](int i, int k) { return keys[k] >= C.seats[i].lo && keys[k] <= C.seats[i].hi; };
     std::vector<int> spare;
     for (int i : who) {

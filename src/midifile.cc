@@ -30,6 +30,7 @@
 #include "drumkit.h"
 #include "band.h"
 #include "ensemble.h"
+#include "fretless.h"
 #include "instrument.h"
 #include "parallel.h"
 #include "performer.h"
@@ -1124,13 +1125,18 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   // board couples them, sample by sample). Each part's voices go on the same pool in turn
   // (Ensemble::block), so one big part no longer holds back the rest on one thread.
   // The band's sounding notes (src/band.h), kept by the loop below between blocks; every part
-  // may listen (the fretless bass does), each told its own channel.
+  // may listen (the fretless bass does; the brass and the reeds, Ensemble::windEar), each told its
+  // own channel. A part that tunes by ear marks its notes so (the order of hearing, src/band.h).
   SoundingSet band;
   static const bool kBandLog = std::getenv("PJ_BAND_LOG") != nullptr;
   unsigned bandSeen = ~0u;
   for (auto& [id, p] : parts)
-    if (id / 128 != 9)
+    if (id / 128 != 9) {
       for (int i = 0; i < p.ens->size(); ++i) p.ens->player(i).setBand(&band, id / 128);
+      const int ear = Ensemble::windEar(*p.inst);
+      if (ear >= 0) p.ens->setBand(&band, id / 128, ear);
+    }
+  auto byEar = [&](const Part& p) { return p.ens->listens() ? 2 : fretlessBassInstrument(*p.inst) ? 1 : 0; };
   std::vector<std::vector<Part*>> jobs;
   {
     std::vector<Part*> circuits, others;
@@ -1324,13 +1330,15 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           auto it = parts.find(id);
           if (id < 0 || it == parts.end()) continue;
           noteOwner[ch * 128 + e.a] = id;
-          heldKey[ch * 128 + e.a] = pk + it->second.inst->transpose;
-          if (ch != 9) band.on(ch, e.a, heldKey[ch * 128 + e.a], e.b, bandFamily(it->second.inst->family, it->second.inst->name));
+          // (the file's keys are sounding pitches, and so are the ensemble's: a transposing
+          // instrument's `transpose` is between its written notes and these, not added here)
+          heldKey[ch * 128 + e.a] = pk;
+          if (ch != 9) band.on(ch, e.a, heldKey[ch * 128 + e.a], e.b, bandFamily(it->second.inst->family, it->second.inst->name), byEar(it->second));
           if (it->second.plan) {  // (an organ by its plan: the note on its track's division)
             Part& op = it->second;
             const int line = ch * 1000 + e.track;
             const int div = op.manualOf.count(line) ? op.manualOf[line] : 0;
-            const int key = pk + op.inst->transpose;
+            const int key = pk;
             if (auto* pl = dynamic_cast<OrganPlayer*>(&op.ens->player(0))) {
               auto old = op.organKey.find(ch * 128 + e.a);
               if (old != op.organKey.end()) pl->noteOffManual(old->second.first, old->second.second);
@@ -1359,7 +1367,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (dir.acts && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
           if (it->second.bplan)  // (the brass section: what the song says about this key)
             if (const BrassHint* bh = it->second.bplan->find(e.a, e.t)) it->second.ens->brassHint(*bh);
-          it->second.ens->noteOn(pk + it->second.inst->transpose, e.b);
+          it->second.ens->noteOn(pk, e.b);
           ++it->second.played;
         } else if (kind == 0x80 || kind == 0x90) {
           auto it = noteOwner.find(ch * 128 + e.a);
@@ -1444,7 +1452,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           p.ens->all(&Performer::setAccompaniment, busy);
         }
       // What the band sounds (src/band.h): the ringing notes fall; a part that tunes its keys by ear
-      // (the fretless) writes back where it has them.
+      // (the fretless, the winds) writes back where it has them.
       band.step(double(kBlock) / kRate);
       if (kBandLog && band.version() != bandSeen) {  // (PJ_BAND_LOG: the set whenever it changes)
         bandSeen = band.version();
@@ -1456,7 +1464,12 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         auto o = noteOwner.find(bn.ch * 128 + bn.key);
         if (o == noteOwner.end()) continue;
         auto pt = parts.find(o->second);
-        if (pt != parts.end() && pt->second.ens->size() == 1) band.setCents(bn.ch, bn.key, pt->second.ens->player(0).tuning(bn.pitch));
+        if (pt == parts.end()) continue;
+        if (pt->second.ens->listens()) {  // (a wind by ear)
+          band.setCents(bn.ch, bn.key, pt->second.ens->keyCents(bn.pitch));
+          band.setEarShare(bn.ch, bn.key, pt->second.ens->keyShare(bn.pitch));
+        }
+        else if (pt->second.ens->size() == 1) band.setCents(bn.ch, bn.key, pt->second.ens->player(0).tuning(bn.pitch));
       }
       std::fill(l.begin(), l.end(), 0.0f);
       std::fill(r.begin(), r.end(), 0.0f);

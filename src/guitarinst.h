@@ -38,6 +38,8 @@ class GuitarModel : public Tube {
   void controlStep() override {}
   float sample() override;
   Guitar g_;
+  int nanSeen_ = 0;  // g_.nanResets() already answered with a resetAir()
+  float strings();   // g_.sample(), with the tests' kick in and a caught NaN answered
   std::unique_ptr<GuitarAmp> amp_;
   float kAmpOut_ = 1;
   float last_ = 0;

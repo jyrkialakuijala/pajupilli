@@ -239,7 +239,7 @@ void HornPlayer::applyNote(Attack a) {
 }
 
 void HornPlayer::render(float* out, int n) {
-  static const double kSectionEar = knob("PJ_BRASS_EAR", 0.02);
+  static const double kSectionEar = knob("PJ_BRASS_EAR", 0.008);
   constexpr int kBlock = 16;
   const LipParams& lp = *inst_.design->lip;
   for (int i = 0; i < n; i += kBlock) {
@@ -319,8 +319,10 @@ void HornPlayer::render(float* out, int n) {
     // calibration keeps 2 % from where the note would flip or crack (and
     // sustained, a note flips sooner than from silence).
     if (ear_ && note_ >= 0 && earClock_ > 0.2) {
-      listen(out + i, m, earCorr_, earCents_ + seatCents_, earClock_, 600, kEarTau_, 5);
-      // (a section's player, its breath reaching further at ff, lips its note up further: 2 %)
+      static const double kSectionDead = knob("PJ_BRASS_EARDEAD", 1);
+      listen(out + i, m, earCorr_, earCents_ + seatCents_, earClock_, 600, kEarTau_, section_ ? kSectionDead : 5);
+      // (a section's player listens closer, a dead band of 1 c: with 5 c the trombones sat 8 c
+      // above their aim; its reach as a soloist's: at 2 % a horn's ear ran away 35 c flat on E4)
       const double reach = section_ ? kSectionEar : 0.008;
       earCorr_ = std::clamp(earCorr_, -reach, reach);
     }

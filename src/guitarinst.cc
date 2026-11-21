@@ -77,19 +77,32 @@ void GuitarModel::resetAir() {
   if (amp_) amp_->reset();
 }
 
+// The strings' sample: the tests' kick (testDrive) goes into them; a non-finite state they caught
+// and cleared clears the rest too (the amp, the filters), counted as a reset.
+float GuitarModel::strings() {
+  if (testDp_ != 0) { g_.kick(float(testDp_)); testDp_ = 0; }
+  const float x = g_.sample();
+  if (g_.nanResets() != nanSeen_) [[unlikely]] {
+    nanSeen_ = g_.nanResets();
+    resetAir();
+    ++resets_;
+  }
+  return x;
+}
+
 float GuitarModel::sample() {
   if (amp_ && kAcoustic_ > 0) {
     // (The jazz archtop: the amp, and the guitar's own sound under it.)
-    last_ = amp_->process(g_.sample()) * kAmpOut_ + kAcoustic_ * g_.acoustic();
+    last_ = amp_->process(strings()) * kAmpOut_ + kAcoustic_ * g_.acoustic();
     side_.push_back(0.0f);
     return finish(last_);
   }
   if (amp_) {
-    last_ = amp_->process(g_.sample()) * kAmpOut_;
+    last_ = amp_->process(strings()) * kAmpOut_;
     side_.push_back(0.0f);
     return finish(last_);
   }
-  last_ = g_.sample();
+  last_ = strings();
   side_.push_back(float(outScale()) * g_.side());
   return finish(last_);
 }

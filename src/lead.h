@@ -298,6 +298,9 @@ class Lead : public Tube {
   // The compressor: the main oscillator's envelope (the cascade's input),
   // each resonator's contribution's envelope, each one's gain.
   double cEnvSrc_ = 0, cEnv_[kCasc] = {}, cGain_[kCasc] = {1, 1, 1, 1, 1};
+  // The cascade's leveller (its gain, its target), and the samples since
+  // this attack (the envelopes' memory grows with it, up to 1.5 s).
+  double cLev_ = 1, cLevT_ = 1, cAge_ = 0;
   // ... and the whole sound's envelope, kept per control block (16 samples)
   // for the resonators' delayed views of it; each one's delay.
   static constexpr int kTotRing = 4096;  // blocks (~1.4 s at 48 kHz)

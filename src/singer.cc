@@ -138,11 +138,18 @@ void Singer::coefs() {
   // The boundaries: the mean area; losses (a viscous part growing in the
   // narrow places, and a constant for the walls' and the boundary layer's):
   // formant bandwidths ~50-100 Hz.
+  // (At most 1.7 x the narrower side: a boundary much wider than a
+  // section next to it, as at a closure, breaks the leapfrog's bound,
+  // (c dt / dx)^2 ab / A < 1. 1.7 holds while (c dt / dx)^2 < 0.56, a tract
+  // of 14.3 cm or more; a soprano's tract shortened by her open jaw (to
+  // ~11 cm on G5, (c dt / dx)^2 ~0.9) closed by Voice Oohs' soft "d" rang
+  // up at the Nyquist rate to 1e28 in 2 ms. With a constriction a boundary
+  // is at most 0.95 / (c dt / dx)^2 x the narrower side; without one the
+  // vowels' steps are gentle and the 1.7 stands, unchanged.)
+  const double cdx = kC * dts_ / dx_;
+  const double wide = cArea_ > 0 ? std::min(1.7, 0.95 / (cdx * cdx)) : 1.7;
   for (int i = 1; i < kN; ++i) {
-    // (At most 1.7 x the narrower side: a boundary much wider than a
-    // section next to it, as at a closure, breaks the leapfrog's bound,
-    // (c dt / dx)^2 ab / A < 1.)
-    const double ab = std::min(0.5 * (A_[i - 1] + A_[i]), 1.7 * std::min(A_[i - 1], A_[i]));
+    const double ab = std::min(0.5 * (A_[i - 1] + A_[i]), wide * std::min(A_[i - 1], A_[i]));
     ku_[i] = float(dts_ * ab / (kRho * dx_));
     damp_[i] = float(std::exp(-(260 + 0.035 / ab) * dts_));
   }

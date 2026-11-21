@@ -121,6 +121,7 @@ class Performer {
   // Play this note `cents` off its tempered pitch, tuned by ear with the lips.
   void setTuning(double cents) { ear_ = true; earCents_ = cents; }
   void setEar(bool on) { ear_ = on; }  // listen and tune held notes with the lips
+  double earCorr() const { return earCorr_; }  // (what the ear has trimmed the lips by now: log)
   const NoteInfo* info(int midi) const { return noteInfo(inst_, midi); }
   // The fingering the player uses: the calibration's choice.
   const NoteInfo* played(int midi) const {

@@ -1081,7 +1081,8 @@ static std::string organCachePath(const char* inst) {
       // (not the settings that do not touch the pipes: the threads, the logs)
       bool skip = false;
       for (const char* k : {"PJ_ORGAN_THREADS=", "PJ_ORGAN_RENDER_THREADS=", "PJ_WIND_LOG=", "PJ_CALDBG=",
-                            "PJ_PLAY_THREADS=", "PJ_PLAY_LEAD=", "PJ_ROLLER_OMIT="})
+                            "PJ_PLAY_THREADS=", "PJ_PLAY_LEAD=", "PJ_ROLLER_OMIT=", "PJ_THREADS=",
+                            "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK="})
         skip |= std::strncmp(*e, k, std::strlen(k)) == 0;
       if (!skip) env.emplace_back(*e);
     }

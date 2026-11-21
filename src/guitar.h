@@ -245,6 +245,10 @@ class Guitar {
   float acoustic() const { return acoustic_; }
   void reset();
   bool asleep() const { return asleep_; }
+  // Tests: a kick (or a NaN) into string 0's first mode on the next sample; and how many times a
+  // non-finite state was caught and cleared (reset()) inside sample().
+  void kick(float v) { str_[0].v[0][0] += v; str_[0].active = true; asleep_ = false; }
+  int nanResets() const { return nanResets_; }
   double frequency(int s) const;  // as stopped now
   // The fretless's left hand (GuitarSpec::board; any guitar can): string s stopped `semis`
   // semitones above its open pitch, anywhere along the board (fractional; 0: open). Called again
@@ -351,6 +355,7 @@ class Guitar {
   float clickB0_ = 0, clickA1_ = 0, clickA2_ = 0;
   bool asleep_ = true;
   int quiet_ = 0;
+  int nanResets_ = 0;
   static constexpr double kPlant_ = 0.005, kFlesh_ = 0.0022, kNail_ = 0.0005;  // s: the finger's rise; its two slips
 };
 

@@ -491,3 +491,17 @@ left out) and their mass-normalised shapes go to `src/glass_data.h`.
   its 3rd at 881): the autocorrelation tracker reads a fifth up (D4, D#5, G5) or an octave down
   (Bb6). The tone, not the pitch; the test reads the core with the cascade out (PJ_INHARM=0).
   Lower formants on average met more of the source: +3.4 dB, trim −5.3 dB.
+- Prompter (the GM comparison: −7.4 dB against the other instruments, −6 dB reached 422 ms after
+  the key, fonts 16–104 ms; key-to-key level scatter 3.5 dB, fonts 0.6–1.4). Two causes. The
+  amplifier's attack (0.5 s, full at 0.73 s): now 0.04 s (full at ~60 ms); the echo's build-up
+  still swells it to full over ~0.5 s. And the compressor at an attack: every envelope rising from
+  silence over 1.5 s and the delayed whole read from before the note (floored at 0.7 × the source)
+  lifted every gain to ~1.9 by 0.2–0.4 s, a burst; the whole's slow memory of it then held the
+  gains at their 0.5 floor for 1–2 s. Now the envelopes average over the note so far (from 20 ms,
+  growing to the 1.5 s), and the delayed view reaches back at most half the note's age: the gains
+  glide within 0.5–1.3 from the start. A leveller after the cascade (PJ_HALOLEVEL, 0.75): the
+  whole turned towards 1.8 × the source as (1.8 src / whole)^0.75 (the whole was 1.3–3 × the source
+  over the keys). GM comparison: −6 dB at 64 ms, phrase onset 44 ms (was 130), level +0.4 dB
+  against the others, scatter 2.5 dB (2.9 without the leveller; ~2 dB of it is there with the
+  cascade out, in -play though not in -note: not the cascade's), centroid 12.2 ERB (was 13.6: the attack's burst lifted F3–F5).
+  Trim −3.4 dB (levels.py −28.5 LUFS, median −28.2).

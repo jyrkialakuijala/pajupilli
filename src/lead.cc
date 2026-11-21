@@ -255,9 +255,11 @@ const LeadPatch kPatches[] = {
     // of five formant resonators (each feeding the next, each heard from its
     // own place, the room reaching back into them), the chorus, and a
     // regenerating bucket-brigade echo after the amplifier (340 ms, darker
-    // each time round).
+    // each time round). The amplifier opens in ~60 ms (was 0.75 s: GM's
+    // Halo speaks within ~20-100 ms); the echo building up gives the swell
+    // after (~0.5 s to full).
     [] { LeadPatch p{"pad-halo"}; p.vibKnob = 17 / 127.0; p.sine = 0.7; p.saw = 0.2; p.pulse = 0.4; p.pw = 0.25; p.cascade = 1; p.breath = 0.25;
-         p.comb = 0.7; p.chorus = 0.6; p.echo = 0.45; p.echoMs = 340; p.echoFb = 0.55; p.ampA = 0.5; p.ampD = 2;
+         p.comb = 0.7; p.chorus = 0.6; p.echo = 0.45; p.echoMs = 340; p.echoFb = 0.55; p.ampA = 0.04; p.ampD = 2;
          p.ampS = 0.9; p.cutoff = 14; p.fltEnv = 0.2; p.resScale = 0.2; p.relMul = 3; return p; }(),
     // 99 FX 3 (crystal): a glass plate, 16 x 16, its edges joined into a
     // torus, its mass varying along x, struck by two felt hammers at random
@@ -517,6 +519,8 @@ void Lead::resetAir() {
     std::fill(cEnv_, cEnv_ + kCasc, 0.0);
     std::fill(cGain_, cGain_ + kCasc, 1.0);
     cEnvSrc_ = cEnvTot_ = 0;
+    cLev_ = cLevT_ = 1;
+    cAge_ = 0;
     std::fill(cTotRing_, cTotRing_ + kTotRing, 0.0f);
     cascSide_ = 0;
     glassSide_ = 0;
@@ -700,6 +704,7 @@ void Lead::controlStep() {
         const double keyMul = std::exp2(0.32 * (double(z >> 11) / double(1ull << 53) * 2 - 1));
         const double velMul = 1.4 - 0.8 * std::clamp(ctl_.vel, 0.0, 1.0);
         for (int k = 0; k < kCasc; ++k) cBwMul_[k] = keyMul * velMul * (1 + 0.15 * urand());
+        cAge_ = 0;
         // Each key its own formants: over the keys, each spread evenly over
         // its range in human speech (F1 250-850, F2 800-2300, F3 2000-3200,
         // F4 3000-4200, F5 3800-5000 Hz): a Halton sequence over the key
@@ -1305,10 +1310,17 @@ double Lead::post(double y) {
     // 1.5 s; 1.5:1, so the gain goes as (target / level)^(1/3), within
     // 0.5..2, gliding over 0.1 s) and passed on so to the next: the formants
     // drift up towards the source's level, a quiet one most. PJ_HALOCOMP 0:
-    // none.
+    // none. At an attack the envelopes average over the note so far (20 ms
+    // at first, growing with the note to the 1.5 s): they hold the new
+    // note's levels within ~50 ms instead of rising from silence over
+    // seconds (then every gain leapt up at the attack, a burst ~0.3 s in, and
+    // the whole's slow memory of it held the gains at their floor for a
+    // second or two: the note came late and unevenly).
     static const double kComp = knob("PJ_HALOCOMP", 1);
-    static const double aAtt = 1 - std::exp(-1 / (1.5 * fs_)), aRel = aAtt, aG = 1 - std::exp(-1 / (0.1 * fs_));
-    auto follow = [&](double& e, double v) { e += (v > e ? aAtt : aRel) * (v - e); };
+    static const double aAtt = 1 - std::exp(-1 / (1.5 * fs_)), aG = 1 - std::exp(-1 / (0.1 * fs_));
+    const double aNow = cAge_ < 1.5 * fs_ ? std::max(aAtt, 1 / (cAge_ + 0.02 * fs_)) : aAtt;
+    cAge_ += 1;
+    auto follow = [&](double& e, double v) { e += aNow * (v - e); };
     follow(cEnvSrc_, std::fabs(y));
     double x = y, side = 0;
     for (int k = 0; k < kCasc; ++k) {
@@ -1326,7 +1338,10 @@ double Lead::post(double y) {
         // whole (which they make together): a slow loop that does not quite
         // settle; the formants take turns. PJ_HALOWHOLE scales the 1.5.
         static const double kWhole = knob("PJ_HALOWHOLE", 2);
-        const int back = int(cDelay_[k] * fs_ / 16);
+        // (Early in a note the delay is at most half the note's age: the view
+        // never reaches back before the attack, into the silence or the last
+        // note.)
+        const int back = std::min(int(cDelay_[k] * fs_ / 16), int(cAge_ / 32));
         // (The delayed whole no lower than 0.7 x the source: at an attack it
         // is still silence, and every gain would leap to its limit.)
         const double tot = std::max(double(cTotRing_[(cTotPos_ - back + 2 * kTotRing) % kTotRing]), 0.7 * cEnvSrc_);
@@ -1348,8 +1363,19 @@ double Lead::post(double y) {
       cTotSub_ = 0;
       cTotPos_ = (cTotPos_ + 1) % kTotRing;
       cTotRing_[cTotPos_] = float(cEnvTot_);
+      // The cascade's level against its source: each key's formants meet its
+      // harmonics differently (the whole 1.3..3 x the source over the keys,
+      // ~7 dB): the whole is turned towards 1.8 x the source, as (1.8 src /
+      // whole)^0.75 within 0.5..2, gliding over 50 ms: three quarters of a
+      // key's own excess taken out, the slow swing of the formants' turns
+      // mostly kept. PJ_HALOLEVEL: the 0.75 (0: none).
+      static const double kLevP = knob("PJ_HALOLEVEL", 0.75);
+      cLevT_ = kLevP > 0 ? std::clamp(std::pow((1.8 * cEnvSrc_ + 1e-6) / (cEnvTot_ + 1e-6), kLevP), 0.5, 2.0) : 1.0;
     }
-    y = x;
+    static const double aL = 1 - std::exp(-1 / (0.05 * fs_));
+    cLev_ += aL * (cLevT_ - cLev_);
+    cascSide_ *= cLev_;
+    y = x * cLev_;
   }
   if (P.ensemble > 0) {
     // Three bucket-brigade lines from one input (the string machine's): each

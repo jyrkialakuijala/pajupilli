@@ -24,8 +24,9 @@ clean:
 	rm -f pajupilli pajupilli-scalar
 
 # Fast checks (PLAN.md step 1): vectorisation, stability, NaN recovery,
-# tuning and registers, scalar parity, real-time margin.
+# tuning and registers, scalar parity, real-time margin. Some groups, in parallel:
+# make test T='jazz_guitar fx_*' J=4 (tools/test.py -l lists the groups).
 test: pajupilli scalar
-	python3 -I tools/test.py
+	python3 -I tools/test.py $(if $(J),-j $(J)) $(T)
 
 .PHONY: scalar asm clean test

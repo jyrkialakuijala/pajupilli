@@ -61,6 +61,10 @@ class Voice {
   Resampler rs_;
   std::vector<float> in_, room_;
   float roomLast_ = 0;
+  // A side or directional part with a NaN / Inf in it (its model reset that block): silence in
+  // its place, so it does not reach the room or the mix.
+  std::vector<float> zeros_;
+  const float* finite(const float* p, int n);
 };
 
 }  // namespace pajupilli

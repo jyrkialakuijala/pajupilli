@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
 
 #include "bowlevels_data.h"
 #include "cellobowlevels_data.h"
@@ -431,6 +432,7 @@ void Bass::reset() {
   for (Str& s : str_) {
     s.bowOn = false;
     s.bowV = s.bowF = s.bowVTo = s.bowFTo = s.bowTurn = 0;
+    s.bowNoise = s.bowTw = 0;  // (the hair's grip and the string's twist: a NaN kept there came back)
     std::memset(s.q, 0, sizeof s.q);
     std::memset(s.v, 0, sizeof s.v);
     std::memset(s.aq, 0, sizeof s.aq);
@@ -439,6 +441,7 @@ void Bass::reset() {
     s.active = false;
   }
   uy_ = vy_ = uz_ = vz_ = ay_ = az_ = ut_ = vt_ = at_ = prevVy_ = prevVz_ = 0;
+  prevFootV_ = 0;  // (the microphone's last sample: a NaN there made a second reset)
   floorY_ = floorV_ = floorLp_ = 0;
   ux_ = vx_ = xt_ = vxt_ = 0;
   bank_.reset();
@@ -667,6 +670,42 @@ float Bass::sample(float testForce) {
   return micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
 }
 
+// One string's modes in one direction, one step: forces as a step in velocity, then each mode's
+// own rotation and decay. Vectorised (the arrays apart), with every mode's arithmetic exactly as
+// the scalar loop did it, so the same bits: its fused multiply-adds written out, the rest kept in
+// order (no reassociation, no reciprocals). (Builtins: std::fma would not inline under the
+// function's own options.)
+template <bool kBoardOn>
+__attribute__((noinline, optimize("no-associative-math", "no-reciprocal-math")))
+static void stepModes(float* __restrict q, float* __restrict v, const float* __restrict w,
+                      const float* __restrict wdt, const float* __restrict csd, const float* __restrict snd,
+                      const float* __restrict dec, const float* __restrict tch, const float* __restrict shp,
+                      const float* __restrict bin, const float* __restrict bf, float dt, float dr, float a,
+                      float eps, float extra) {
+  for (int i = 0; i < Bass::kModes; ++i) {
+    // (the board's push folded into the same step, in the order the compiler had it)
+    const float vv = kBoardOn ? __builtin_fmaf(dt, __builtin_fmaf(bin[i], a, __builtin_fmaf(dr, shp[i], bf[i])), v[i])
+                              : __builtin_fmaf(dt, __builtin_fmaf(dr, shp[i], bin[i] * a), v[i]);
+    const float x = q[i] * w[i];
+    // (The extra turn del, kept a pure rotation: c^2 + s^2 = 1.)
+    const float del = wdt[i] * eps;
+    const float nrm = 1 / __builtin_sqrtf(__builtin_fmaf(del, del, 1.0f));
+    const float cc = __builtin_fmaf(-snd[i], del, csd[i]) * nrm, ss = __builtin_fmaf(csd[i], del, snd[i]) * nrm;
+    const float g = dec[i] * extra * tch[i];
+    q[i] = __builtin_fmaf(x, cc, vv * ss) * g / w[i];
+    v[i] = __builtin_fmaf(cc, vv, -(x * ss)) * g;
+  }
+}
+
+// The string's slope at the bridge, sum q[i] slope[i], one mode after another (as the scalar loop
+// added them: the same bits).
+static float slopeInOrder(const float* q, const float* slope) {
+  float sl = 0;
+#pragma GCC novector
+  for (int i = 0; i < Bass::kModes; ++i) sl = std::fma(q[i], slope[i], sl);
+  return sl;
+}
+
 // One step of the strings, the bow, the tailpiece and the bridge (BassSpec::oversample of them a
 // sample), against the body as the last sample left it.
 void Bass::stepStrings() {
@@ -801,26 +840,27 @@ void Bass::stepStrings() {
     const float acc[2] = {ay_, az_};
     const float accOn = kSymp_ || s.fingerClock < 10.0 ? 1.0f : 0.0f;
     float slope[2] = {0, 0};
+    // (Each mode on its own: vectorised (the arrays apart: restrict), every mode's arithmetic as
+    // it was. The board's push and the finger's touch: chosen outside the loop.)
+    static constexpr float kOnes[kModes] = {
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    static_assert(kModes == 64, "kOnes");
+    const float* __restrict tch = touched ? s.touch : kOnes;
+    const float* __restrict shp = shape;
+    const float* __restrict bin = s.bridgeIn;
     for (int d = 0; d < 2; ++d) {
-      float* q = s.q[d];
-      float* v = s.v[d];
-      float sl = 0;
-      const float a = acc[d] * accOn;
-      for (int i = 0; i < kModes; ++i) {
-        // Forces as a step in velocity, then the mode's own rotation and decay.
-        float vv = v[i] + dt * (drive[d] * shape[i] + s.bridgeIn[i] * a);
-        if (d == 0 && touching) vv += dt * boardF[i];
-        const float x = q[i] * s.w[d][i];
-        // (The extra turn del, kept a pure rotation: c^2 + s^2 = 1.)
-        const float del = s.wdt[d][i] * eps;
-        const float nrm = 1 / std::sqrt(1 + del * del);
-        const float cc = (s.cs[d][i] - s.sn[d][i] * del) * nrm, ss = (s.sn[d][i] + s.cs[d][i] * del) * nrm;
-        const float g = s.decay[d][i] * extra * (touched ? s.touch[i] : 1.0f);
-        q[i] = g * (x * cc + vv * ss) / s.w[d][i];
-        v[i] = g * (vv * cc - x * ss);
-        sl += q[i] * s.slope[i];
-      }
-      slope[d] = sl;
+      float* __restrict q = s.q[d];
+      float* __restrict v = s.v[d];
+      const float* __restrict w = s.w[d];
+      const float* __restrict wdt = s.wdt[d];
+      const float* __restrict csd = s.cs[d];
+      const float* __restrict snd = s.sn[d];
+      const float* __restrict dec = s.decay[d];
+      const float a = acc[d] * accOn, dr = drive[d];
+      if (d == 0 && touching) stepModes<true>(q, v, w, wdt, csd, snd, dec, tch, shp, bin, boardF, dt, dr, a, eps, extra);
+      else stepModes<false>(q, v, w, wdt, csd, snd, dec, tch, shp, bin, boardF, dt, dr, a, eps, extra);
+      slope[d] = slopeInOrder(q, s.slope);
     }
     // The plane of each mode's swing turns a little (y into z and back).
     for (int i = 0; i < kModes; ++i) {

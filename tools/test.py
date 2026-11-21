@@ -14,7 +14,8 @@ failures = []
 # The flute family: name, sounding minus written pitch, written range.
 FAMILY = (('flute-c', 0, 60, 96), ('piccolo', 12, 62, 95), ('alto', -5, 60, 88), ('bass', -12, 60, 86))
 
-def run(args, binary=FLUTE, env=None):
+def run(args, binary=None, env=None):
+    binary = binary or FLUTE  # (at call time: --bin may have replaced it)
     e = dict(os.environ)
     e.update(env or {})
     return subprocess.run([binary] + args, capture_output=True, text=True, env=e, cwd=ROOT)
@@ -6172,10 +6173,73 @@ def brass_section():
         check(f'real-time margin (brass-section, {mode}: {5 if mode == "pop" else 10} players)', ns < lim,
               f'{ns:.0f} ns/sample ({ns / 20833 * 100:.1f} % of a core)')
 
-if __name__ == '__main__':
+def plucked_nan():
+    """NaN recovery of the guitars, the electric basses, the struck strings and the double bass's
+    family, plucked and bowed (src/bass.cc: Bass::reset clears the bow's state too) (src/guitar.cc: a
+    NaN in the strings is caught there, before the amp, the side and the room, and every part of
+    the instrument is reset once; the key is struck again)."""
+    for inst in ('nylon-guitar', 'steel-guitar', 'jazz-guitar', 'clean-guitar', 'muted-guitar',
+                 'overdriven-guitar', 'distortion-guitar', 'guitar-harmonics', 'electric-bass',
+                 'pick-bass', 'fretless-bass', 'slap-bass-1', 'slap-bass-2', 'grand-piano',
+                 'bright-piano', 'upright-piano', 'honky-tonk', 'electric-grand', 'harpsichord', 'dulcimer',
+                 'double-bass', 'contrabass', 'cello', 'viola', 'violin'):
+        r = run(['-inst', inst, '-nantest'])
+        check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
+
+GROUPS = None  # (set below: every test group, in the order they run)
+
+def main():
+    """Every group, or some: `tools/test.py [-l] [-j N] [--bin PATH] [GROUP|PREFIX* ...]`.
+    -l lists the groups; GROUP is a function's name (jazz_guitar), PREFIX* every group starting
+    so (fx_*); --bin tests another build of the synth (an older version, a patch: the same
+    groups on each); -j N runs N groups at once, each its own process (their output kept
+    together, a group's time printed with it). The real-time checks measure CPU time, but N
+    groups at once still share the caches: rerun a failed margin alone."""
+    global FLUTE
+    import argparse, concurrent.futures
+    ap = argparse.ArgumentParser(description=main.__doc__)
+    ap.add_argument('groups', nargs='*')
+    ap.add_argument('-l', '--list', action='store_true')
+    ap.add_argument('-j', '--jobs', type=int, default=1)
+    ap.add_argument('--bin')
+    a = ap.parse_args()
+    names = [f.__name__ for f in GROUPS]
+    if a.list:
+        print('\n'.join(names))
+        return 0
+    want = []
+    for g in a.groups or names:
+        hit = [n for n in names if (n.startswith(g[:-1]) if g.endswith('*') else n == g)]
+        if not hit:
+            print(f'no test group {g!r} (-l lists them)', file=sys.stderr)
+            return 2
+        want += [n for n in hit if n not in want]
+    if a.bin:
+        FLUTE = os.path.abspath(a.bin)
     t0 = time.time()
-    for f in (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes):
-        f()
-    print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
-    sys.exit(1 if failures else 0)
+    if a.jobs <= 1:
+        for n in want:
+            t1 = time.time()
+            globals()[n]()
+            if len(want) > 1:
+                print(f'-- {n}: {time.time() - t1:.0f} s', flush=True)
+        print(f"\n{len(failures)} failed, {time.time() - t0:.0f} s" + (f": {failures}" if failures else ''))
+        return 1 if failures else 0
+    def one(n):
+        t1 = time.time()
+        cmd = [sys.executable, '-I', os.path.abspath(__file__), n] + (['--bin', FLUTE] if a.bin else [])
+        r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
+        return n, r.stdout + r.stderr, time.time() - t1
+    bad = []
+    with concurrent.futures.ThreadPoolExecutor(a.jobs) as ex:
+        for n, out, secs in ex.map(one, want):
+            lines = [l for l in out.splitlines() if l and not re.match(r'\d+ failed, \d+ s', l)]
+            print('\n'.join(lines) + f'\n-- {n}: {secs:.0f} s', flush=True)
+            bad += [l[6:] for l in lines if l.startswith('FAIL')]
+    print(f"\n{len(bad)} failed, {time.time() - t0:.0f} s" + (f": {bad}" if bad else ''))
+    return 1 if bad else 0
+
+if __name__ == '__main__':
+    GROUPS = (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
+    sys.exit(main())

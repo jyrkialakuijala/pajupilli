@@ -36,6 +36,27 @@
 // 3 s, PJ_JIHEAL), as far as their intervals let them; a note alone, or with
 // no harmonic reason to be off, ends at 0 c.
 //
+// The winds by ear (-play; src/windear.cc, research/fretless_bass.md 7.6): a brass or reed part
+// (the trumpets, the horn, the trombone, the tuba, the brass section; the saxes, the oboe, the
+// English horn, the bassoon, the clarinet, the duduk, shawm and shehnai; not the free reeds, nor
+// synth brass) also tunes each held note to what the rest of the band sounds (src/band.h), as the
+// fretless bass does: its own partials (brass 1/sqrt(k) to 2 kHz, the reeds 1/k, the clarinet's
+// evens weak) against every other note's template, followed by its weight w as w / (w + 0.0005),
+// within +-15 c, a change under 3 c let be, the lips at most 0.2 c/ms (no change quicker than 0.1 s:
+// slower than the fretless finger), back to 0 c in ~3 s with nothing to
+// hear; landed on at once on a new note, heard again when the band changes and every 50 ms. Each
+// voice's band pull b is where its "equal temperament" lies in the section's own solve (above):
+// its anchor, the young notes' mean, the top note's pull and the healing lie on b instead of 0 c
+// (a note already sounding is anchored where it was, moved by as much as its pull has moved since),
+// the pairs asking for their just intervals as before; so the section's just intervals and the
+// band's pull are solved together, a pull that moves 1 c asking for a solve. A single voice plays b.
+// A lone brass player sets its lips for it (as for the pitch wheel: the lip roll, 36 c a unit),
+// its ear trimming the rest; the reeds' own ear reaches it. The brass section's lean to equal
+// temperament (x0.5) scales both. Each note's tuning is written back to the band (keyCents), heard
+// in the order that keeps the winds from chasing each other, the winds' mean healing to equal
+// temperament as far as they sound alone (src/band.h). PJ_WIND_EAR=0: as before; PJ_WIND_EAR_LIM:
+// the limit (c); PJ_WIND_EAR_LOG=1: each note's pull on stderr, 2: every change of its tuning.
+//
 // The room (room.h): the instruments sit in it, sound into it and hear it in
 // their bores, the silent ones too. Without a room the silent flutes are not
 // computed.
@@ -55,6 +76,7 @@ namespace pajupilli {
 struct ChoirState;  // (the choir's dealing: src/choir.cc)
 struct BrassState;  // (the brass section's: src/brasssect.cc)
 struct BrassHint;
+class SoundingSet;
 
 class Ensemble {
  public:
@@ -74,6 +96,7 @@ class Ensemble {
     // (the brass section: a bend is each player's own fall, the dynamics its swell's base)
     if (brass_ && set == &Performer::setLipRoll) { brassBend(x); return; }
     if (brass_ && set == &Performer::setDynamics) { brassSetDynamics(x); return; }
+    if (rollFeed_ && set == &Performer::setLipRoll) { wheel_ = x; bandRoll(); return; }  // (src/windear.cc)
     for (Slot& s : f_) (s.v->player().*set)(x);
     for (Section& k : kids_) k.ens->all(set, x);
   }
@@ -104,6 +127,13 @@ class Ensemble {
     for (Slot& s : f_) s.v->player().direct(c);
     for (Section& k : kids_) k.ens->direct(c);
   }
+  // (-play) The winds by ear (above): the band, this part's channel, its own template (a
+  // BandFamily; windEar), or -1: not listening.
+  static int windEar(const Instrument& in);
+  void setBand(const SoundingSet* band, int self, int fam);
+  bool listens() const { return band_ && earFam_ >= 0; }
+  double keyCents(int key) const;  // where it has key now (c; 0: not tuned by ear)
+  double keyShare(int key) const;  // ... how much of its pull is other winds' (SoundingSet::drift)
   void setHold(bool h) {
     for (Slot& s : f_) s.v->player().setHold(h);
     for (Section& k : kids_) k.ens->setHold(h);
@@ -137,6 +167,12 @@ class Ensemble {
     double gl = 1, gr = 1;   // its pan (no room): gains left and right
     double vg = 1, vgTo = 1, vgTau = 0.005;  // velocity's gain: now, its goal, how fast (s)
     std::vector<float> room; // the room's pressure here, next block
+    // The band's pull (the winds by ear): the note it is for; now, where it goes, how firmly (the
+    // weight); when it was last heard, the band's version then; what the section's solve last
+    // took it as; the tuning last given the player (c).
+    int earNote = -1;
+    double band = 0, bandTo = 0, bandMix = 0, bandAt = -1, bandSolved = 0, sent = 0, shown = 0, earShare = 0;
+    unsigned bandVersion = ~0u;
   };
   void init(const std::vector<Member>& members, const RoomSpec* room);
   int fold(int f, int key, int* octaves) const;  // the key in flute f's range (a pool), -1 (an ensemble)
@@ -151,6 +187,13 @@ class Ensemble {
   void take(int flute, int key, int pitch, int velocity);
   void release(int key);
   void retune();  // the pajupilli intonation among the sounding flutes (adaptive just)
+  bool bandEar(double dt);  // the winds by ear: each held note's band pull (true: one moved >= 1 c)
+  double bandHear(int slot, int note, double* weight, double* earShare) const;
+  // ... retune's right-hand side: the young's mean (weight kMean, 0: none) and the top note
+  // (topPull) pulled to their band pulls.
+  void bandRhs(int n, const int* idx, const bool* young, int ny, double kMean, int top, double topPull, double* b) const;
+  void bandRoll();          // ... a lone brass player's lips set for it (the pitch wheel's roll and more)
+  void bandSend();          // ... the section's solve about it, to the players
   void block(float* left, float* right, int n);
 
   static constexpr double kChord = 0.035, kSplit = 0.10, kForget = 2.0, kIdle = 1.0;
@@ -226,6 +269,7 @@ class Ensemble {
   void brassRender(float* left, float* right, int n);
   std::shared_ptr<BrassState> brass_;
   bool mixFixed_ = false;  // (a section's players: their sum not evened to one player's level)
+  bool spectral_ = false;  // (the brass section: the pairs pulled by their partials, as the organ's keys)
   double jiScale_ = 1;     // (the pajupilli intonation's share: the brass section's players lean to equal temperament)
   int sheld_[128] = {};  // the held keys' velocities (0: up)
   unsigned srng_ = 2026;
@@ -249,6 +293,12 @@ class Ensemble {
   bool verbose_;
   bool ji_;                 // PJ_JI (1): the pajupilli intonation (adaptive just)
   long long tuneSig_ = -1;  // the sounding set last tuned for
+  const SoundingSet* band_ = nullptr;  // (the winds by ear)
+  int self_ = -1, earFam_ = -1, earLog_ = 0;
+  double earLim_ = 15;
+  bool bandSolve_ = false;  // (a solve for the band's pull alone: not printed)
+  bool rollFeed_ = false;   // (brass by ear, not the section's seats: the lips set for the pull)
+  double wheel_ = 0;        // (... over the pitch wheel's roll)
   std::vector<std::vector<float>> buf_;
   // Three reverb channels, each a room of its own: small (the synth
   // basses), main (the room chosen; everyone else), gated (a big live room,

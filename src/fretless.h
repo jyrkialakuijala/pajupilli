@@ -66,6 +66,8 @@ class FretlessBassModel : public Tube {
   void controlStep() override {}
   float sample() override;
   Guitar g_;
+  int nanSeen_ = 0;  // g_.nanResets() already answered with a resetAir()
+  float strings();   // g_.sample(), with the tests' kick in and a caught NaN answered
   std::unique_ptr<GuitarAmp> amp_;
   double b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0, z1_ = 0, z2_ = 0, out_ = 1;
   // The chorus (PJ_FRETLESS_CHORUS): a delay line, the wet path's high-pass, the LFO's phase.

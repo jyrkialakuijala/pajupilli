@@ -944,14 +944,19 @@ void Ensemble::brassBuild(int mode) {
   s.ens.reset(new Ensemble(members, false, B.room));
   s.ens->quiet_ = true;
   s.ens->mixFixed_ = true;  // (the section's own balance: brassRender)
-  s.ens->jiScale_ = knob("PJ_BRASS_JI", 0.5);
+  // (the held chord tuned by its partials, as the organ's keys: the overtones lock. At full
+  // strength: the spectral pull is itself mild, a close major third about 5 c narrow, an open one
+  // 9 c, a seventh left near tempered. PJ_BRASS_JI_SPECTRAL=0, PJ_BRASS_JI=0.5: the interval
+  // table at half strength, as before)
+  s.ens->spectral_ = knob("PJ_BRASS_JI_SPECTRAL", 1) != 0;
+  s.ens->jiScale_ = knob("PJ_BRASS_JI", s.ens->spectral_ ? 1.0 : 0.5);
   s.lo = lo_;
   s.hi = hi_;
   s.gain = 1;
   s.stops = true;
   kids_.push_back(std::move(s));
   // A key at about one trumpet's level, +2 dB (research 6.4; measured on a unison key).
-  B.gain = knob("PJ_BRASS_GAIN", 0.72) * levelTrim(*B.inst);  // (-play: a unison G4 2 dB over the trumpet at velocity 100)
+  B.gain = knob("PJ_BRASS_GAIN", 1.08) * levelTrim(*B.inst);  // (-play: a unison G4 2 dB over the trumpet at velocity 100; 0.72 while -play sounded the trumpet a tone low)
   unsigned seat = 0;
   for (Slot& f : kids_[0].ens->f_) {
     ++seat;

@@ -253,12 +253,14 @@ int Ensemble::pickFree(int key, int* pitch) const {
       if (f_[g].held) c += crossing(i, p, g, f_[g].v->player().sounding());
     if (keepTails_ > 0 && !mixed_) {
       // (-play) Let released notes ring out: the voice released longest ago
-      // (never played: the longest). A wind's line keeps to its player: the
-      // voice released last, if its note was within a minor third.
+      // (never played: the longest). A wind's line keeps to its player, the
+      // voice released last, whatever the leap (PJ_WINDLEAP: the widest, semitones): one horn
+      // plays the part; a leap begun on another, silent one spoke 80 ms later and over the first's end.
       const Instrument& in = f_[i].v->instrument();
       const bool wind = !in.circuit() && !in.plucked() && !in.modal();
       const double age = f_[i].lastNote < 0 ? 1e6 : now_ - f_[i].lastOff;
-      c = wind && f_[i].lastNote >= 0 && std::abs(f_[i].lastNote - p) <= 3 && age < keepTails_ ? -1e9 + age : -age;
+      static const int kWindLeap = int(knob("PJ_WINDLEAP", 127));
+      c = wind && f_[i].lastNote >= 0 && std::abs(f_[i].lastNote - p) <= kWindLeap && age < keepTails_ ? -1e9 + age : -age;
     }
     if (c < bestCost) { bestCost = c; best = i; *pitch = p; }
   }
@@ -510,7 +512,8 @@ void Ensemble::retune() {
   // common offset heals to equal temperament (its weighted mean to 0 c); a
   // note left alone, or with no harmonic reason to be off, goes back to 0 c.
   bool heal = false;
-  if (sig == tuneSig_) {
+  const bool same = sig == tuneSig_;
+  if (same && !bandSolve_) {  // (bandSolve_: the winds' band pull moved, src/windear.cc)
     if (kHeal_ <= 0 || n == 0 || now_ - healAt_ < kHealEvery) return;
     for (int i = 0; i < n; ++i)
       if (now_ - f_[idx[i]].noteAt < kYoung) return;
@@ -688,6 +691,49 @@ void Ensemble::retune() {
     if (n < 2 || kTopPull <= 0) top = -1;
     if (top >= 0) topPull = kTopPull * (0.4 + 2.5 * (1 - clar[top]));
   }
+  // The brass section (spectral_): each pair pulled by its partials, as the organ's keys are
+  // (src/organ.cc justSolve): every two partials within 36 c of each other beat, and pull the
+  // interval to where they meet, by the weaker one's level (the beating's depth). Brass players
+  // tune a held chord so: its overtones lock, a major third the fifth partial of its root (-14 c),
+  // a seventh the seventh where the root's spectrum reaches it. The spectra: harmonics level to
+  // the instrument's cut-off, 12 dB an octave above it (measured on the models at mf: the
+  // trumpet's about 1.2 kHz, the trombone's 500 Hz, the horn's 450 Hz, the tuba's 250 Hz; the
+  // dynamics move them little), each normalised to its power.
+  static double specW[64][64], specD[64][64];
+  if (spectral_) {
+    static const double kWin = knob("PJ_BRASS_JI_WINDOW", 36), kSpecW = knob("PJ_BRASS_JI_W", 1.0);
+    std::vector<std::pair<double, double>> spec[64];  // (log2 of the harmonic number, level)
+    for (int i = 0; i < n; ++i) {
+      const char* nm = f_[idx[i]].v->instrument().name;
+      const double fc = std::strstr(nm, "trumpet") ? 1200 : std::strstr(nm, "trombone") ? 500
+                        : std::strstr(nm, "horn") ? 450 : std::strstr(nm, "tuba") ? 250 : 800;
+      const double f0 = 440 * std::exp2((note[i] - 69) / 12.0);
+      double pw = 0;
+      for (int k = 1; k <= 16 && k * f0 < 6000; ++k) {
+        const double r = k * f0 / fc, w = 1 / (1 + r * r);
+        spec[i].push_back({std::log2(double(k)), w});
+        pw += w * w;
+      }
+      for (auto& q : spec[i]) q.second /= std::sqrt(pw);
+    }
+    for (int i = 0; i < n; ++i)
+      for (int j = 0; j < n; ++j) {
+        specW[i][j] = specD[i][j] = 0;
+        double sw = 0, sd = 0;
+        for (auto& a : spec[i])
+          for (auto& bq : spec[j]) {
+            const double delta = 1200 * (bq.first + (note[j] - note[i]) / 12.0 - a.first);
+            if (std::fabs(delta) > kWin) continue;
+            const double ww = std::min(a.second, bq.second) * std::exp(-(delta / 20) * (delta / 20));
+            sw += ww;
+            sd -= ww * delta;  // (c_j - c_i that makes them meet)
+          }
+        if (sw > 1e-6) {
+          specW[i][j] = kSpecW * sw;
+          specD[i][j] = sd / sw;
+        }
+      }
+  }
   bool pin[64] = {};
   double pinTo[64] = {}, c[64];
   bool meanOn = true;  // the young's mean held at 0 (dropped once an old note is at its limit)
@@ -697,10 +743,13 @@ void Ensemble::retune() {
       Slot& s = f_[idx[i]];
       const bool known = s.tunedNote == note[i];
       double l, a;
+      // (The winds by ear, src/windear.cc: each anchor about the voice's band pull ba, moved by as
+      // much as the pull has since it was last solved, bs; without the band both 0.)
+      const double ba = listens() ? s.band : 0.0, bs = listens() ? s.bandSolved : 0.0;
       if (pin[i]) { l = 1e6; a = pinTo[i]; }
-      else if (young[i]) { l = kToTempered; a = known ? s.cents : 0; }
-      else if (oldStay) { l = kStay; a = s.cents * decay; }
-      else { l = kToTempered; a = s.cents; }  // the old minority: free, near where it is
+      else if (young[i]) { l = kToTempered; a = known ? s.cents + ba - bs : ba; }
+      else if (oldStay) { l = kStay; a = ba + (s.cents - bs) * decay; }
+      else { l = kToTempered; a = s.cents + ba - bs; }  // the old minority: free, near where it is
       A[i][i] += l;
       b[i] += l * a;
     }
@@ -717,6 +766,8 @@ void Ensemble::retune() {
       for (int i = 0; i < n; ++i)
         for (int j = 0; j < n; ++j)
           if (young[i] && young[j]) A[i][j] += kMean / (double(ny) * ny);
+    // (The winds by ear: the young's mean and the top note pulled to their band pulls, not 0 c.)
+    if (listens()) bandRhs(n, idx, young, ny, ny > 0 && !oldStay && meanOn ? kMean : 0.0, top, topPull, b);
     for (int i = 0; i < n; ++i)
       for (int j = 0; j < n; ++j) {
         if (note[j] <= note[i] && !(note[j] == note[i] && j > i)) continue;
@@ -729,7 +780,11 @@ void Ensemble::retune() {
         } else if (seventh(j, i, &d)) {
           wJ = std::max(wJ, kJust[10].weight);
         }
-        const double w = wJ / (1 + 0.5 * (semis / 12));
+        double w = wJ / (1 + 0.5 * (semis / 12));
+        if (spectral_ && specW[i][j] > 0) {  // (the partials that meet, above)
+          w = specW[i][j];
+          d = specD[i][j];
+        }
         // c_j - c_i = d
         A[i][i] += w; A[j][j] += w; A[i][j] -= w; A[j][i] -= w;
         b[j] += w * d; b[i] -= w * d;
@@ -787,9 +842,15 @@ void Ensemble::retune() {
     Slot& s = f_[idx[i]];
     s.cents = c[i];
     s.tunedNote = note[i];
+    if (listens()) { s.bandSolved = s.band; s.sent = c[i] * jiScale_; }  // (src/windear.cc)
     s.v->player().setTuning(c[i] * jiScale_);
   }
-  if (n > 1 && !heal && !quiet_) {
+  if (n > 1 && !heal && std::getenv("PJ_TUNEDBG")) {  // (also a quiet ensemble's, the brass section's)
+    std::fprintf(stderr, "tuned:");
+    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.1f", name(note[i]), note[i] / 12 - 1, c[i]);
+    std::fprintf(stderr, "\n");
+  }
+  if (n > 1 && !heal && !quiet_ && !(same && bandSolve_)) {
     std::fprintf(stderr, "tune:");
     for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.0f", name(note[i]), note[i] / 12 - 1, c[i]);
     if (vp) {  // (its own line: tools/test.py reads the notes on the tune line)
@@ -829,7 +890,12 @@ void Ensemble::render(float* out, int n) {
 
 void Ensemble::block(float* left, float* right, int n) {
   if (f_.size() > 1) split();
+  // (The winds by ear, src/windear.cc: a pull moved enough asks the section to solve again.)
+  const bool ear = listens();
+  if (ear && bandEar(n / 48000.0) && f_.size() > 1 && ji_) bandSolve_ = true;
   if (f_.size() > 1 && ji_) retune();
+  bandSolve_ = false;
+  if (ear) bandSend();
   // How many lines: the most seen lately, back down after kForget with fewer.
   const int h = holding();
   if (h >= lines_) {

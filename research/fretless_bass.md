@@ -755,6 +755,80 @@ All three users solve a small least-squares problem over the sounding notes.
 - **All of it is one quantity:** the cents of the stopping finger, applied as the stopped length
   (§8.2). One code path drives intonation, scoop, slide, vibrato and pitch bend.
 
+### 7.6 The winds by ear (brass and reeds; built 2026-11-21)
+
+The user (2026-11-20): "all horns and reeds should use spectral tuning". Every brass part (trumpet,
+muted trumpet, trombone, horn, tuba, the brass section) and every blown reed (the saxes, oboe,
+English horn, bassoon, clarinet; duduk, shawm, shehnai) now tunes by ear to the registry (§7.4).
+Not the free reeds (harmonica, accordion, bandoneón: fixed reeds) and not synth brass.
+`src/windear.cc`, `Ensemble::windEar`; `PJ_WIND_EAR=0` gives the old behaviour exactly (checked:
+byte-identical renders of a brass-section file and a four-wind file).
+
+- **The rule is the fretless's (§7.5)**, factored into `bandPull()` (`src/band.cc`), which the
+  fretless now calls too (its renders byte-identical before and after):
+  - each note's own partials against every other note's template; pairs within 36 c pulling by
+    min(levels) · exp(−(δ/20)²) / k², followed by the weight w as w/(w + 0.0005), within ±15 c;
+  - the winds' own templates: brass 1/√k to 2 kHz (then 0.5/k); the reeds 1/k; the clarinet its odd
+    partials 1/k, its even ones 0.1/k below 1.5 kHz (the tone-hole lattice's cutoff, Benade: about
+    −20 dB in the chalumeau) and 0.6/k above. The clarinet is now its own family in the registry,
+    so the others hear it so too.
+- **The lips are slower than the fretless's finger:** a held note is retuned over 0.1 s or more, at
+  most 0.2 c/ms (the finger: 25 ms, 1 c/ms), and a change under 3 c is let be (the finger: 2). In a
+  busy texture (a Bach chorus's running strings) passing notes pull a few cents either way within
+  100–200 ms; the finger's limits let a held trumpet note follow them as a 2–3 c flutter.
+- **A section's own intervals and the band, solved together:** in a part playing chords
+  (`Ensemble::retune`, the pajupilli intonation) each voice's band pull b_i takes the place of
+  equal temperament in its anchor: a new note's a_i = b_i, a sounding one anchored where it was
+  plus what its pull has moved since the last solve, the young notes' mean and the top note pulled
+  to their b's instead of 0, the healing towards b. The pairs still ask for their just intervals.
+  A pull moved by 1 c asks for a new solve (not printed). A single voice plays b. The brass
+  section's lean to equal temperament (×0.5) scales the whole.
+- **Reaching the target:** the reeds' own ear (`ReedPlayer`, ±120 c) plays the target to within
+  0.5 c. A brass player's ear trims at most 0.8 % of the lips' tension with a 5 c dead band
+  (`HornPlayer`): it reaches ~5 c. A lone brass player therefore sets its lips for the pull as for
+  the pitch wheel (the lip roll: the lips' resonance × e^(0.06·roll), 600 c per unit of its log,
+  36 c a roll unit), the ear trimming the rest. The section's seats set their lips by their own
+  feed-forward (`section_`).
+- **Measured** (each wind holding a note 2.5 s over a piano's or a string pad's chord, the backing
+  heard but not rendered; the logged target, then the played pitch from the spectrum, and in
+  brackets the same render with `PJ_WIND_EAR=0`; the brass in its octave):
+
+| | E4 over C3 G3 | G4 over C3 E3 | C4 over C3 E3 G3 |
+|---|---|---|---|
+| target (all) | −13.3 c | +1.9 | −0.1 |
+| alto sax, oboe, clarinet, bassoon | −12.7 to −13.6 (−0.2) | +1.7 to +1.8 (−0.3 to +0.1) | −0.4 to +0.4 |
+| horn, tuba | −13.2, −12.7 (−2.6, +7.5) | +3.4, +6.6 (+1.8, +4.6) | −3.1, −2.8 |
+| trumpet, trombone | −7.4, −7.7 (+4.6, +5.1) | +6.4, +6.8 (+6.4, +5.0) | +6.3, +4.4 |
+| brass section (×0.5) | −3.9 (+3.8) | +2.5 (+1.2) | +1.1 |
+
+  The same over C2 C3 G3 and over strings instead of the piano. The reeds land within 0.5 c. The
+  brass move by −12 to −20 c on the third; what is left is the player's own error on that note
+  (the trumpet's and trombone's +5 to +6 c without the band too, their ear's dead band), not the
+  band's.
+- **No loops (`src/band.h`):** a note of a part tuning by ear (a wind, the fretless) is heard only
+  by the notes begun after it (more than 35 ms later; struck together, the lower by the higher, a
+  unison by channel). The newcomer fits in, as the young notes do within a section. Who hears whom
+  is a fixed order: two winds never chase each other (A to B's −14 c, B to A's, ...).
+- **No wander:** a chain of winds can still carry an offset on through held common tones: the
+  comma pump (C Am Dm G C, every interval just, 21.5 c a round). With the order alone, four winds
+  (trumpet, clarinet, alto sax, trombone, no fixed pitch) settled with their C chord's mean at
+  −10.5 c, held there by the ±15 c clamp. Hence the winds' common healing (`SoundingSet::drift`):
+  every held wind note moves at once (their intervals kept) by −(Σ level · share · cents)/(Σ
+  level)/1 s, summed over the winds and the fixed-pitch notes, `share` being how much of the
+  note's pull comes from other parts tuning by ear (what a piano asks for is the piano's to keep;
+  a note hearing nothing: all). Then the C chord's mean stays at −2.9 c round after round (its
+  just form, 0 −14 +2 0, has a mean of −3), the fastest change within a note 0.45 c/ms.
+- **A real file:** `bwv0248a.mid`'s first 30 s (two trumpets, two oboes, flutes, strings, choir,
+  harpsichord, continuo; under the user's remaps alto sax, clarinet, trombone, baritone sax,
+  bassoon): 309 wind notes landed, their pulls' mean −0.4 c, sd 3.0 c, 5 % beyond ±5 c, the
+  extremes −14.8 and +14.2 c. The band's part of a held note moves at most 0.2 c/ms; the faster
+  changes (to 0.8 c/ms) and the largest offsets (to 24.5 c) are the trumpet chord part's own
+  retune (8 notes at once), the same with `PJ_WIND_EAR=0`. No wandering: the winds' landings
+  have no trend over the 30 s.
+- **Cost:** a hearing per note at its onset, on each change of the registry and every 50 ms:
+  (16 own partials) × (24) × (the sounding notes), ~10–100 µs. The 30 s of `bwv0248a.mid` took
+  797 s of CPU with it and 806 s without (a loaded machine: the same within its noise).
+
 ---
 
 ## 8. Build plan
@@ -823,7 +897,8 @@ All three users solve a small least-squares problem over the sounding notes.
 - In `midifile.cc`: update it at note-on, note-off and CC64, and decay the ringing entries per
   block.
 - In `Performer`: `setBand()` and a virtual `tuning(key)`.
-- The fretless reads it. The organ, choir and flutes can follow later.
+- The fretless reads it; so do the brass and the reeds (§7.6). The organ, choir and flutes can
+  follow later.
 
 ### 8.6 Tests (`tools/test.py`, the existing style)
 

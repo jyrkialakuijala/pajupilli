@@ -597,9 +597,9 @@ right:
   (`src/singer_vowels_data.h`, `tools/choirvowels.cc`): R1/R2 ~300/800 Hz for men, ~360/900 for
   women; the old singer's /u/ was a fronted [ʉ] with F2 ~1370. The women's top opens toward [ɔ]
   from D5 to G5, as sopranos do when a rounded [u] cannot keep R1 up with f0.
-- **Softer and slower** than the aahs: lower pressures, the lungs rising with τ ≈ 0.2 s at mf (half level at
-  ~110 ms against the aahs' ~65), breathier (×1.3), less vibrato (×0.8). Firmer keys start with a
-  soft "d", as Roland's "dooh" does.
+- **Softer** than the aahs and a little slower: lower pressures, the lungs rising with τ ≈ 75 ms at
+  mf, a soft onset (half level at ~75 ms against the aahs' ~65, within 2–3 dB of full in ~0.2 s),
+  breathier (×1.3), less vibrato (×0.8). Firmer keys start with a soft "d", as Roland's "dooh" does.
 - **Dark:** the band 1.5–5 kHz is ~28 dB under the lows on A4, against ~10 dB for the aahs. Before
   its level trim it is ~6 dB quieter than the aahs.
 - **Hum:** `src/hum.h` closes the lips into a hum ("mmm", GM2 Humming). It is a nasal pole (270 Hz)
@@ -1570,14 +1570,15 @@ frets pulled, played by a fretless player who tunes by ear to the band.
   beating 0.2 Hz against the piano's 2nd; under C3 E3 G3 -0.9 c; G1 under B2 F3 +9 c. A chord
   changing over a held note is followed at most 1 c/ms (no change under 25 ms), changes under 2 c
   let be; with nothing to hear, back to equal temperament in ~3 s. The fretless writes its tuning
-  back (`Performer::tuning`) for adaptive players to use later.
+  back (`Performer::tuning`); the winds (brass and reeds) tune by the same rule and hear it
+  (MIDI files, below).
 - **GM 36 in a file:** the fretless, except in a jazz trio's file (a piano and GM 33 or 36: the
   user's bushgrafts files, where GM 36 is the upright): there the double bass, as before.
   `-reinstrument double-bass=fretless-bass` forces it (then without slides).
 - Not yet: the mwah high on the neck (from the 12th position the steeper angle keeps a v120 G3 off
   the board, where FluidR3's G3 blooms most), the slide's squeak, finger buzz on a light touch, the
-  second polarisation's friction on the board, a velocity table for `-play`, the adaptive players
-  (organ, choir, flutes) tuning to the fretless. About 1.2x the finger bass's CPU with the chorus.
+  second polarisation's friction on the board, a velocity table for `-play`, the organ, choir and
+  flutes tuning to the fretless. About 1.2x the finger bass's CPU with the chorus.
 
 ### Concert harp
 
@@ -1995,8 +1996,10 @@ reeds run at 96 kHz (their puffs are sharp), then a half-band filter takes them 
   cassotto (two poles at 1.4 kHz, `PJ_ACC_CASS`), and the outer two are tuned 3.5 beats a second
   flat and sharp at A4 (`PJ_ACC_BEAT`; 0: one set). The tuning is in beats, so the low notes are wider in
   cents, up to 25. Below C3 the bass plays 16' + 8', both in the cassotto.
-- **Bandoneón:** two reeds an octave apart on each note (8' + 4'), no cassotto or musette, thicker
-  plates, a brighter grille and a harder arm (tango's marcato).
+- **Bandoneón:** two reeds an octave apart on each note (8' + 4', the 4' tuned a pure octave to its
+  8' at ~1 kPa), no cassotto or musette, thicker plates, stiffer tongues (they still speak at
+  fortissimo), and a harder arm (tango's marcato). Its reeds sound through the wooden reed blocks and
+  the end-plate: one pole at 500 Hz (`PJ_BN_BLOCK`), a darker voice than the accordion's.
 - **Push and pull:** each set has two reeds per plate, one per bellows direction, each tuned a little apart
   (within ~1 c). Every key draws on one bellows. Its pressure follows the arm, ~220 Pa at velocity 0
   to ~2.2 kPa at 127 (channel pressure adds to it); a harder key pushes it up faster (8-45 ms) and opens
@@ -3109,6 +3112,27 @@ program picks (`grand-piano`, `electric-grand`), its family (`piano`) or `*` (ev
 drums); the first rule that matches wins; `organ` is the church organ by its plan (pedal, manuals,
 registration, articulation). A channel remapped onto any Hammond (`hammond`, `drawbar-organ`, ...) joins the
 file's Hammond, one instrument and one plan.
+
+**The winds tune by ear to the band** (`src/windear.cc`, `src/band.h`; `research/fretless_bass.md`
+7.6): every brass part (trumpet, muted trumpet, trombone, horn, tuba, the brass section) and every
+blown reed (the saxes, oboe, English horn, bassoon, clarinet; duduk, shawm, shehnai; not the free
+reeds, which are fixed, nor synth brass) tunes each held note to what the other channels sound, by
+the fretless bass's spectral rule: its own partials (brass 1/√k to 2 kHz, the reeds 1/k, the
+clarinet's even partials weak below 1.5 kHz) against each other note's template, within ±15 c
+(`PJ_WIND_EAR_LIM`). Over a piano's or the strings' C3 G3, an E4 leans to the just third (-13.3 c):
+the alto sax, oboe, clarinet and bassoon measured -12.7 to -13.6 c, the horn -13.2, the tuba -12.7;
+the trumpet and trombone move by -12 c, to -7.5 (their own +5 c on these notes stays, as without the
+band); a G4 over C3 E3 +1.7 c (the reeds); a C4 over C3 E3 G3 stays (±0.5 c). A chord changing
+under a held note is followed by the lips in 0.1 s or more (at most 0.2 c/ms; changes under 3 c let
+be); with nothing to hear, back to equal temperament in ~3 s. In a part playing chords the
+section's own just intervals are solved together with the band's pull (each voice's pull is its
+anchor in the pajupilli intonation); the brass section leans to equal temperament (half of it).
+Each wind's tuning goes back into the registry, so the others hear it as played; a note of a part
+tuning by ear is heard only by the notes after it (struck together: the lower by the higher), so two
+winds never chase each other, and where the winds sound alone their mean heals to equal temperament
+(1 s, `PJ_WIND_EAR_HEAL`): four winds through the comma pump (C Am Dm G C, common tones held) keep
+the C chord within 3 c of equal temperament round after round. `PJ_WIND_EAR=0`: as before;
+`PJ_WIND_EAR_LOG=1`: each note's pull, 2: every change of its tuning.
 
 The drum kit, live (`src/drumkit.h`): the same drum keys from the keyboard.
 

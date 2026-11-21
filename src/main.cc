@@ -208,7 +208,8 @@ int nanTest() {
   fl.testDrive(NAN);
   // (A plucked or struck note does not come back after the reset clears it:
   // the key again.)
-  if (gInst->modal()) {
+  const bool struck = gInst->modal() || gInst->plucked();
+  if (struck) {
     v.render(x.data(), 64);
     pl.noteOn((gInst->design ? (gInst->lo + gInst->hi) / 2 : 69) + gInst->transpose, 80);
     x.resize(3 * kFs);  // (a reversed cymbal swells for ~2 s)
@@ -216,7 +217,7 @@ int nanTest() {
   v.render(x.data(), int(x.size()));
   // (A struck sound may be over in 50 ms: its peak, not the second half's level.)
   double r = rms(x.data() + x.size() / 2, int(x.size() / 2));
-  if (gInst->modal()) {
+  if (struck) {
     r = 0;
     for (float s : x) r = std::max(r, double(std::fabs(s)));
   }
