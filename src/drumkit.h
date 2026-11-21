@@ -33,6 +33,11 @@ bool brushKitWanted();
 // gs: the file says it is Roland GS or General MIDI 2 (what the keys below 35
 // mean; else they are read as Yamaha XG's).
 Drum drumFor(int gmKey, Kit kit = brushKitWanted() ? Kit::kBrush : Kit::kStandard, bool gs = false);
+// The stroke that sounds a key at the SoundFonts' level for this velocity, and the instrument's
+// gain (dB) that goes with it (drumkit.cc; tools/gmcompare.py kits --emit).
+int drumVelocity(int gmKey, Kit kit, int velocity);
+double drumGainDb(const char* inst);  // the player's share (the room hears it)
+double drumTrimDb(const char* inst);  // what is over +6 dB: the direct sound alone
 const char* drumName(int gmKey);  // General MIDI's name of the key ("" outside 35 .. 81)
 
 // The brush player's own swirls on a cymbal (-play, with the brushed snare:
@@ -79,6 +84,7 @@ class DrumKit {
   std::string describe() const;  // the instruments, and the keys that are silent
 
  private:
+  Kit kit_ = Kit::kBrush;
   struct Part {
     const Instrument* inst;
     std::unique_ptr<Calibration> cal;

@@ -388,6 +388,10 @@ const char kUsage[] =
     "                      and gives every part one reading: phrases, dynamics, accents,\n"
     "                      vibrato, a final ritardando, fermatas. auto (default): only\n"
     "                      for a file with no performance of its own; on; off\n"
+    "  -pianist            with -play: each piano part's sustain pedal planned from\n"
+    "                      its notes (research/pedaling.md), the file's own set\n"
+    "                      aside: changed with the harmony, sparing in a linear\n"
+    "                      texture (PJ_PIANIST_LOG=1: every decision)\n"
     "  -reinstrument R     with -play: FROM=TO[,FROM=TO]: a channel's instrument\n"
     "                      (a name, a family, or * for all but the drums) on\n"
     "                      another (organ: the church organ by its plan), e.g.\n"
@@ -572,6 +576,7 @@ int main(int argc, char** argv) {
     else if (a == "-reinstrument") {
       if (!setReinstrument(next())) return 1;
     }
+    else if (a == "-pianist") setPianist(true);
     else if (a == "-ensemble") {
       ensemble = "bass,alto,flute,flute,piccolo";
       if (i + 1 < argc && argv[i + 1][0] != '-') ensemble = argv[++i];
@@ -891,6 +896,10 @@ int main(int argc, char** argv) {
         double x = 0;
         is >> k >> x;
         if (!pl.setKnob(k - 1, x)) std::fprintf(stderr, "-seq: K%d is not this instrument's own\n", k);
+      } else if (w == "pedal") {  // (the sustain pedal, 0..127, as -play's CC 64)
+        int x = 0;
+        is >> x;
+        pl.sustainPedal(x);
       } else if (w == "wheel") {  // (the mod wheel, 0..1, as -play's CC 1)
         double x = 0;
         is >> x;
@@ -904,7 +913,7 @@ int main(int argc, char** argv) {
         is >> x;
         pl.setLipRoll(x);
       } else {
-        std::fprintf(stderr, "-seq: on N V, off N, wait S, knob K X, wheel X, expr X, bend X (not %s)\n", w.c_str());
+        std::fprintf(stderr, "-seq: on N V, off N, wait S, pedal CC, knob K X, wheel X, expr X, bend X (not %s)\n", w.c_str());
         return 1;
       }
     }

@@ -1,4 +1,5 @@
 #include "fretless.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -285,7 +286,7 @@ void FretlessBassPlayer::start(size_t k) {
         sinceNote_ = 0;
         hand_ = std::clamp(hand_ + 0.5 * (nf - 1 - hand_), 1.0, 14.0);
         if (log_)
-          std::fprintf(stderr, "fretless slide t=%.3f key %d string %d fret %d over %.0f ms band %+.1f (w %.4f)\n", t_, p.midi, s, nf,
+          say(stderr, "fretless slide t=%.3f key %d string %d fret %d over %.0f ms band %+.1f (w %.4f)\n", t_, p.midi, s, nf,
                        1000 * l.slDur, l.band, w);
         return;
       }
@@ -379,7 +380,7 @@ void FretlessBassPlayer::start(size_t k) {
   g.pluckPad(s, depth, from, angle, pad_, (0.002 + 0.002 * (1 - v) - 0.0008 * snap_ * v * v * v) * rise_,
              (0.0008 + 0.0006 * (1 - v) - 0.0005 * snap_ * v * v * v * v) * slip_);
   if (log_)
-    std::fprintf(stderr, "fretless note t=%.3f key %d v %d string %d fret %d%s e0 %+.1f%s band %+.1f (w %.4f) residue %+.1f bias %+.1f\n", t_,
+    say(stderr, "fretless note t=%.3f key %d v %d string %d fret %d%s e0 %+.1f%s band %+.1f (w %.4f) residue %+.1f bias %+.1f\n", t_,
                  p.midi, p.vel, s, l.fret, hn ? " harmonic" : "", e0, scooped ? " scoop" : "", l.band, w, l.residue, bias_);
   ++struck_;
   last_ = s;
@@ -460,7 +461,7 @@ void FretlessBassPlayer::steer(int s, double dt) {
   const double pos = std::max(0.3, (l.slide ? l.pos : l.fret + cents / 100) + (vib + 200 * roll_) / 100);
   if (!l.slide) l.pos = l.fret + cents / 100;
   m_.bass().stop(s, pos);
-  if (log_ >= 2 && s == last_) std::fprintf(stderr, "finger t=%.4f string %d cents %+.2f band %+.2f to %+.2f at %.4f\n", t_, s, 100 * (pos - l.fret), l.band, l.bandTo, pos);
+  if (log_ >= 2 && s == last_) say(stderr, "finger t=%.4f string %d cents %+.2f band %+.2f to %+.2f at %.4f\n", t_, s, 100 * (pos - l.fret), l.band, l.bandTo, pos);
 }
 
 void FretlessBassPlayer::render(float* out, int n) {

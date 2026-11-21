@@ -243,7 +243,7 @@ class Controls {
         joyBreath_ = 0.5 * x;
         if (!breathPad_) p_.all(&Performer::setBreath, joyBreath_);
         break;
-      case 64: p_.setHold(v >= 64); break;  // sustain pedal: keep blowing
+      case 64: p_.sustainPedal(v); break;  // sustain pedal: keep blowing
       case 70:
         // A synth: K1 spreads the filter per key (its level is K8's).
         if (circuit_) {

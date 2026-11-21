@@ -820,6 +820,77 @@ def electric_pianos():
           f'E2: H2 re H1 {h2[0]:+.0f} dB (velocity 30) -> {h2[1]:+.0f} dB (120)')
 
 
+def piano():
+    """The grand's mechanics around the strings (-inst grand-piano, src/piano.cc): the dampers
+    landing and the pedal's trapwork (PJ_PIANO_PEDALNOISE), the strings' stretching on a loud
+    bass blow (PJ_PIANO_LONG)."""
+    import numpy as np
+    from scipy.io import wavfile
+    def render(seq, env=None, inst='grand-piano'):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'p.wav')
+            run(['-inst', inst, '-room', 'dry', '-seq', seq, '-o', path], env=env)
+            fs, x = wavfile.read(path)
+        x = x.astype(float)
+        return fs, (x.mean(1) if x.ndim > 1 else x)
+    db = lambda x: 10 * np.log10(np.mean(x ** 2) + 1e-30)
+    def peak50(x, fs, t0=0.0, t1=None):
+        w = int(0.05 * fs)
+        a, b = int(t0 * fs), int((t1 if t1 is not None else len(x) / fs) * fs)
+        return max(db(x[i:i + w]) for i in range(a, max(a + 1, b - w), w // 2))
+    # A mezzo-forte chord held with the pedal down, the keys let up, the pedal let go in its
+    # ringing (at 4 s): the dampers land, a thump. Its level (the difference from the same
+    # without the noise, 50 ms windows) 25-40 dB under the chord's peak, no click (under 1 % of
+    # its energy above 4 kHz), over within 0.3 s.
+    chord = 'pedal 127 on 48 80 on 55 80 on 60 80 on 64 80 on 67 80 wait 1 off 48 off 55 off 60 off 64 off 67 wait 3 pedal 0 wait 1.5'
+    fs, on = render(chord)
+    _, off = render(chord, {'PJ_PIANO_PEDALNOISE': '0'})
+    d = on - off
+    top = peak50(off, fs)
+    th = peak50(d, fs, 3.95, 4.4)
+    seg = d[int(4.0 * fs):int(4.3 * fs)]
+    X = np.abs(np.fft.rfft(seg)) ** 2
+    f = np.fft.rfftfreq(len(seg), 1 / fs)
+    hi = 100 * X[f > 4000].sum() / X.sum()
+    late = db(d[int(4.4 * fs):int(4.5 * fs)]) - th
+    check('grand-piano: the pedal let go, the dampers land (25-40 dB under the chord, no click)',
+          -40 <= th - top <= -25 and hi < 1 and late < -20 and not np.isnan(on).any(),
+          f'{th - top:.1f} dB under the chord\'s peak, {hi:.2f} % above 4 kHz, {late:.0f} dB 0.4 s on')
+    # The pedal pressed and let go with nothing played: pressed, the rail's knock alone, quiet
+    # (45-75 dB under the chord); let go, the dampers land on the silent strings as on ringing
+    # ones (within 3 dB of the above). With the knob at 0, silence, as before.
+    pedal = 'wait 0.5 pedal 127 wait 1 pedal 0 wait 1'
+    _, x = render(pedal)
+    _, x0 = render(pedal, {'PJ_PIANO_PEDALNOISE': '0'})
+    press, rel = peak50(x, fs, 0.45, 1.0), peak50(x, fs, 1.45, 2.0)
+    check('grand-piano: the pedal alone: a quiet press, the same landing', -75 <= press - top <= -45 and abs(rel - th) <= 3 and not np.abs(x0).any(),
+          f'press {press - top:.1f} dB, release {rel - top:.1f} dB under the chord; knob 0: {"silent" if not np.abs(x0).any() else "NOT silent"}')
+    # Knob 0: the pedal's speed changes nothing (the old piano, byte for byte).
+    slow = chord.replace('pedal 0', 'pedal 100 wait 0.02 pedal 70 wait 0.02 pedal 40 wait 0.02 pedal 0').replace('wait 3 pedal 100', 'wait 2.94 pedal 100')
+    _, a = render(slow, {'PJ_PIANO_PEDALNOISE': '0'})
+    _, b = render(slow.replace('pedal 100', 'pedal 127').replace('pedal 70', 'pedal 127').replace('pedal 40', 'pedal 0'),
+                  {'PJ_PIANO_PEDALNOISE': '0'})
+    check('grand-piano: PJ_PIANO_PEDALNOISE=0 is the old piano (the pedal\'s speed unheard)', np.array_equal(a, b))
+    # A slow release (a continuous pedal over 60 ms) lands softer than the quick one.
+    _, s = render(slow)
+    ts = peak50(s - a, fs, 3.9, 4.4)
+    check('grand-piano: a slow release lands softer', ts < th - 3, f'{ts - th:.1f} dB against the quick one')
+    # The strings' stretching: a loud bass blow (C2, A0 at 127) gains 1-5 dB in 2-5 kHz over its
+    # first 0.2 s; a middling one (64) hardly changes (under 0.5 dB in level).
+    for m in (21, 36):
+        band = {}
+        for vel in (64, 127):
+            for k in ('0', '0.7'):
+                _, y = render(f'on {m} {vel} wait 1.5', {'PJ_PIANO_LONG': k})
+                seg = y[:int(0.2 * fs)]
+                X = np.abs(np.fft.rfft(seg)) ** 2
+                f = np.fft.rfftfreq(len(seg), 1 / fs)
+                band[vel, k] = (10 * np.log10(X[(f >= 2000) & (f < 5000)].sum()), peak50(y, fs, 0, 0.5))
+        gain = band[127, '0.7'][0] - band[127, '0'][0]
+        mf = band[64, '0.7'][1] - band[64, '0'][1]
+        check(f'grand-piano: MIDI {m} at 127 rings brighter for its stretch, 64 the same', 1 <= gain <= 5 and abs(mf) < 0.5,
+              f'2-5 kHz {gain:+.1f} dB at 127; level at 64 {mf:+.2f} dB')
+
 def upright():
     """The upright piano (-inst upright-piano, src/upright.cc): the grand's checks on its own scale
     and board: every octave at its pitch (modulo the octave, as the grand), clear, no blow-up,
@@ -1404,7 +1475,7 @@ def jazz_guitar():
                              '  for (double f = 50; f < 20000; f *= 1.005) { const double d = 20 * std::log10(std::abs(a.response(0, f)) / ref);\n'
                              '    if (d > pk) { pk = d; pf = f; } if (!f3 && f > 300 && d < -3) f3 = f; }\n'
                              '  std::printf("%.2f %.0f %.0f\\n", pk, pf, f3); } }\n')
-        b = subprocess.run(['g++', '-O1', '-std=c++17', '-Isrc', src, 'src/guitaramp.cc', '-o', exe], capture_output=True, text=True, cwd=ROOT)
+        b = subprocess.run(['g++', '-O1', '-std=c++17', '-Isrc', src, 'src/guitaramp.cc', 'src/heard.cc', '-o', exe], capture_output=True, text=True, cwd=ROOT)
     if b.returncode:
         check(f'{inst}: the tone control\'s network (builds)', False, b.stderr.strip()[-300:])
     else:
@@ -1626,7 +1697,7 @@ def electric_bass_amp():
     import numpy as np
     from scipy.io import wavfile
     exe = os.path.join(ROOT, 'tools', '.bassamp')
-    b = subprocess.run(['g++', '-O3', '-march=native', '-ffast-math', '-std=c++17', '-Isrc', 'tools/bassamp.cc', 'src/guitaramp.cc', '-o', exe],
+    b = subprocess.run(['g++', '-O3', '-march=native', '-ffast-math', '-std=c++17', '-Isrc', 'tools/bassamp.cc', 'src/guitaramp.cc', 'src/heard.cc', '-o', exe],
                        capture_output=True, text=True, cwd=ROOT)
     if b.returncode:
         check('bass amp: tools/bassamp.cc builds', False, b.stderr.strip()[-300:])
@@ -6186,6 +6257,163 @@ def plucked_nan():
         r = run(['-inst', inst, '-nantest'])
         check(f'NaN recovery ({inst})', r.returncode == 0, r.stdout.strip())
 
+def pianist():
+    """The pianist's pedalling (-pianist with -play; src/pianoplan.h; research/pedaling.md): without
+    it nothing changes (the same sound, no plan); with it a chord progression is pedalled by its
+    chords (up at each chord's onset, down 30-300 ms after: legato pedalling, the lags measured in
+    MAESTRO and the performed files), the melody's notes over a chord not changing it; a two-part
+    Bach-like line gets almost none (finger legato); and on a performed solo (Don't Explain, Doug
+    McKenzie's, 219 presses) the plan finds the pianist's changes: 70 % of his lifts within
+    150 ms of one planned (chance, as many changes at random, ~28 %), and 60 % of the planned ones
+    his (research/pedaling.md 8)."""
+    import struct, bisect
+    def vlq(n):
+        out = [n & 0x7f]
+        while n > 127:
+            n >>= 7
+            out.append(0x80 | (n & 0x7f))
+        return bytes(reversed(out))
+    def smf(path, events, bpm=90, prog=0):
+        """events: (beat, status, a, b) on channel 1."""
+        tr = bytearray(b'\x00\xff\x51\x03' + int(60e6 / bpm).to_bytes(3, 'big') + b'\x00\xff\x58\x04\x04\x02\x18\x08'
+                       + b'\x00\xc0' + bytes([prog]))
+        last = 0
+        for t, s, a, b in sorted(events, key=lambda e: (round(e[0] * 480), e[1] != 0x80)):
+            tk = round(t * 480)
+            tr += vlq(tk - last) + bytes([s, a, b])
+            last = tk
+        tr += b'\x00\xff\x2f\x00'
+        open(path, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(tr)) + tr)
+    def note(ev, beat, dur, k, v=70):
+        ev += [(beat, 0x90, k, v), (beat + dur, 0x80, k, 0)]
+    def pedals(r):
+        return [(float(m.group(1)), m.group(2) == 'down') for m in re.finditer(r'pianist ch 1: pedal ([\d.]+) (up|down)', r.stderr)]
+    with tempfile.TemporaryDirectory() as d:
+        mid, wav, wav2 = os.path.join(d, 'p.mid'), os.path.join(d, 'a.wav'), os.path.join(d, 'b.wav')
+        # A chord progression (C Am F G, a bar each at 90, twice), the left hand's bass and chord, a
+        # melody of quarter notes over it; the file's own pedal pressed once for the whole, never changed.
+        ev, chords = [], [(36, (52, 55, 60)), (45, (52, 57, 60)), (41, (53, 57, 60)), (43, (50, 55, 59))] * 2
+        mel = [72, 74, 76, 79, 76, 77, 79, 81, 77, 76, 74, 72, 74, 71, 67, 71] * 2
+        for b, (bass, ch) in enumerate(chords):
+            note(ev, 4 * b, 3.9, bass, 60)
+            for k in ch:
+                note(ev, 4 * b, 3.9, k, 55)
+            for q in range(4):
+                note(ev, 4 * b + q, 0.95, mel[(4 * b + q) % len(mel)], 75)
+        ev += [(0, 0xb0, 64, 127), (32, 0xb0, 64, 0)]
+        smf(mid, ev)
+        env = {'PJ_NOCAL': '1', 'PJ_PLAY_UNTIL': '3'}
+        a = run(['-play', mid, '-room', 'dry', '-o', wav], env=env)
+        b = run(['-play', mid, '-room', 'dry', '-o', wav2], env=env)
+        same = open(wav, 'rb').read() == open(wav2, 'rb').read()
+        check('pianist: without -pianist no plan, the same sound', 'pianist' not in a.stderr and same,
+              'no "pianist" line; two renders byte-identical')
+        r = run(['-pianist', '-play', mid, '-room', 'dry', '-o', wav], env=dict(env, PJ_PIANIST_LOG='2'))
+        p = pedals(r)
+        diff = open(wav, 'rb').read() != open(wav2, 'rb').read()
+        beat = 60 / 90
+        onsets = [4 * b * beat for b in range(len(chords))]
+        ups = [t for t, dn in p if not dn]
+        downs = [t for t, dn in p if dn]
+        hit, lags = 0, []
+        for t0 in onsets[1:]:
+            u = [x for x in ups if abs(x - t0) < 0.06]
+            dn = [x for x in downs if t0 < x < t0 + 0.4]
+            if u and dn:
+                hit += 1
+                lags.append(1000 * (dn[0] - t0))
+        melody = [x for x in ups if all(abs(x - t0) > 0.1 for t0 in onsets) and x < onsets[-1] + 3.9 * beat - 0.1]
+        check('pianist: a change at each chord, down 30-300 ms after it, none at the melody',
+              hit == len(onsets) - 1 and all(30 <= l <= 300 for l in lags) and not melody and diff and 'file\'s own 2' in r.stderr,
+              f'{hit} of {len(onsets) - 1} chords changed, lags {min(lags or [0]):.0f}-{max(lags or [0]):.0f} ms; '
+              f'{len(melody)} changes elsewhere; the file\'s own pedal set aside')
+        # A Bach-like two-part invention: sixteenths by step in the right hand, eighths in the left.
+        ev = []
+        rh = [72, 74, 76, 77, 79, 77, 76, 74, 76, 77, 79, 81, 79, 77, 76, 74]
+        lh = [48, 50, 52, 53, 55, 53, 52, 50]
+        for bar in range(8):
+            sh = [0, 2, -1, 0, 3, 2, -2, 0][bar]
+            for i, k in enumerate(rh):
+                note(ev, 4 * bar + i * 0.25, 0.24, k + sh, 70)
+            for i, k in enumerate(lh):
+                note(ev, 4 * bar + i * 0.5, 0.48, k + sh, 65)
+        note(ev, 32, 3, 48, 65)
+        note(ev, 32, 3, 72, 70)
+        smf(mid, ev, bpm=72)
+        r = run(['-pianist', '-play', mid, '-room', 'dry', '-o', wav], env=dict(env, PJ_PIANIST_LOG='2', PJ_PLAY_UNTIL='0.05'))
+        p = pedals(r)
+        m = re.search(r'pedal down (\d+) %', r.stderr)
+        share = int(m.group(1)) if m else 100
+        check('pianist: a two-part Bach-like line nearly unpedalled (finger legato)', sum(dn for _, dn in p) <= 2 and share <= 10,
+              f'{sum(dn for _, dn in p)} presses, down {share} % of the time; ' + (re.search(r'pianist: [^\n]*', r.stderr) or [''])[0][:90])
+        # A performed solo: the plan against the pianist's own pedal (CC 64 in the file).
+        src = os.path.expanduser("~/Music/midi/bushgrafts/Don't Explain solo.mid")
+        if not os.path.exists(src):
+            info('pianist: Don\'t Explain', 'not found')
+            return
+        r = run(['-pianist', '-play', src, '-o', wav], env=dict(env, PJ_PIANIST_LOG='2', PJ_PLAY_UNTIL='0.02'))
+        plan_ups = sorted(t for t, dn in pedals(r) if not dn)
+        # (the pianist's: the file's CC 64 on channel 1, its seconds through the tempo map)
+        data = open(src, 'rb').read()
+        div = struct.unpack('>H', data[12:14])[0]
+        pos, raw, tempo = 14, [], []
+        while pos + 8 <= len(data):
+            ln = struct.unpack('>I', data[pos + 4:pos + 8])[0]
+            p, end, tick, run_ = pos + 8, pos + 8 + ln, 0, 0
+            pos = end
+            def var():
+                nonlocal p
+                v = 0
+                while True:
+                    c = data[p]; p += 1; v = v << 7 | (c & 0x7f)
+                    if not c & 0x80:
+                        return v
+            while p < end:
+                tick += var()
+                s = data[p]
+                if s & 0x80:
+                    p += 1
+                else:
+                    s = run_
+                if s == 0xff:
+                    t = data[p]; p += 1; n = var()
+                    if t == 0x51:
+                        tempo.append((tick, int.from_bytes(data[p:p + 3], 'big')))
+                    p += n
+                elif s in (0xf0, 0xf7):
+                    p += var()
+                else:
+                    run_ = s
+                    a = data[p]; p += 1
+                    bb = 0
+                    if s & 0xf0 not in (0xc0, 0xd0):
+                        bb = data[p]; p += 1
+                    if s & 0xf0 == 0xb0 and a == 64 and s & 15 == 0:
+                        raw.append((tick, bb >= 64))
+        tempo = sorted(tempo) or [(0, 500000)]
+        def sec(tk):
+            t, last, us = 0.0, 0, 500000
+            for k, u in tempo:
+                if k > tk:
+                    break
+                t += (k - last) * us * 1e-6 / div
+                last, us = k, u
+            return t + (tk - last) * us * 1e-6 / div
+        human, state = [], False
+        for tk, dn in sorted(raw):
+            if dn != state:
+                state = dn
+                if not dn:
+                    human.append(sec(tk))
+        def near(t, xs):
+            i = bisect.bisect_left(xs, t)
+            return min((abs(xs[j] - t) for j in (i - 1, i) if 0 <= j < len(xs)), default=9)
+        recall = sum(near(t, plan_ups) <= 0.15 for t in human) / max(1, len(human))
+        precision = sum(near(t, human) <= 0.15 for t in plan_ups) / max(1, len(plan_ups))
+        check('pianist: Don\'t Explain\'s pedalling found (70 % of the lifts within 150 ms, 60 % of the plan\'s his)',
+              recall >= 0.7 and precision >= 0.6,
+              f'{len(human)} lifts by the pianist, {len(plan_ups)} planned: {100 * recall:.0f} % of his matched, {100 * precision:.0f} % of the plan\'s')
+
 GROUPS = None  # (set below: every test group, in the order they run)
 
 def main():
@@ -6241,5 +6469,5 @@ def main():
 
 if __name__ == '__main__':
     GROUPS = (vectorised, nan_recovery, fuzz, tuning, slur_stability, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, piano, upright, bright_piano, clavinet, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, accordions, harmonica, reed_organ, hammond, honky_tonk, pianist, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
     sys.exit(main())

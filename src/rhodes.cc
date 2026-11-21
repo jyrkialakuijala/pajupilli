@@ -1,4 +1,5 @@
 #include "rhodes.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -347,7 +348,7 @@ float RhodesModel::sample() {
         if (kDebug) {
           double a = 0;
           for (int n = 0; n < K.nm; ++n) a += std::hypot(K.m[n].re, K.m[n].im);
-          std::fprintf(stderr, "rhodes key %d: contact %.2f ms, tip %.2f mm (A/w %.2f)\n", int(&K - &keys_[0]) + kLowest,
+          say(stderr, "rhodes key %d: contact %.2f ms, tip %.2f mm (A/w %.2f)\n", int(&K - &keys_[0]) + kLowest,
                        K.contact * 1e3, a * 1e3, a / K.w);
         }
       }

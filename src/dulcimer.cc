@@ -60,6 +60,7 @@ PianoDesign dulcimerDesign() {
   const double mistune = knob("PJ_DULCIMER_MISTUNE", 1.0);
   des.unisonCents[0] = mistune * 1.2;
   des.unisonCents[1] = mistune * 0.8;
+  des.pedalNoise = 0;  // (no dampers)
   return des;
 }
 

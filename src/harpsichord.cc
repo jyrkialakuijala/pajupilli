@@ -29,6 +29,7 @@ PianoDesign harpsichordDesign() {
   const PianoDesign grand = grandDesign();
   PianoDesign des = grand;
   des.name = "harpsichord";
+  des.pedalNoise = 0;  // (a jack's cloth is no piano damper; no pedal)
   des.keys = kChoirs * kKeys;
   const double a4 = knob("PJ_HPSI_A4", 440), voice = knob("PJ_HPSI_VOICE", 1.0), boardK = knob("PJ_HPSI_BOARD", 2.0);
   const double lossK = knob("PJ_HPSI_LOSS", 1.0);

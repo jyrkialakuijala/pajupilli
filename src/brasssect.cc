@@ -1,6 +1,7 @@
 // The brass section (General MIDI 62): the voicer, the plan from the song, and the section's
 // playing. See src/brasssect.h.
 #include "brasssect.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -967,11 +968,11 @@ void Ensemble::brassBuild(int mode) {
   B.built = true;
   if (std::getenv("PJ_BRASS_DEBUG"))
     for (Slot& f : kids_[0].ens->f_)
-      if (auto* hp = dynamic_cast<HornPlayer*>(&f.v->player())) std::fprintf(stderr, "brass: seat cents %+.1f\n", hp->seatCents());
+      if (auto* hp = dynamic_cast<HornPlayer*>(&f.v->player())) say(stderr, "brass: seat cents %+.1f\n", hp->seatCents());
   if (B.verbose) {
     std::string who;
     for (int i = 0; i < n; ++i) who += std::string(i ? ", " : "") + B.voicer->seat(i).label;
-    std::fprintf(stderr, "brass: the %s section: %s\n", brassModeName(mode), who.c_str());
+    say(stderr, "brass: the %s section: %s\n", brassModeName(mode), who.c_str());
   }
 }
 
@@ -1166,7 +1167,7 @@ void Ensemble::brassRender(float* left, float* right, int n) {
   static const double kLeadDb = knob("PJ_BRASS_LEAD_DB", 1.5);
   static const double kVib = knob("PJ_BRASS_VIB", 0.6);  // (the lead's depth without a director's cue)
   if (!B.pendingShow.empty()) {
-    if (B.pendingShow != B.lastShow) std::fprintf(stderr, "%s\n", B.pendingShow.c_str());
+    if (B.pendingShow != B.lastShow) say(stderr, "%s\n", B.pendingShow.c_str());
     B.lastShow = B.pendingShow;
     B.pendingShow.clear();
   }

@@ -1,4 +1,5 @@
 #include "leslie.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -222,9 +223,9 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
     rotor(hornW_, hornI_, hT, hWn, hWnDown, hAcc * accH_);
     rotor(drumW_, drumI_, dT, dWn, dWnDown, dAcc * accD_);
     static const bool kLog = std::getenv("PJ_LESLIE_LOG") != nullptr;
-    if (kLog && log_ && std::fmod(t_, 0.1) < dt_) std::fprintf(stderr, "leslie t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
+    if (kLog && log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "leslie t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
     static const bool kLog2 = std::getenv("PJ_LESLIE_LOG2") != nullptr;  // (the second cabinet's)
-    if (kLog2 && !log_ && std::fmod(t_, 0.1) < dt_) std::fprintf(stderr, "leslie2 t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
+    if (kLog2 && !log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "leslie2 t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
     hornPh_ += 2 * M_PI * hornW_ * dt_ * (1 + hornEcc_ * std::cos(hornPh_ + hornEccPh_) + beltEcc_[0] * std::cos(beltPh_[0]));
     drumPh_ += 2 * M_PI * drumW_ * dt_ * (1 + drumEcc_ * std::cos(drumPh_ + drumEccPh_) + beltEcc_[1] * std::cos(beltPh_[1]));
     beltPh_[0] = std::fmod(beltPh_[0] + 2 * M_PI * hornW_ * 2.6 * dt_, 2 * M_PI);

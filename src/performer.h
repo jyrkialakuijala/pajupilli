@@ -53,6 +53,9 @@ class Performer {
   virtual void noteOff(int midi) = 0;
   virtual void render(float* out, int n) = 0;
   virtual void setHold(bool h) = 0;               // keep blowing after the keys are up
+  // The sustain pedal as its controller moves (CC 64, 0..127; held from 64): a piano hears how
+  // fast it moves (its dampers' landing), the rest only whether it is held.
+  virtual void sustainPedal(int cc) { setHold(cc >= 64); }
   // Its own breath wander, and its own vibrato and flutter: rate, phase and
   // depth differ from player to player, so an ensemble never pulses together.
   virtual void seed(unsigned s) = 0;

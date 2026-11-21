@@ -1,4 +1,5 @@
 #include "guitaramp.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1205,7 +1206,7 @@ void GuitarAmp::gate(double x) {
     gateHold_ = p_.gateHold;
   }
   ++gateT_;
-  if (gateDebug_ && was != gateOpen_) std::fprintf(stderr, "gate %s %.3f s\n", gateOpen_ ? "open" : "close", gateT_ / fs_);
+  if (gateDebug_ && was != gateOpen_) say(stderr, "gate %s %.3f s\n", gateOpen_ ? "open" : "close", gateT_ / fs_);
   if (gateOpen_ ? gateDb_ < 0 : gateDb_ > -80) {
     gateDb_ = gateOpen_ ? std::min(0.0, gateDb_ + gateRise_) : std::max(-80.0, gateDb_ - (gateQuick_ ? 4 : 1) * gateFall_);
     gateGain_ = std::pow(10.0, gateDb_ / 20);

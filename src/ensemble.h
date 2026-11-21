@@ -138,6 +138,10 @@ class Ensemble {
     for (Slot& s : f_) s.v->player().setHold(h);
     for (Section& k : kids_) k.ens->setHold(h);
   }
+  void sustainPedal(int cc) {
+    for (Slot& s : f_) s.v->player().sustainPedal(cc);
+    for (Section& k : kids_) k.ens->sustainPedal(cc);
+  }
   void render(float* left, float* right, int n);  // 48 kHz, mixed, stereo
   void render(float* out, int n);                 // ... mono
   int resets() const;

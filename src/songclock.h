@@ -21,6 +21,7 @@ struct SongClock {
   // (s), and when each pitch (MIDI key, any part but the drums) was last
   // begun (s; far in the past: never).
   double now = 0;
+  bool playing = false;  // (a file is being rendered: -play; messages carry the song's time, src/heard.h)
   double lastOn[128];
   SongClock() { for (double& t : lastOn) t = -1e9; }
   static SongClock& get() {

@@ -1,4 +1,5 @@
 #include "organ.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1316,7 +1317,7 @@ double OrganModel::liveTouch(int midi) {
   recent_.push_back({now_, midi});
   if (midi >= 60) groupTop_ = std::max(groupTop_, midi);
   if (std::getenv("PJ_ORGAN_TOUCHDBG") && t > 0)
-    std::fprintf(stderr, "touch %.2f s key %d (previous %d): %.2f\n", now_ / fs_, midi, prevHigh_, t);
+    say(stderr, "touch %.2f s key %d (previous %d): %.2f\n", now_ / fs_, midi, prevHigh_, t);
   return t;
 }
 
@@ -2025,7 +2026,7 @@ void OrganModel::airStep(double t) {
     air_.push_back(ev);
     static const char* kWhere[5] = {"the main case and the Positiv", "the swell boxes", "the left side", "the right side", "the nave"};
     if (std::getenv("PJ_ORGAN_SAY"))
-      std::fprintf(stderr, "organ: at %.0f s %s air (%+.1f C) reaches %s\n", t, ev.dT > 0 ? "warm" : "cold", ev.dT, kWhere[ev.region]);
+      say(stderr, "organ: at %.0f s %s air (%+.1f C) reaches %s\n", t, ev.dT > 0 ? "warm" : "cold", ev.dT, kWhere[ev.region]);
     // (the next, exponentially apart)
     airNext_ = t - kEvery * std::log(std::max(1e-3, 0.5 + 0.5 * airRng_.uniform()));
   }
@@ -2238,7 +2239,7 @@ void OrganPlayer::zoneLevel() {
         }
   }
   const char* name = OrganModel::dynamicName(x);
-  if (name != lastLevel_ && std::getenv("PJ_ORGAN_SAY")) std::fprintf(stderr, "organ: %s\n", name);
+  if (name != lastLevel_ && std::getenv("PJ_ORGAN_SAY")) say(stderr, "organ: %s\n", name);
   lastLevel_ = name;
 }
 
@@ -2266,7 +2267,7 @@ void OrganPlayer::render(float* out, int n) {
     const double x = std::clamp(dyn_ + breathCtl_, 0.0, 1.0);
     m_.setRoller(x);
     const char* name = OrganModel::dynamicName(x);
-    if (name != lastDyn_ && std::getenv("PJ_ORGAN_SAY")) std::fprintf(stderr, "organ: %s\n", name);
+    if (name != lastDyn_ && std::getenv("PJ_ORGAN_SAY")) say(stderr, "organ: %s\n", name);
     lastDyn_ = name;
   } else {
     m_.setSwell(std::clamp(1.5 * (dyn_ + breathCtl_), 0.03, 1.0));

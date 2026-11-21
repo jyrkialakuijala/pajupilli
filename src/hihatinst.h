@@ -71,6 +71,7 @@ class HiHatPlayer : public Performer {
   int strokeVel_ = 0;
   double closeSpeed_ = 0.6, closeForce_ = 30;
   bool brush_ = false;
+  bool brushKey_ = false;  // this stroke is the brush's (keys 43, 47)
   double flat_ = 0.35;
 };
 

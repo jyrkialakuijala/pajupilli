@@ -185,10 +185,16 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
   // stroke, so nothing already ringing changes.) 13 dB: with the fan's
   // friction low (fanLoss 0.4) more of its ends land, and 20 dB left the
   // brush only 4-5 dB under a stick; 13 puts it ~11 dB under.)
-  brushGain_ = float(std::pow(10.0, knob("PJ_CYM_BRUSHDB", 13) / 20));
+  // (A crash, splash or china takes the sweep across its edge at the plate's
+  // loudest place: at 13 dB its brushed stroke measured 0-2 dB under the stick's
+  // (tools/gmcompare.py kits), where the ride's and the toms' are 8-10 dB under
+  // theirs. PJ_CYM_CRASHBRUSHDB 5: ~9 dB under.)
+  static const double kRideBrushDb = knob("PJ_CYM_BRUSHDB", 13), kCrashBrushDb = knob("PJ_CYM_CRASHBRUSHDB", 5);
+  brushGain_ = float(std::pow(10.0, (spec.ride ? kRideBrushDb : kCrashBrushDb) / 20));
   // (And a swirl, the brush lying on the plate, at its own level against
   // the strokes: PJ_CYM_SWIRLDB more.)
-  swirlGain_ = float(std::pow(10.0, knob("PJ_CYM_SWIRLDB", 12) / 20));
+  // (A crash's swirl stays where it was: what its strokes gave up, back.)
+  swirlGain_ = float(std::pow(10.0, (knob("PJ_CYM_SWIRLDB", 12) + (spec.ride ? 0 : kRideBrushDb - kCrashBrushDb)) / 20));
   feel_.reset(new Feel(plate_));
   brush_.reset(new Brush(fs, *feel_, bs, seed));
   if (const char* tr = std::getenv("PJ_CYM_TRACE")) trace_ = std::fopen(tr, "wb");

@@ -1,4 +1,5 @@
 #include "guitarinst.h"
+#include "heard.h"
 
 #include <cmath>
 #include <cstdio>
@@ -299,8 +300,8 @@ void GuitarPlayer::play() {
     strumWay_ = way;
     strumming_ = 1.5;
     noteStrum(way);
-    std::fprintf(stderr, strumWay_ > 0 ? "down\n" : "up\n");
-    if (std::getenv("PJ_GUITAR_STRUMDEBUG")) std::fprintf(stderr, "  (beat %.2f, %zu notes, gap %.3f s, swing %.3f s)\n", SongClock::get().beat, asked_.size(), gapBefore_, swing_);
+    say(stderr, "%s", strumWay_ > 0 ? "down\n" : "up\n");
+    if (std::getenv("PJ_GUITAR_STRUMDEBUG")) say(stderr, "  (beat %.2f, %zu notes, gap %.3f s, swing %.3f s)\n", SongClock::get().beat, asked_.size(), gapBefore_, swing_);
   }
   double chordVel = 0;
   for (const Asked& a : asked_) chordVel += std::clamp(a.velocity, 1, 127) / 127.0 / asked_.size();
@@ -401,7 +402,7 @@ void GuitarPlayer::play() {
         strumming_ = 1.5;
         strumWay_ = way;
         if (!inRun_) {  // (once a stroke: at its third string)
-          std::fprintf(stderr, way > 0 ? "down\n" : "up\n");
+          say(stderr, "%s", way > 0 ? "down\n" : "up\n");
           noteStrum(way);
         }
       }
@@ -777,7 +778,7 @@ void HarmonicsPlayer::play() {
     rested_[s] = false;
     age_[s] = 0;
     if (std::getenv("PJ_GHARM_DEBUG"))
-      std::fprintf(stderr, "harmonic %d: string %d fret %d n %d (%s), pick %.0f mm, depth %.2f mm, ear %.3f\n", a.midi, s + 1, fret, n,
+      say(stderr, "harmonic %d: string %d fret %d n %d (%s), pick %.0f mm, depth %.2f mm, ear %.3f\n", a.midi, s + 1, fret, n,
                    fret ? "touched" : "natural", where * 1000, depth * 1000, ear);
     ++order;
   }

@@ -1,4 +1,5 @@
 #include "ebass.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -478,7 +479,7 @@ void SlapBassPlayer::render(float* out, int n) {
       for (int s = 0; s < kStrings; ++s) {
         uint32_t w = 0;
         const int h = m_.bass().fretHits(s, &w);
-        if (h) std::fprintf(stderr, "fret %.5f %d %d %x\n", now_, s, h, w);
+        if (h) say(stderr, "fret %.5f %d %d %x\n", now_, s, h, w);
       }
     }
   }
@@ -511,7 +512,7 @@ void SlapBassPlayer::strike(int s, int fret, const Asked& a) {
   const double dynK = 0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0);
   const int idx = chordIdx_++;
   const double L = g.spec().scale;
-  if (log_) std::fprintf(stderr, "strike %.4f key %d v %d string %d fret %d tech %d\n", now_, midi, a.velocity, s, fret, t);
+  if (log_) say(stderr, "strike %.4f key %d v %d string %d fret %d tech %d\n", now_, midi, a.velocity, s, fret, t);
   // Slurs: only on the string still ringing, the fret moved.
   if (t == kHammer || t == kPull) {
     if (s == last_ && held_[s] && fret != lastFret_ && (t == kHammer) == (fret > lastFret_)) {

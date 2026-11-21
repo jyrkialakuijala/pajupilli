@@ -5,6 +5,8 @@
     tools/gmcompare.py run --bin ./pajupilli --programs 0-127,drums [--jobs 8]
     tools/gmcompare.py run --bin /path/to/pajupilli --programs 40 --force   # re-run one
     tools/gmcompare.py report                                             # rebuild the report
+    tools/gmcompare.py kits [--pj-only] [--measure 0|1|2]                  # the drum kits, stroke by stroke: research/gm_kits.md
+    tools/gmcompare.py kits --emit                                        # ... and src/drumcal_data.h: each drum at the fonts' level
 
 Each instrument plays tools/synthcompare.py's profile probe (keys a few semitones apart over the
 GM program's range, velocities 40/64/96/127, each held 2 s in a 4 s slot) and a short phrase (six
@@ -644,9 +646,235 @@ def cmd_report(a):
     print('wrote %s (%d instruments)' % (REPORT, len(R)), file=sys.stderr)
 
 
+# ---------------------------------------------------------------------------------------------
+# The drum kits, stroke by stroke: how loud each piece is against the band
+
+KITS = [('standard', 0), ('jazz', 32), ('brush', 40)]  # the drum channel's program
+KIT_SLOT, KIT_HOLD = 4.0, 1.0
+KIT_ANCHOR = (48, 60, 72)  # a piano's notes (channel 1, velocity 96), each synth's own yardstick
+KIT_DATA = os.path.join(os.path.dirname(DATA), 'kits.json')
+KIT_REPORT = os.path.join(ROOT, 'research', 'gm_kits.md')
+DRUM_NAMES = ('Acoustic Bass Drum,Bass Drum 1,Side Stick,Acoustic Snare,Hand Clap,Electric Snare,Low Floor Tom,Closed Hi-Hat,'
+              'High Floor Tom,Pedal Hi-Hat,Low Tom,Open Hi-Hat,Low-Mid Tom,Hi-Mid Tom,Crash Cymbal 1,High Tom,Ride Cymbal 1,'
+              'Chinese Cymbal,Ride Bell,Tambourine,Splash Cymbal,Cowbell,Crash Cymbal 2,Vibraslap,Ride Cymbal 2,Hi Bongo,'
+              'Low Bongo,Mute Hi Conga,Open Hi Conga,Low Conga,High Timbale,Low Timbale,High Agogo,Low Agogo,Cabasa,Maracas,'
+              'Short Whistle,Long Whistle,Short Guiro,Long Guiro,Claves,Hi Wood Block,Low Wood Block,Mute Cuica,Open Cuica,'
+              'Mute Triangle,Open Triangle').split(',')
+DRUM_GROUPS = [('kick', (35, 36)), ('snare', (37, 38, 39, 40)), ('toms', (41, 43, 45, 47, 48, 50)), ('hi-hat', (42, 44, 46)),
+               ('ride', (51, 53, 59)), ('crash', (49, 52, 55, 57)), ('other', tuple(k for k in range(54, 82) if k not in (55, 57, 59)))]
+
+
+KIT_GRID = (4, 8, 16, 32, 48, 64, 80, 96, 112, 127)  # pajupilli's own curve, for --emit
+KIT_BRUSHED = (41, 43, 45, 47, 48, 50, 42, 46, 49, 51, 52, 53, 55, 57, 59)  # the Brush kit's toms, hi-hat and cymbals
+KIT_BRUSH_DB = -8.0  # ... are this far under the Standard kit's (the fonts' Brush kits play the stick's samples there)
+KIT_HEADER = os.path.join(ROOT, 'src', 'drumcal_data.h')
+
+
+def kit_layout(keys, vels=None):
+    """(channel, key, velocity, t): the piano's yardstick notes, then every drum key, soft to loud."""
+    L = [(0, k, 96) for k in KIT_ANCHOR] + [(1, 36, 0)] + [(9, k, v) for k in keys for v in (vels or sc.VELS)]
+    return [(ch, k, v, i * KIT_SLOT) for i, (ch, k, v) in enumerate(L)]
+
+
+def write_kit(path, program, keys, vels=None):
+    tpq = 480; tick = lambda s: int(round(s * 2 * tpq))
+    lay = kit_layout(keys, vels)
+    ev = [(0, bytes([0xC0, 0])), (0, bytes([0xC9, program]))]
+    # (pajupilli's Jazz kit is the kit of a file with a piano and an upright bass: one bass note in a slot of its own)
+    if program == 32: lay[len(KIT_ANCHOR)] = (1, 36, 64, lay[len(KIT_ANCHOR)][3]); ev.append((0, bytes([0xC1, 32])))
+    lay = [l for l in lay if l[2] > 0]
+    for ch, k, v, t in lay:
+        ev.append((tick(t), bytes([0x90 | ch, k, v]))); ev.append((tick(t + KIT_HOLD), bytes([0x80 | ch, k, 0])))
+    ev.sort(key=lambda e: (e[0], e[1][0] & 0xF0 == 0x90))
+    body = bytearray(); last = 0
+    for t, e in ev: body += sc._enc_vlq(t - last) + e; last = t
+    body += sc._enc_vlq(tick(KIT_SLOT)) + b'\xff\x2f\x00'
+    open(path, 'wb').write(b'MThd' + sc.struct.pack('>IHHH', 6, 0, 1, tpq) + b'MTrk' + sc.struct.pack('>I', len(body)) + bytes(body))
+    return lay
+
+
+def kit_cfg(font, work):
+    """TiMidity's cfg with the three drum sets of this font mapped (sc.timidity_cfg maps drum set 0 only)."""
+    sf = SF[font]; cfg = os.path.join(work, 'kit_%s.cfg' % font)
+    L = ['soundfont "%s"' % sf, 'bank 0'] + ['%d %%font "%s" 0 %d' % (p, sf, p) for p in range(128)]
+    for _, prog in KITS:
+        L += ['drumset %d' % prog] + ['%d %%font "%s" 128 %d %d' % (k, sf, prog, k) for k in range(27, 88)]
+    open(cfg, 'w').write('\n'.join(L) + '\n')
+    return cfg
+
+
+def stroke_levels(x, t):
+    """One stroke's loudness as a meter reads it (BS.1770's weighting): its loudest 400 ms, and all of it
+    (its energy over the slot, as if spread over one second); and the plain peak."""
+    seg = x[int(t * FS):int((t + KIT_SLOT - 0.05) * FS)]
+    if len(seg) < FS: return None
+    p = (sc.kweight(seg) ** 2).sum(axis=1)
+    B, H = int(0.4 * FS), int(0.02 * FS)
+    c = np.concatenate([[0], np.cumsum(p)]); idx = np.arange(0, len(p) - B, H)
+    mom = float(sc.db(((c[idx + B] - c[idx]) / B).max()))
+    return [sc.r1(mom), sc.r1(sc.db(p.sum() / FS)), sc.r1(20 * math.log10(max(float(np.abs(seg).max()), 1e-7)))]
+
+
+def kit_one(kit, program, name, kind, font, pjbin, workroot, raw=False):
+    work = os.path.join(workroot, 'kit_%s_%s' % (kit, name.replace('/', '_'))); os.makedirs(work, exist_ok=True)
+    try:
+        mid = os.path.join(work, kit + '.mid'); lay = write_kit(mid, program, list(range(35, 82)), KIT_GRID if raw else None)
+        wav = os.path.join(work, 'out.wav'); log = ''
+        if kind == 'pj':
+            r = subprocess.run([pjbin, '-director', 'off', '-play', mid, '-o', wav],
+                               env=dict(os.environ, PJ_PLAY_VELMEDIAN='1000', PJ_THREADS='3', PJ_SWIRL='0',
+                                        **(dict(PJ_NODRUMCAL='1') if raw else {})), capture_output=True, text=True)
+            log = r.stdout + r.stderr
+            if r.returncode != 0: raise RuntimeError(log[-2000:])
+        elif kind == 'tim':
+            r = subprocess.run(['timidity', '-c', kit_cfg(font, work), '-s', str(FS), '-OwS2', '-EFreverb=d', '-EFchorus=d',
+                                '-o', wav, mid], capture_output=True, text=True)
+            if r.returncode != 0 or not os.path.exists(wav): raise RuntimeError((r.stdout + r.stderr)[-2000:])
+        else:
+            render_fluid(font, mid, wav)
+        x = sc.load_wav(wav)
+        m = re.search(r'peak [\d.]+: the whole song (-?[\d.]+) dB down', log)
+        if m: x = x * 10 ** (-float(m.group(1)) / 20)  # (undo pajupilli's mastering)
+        anchor = []; S = {}
+        for ch, k, v, t in lay:
+            l = stroke_levels(x, t)
+            if l is None: continue
+            if ch == 0: anchor.append(l)
+            elif ch == 9: S['%d/%d' % (k, v)] = l
+        return kit, name, dict(anchor=[sc.r1(np.mean([a[i] for a in anchor])) for i in range(3)], strokes=S,
+                               log=[l for l in log.splitlines() if 'channel' in l or 'peak' in l or 'drum' in l][:12])
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def cmd_kits(a):
+    if not a.report_only:
+        synths = [s for s in SYNTHS if s[0] == 'pajupilli' or s[0] in REFS]
+        R = json.load(open(KIT_DATA)) if os.path.exists(KIT_DATA) and (a.pj_only or a.emit or a.refine) else {}
+        if a.refine: return kits_emit(R, True)
+        if a.pj_only: synths = synths[:1]
+        if a.emit:  # pajupilli's own curves, uncalibrated; the fonts only if not at hand
+            synths = [('pajupilli/raw', 'pj', None)] + ([] if all(n in R.get(k, {}) for k, _ in KITS for n in REFS) else synths[1:])
+        with ProcessPoolExecutor(a.jobs) as ex:
+            fut = [ex.submit(kit_one, kit, prog, n, kind, font, a.bin, a.work, n == 'pajupilli/raw')
+                   for kit, prog in KITS for n, kind, font in synths]
+            for f in as_completed(fut):
+                kit, name, res = f.result(); R.setdefault(kit, {})[name] = res
+                if name == 'pajupilli/raw': R.pop('adjust', None)
+                print('%s %s' % (kit, name), file=sys.stderr)
+        json.dump(R, open(KIT_DATA, 'w'), indent=0)
+    if a.emit: return kits_emit(R)
+    R = json.load(open(KIT_DATA)); R.pop('adjust', None)
+    kits_report(R, a.measure)
+
+
+def kits_rel(R, measure=0):
+    """kit -> synth -> 'key/velocity' -> the stroke against that synth's own piano (dB); silent strokes left out."""
+    return {kit: {n: {s: l[measure] - D[n]['anchor'][measure] for s, l in D[n]['strokes'].items() if l[2] > -80} for n in D}
+            for kit, D in R.items()}
+
+
+def kits_target(rel, kit, k, v):
+    """What a stroke should be against the piano: the SoundFonts' average; the Brush kit's toms, hi-hat and
+    cymbals KIT_BRUSH_DB under the Standard kit's. ((target, the fonts' range) or None.)"""
+    if kit == 'brush' and k in KIT_BRUSHED:
+        t = kits_target(rel, 'standard', k, v)
+        return (t[0] + KIT_BRUSH_DB, t[1]) if t else None
+    s = '%d/%d' % (k, v); refs = [rel[kit][n][s] for n in REFS if n in rel[kit] and s in rel[kit][n]]
+    return (float(np.mean(refs)), max(refs) - min(refs)) if len(refs) >= 2 else None
+
+
+def kits_table(R, measure=0):
+    """kit -> key -> velocity -> (pajupilli over the target, the SoundFonts' range, pajupilli, the target), each
+    synth's stroke taken against its own piano; nothing where pajupilli or the fonts are silent."""
+    T = {}; rel = kits_rel(R, measure)
+    for kit in R:
+        T[kit] = {}
+        for k in range(35, 82):
+            row = {}
+            for v in sc.VELS:
+                s = '%d/%d' % (k, v); t = kits_target(rel, kit, k, v)
+                if s in rel[kit].get('pajupilli', {}) and t:
+                    row[v] = (rel[kit]['pajupilli'][s] - t[0], t[1], rel[kit]['pajupilli'][s], t[0])
+            T[kit][k] = row
+    return T
+
+
+def kits_emit(R, refine=False):
+    """src/drumcal_data.h: per kit and key, the target at sc.VELS and pajupilli's own curve at KIT_GRID.
+    refine: what the calibrated pajupilli (the last `kits` run) still misses is taken off the target it is
+    given (R['adjust'], kept and added to; at most 10 dB): for what the stroke alone does not reach as the
+    curve says (a drum's hands and places differ with the velocity)."""
+    rel = kits_rel({k: v for k, v in R.items() if k != 'adjust'}); L = []
+    adj = R.setdefault('adjust', {})
+    if refine:
+        T = kits_table({k: v for k, v in R.items() if k != 'adjust'})
+        for kit in T:
+            for k, row in T[kit].items():
+                a = adj.setdefault(kit, {}).setdefault(str(k), [0.0] * len(sc.VELS))
+                for i, v in enumerate(sc.VELS):
+                    if v in row: a[i] = round(float(np.clip(a[i] + 0.8 * row[v][0], -10, 10)), 2)
+        json.dump(R, open(KIT_DATA, 'w'), indent=0)
+    for i, (kit, _) in enumerate(KITS):
+        own = rel[kit].get('pajupilli/raw', {})
+        for k in range(35, 82):
+            t = [kits_target(rel, kit, k, v) for v in sc.VELS]; o = [own.get('%d/%d' % (k, u)) for u in KIT_GRID]
+            if None in t or o[-1] is None: continue
+            for j in range(len(o) - 2, -1, -1):  # (too soft to measure: as the loudness curve would have it)
+                if o[j] is None: o[j] = o[j + 1] + 33.3 * math.log10(KIT_GRID[j] / KIT_GRID[j + 1])
+            a = adj.get(kit, {}).get(str(k), [0.0] * len(sc.VELS)); t = [(x[0] - a[j], x[1]) for j, x in enumerate(t)]
+            L.append('    {%d, %d, {%s}, {%s}},  // %s' % (i, k, ', '.join('%.1ff' % x[0] for x in t), ', '.join('%.1ff' % x for x in o),
+                                                          DRUM_NAMES[k - 35]))
+    H = ['// Generated by tools/gmcompare.py kits --emit: do not edit.',
+         '// Per kit (0 Standard, 1 Jazz, 2 Brush) and General MIDI drum key: how loud the stroke should be at',
+         '// velocities kDrumCalVels (the SoundFonts\' average; the Brush kit\'s toms, hi-hat and cymbals %g dB under the' % -KIT_BRUSH_DB,
+         '// Standard kit\'s) and how loud pajupilli\'s own is at kDrumCalGrid, uncalibrated: each its loudest 400 ms,',
+         '// K-weighted, against a piano\'s notes (C3, C4, C5 at velocity 96) in the same file, dB. src/drumkit.cc.',
+         '#pragma once', 'namespace pajupilli {',
+         'constexpr int kDrumCalVels[4] = {%s};' % ', '.join(map(str, sc.VELS)),
+         'constexpr int kDrumCalGridN = %d;' % len(KIT_GRID),
+         'constexpr int kDrumCalGrid[kDrumCalGridN] = {%s};' % ', '.join(map(str, KIT_GRID)),
+         'struct DrumCal { int kit, key; float target[4], own[kDrumCalGridN]; };', 'const DrumCal kDrumCal[] = {'] + L + ['};', '}  // namespace pajupilli']
+    open(KIT_HEADER, 'w').write('\n'.join(H) + '\n')
+    print('wrote %s (%d keys): build, then `kits --pj-only` to check' % (KIT_HEADER, len(L)), file=sys.stderr)
+
+
+def kits_report(R, measure=0):
+    T = kits_table(R, measure)
+    what = ['loudest 400 ms', 'whole stroke (energy)', 'peak'][measure]
+    L = ['# The drum kits against the SoundFonts, stroke by stroke', '',
+         'tools/gmcompare.py kits. Each General MIDI drum key at velocities %s on the Standard, Jazz and Brush kits '
+         '(the drum channel\'s program 1, 33, 41), on pajupilli and on %s. Measure: %s, K-weighted (BS.1770), '
+         'each synth\'s stroke against its own piano (C3, C4, C5 at velocity 96 in the same file). The numbers are pajupilli '
+         'less the SoundFonts\' average, dB: positive = pajupilli\'s piece is louder against the piano than the fonts\'. '
+         'The Brush kit\'s toms, hi-hat and cymbals are compared with the Standard kit\'s average less %g dB (the fonts\' Brush '
+         'kits play the stick\'s samples there). '
+         '(range): how far the fonts lie apart at velocity 96.' % (', '.join(map(str, sc.VELS)), ', '.join(REFS), what, -KIT_BRUSH_DB), '']
+    for kit, _ in KITS:
+        if kit not in T: continue
+        L += ['## %s kit' % kit.capitalize(), '']
+        L += ['| group | mean | ' + ' | '.join('v%d' % v for v in sc.VELS) + ' |', '|---|---|' + '---|' * len(sc.VELS)]
+        for g, keys in DRUM_GROUPS:
+            c = [[T[kit][k][v][0] for k in keys if v in T[kit][k]] for v in sc.VELS]
+            al = [x for cc in c for x in cc]
+            if al: L.append('| %s | %+.1f | %s |' % (g, np.mean(al), ' | '.join('%+.1f' % np.mean(cc) if cc else '' for cc in c)))
+        L += ['', '| key | drum | mean | ' + ' | '.join('v%d' % v for v in sc.VELS) + ' | (range) | re piano v96: pajupilli / fonts |',
+              '|---|---|---|' + '---|' * len(sc.VELS) + '---|---|']
+        for k in range(35, 82):
+            row = T[kit][k]
+            if not row: L.append('| %d | %s | silent |' % (k, DRUM_NAMES[k - 35]) + ' |' * (len(sc.VELS) + 2)); continue
+            L.append('| %d | %s | %+.1f | %s | %s | %s |' % (
+                k, DRUM_NAMES[k - 35], np.mean([r[0] for r in row.values()]),
+                ' | '.join('%+.1f' % row[v][0] if v in row else '' for v in sc.VELS),
+                '%.1f' % row[96][1] if 96 in row else '', '%.1f / %.1f' % (row[96][2], row[96][3]) if 96 in row else ''))
+        L.append('')
+    open(KIT_REPORT, 'w').write('\n'.join(L) + '\n')
+    print('wrote ' + KIT_REPORT, file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['run', 'report'])
+    ap.add_argument('cmd', choices=['run', 'report', 'kits'])
     ap.add_argument('--bin', default=os.path.join(ROOT, 'pajupilli'))
     ap.add_argument('--programs', default='0-127,drums', help='GM programs 0-127 (0-based), ranges, pajupilli names, "drums"')
     ap.add_argument('--jobs', type=int, default=8)
@@ -656,7 +884,13 @@ def main():
     ap.add_argument('--head', default=os.path.join(ROOT, 'research', 'gm_compare', 'head.md'))
     ap.add_argument('--patterns', default=os.path.join(ROOT, 'research', 'gm_compare', 'patterns.md'))
     ap.add_argument('--tail', default=os.path.join(ROOT, 'research', 'gm_compare', 'methods.md'))
+    ap.add_argument('--pj-only', action='store_true', help='kits: render pajupilli again, keep the SoundFonts\' numbers')
+    ap.add_argument('--emit', action='store_true', help='kits: measure pajupilli uncalibrated and write src/drumcal_data.h')
+    ap.add_argument('--refine', action='store_true', help='kits: after --emit, a build and a `kits --pj-only`: take what is still missed off the targets, write the header again')
+    ap.add_argument('--report-only', action='store_true', help='kits: the report from the numbers at hand')
+    ap.add_argument('--measure', type=int, default=0, help='kits: 0 the loudest 400 ms, 1 the whole stroke, 2 the peak')
     a = ap.parse_args()
+    if a.cmd == 'kits': return cmd_kits(a)
     cmd_run(a) if a.cmd == 'run' else cmd_report(a)
 
 

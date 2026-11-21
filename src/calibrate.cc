@@ -33,8 +33,10 @@ constexpr int kFs = 48000;  // Voice output
 // a harder attack: the tongue, the accent, the fingers), not from the breath
 // control alone.
 double tryNote(const Instrument& inst, int midi, double cover, double press, double a4, double dyn = 0.5,
-               double jet = 1, double* wobble = nullptr, double tol = 150, bool keyed = false) {
+               double jet = 1, double* wobble = nullptr, double tol = 150, bool keyed = false, int restruck = 0,
+               unsigned seed = 0) {
   Voice v(inst);
+  if (seed) v.seed(seed);  // (another player of the pool: its own breath noise)
   Performer& pl = v.player();
   pl.coverTrim[midi] = pl.coverLoTrim[midi] = pl.coverHiTrim[midi] = cover;
   pl.pressTrim[midi] = press;
@@ -56,6 +58,15 @@ double tryNote(const Instrument& inst, int midi, double cover, double press, dou
   const double slow = std::max(1.0, 261.6 / f0) * (inst.lip() ? 1.6 : 1.0);
   const int n = int((wobble ? 0.5 : 0.35) * slow * kFs);
   std::vector<float> x(n);
+  // (restruck: the note played short that many times first, an eighth of a second each and as
+  // long between them, as a passage's repeated notes come: the air and the reed not at rest)
+  for (int k = 0; k < restruck; ++k) {
+    const int e = int(0.125 * kFs);
+    pl.noteOn(midi, vel);
+    v.render(x.data(), std::min(n, e));
+    pl.noteOff(midi);
+    v.render(x.data(), std::min(n, e));
+  }
   pl.noteOn(midi, vel);
   v.render(x.data(), n);
   const int a = wobble ? int(0.2 * slow * kFs) : n / 2;
@@ -409,6 +420,19 @@ static double playReed(const Instrument& inst, int m, double a4, double cv, doub
     if (std::isnan(c) || wob > kSteady) return NAN;
     if (std::fabs(c) > std::fabs(worst)) worst = c;
   }
+  // ... and struck again and again from the key, as repeated notes are (the oboe's F4 at the top
+  // of its dynamics spoke from rest every time and fell into its octave on the third of three
+  // quick ones).
+  static const bool kRestruck = knob("PJ_CALRESTRUCK", 0) > 0;
+  // Each time by another player of the pool (-play gives a line to any of them): the breath's
+  // noise is each one's own, and an attack that hangs on it speaks for one and not for the next.
+  static const int kSeeds = int(knob("PJ_CALRESTRUCK_SEEDS", 4));
+  if (kRestruck && inst.droneLo < 0)
+    for (int s = 1; s <= kSeeds; ++s) {
+      double wob = 1;
+      const double c = tryNote(inst, m, cv, press, a4, d, 1, &wob, kReedTol + 10, true, 2, unsigned(s));
+      if (std::isnan(c) || wob > kSteady) return NAN;
+    }
   return worst;
 }
 

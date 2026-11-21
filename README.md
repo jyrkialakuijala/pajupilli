@@ -632,6 +632,16 @@ right:
 - **Dampers and pedal:** releasing a key lets its damper down (the top 18 keys have none).
   The sustain pedal lifts all dampers: every string rings along with what is played. A key
   struck again before its sound is gone meets its own waves: repeated notes differ.
+  The dampers land as forces: each head (12-20 g) gives its strings its momentum in an 8 ms
+  felt push, and its grip comes on as it touches; a pedal release lands them all, a soft
+  thump and "chuff" ~30 dB under a mezzo-forte chord (no click), the lift rail's knock under
+  it through the rim. The release's speed follows CC 64 when it moves through values between
+  (an on/off pedal: 0.15 m/s, each release its own). `PJ_PIANO_PEDALNOISE` (1; 0: off, the
+  old piano byte for byte).
+- **The strings stretch:** a loud blow lengthens a bass string by the square of its swing; its
+  lengthwise modes (~16 x the fundamental) ring with the sums of its partials and push the
+  bridge along the string (Bank's phantom partials): at ff in the bass 0.6-2.8 dB more 2-5 kHz
+  at the attack, dying with the partials; nothing at mf (`PJ_PIANO_LONG`, 0.7; 0: off).
 - **Fitted to recordings:** string stiffness, tuning stretch, string loss, unison spread,
   felt hardness and the bridge's stiffness are fitted to notes found in two solo piano
   recordings (`tools/pianofit.py`, research/piano.md section 11): numbers only, no samples.
@@ -643,7 +653,8 @@ right:
   faster (1.31-1.47x measured at C6-G7), so the tone settles onto the fundamental. Its own loss is
   x1.6 (`PJ_PIANO_TOPH2`), the board's share unchanged. `PJ_PIANO_TOPHI` does the same for the
   partials above it (1: off).
-- **Cost:** about 9 % of a core for a single note, 32 % with the pedal down.
+- **Cost:** about 9 % of a core for a single note, 32 % with the pedal down (the stretching
+  adds ~0.75 % of a core per loud bass key while it lasts; the dampers' landing only its 8 ms).
 
 ### Bright piano (Shigeru Kawai SK-7)
 
@@ -3103,6 +3114,17 @@ Lead-saw's circuit:
     ./pajupilli -play song.mid -room church  # in another room
     ./pajupilli -reinstrument grand-piano=organ -play song.mid   # the piano's part on the church organ
     ./pajupilli -reinstrument piano=hammond,*=organ -play song.mid
+    ./pajupilli -pianist -play song.mid      # the piano's sustain pedal planned anew
+
+- **`-pianist`** (`src/pianoplan.h`, `research/pedaling.md`): each channel played by a piano with
+  dampers (grand, bright, upright, honky-tonk) is pedalled by a plan made from its notes, the
+  file's own CC 64 there set aside. Legato pedalling: up at the new harmony's onset, down
+  40 ms + a quarter of the time to the next onset after it (MAESTRO's pianists), changed at the
+  bass's and the harmony's changes and at revoiced chords, not at a melody's notes; up through a
+  low stepwise run; sparing in counterpoint (Bach: the pedal down 0–4 % of the time); lifted at
+  rests and at the end. It prints the texture it found, the changes and the time pressed
+  (`PJ_PIANIST_LOG=1`: every decision). On ten performed files it finds 72 % of the pianists'
+  own changes within 150 ms (Don't Explain: 80 %), 63 % of its changes theirs.
 
 `-transpose N` with `-play` moves every note but the drums N semitones (12: an octave up, -12 down)
 as the file is read, so the organ's and the Hammond's plans are made for the transposed piece.

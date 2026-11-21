@@ -1,4 +1,5 @@
 #include "hammond.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -543,7 +544,7 @@ void HammondModel::moveDrawbars(double dt) {
     static double logT = 0;
     if (kLog && (logT += dt) >= 1) {
       logT -= 1;
-      std::fprintf(stderr, "mud t %.0f crowd %.2f upper crowd %.2f clusters %.2f trill %.2f bassline %.2f lower 16' %.1f upper %.1f%.1f%.1f\n", t_, crowd_, upCrowd_, mud_, thinNow_, bass_, pos_[kLower][0], pos_[kUpper][0], pos_[kUpper][1], pos_[kUpper][2]);
+      say(stderr, "mud t %.0f crowd %.2f upper crowd %.2f clusters %.2f trill %.2f bassline %.2f lower 16' %.1f upper %.1f%.1f%.1f\n", t_, crowd_, upCrowd_, mud_, thinNow_, bass_, pos_[kLower][0], pos_[kUpper][0], pos_[kUpper][1], pos_[kUpper][2]);
     }
   }
   bool moving = false;
@@ -903,9 +904,9 @@ float HammondModel::sample() {
       static double e[4] = {};
       e[c] += v * v;
       if (c == nc - 1 && std::fmod(t_, 1.0) < dt) {
-        std::fprintf(stderr, "leslie inputs t %.0f:", t_);
-        for (int k = 0; k < nc; ++k) std::fprintf(stderr, " %.1f dB", 10 * std::log10(e[k] * dt + 1e-20)), e[k] = 0;
-        std::fprintf(stderr, "\n");
+        std::string d = strf("leslie inputs t %.0f:", t_);
+        for (int k = 0; k < nc; ++k) d += strf(" %.1f dB", 10 * std::log10(e[k] * dt + 1e-20)), e[k] = 0;
+        say(stderr, "%s\n", d.c_str());
       }
     }
   }
@@ -1245,7 +1246,7 @@ bool HammondPlayer::setKnob(int k, double x) {
     overdrive_ = std::exp(std::log(8.0) * std::clamp(x, 0.0, 1.0));
     const int tenths = int(std::lround(10 * overdrive_));
     if (tenths != lastOverdrive_) {
-      std::fprintf(stderr, "overdrive x %.1f\n", overdrive_);
+      say(stderr, "overdrive x %.1f\n", overdrive_);
       lastOverdrive_ = tenths;
     }
     if (knobs_[0] < 0) {
@@ -1263,7 +1264,7 @@ bool HammondPlayer::setKnob(int k, double x) {
     const int state = x < 1.0 / 3 ? 0 : x < 2.0 / 3 ? 1 : 2;
     if (state != lastLeslieKnob_) {
       static const char* const kNames[3] = {"stop (brake)", "slow (chorale)", "fast (tremolo)"};
-      std::fprintf(stderr, "Leslie: %s\n", kNames[state]);
+      say(stderr, "Leslie: %s\n", kNames[state]);
       lastLeslieKnob_ = state;
       setLeslie(state);
     }
@@ -1305,7 +1306,7 @@ bool HammondPlayer::setKnob(int k, double x) {
       std::snprintf(b, sizeof b, "%s%.1f", d ? " " : "", lower[d]);
       low += b;
     }
-    std::fprintf(stderr, "drawbars %s%s%s (drive %.1f); lower %s; pedal %.1f %.1f\n", bars.c_str(), name ? ": " : "", name ? name : "",
+    say(stderr, "drawbars %s%s%s (drive %.1f); lower %s; pedal %.1f %.1f\n", bars.c_str(), name ? ": " : "", name ? name : "",
                  r.drive, low.c_str(), pedal[0], pedal[1]);
     for (int d = 0; d < 9; ++d) printed_[d] = goal[d];
     lastName_ = name;

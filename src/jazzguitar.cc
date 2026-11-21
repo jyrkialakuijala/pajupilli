@@ -1,4 +1,5 @@
 #include "jazzguitar.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -255,7 +256,7 @@ void JazzGuitarPlayer::chord(std::vector<Asked>& notes) {
   if (!voice(notes, grip)) { ++nFailed_; return; }
   {
     // (Was the top note kept? Folded, it is the same pitch class at the top.)
-    if (notes.back().midi % 12 != topAsked % 12) { ++nTopDropped_; if (debug_) std::fprintf(stderr, "top dropped: asked top %d\n", topAsked); }
+    if (notes.back().midi % 12 != topAsked % 12) { ++nTopDropped_; if (debug_) say(stderr, "top dropped: asked top %d\n", topAsked); }
   }
   (void)droppedBefore;
   const int n = int(notes.size());
@@ -345,9 +346,9 @@ void JazzGuitarPlayer::chord(std::vector<Asked>& notes) {
     if (!a.ghost) chordMidi_[s] = a.midi;
   }
   if (debug_) {
-    std::fprintf(stderr, "chord %s%s%s v%.0f:", fingers ? "fingers" : up ? "up" : "down", fourBar_ ? " (four to the bar)" : "", allGhost ? " ghost" : "", vmean);
-    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %d@s%d/f%d", notes[i].midi, 6 - grip.string[i], grip.fret[i]);
-    std::fprintf(stderr, " (asked %zu)\n", asked);
+    std::string d = strf("chord %s%s%s v%.0f:", fingers ? "fingers" : up ? "up" : "down", fourBar_ ? " (four to the bar)" : "", allGhost ? " ghost" : "", vmean);
+    for (int i = 0; i < n; ++i) d += strf(" %d@s%d/f%d", notes[i].midi, 6 - grip.string[i], grip.fret[i]);
+    say(stderr, "%s (asked %zu)\n", d.c_str(), asked);
   }
 }
 
@@ -385,7 +386,7 @@ void JazzGuitarPlayer::octave(const Asked& lo, const Asked& hi) {
   }
   hand_ += 0.6 * ((bf + bh) * 0.5 - 1 - hand_);
   bendString_ = best + 2;
-  if (debug_) std::fprintf(stderr, "octave %d/%d strings %d,%d frets %d,%d %s%s\n", lo.midi, hi.midi, 6 - best, 4 - best, bf, bh, thumb ? "thumb" : "pick", up ? " up" : "");
+  if (debug_) say(stderr, "octave %d/%d strings %d,%d frets %d,%d %s%s\n", lo.midi, hi.midi, 6 - best, 4 - best, bf, bh, thumb ? "thumb" : "pick", up ? " up" : "");
 }
 
 void JazzGuitarPlayer::single(const Asked& a) {
@@ -447,7 +448,7 @@ void JazzGuitarPlayer::single(const Asked& a) {
   lastMidi_ = midi;
   lastVel_ = a.velocity;
   bendString_ = fret > 0 ? best : -1;
-  if (debug_) std::fprintf(stderr, "note %d s%d f%d %s%s%s v%d: %.0f mm from the saddle, %.2f mm, push %.1f ms, slip %.2f ms\n", a.midi, 6 - best, fret,
+  if (debug_) say(stderr, "note %d s%d f%d %s%s%s v%d: %.0f mm from the saddle, %.2f mm, push %.1f ms, slip %.2f ms\n", a.midi, 6 - best, fret,
                            slur ? (step > 0 ? "hammer" : "pull") : thumb ? "thumb" : up ? "up" : "down", ghost ? " ghost" : "", "", a.velocity,
                            t.from * 1000, t.depth * 1000, t.push * 1000, t.slip * 1000);
 }

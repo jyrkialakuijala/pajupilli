@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
+#include "drumcal_data.h"
 #include "knob.h"
 
 namespace pajupilli {
@@ -44,7 +46,10 @@ Drum drumFor(int k, Kit kit, bool gs) {
   if (k == 39 && kit != Kit::kBrush) return {"hand-clap", 39};  // (the Brush kit's 39 is the slap)
   if (k == 37) return {"brush-snare", 37};
   if (k >= 38 && k <= 40) return {"brush-snare", brush || k != 40 ? k : 41};
-  if (k == 42 || k == 44 || k == 46) return {"hi-hat", k};  // closed, the foot, open
+  // (PJ_HAT_KITBRUSH=1: the Brush kit strikes it with the brush, the hi-hat's keys 43 and 47: 15-25 dB
+  // under the stick as the model stands, so not the default; the Brush kit's stick is a light one: drumVelocity)
+  static const bool kHatBrush = knob("PJ_HAT_KITBRUSH", 0) > 0;
+  if (k == 42 || k == 44 || k == 46) return {"hi-hat", brush && kHatBrush && k != 44 ? k + 1 : k};  // closed, the foot, open
   // Below 35 General MIDI 1 defines nothing. Files that play there are
   // Yamaha XG's (its brush strokes and extra snares live there) unless they
   // say they are Roland GS or General MIDI 2 (clicks, scratches, sticks).
@@ -267,7 +272,96 @@ std::vector<CymbalSwirl> planCymbalSwirls(const std::vector<DrumPlanNote>& notes
   return out;
 }
 
+// Each drum at the SoundFonts' level (tools/gmcompare.py kits --emit: drumcal_data.h). The table
+// holds, for a kit's key, how loud the fonts' average stroke is at four velocities and how loud
+// pajupilli's own is at eight (both against a piano's note in the same file, dB). An instrument
+// rings all its keys in one voice, so its level is one gain (drumGainDb, drumTrimDb: enough for its key that
+// needs the most at velocity 127) and each key's the stroke's strength (drumVelocity: the velocity
+// at which its own curve reaches the fonts' level). PJ_NODRUMCAL: neither.
+namespace {
+struct DrumCalState {
+  bool on = false;
+  std::vector<std::pair<std::string, double>> gain;
+  unsigned char map[3][128][128];
+  bool has[3][128] = {};
+  double own(const DrumCal& c, double u) const {  // the key's own level at velocity u, never falling as u rises
+    double m = c.own[0];
+    if (u <= kDrumCalGrid[0]) return m + 33.3 * std::log10(std::max(u, 1.0) / kDrumCalGrid[0]);
+    for (int i = 1; i < kDrumCalGridN; ++i) {
+      const double at = m;
+      m = std::max(m, double(c.own[i]));
+      if (u <= kDrumCalGrid[i]) return at + (u - kDrumCalGrid[i - 1]) / double(kDrumCalGrid[i] - kDrumCalGrid[i - 1]) * (m - at);
+    }
+    return m;
+  }
+  static double target(const DrumCal& c, double v) {
+    if (v <= kDrumCalVels[0]) return c.target[0] + 33.3 * std::log10(std::max(v, 1.0) / kDrumCalVels[0]);
+    int i = 0;
+    while (i + 2 < 4 && kDrumCalVels[i + 1] < v) ++i;
+    const double a = (v - kDrumCalVels[i]) / double(kDrumCalVels[i + 1] - kDrumCalVels[i]);
+    return c.target[i] + a * (c.target[i + 1] - c.target[i]);
+  }
+  double gainOf(const char* inst) const {
+    for (const auto& g : gain)
+      if (g.first == inst) return g.second;
+    return 0;
+  }
+  DrumCalState() {
+    if (std::getenv("PJ_NODRUMCAL") || kDrumCal[0].kit < 0) return;
+    on = true;
+    static const Kit kKits[3] = {Kit::kStandard, Kit::kJazz, Kit::kBrush};
+    for (const DrumCal& c : kDrumCal) {
+      const Drum d = drumFor(c.key, kKits[c.kit], false);
+      if (!d.inst) continue;
+      double need = std::clamp(double(c.target[3]) - own(c, 127), -15.0, 15.0);
+      // (an instrument that is a General MIDI program too keeps its level there: its drum keys by the stroke alone)
+      if (std::strcmp(d.inst, "agogo") == 0) need = 0;  // (GM 114)
+      bool found = false;
+      for (auto& g : gain)
+        if (g.first == d.inst) { g.second = std::max(g.second, need); found = true; }
+      if (!found) gain.push_back({d.inst, need});
+    }
+    for (const DrumCal& c : kDrumCal) {
+      const Drum d = drumFor(c.key, kKits[c.kit], false);
+      if (!d.inst) continue;
+      const double g = gainOf(d.inst);
+      has[c.kit][c.key] = true;
+      int u = 1;
+      for (int v = 1; v < 128; ++v) {
+        const double want = target(c, v) - g;
+        while (u < 127 && own(c, u) < want) ++u;
+        map[c.kit][c.key][v] = (unsigned char)u;
+      }
+    }
+  }
+};
+const DrumCalState& drumCal() {
+  static const DrumCalState s;
+  static const bool dbg = [] {
+    if (std::getenv("PJ_DRUMCALDBG"))
+      for (const auto& g : s.gain) std::fprintf(stderr, "drumcal: %s %+.1f dB\n", g.first.c_str(), g.second);
+    return true;
+  }();
+  (void)dbg;
+  return s;
+}
+}  // namespace
+
+// (The gain is the player's, as velocity's is: the room hears it too (ensemble.cc: vg). The level
+// trim is not: it moves the direct sound alone, and a kick trimmed 5 dB down in a hall came out
+// 1-2 dB softer and further away. As velocity's, at most +6 dB into the room; what is over goes to the trim.)
+double drumGainDb(const char* inst) { return drumCal().on ? std::min(drumCal().gainOf(inst), 6.0) : 0; }
+double drumTrimDb(const char* inst) { return drumCal().on ? std::max(drumCal().gainOf(inst) - 6.0, 0.0) : 0; }
+
+int drumVelocity(int gmKey, Kit kit, int velocity) {
+  const DrumCalState& s = drumCal();
+  const int k = kit == Kit::kStandard ? 0 : kit == Kit::kJazz ? 1 : 2;
+  if (!s.on || gmKey < 0 || gmKey > 127 || velocity < 1 || !s.has[k][gmKey]) return velocity;
+  return s.map[k][gmKey][std::min(velocity, 127)];
+}
+
 DrumKit::DrumKit(const RoomSpec* room, bool verbose, int voices, Kit kit) {
+  kit_ = kit;
   for (int k = 0; k < 128; ++k) {
     part_[k] = key_[k] = -1;
     const Drum d = drumFor(k, kit, false);
@@ -290,7 +384,7 @@ DrumKit::DrumKit(const RoomSpec* room, bool verbose, int voices, Kit kit) {
 
 bool DrumKit::noteOn(int k, int velocity) {
   if (k < 0 || k > 127 || part_[k] < 0) return false;
-  parts_[part_[k]].ens->noteOn(key_[k], velocity);
+  parts_[part_[k]].ens->noteOn(key_[k], drumVelocity(k, kit_, velocity));
   held_[k] = true;
   return true;
 }

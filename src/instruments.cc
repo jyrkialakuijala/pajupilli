@@ -92,12 +92,14 @@ extern const int kNumChoirInstruments;
 
 // The instruments at a common loudness: each one's trim (tools/levels.py),
 // as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
+double drumTrimDb(const char* inst);  // (drumkit.cc: a drum at the SoundFonts' level, what its gain leaves over)
 double levelTrim(const Instrument& inst) {
   static const bool off = std::getenv("PJ_NOLEVELS") != nullptr;
   if (off) return 1;
+  const double drum = drumTrimDb(inst.name);
   for (const LevelTrim& t : kLevelTrims)
-    if (std::strcmp(t.name, inst.name) == 0) return std::pow(10.0, t.db / 20);
-  return 1;
+    if (std::strcmp(t.name, inst.name) == 0) return std::pow(10.0, (t.db + drum) / 20);
+  return std::pow(10.0, drum / 20);
 }
 
 // The sample players' curve (TiMidity++ with FluidR3, its median over every

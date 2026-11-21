@@ -66,14 +66,24 @@ class PianoPlayer : public Performer {
   void noteOff(int midi) override;
   void render(float* out, int n) override;
   void setHold(bool h) override;
+  void sustainPedal(int cc) override;
   void seed(unsigned) override {}
   static double hammerSpeed(int velocity, double dynamics);  // m/s
 
  private:
   int fold(int midi) const;
+  double pedalMoved(bool h);
   PianoModel& m_;
   bool down_[Piano::kKeys] = {};
+  // (the pedal: its controller's last value and when it came (s), the time now, the speed it
+  // gave, whether it is down, the draws for each release's own speed)
+  int pedalCC_ = 0;
+  double pedalT_ = -1, now_ = 0, nextSpeed_ = -1;
+  bool pedalDown_ = false;
+  uint32_t pedalRng_ = 9157;
   int lo_ = 0, hi_ = 127;
+  bool held_ = false;  // the sustain pedal, as last told (printed when it changes)
+  double t_ = 0;       // the player's clock (s)
 };
 
 }  // namespace pajupilli

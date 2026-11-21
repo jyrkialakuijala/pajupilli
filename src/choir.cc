@@ -1,6 +1,7 @@
 // The choir (General MIDI 53 "Choir Aahs"): the parts, the singers and the dealing of the keys.
 // See src/choir.h.
 #include "choir.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -644,9 +645,9 @@ void Ensemble::choirTune() {
     C.tune[note[i]] = t;
   }
   if (std::getenv("PJ_CHOIR_TUNEDBG")) {
-    std::fprintf(stderr, "choir tune:");
-    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %d %+.1f", note[i], C.tune[note[i]]);
-    std::fprintf(stderr, "\n");
+    std::string d = "choir tune:";
+    for (int i = 0; i < n; ++i) d += strf(" %d %+.1f", note[i], C.tune[note[i]]);
+    say(stderr, "%s\n", d.c_str());
   }
 }
 

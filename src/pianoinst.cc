@@ -1,5 +1,9 @@
 #include "pianoinst.h"
 
+#include "heard.h"
+
+#include <cstdio>
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -174,7 +178,10 @@ float PianoModel::sample() {
 
 PianoPlayer::PianoPlayer(PianoModel& m) : Performer(m), m_(m) {
   // (PJ_PIANO_PEDAL: the sustain pedal held from the start: every string free, the most work.)
-  if (knob("PJ_PIANO_PEDAL", 0) > 0) setHold(true);
+  if (knob("PJ_PIANO_PEDAL", 0) > 0) {
+    pedalDown_ = true;  // (lifted before the first note: no knock)
+    setHold(true);
+  }
   if (dulcimer(m.instrument())) { lo_ = 43; hi_ = 93; }  // G2 .. A6
 }
 
@@ -210,20 +217,62 @@ void PianoPlayer::noteOff(int midi) {
 }
 
 void PianoPlayer::setHold(bool h) {
+  if (h != held_) {  // (the pedal's changes on stdout, as they are heard: src/heard.h)
+    sayAt(t_, std::string(m_.instrument().name) + ": sustain pedal " + (h ? "down" : "up"));
+    held_ = h;
+  }
   hold_ = h;
+  const double speed = pedalMoved(h);
   for (int k = 0; k < Piano::kKeys; ++k)
     if (h) m_.piano().damper(k, false);
-    else if (!down_[k]) m_.piano().damper(k, true);
+    else if (!down_[k]) m_.piano().damper(k, true, speed);
+}
+
+// The pedal's speed. Its controller moving through the values between (a continuous pedal
+// sensor): the foot's speed, from how far it moved since the last value, over the 6 mm the
+// pedal lifts the dampers by; never more than they fall by themselves (~0.3 m/s: 5 mm under
+// their weight, the underlevers' inertia with them). Only on and off (0 and 127, as most files
+// and keyboards send): a release as a pianist's foot lets the pedal up, 0.15 m/s at the
+// dampers (the pedal's 10 mm in some 40 ms), each its own (x 0.75 .. 1.25, seeded).
+void PianoPlayer::sustainPedal(int cc) {
+  cc = std::clamp(cc, 0, 127);
+  nextSpeed_ = -1;
+  if ((cc >= 64) != pedalDown_) {
+    const bool between = (cc > 0 && cc < 127) || (pedalCC_ > 0 && pedalCC_ < 127);
+    const double dt = now_ - pedalT_;
+    if (between && pedalT_ >= 0 && dt > 0 && dt < 0.25)
+      nextSpeed_ = std::min(0.3, std::abs(pedalCC_ - cc) / 127.0 / std::max(dt, 1e-3) * 0.006);
+  }
+  pedalCC_ = cc;
+  pedalT_ = now_;
+  setHold(cc >= 64);
+}
+
+// The pedal pressed or let go (or neither: -1): the rail's knock (piano.h's pedal()), and the
+// speed the dampers of the keys not held fall back onto their strings at.
+double PianoPlayer::pedalMoved(bool h) {
+  if (h == pedalDown_) return -1;
+  pedalDown_ = h;
+  double speed = nextSpeed_;
+  nextSpeed_ = -1;
+  if (speed <= 0) {
+    pedalRng_ = pedalRng_ * 1664525u + 1013904223u;
+    speed = 0.15 * (0.75 + 0.5 * ((pedalRng_ >> 8) / 16777216.0));
+  }
+  m_.piano().pedal(h, speed);
+  return speed;
 }
 
 void PianoPlayer::render(float* out, int n) {
   constexpr int kBlock = 16;
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
+    t_ += m / fs_;
     tick(m / fs_);
     m_.piano().setVoicing(std::pow(4.0, brightness_ - 1) * hardness_);
     m_.process(out + i, m);
   }
+  now_ += n / fs_;
   blowing_ = !m_.piano().asleep();
 }
 

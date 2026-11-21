@@ -93,7 +93,23 @@ B curve from memory]**:
   free longitudinal modes (16–20 times the transverse fundamental **[web, Bank]**) and phantom
   partials at sums of transverse partials. Bank's method: the stretching force from products of
   the transverse modes' amplitudes, a few longitudinal resonators (5–10), one-way coupling.
-  25 % of his cost. Second stage.
+  25 % of his cost.
+  **Built (2026-11-21, `Piano::stretch`, `PJ_PIANO_LONG`):** on the strings whose first
+  lengthwise mode is under 2.5 kHz (the wound bass and the low plain strings, A0 to about E3),
+  up to 8 lengthwise modes each (the core's E A from B, the whole string's mass: A0 440 Hz, 16 x;
+  key 21 1.3 kHz, 15 x), Q 50, driven by the slopes' products (pairs k apart and pairs adding to
+  k, both directions of swing); the bridge gets the even tension (the partials' squares) plus
+  each mode's motion less what it would hold at rest (the phantoms, rising near the modes).
+  That push along the string rocks the bridge: it moves the board as 0.7 of it would at 1 kHz,
+  as sqrt(f) (bridge height 3 cm x the board's bending wavenumber under the bass bridge,
+  ~24 /m: an estimate; Conklin found the bridge about as mobile along the strings as across).
+  One-way, as Bank's. Computed after each blow until the string has lost 20 dB (at most 4 s).
+  Measured (dry, A0 A1 C2 G2 C3 at 127 against the old piano): 2-5 kHz over the first 0.2 s
+  +2.8 +1.3 +1.8 +2.5 +0.6 dB, over 0.5-1.5 s +1.5 +1.0 +0.3 +1.2 +0.5; level +0.5 .. +0.1 dB;
+  at 64 under 0.3 dB anywhere; the added 1-5 kHz sound falls 13 dB in its first second at C2
+  and G2 (A0's partials die slowly, and so do its phantoms: 4 dB). In Taking a Chance on Love's
+  loudest bass passage (142-165 s, velocities to 99) the 1-5 kHz band +0.4 dB, the level
+  unchanged. Cost: ~0.75 % of a core per loud bass key while it is computed.
 - **Damping per mode:** a law in frequency (air, internal friction) plus what the bridge takes;
   T60 from tens of seconds in the bass to under a second at the top **[memory]**; to be fitted to
   recordings.
@@ -160,6 +176,41 @@ added stiffness and mass, the way the bass bar is done.
   over 30–100 ms (the bass model's `touch`). Half pedalling follows from the felt's pressure.
   Keys 71–88 have none **[memory]**.
 - Sustain pedal: all dampers up. Sostenuto: those up at that moment stay.
+- **The dampers landing and the trapwork (built 2026-11-21, `PJ_PIANO_PEDALNOISE`, 0 = the old
+  piano byte for byte).** No published level found (Askenfelt & Jansson measured the action's
+  timing and the key-bottom noise, not the pedal's; Schutz et al. 2008 only "a noise floor" with
+  the pedal); numbers are estimates **[calc]**:
+  - Each damper (head, wire, the underlever's share: 20 g in the bass to 12 g at key 70; the
+    upright's x 0.6, spring-driven) lands at the pedal's speed: 0.15 m/s x 0.75-1.25 for an
+    on/off CC 64 (seeded), from the foot's speed (6 mm of damper lift over the CC's travel,
+    at most 0.3 m/s) when CC 64 moves through values between; a key let go, 0.12 m/s (the
+    upright 0.18). Its momentum m v goes into the strings at the damper's place (the felt's
+    length-averaged mode shape) in a half sine of 8 ms (soft felt, ~2.5 kN/m), pushing them
+    down (the grand) or towards the board (the upright); each head late by its regulation
+    (0-0.5 mm of lift over its speed, fixed per instrument): a "chuff", not one click. Its grip
+    starts when it touches: half within the push, the rest over 25 ms (was: 50 ms linear from
+    the key's release).
+  - The lift rail and the pedal's lever (0.6 kg) land on their felt stop in 8 ms; half the knock
+    reaches the board through the rim (entering at the two ends of the bridges); a press knocks
+    at 0.3 of it. The dampers leaving the strings give up only their resting weight: left out.
+  - Measured (dry): a 5-note mezzo-forte chord's ringing stopped by the pedal: the thump ~32 dB
+    under the chord's peak (50 ms windows), 40-500 Hz (none above 4 kHz), -20 dB within 25 ms
+    plus the strings' quicker damping; the pedal alone 40-45 dB under; in Don't Explain (61
+    releases in 60 s) the difference 31 dB under the music's loudest 50 ms, 22 dB under the
+    music around each release. Cost: only during the 8 ms pushes.
+- **Sympathetic strings (checked 2026-11-21).** With the dampers up every string is computed
+  and driven by the bridge's motion (`key_.acc`); measured as string energies after a C4
+  strike, pedal down: C3 (its 2nd partial on C4's fundamental) 6-10 dB under C4, C2 11-15,
+  F1/F2 14-18; non-coinciding strings (C#, D, F#, A) 40-60 dB under; C5 struck: F3 (3rd
+  partial ~2 c off) 11-14 dB under, C6 18-29, C4 (2nd partial ~2-3 c off) 16-24. That is what
+  first-order theory gives: board coupling of a string ~ its board-loaded decay (~0.5 /s at
+  C5) against mistunings of 0.3-1 Hz: (kappa / delta omega)^2 ~ -15 .. -25 dB. The board's
+  transfer between keys' bridge points (from its 352 resonances) is 0-8 dB under the drive
+  point to 1 kHz, 7-19 dB above 2 kHz. A broadband knock into the board (the key bottoming,
+  tried at 27-31 dB under the note) changed no string's energy measurably: a struck note's
+  halo comes from its partials, not from a knock. The pedal-down output: C3/C4 9-12 dB louder
+  after 1-2 s, partials' off-harmonic share -66 -> -36 dB (C4). Left as it is (no tuning
+  changed).
 - Sound: the modes' radiation weights for two or three microphone positions (player, in the
   curve of the rim, the hall), then the project's room. Lid as a fixed colouring at first.
 

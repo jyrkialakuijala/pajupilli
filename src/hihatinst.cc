@@ -60,7 +60,7 @@ void HiHatPlayer::stroke(int velocity) {
   const double v = std::clamp(velocity, 1, 127) / 127.0, R = h.top().radius();
   const double speed = (0.25 + 4.5 * std::pow(v, 1.6)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
   const double th = 0.4 + 0.5 * (ur() - 0.5);
-  if (brush_) {
+  if (brush_ || brushKey_) {
     const double r = (0.75 + 0.1 * (ur() - 0.5)) * R;
     h.brush().jump(r * std::cos(th), r * std::sin(th), th + 0.3);
     // (The fan comes down at a slant and is let through: its wire ends
@@ -81,6 +81,9 @@ void HiHatPlayer::noteOn(int midi, int velocity) {
   blowing_ = true;
   HiHat& h = m_.hat();
   const double v = std::clamp(velocity, 1, 127) / 127.0;
+  // (The Brush kit's hi-hat: 43 the closed, 47 the open, struck with the brush; the foot's 44 is the same.)
+  if (midi == 42 || midi == 46) brushKey_ = false;
+  if (midi == 43 || midi == 47) { brushKey_ = true; --midi; }
   if (midi == 46) {
     if (foot_ != kOpen) { lean(); h.pedal(1, 0.5, closeForce_, leanX_, leanY_); }
     strokeIn_ = foot_ == kDown ? 0.004 : 0;  // (from closed: as the rims part)

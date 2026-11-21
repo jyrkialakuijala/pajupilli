@@ -1,4 +1,7 @@
+#include "drumkit.h"
 #include "ensemble.h"
+
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -296,7 +299,13 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   // Taken from silence (no key, no breath, its last note gone a while, or
   // never played): it starts as a fresh instrument would, its keys and lips
   // already at this note, nothing carried over from where it stood.
-  const bool silent = s.held == 0 && !s.v->player().busy() && now_ - s.lastOff > kFresh;
+  // (A wind player's own next note is not a fresh start until a second has passed: its keys
+  // and lips jumping to the note 0.26 s after the last one, the oboe's F4 and G4 spoke in the
+  // octave on one attack in four; left to move as they do in a phrase, F4 on none.)
+  static const double kFreshWind = knob("PJ_FRESHWIND", 1.0);
+  const Instrument& tin = s.v->instrument();
+  const bool windLine = !tin.circuit() && !tin.plucked() && !tin.modal() && (tin.reed() || tin.lip());
+  const bool silent = s.held == 0 && !s.v->player().busy() && now_ - s.lastOff > (windLine ? kFreshWind : kFresh);
   // (A one-voice instrument sounds all its keys in one voice: a gain would
   // move the notes still ringing; its stroke is chosen instead.)
   if (velGain_ && velocityAsGain(s.v->instrument())) {
@@ -306,6 +315,9 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   } else if (velGain_) {
     velocity = velocityRemap(s.v->instrument(), velocity);
   }
+  // (A drum at the SoundFonts' level: its one gain, never moving (drumkit.cc).)
+  if (!velocityAsGain(s.v->instrument()))
+    if (const double dg = drumGainDb(s.v->instrument().name); dg != 0) s.vg = s.vgTo = std::pow(10.0, dg / 20);
   ++s.held;
   s.lastNote = pitch;
   s.active = true;
@@ -386,10 +398,10 @@ bool Ensemble::deal(int key, int velocity) {
   }
   take(best[nk - 1], key, bestP[nk - 1], velocity);
   if (verbose_ && (nk > 1 || moved)) {
-    std::fprintf(stderr, "deal:");
+    std::string d = "deal:";
     for (int j = 0; j < nk; ++j)
-      std::fprintf(stderr, " %s%d %s%s", name(bestP[j]), bestP[j] / 12 - 1, f_[best[j]].label.c_str(), j + 1 < nk ? "," : "");
-    std::fprintf(stderr, "\n");
+      d += strf(" %s%d %s%s", name(bestP[j]), bestP[j] / 12 - 1, f_[best[j]].label.c_str(), j + 1 < nk ? "," : "");
+    say(stderr, "%s\n", d.c_str());
   }
   return true;
 }
@@ -441,7 +453,7 @@ void Ensemble::noteOn(int key, int velocity) {
     if (f < 0) f = pickFree(key, &p);
     if (f < 0) return;
     if (verbose_ && own && f_[f].held)
-      std::fprintf(stderr, "move: %s%d to %s (from %s%d)\n", name(key), key / 12 - 1, f_[f].label.c_str(),
+      say(stderr, "move: %s%d to %s (from %s%d)\n", name(key), key / 12 - 1, f_[f].label.c_str(),
                    name(f_[f].v->player().sounding()), f_[f].v->player().sounding() / 12 - 1);
     take(f, key, p, velocity);
     return;
@@ -485,7 +497,7 @@ void Ensemble::split() {
       const double t = pressT_[k];
       take(nf, k, p, vel_[k]);
       pressT_[k] = t;
-      if (verbose_) std::fprintf(stderr, "poly: note %d moves to %s\n", p, mixed_ ? f_[nf].label.c_str() : ("flute " + std::to_string(nf + 1)).c_str());
+      if (verbose_) say(stderr, "poly: note %d moves to %s\n", p, mixed_ ? f_[nf].label.c_str() : ("flute " + std::to_string(nf + 1)).c_str());
     }
   }
 }
@@ -846,18 +858,19 @@ void Ensemble::retune() {
     s.v->player().setTuning(c[i] * jiScale_);
   }
   if (n > 1 && !heal && std::getenv("PJ_TUNEDBG")) {  // (also a quiet ensemble's, the brass section's)
-    std::fprintf(stderr, "tuned:");
-    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.1f", name(note[i]), note[i] / 12 - 1, c[i]);
-    std::fprintf(stderr, "\n");
+    std::string d = "tuned:";
+    for (int i = 0; i < n; ++i) d += strf(" %s%d %+.1f", name(note[i]), note[i] / 12 - 1, c[i]);
+    say(stderr, "%s\n", d.c_str());
   }
   if (n > 1 && !heal && !quiet_ && !(same && bandSolve_)) {
-    std::fprintf(stderr, "tune:");
-    for (int i = 0; i < n; ++i) std::fprintf(stderr, " %s%d %+.0f", name(note[i]), note[i] / 12 - 1, c[i]);
+    std::string d = "tune:";
+    for (int i = 0; i < n; ++i) d += strf(" %s%d %+.0f", name(note[i]), note[i] / 12 - 1, c[i]);
+    say(stderr, "%s\n", d.c_str());
     if (vp) {  // (its own line: tools/test.py reads the notes on the tune line)
-      std::fprintf(stderr, "\nvirtual pitch: %s%d / %d, harmonics", name(note[vpRoot]), note[vpRoot] / 12 - 1, vpN);
-      for (int i = 0; i < n; ++i) std::fprintf(stderr, " %d", vpH[i]);
+      d = strf("virtual pitch: %s%d / %d, harmonics", name(note[vpRoot]), note[vpRoot] / 12 - 1, vpN);
+      for (int i = 0; i < n; ++i) d += strf(" %d", vpH[i]);
+      say(stderr, "%s\n", d.c_str());
     }
-    std::fprintf(stderr, "\n");
   }
 }
 
@@ -922,7 +935,7 @@ void Ensemble::block(float* left, float* right, int n) {
     }
     if (who.empty()) who = "none";
     if (who != playing_) {
-      if (who != "none" && !quiet_) std::fprintf(stderr, "playing: %s\n", who.c_str());
+      if (who != "none" && !quiet_) say(stderr, "playing: %s\n", who.c_str());
       playing_ = who;
     }
   }

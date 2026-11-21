@@ -1,4 +1,5 @@
 #include "bassinst.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -925,7 +926,7 @@ void BowPlayer::render(float* out, int n) {
     if (travel_ > seatBow_ * b.spec().bowLength && !trem) {
       dir_ = -dir_;
       static const bool kLog = std::getenv("PJ_BOW_LOG") != nullptr;  // (the bow changes, for the tests)
-      if (kLog) std::fprintf(stderr, "bowturn %.0f Hz %p %.3f\n", b.spec().strings[0].f0, (void*)this, sinceAny_);
+      if (kLog) say(stderr, "bowturn %.0f Hz %p %.3f\n", b.spec().strings[0].f0, (void*)this, sinceAny_);
       travel_ = 0;
     }
     m_.process(out + i, m);

@@ -57,6 +57,7 @@ struct PianoKey {
   double loss = 0, b2 = 0, b3 = 0; // the wire's own loss: loss + b2 f + b3 f^2 (1/s)
   bool hasDamper = true;
   double damper = 0, damperLen = 0, damperRate = 0;  // its place (share), felt length (m), rate (1/s)
+  double damperMass = 0;  // the head, its wire and lever as they land on the strings (kg; 0: no landing force)
 };
 
 // A piano as data: the grand (grandDesign()), and what is built on the same
@@ -79,6 +80,26 @@ struct PianoDesign {
   // a knock of ~tackHard N per m/s of the hammer lasting tackTime s, the face uneven by up to
   // tackGap m)
   double tackHard = 0, tackGap = 0, tackTime = 1e-4;
+  // The strings' stretching (0: none): a loud blow lengthens a string by the square of its
+  // swing; its lengthwise modes (the first at sqrt(E A / mu) / 2 L, ~16 x the fundamental in
+  // the bass) ring with the sums of its partials, pushing the bridge along the string; that
+  // push rocks the bridge on the board, moving it as a force of longShare of it would at 1 kHz
+  // (as the square root of the frequency). Computed after a blow until the string's swing has
+  // lost 20 dB (at most longTime s), on the strings whose first lengthwise mode is under
+  // longTop Hz; each mode's Q longQ.
+  double longShare = 0, longTime = 4, longTop = 2500, longQ = 50;
+  // The dampers and the pedal's trapwork as forces (research/piano.md 6), x pedalNoise (0: none).
+  // A damper falls onto its strings at damperFall m/s (a key let go; the pedal's release gives
+  // its own speed), its momentum taken up by the felt in a half sine of damperContact s, pushing
+  // the strings towards damperSide (-1: down, from above, the grand's; +1: the upright's, from
+  // the hammers' side), each head late by up to damperSpread m of the lift over its speed (the
+  // regulation). The lift rail and the pedal's lever (railMass kg) land on their felt stops at
+  // the pedal's speed in railContact s; rimShare of a knock in the case reaches the board
+  // through the rim. A press: the rail meets the dampers' underlevers, railPress of the
+  // release's knock.
+  double pedalNoise = 0;
+  double damperFall = 0.12, damperContact = 8e-3, damperSide = -1, damperSpread = 0.5e-3;
+  double railMass = 0.6, railContact = 8e-3, rimShare = 0.5, railPress = 0.3;
   uint32_t seed = 4242;
   // The sideways swing: how far off the vertical the blow sets a string
   // swinging, how far sideways is tuned from up-and-down (cents), and the
@@ -140,8 +161,13 @@ class Piano {
   int keys() const { return nKeys_; }
   // Key 0 .. keys() - 1 (the grand: A0 .. C8). The hammer leaves the action at `speed` (m/s).
   void strike(int key, double speed);
-  // The key's damper: on the strings, or lifted.
-  void damper(int key, bool down);
+  // The key's damper: on the strings, or lifted. Let down, it lands at `speed` (m/s; < 0: the
+  // design's damperFall, each time a little its own).
+  void damper(int key, bool down, double speed = -1);
+  // The sustain pedal's trapwork: the lift rail rising (down: the pedal pressed) or falling back
+  // onto its stop at `speed` (m/s); its knock reaches the board. (The dampers are the player's.)
+  void pedal(bool down, double speed);
+  bool pedalNoise() const { return noise_ > 0; }
   // The felt's hardness (1: as voiced; the stiffness K times this).
   void setVoicing(double hardness) { voicing_ = float(hardness); }
   // One sample: the two microphones' mean (Pa), side(): half their difference;
@@ -173,6 +199,16 @@ class Piano {
     float tickAmp = 0;        // (... the knock under way: its peak (N), samples left)
     int tickLeft = 0, tickN = 1;
     bool active = false;
+    // Its stretching (research/piano.md 3): nl lengthwise modes, each as the transverse ones
+    // (lx = U omega, lv), its turn per sample (decay folded in), the drive by the transverse
+    // modes' products (x dt), its force on the bridge per lx and per product (what the mode
+    // would hold at rest, taken off: x dt), and the even tension's per squared slope (x dt);
+    // samples left to compute it.
+    static constexpr int kLong = 8;
+    int nl = 0, nlx = 0, longLeft = 0;  // (nlx: its transverse modes under 5 kHz, those stretching it)
+    float lx[kLong] = {}, lv[kLong] = {}, lcs[kLong] = {}, lsn[kLong] = {}, ldrive[kLong] = {}, lout[kLong] = {};
+    float lrest[kLong] = {}, ltension = 0;
+    float longPeak = 0;       // (its swing's energy at the loudest since the blow)
   };
   struct Key {
     int s0, ns;
@@ -186,6 +222,10 @@ class Piano {
     float engage = 1;     // the damper's felt: 0 lifted .. 1 resting on the strings
     float acc = 0;        // how far the bridge moved at its strings in the last sample (m)
     bool active = false;
+    // (its damper landing: the felt's push on each string (N, the peak), the samples until it
+    // touches, those left of the push and its length)
+    float landAmp = 0, landDelay = 0;
+    int landWait = 0, landLeft = 0, landN = 1;
   };
   void build();
   void hammer(Key& k);
@@ -219,6 +259,8 @@ class Piano {
   float *damp_;           // the damper resting on it: what is left per sample
   float *hk_;             // the hammer's force into the mode's velocity (x dt / mass)
   float *hc_, *hs_;       // the string's place under the hammer one sample on, from x and v
+  float *dk_;             // a force on the damper's felt into the mode's velocity (x dt / mass)
+  float *nw_;             // n / omega: the mode's x to its slope's share (n a_n, m)
   // The soundboard.
   float *bx_, *bv_, *bcs_, *bsn_, *bf_, *ba_, *binv_;
   std::vector<float> loadR_, loadX_;  // [key][resonance]: a damped key's strings as a load on it (1/s)
@@ -237,6 +279,20 @@ class Piano {
   int clock_ = 0;
   uint32_t rng_ = 4242;
   float pick_ = 0;        // the pickup's signal, this sample
+  // The dampers' and the trapwork's noise (pedalNoise): the landings under way, the rail's
+  // knocks in the case (a release and a press may overlap), where they enter the board, and
+  // the draws for each landing's own speed.
+  float noise_ = 0;
+  int landing_ = 0;
+  struct Knock { float amp = 0; int left = 0, n = 1; };  // (a half sine at the rim: peak (N), samples)
+  static constexpr int kKnocks = 4;
+  Knock knock_[kKnocks];
+  int knocks_ = 0;           // (those under way)
+  std::vector<float> trapPhi_;
+  void knock(double impulse, double T);
+  uint32_t noiseRng_ = 1;
+  void land(Key& k);
+  float stretch(Str& s);
 };
 
 }  // namespace pajupilli

@@ -1,4 +1,5 @@
 #include "harmonica.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -487,7 +488,7 @@ void HarmonicaPlayer::render(float* out, int n) {
     m_.setTremolo(std::max(flutter_, habit), 6.5);
     static const bool kDebug = std::getenv("PJ_HARP_DEBUG") != nullptr;
     if (kDebug && int(now_ * 1000) % 10 == 0)
-      std::fprintf(stderr, "%.3f hole %d row %d held %zu snd %zu dir %d pL %.0f bdir %d scoop %.2f corr %.2f heard %.0f lung %.2f\n", now_, hole_, row_, held_.size(),
+      say(stderr, "%.3f hole %d row %d held %zu snd %zu dir %d pL %.0f bdir %d scoop %.2f corr %.2f heard %.0f lung %.2f\n", now_, hole_, row_, held_.size(),
                    sounding_.size(), dir_, m_.breath(), m_.breathDir(), scoop_, tractCorr_, m_.heardHz(), m_.lungFill());
     m_.process(out + i, m);
   }

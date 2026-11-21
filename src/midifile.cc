@@ -2,8 +2,11 @@
 
 #include "organ.h"
 #include "organplan.h"
+#include "heard.h"
 #include "hammond.h"
 #include "hammondplan.h"
+#include "pianoinst.h"
+#include "pianoplan.h"
 
 #include <alsa/asoundlib.h>
 
@@ -312,6 +315,77 @@ std::string instrumentList() {
 
 static int gPlayTranspose = 0;
 void setPlayTranspose(int semitones) { gPlayTranspose = semitones; }
+static bool gPianist = false;
+void setPianist(bool on) { gPianist = on; }
+
+namespace {
+
+// -pianist: each channel played wholly by a piano with dampers (the grand, the bright, the upright,
+// the honky-tonk: not the dulcimer, the harpsichord, the electric pianos) pedalled by a plan from
+// its notes (src/pianoplan.h); the file's own sustain pedal on that channel set aside, the plan's
+// put among the events, to go the same way.
+void planPianists(Song& song, bool baroque) {
+  int prog[16] = {}, pianoN[16] = {}, otherN[16] = {};
+  const Instrument* inst[16] = {};
+  for (const Event& e : song.ev) {
+    const int ch = e.status & 15, kind = e.status & 0xf0;
+    if (kind == 0xc0) prog[ch] = e.a;
+    if (kind != 0x90 || e.b == 0 || ch == 9) continue;
+    const Instrument* in = forProgram(prog[ch]);
+    if (in && grandPiano(*in) && std::strcmp(in->name, "dulcimer") != 0) { ++pianoN[ch]; inst[ch] = in; }
+    else ++otherN[ch];
+  }
+  const double qpb = song.barTicks > 0 ? double(song.barTicks) / song.div : 4.0;
+  std::vector<Event> add;
+  bool any = false;
+  for (int ch = 0; ch < 16; ++ch) {
+    if (!pianoN[ch] || otherN[ch]) continue;
+    std::vector<PianoNote> notes;
+    std::map<int, std::vector<size_t>> open;  // key -> its notes held (in notes)
+    int own = 0;
+    for (const Event& e : song.ev) {
+      if ((e.status & 15) != ch) continue;
+      const int kind = e.status & 0xf0;
+      if (kind == 0xb0 && e.a == 64) ++own;
+      if (kind == 0x90 && e.b > 0) {
+        open[e.a].push_back(notes.size());
+        notes.push_back({e.t, e.t, double(e.tick) / song.div, long(e.tick), e.a, e.b});
+      } else if ((kind == 0x80 || kind == 0x90) && !open[e.a].empty()) {
+        notes[open[e.a].front()].off = e.t;
+        open[e.a].erase(open[e.a].begin());
+      }
+    }
+    for (auto& [k, v] : open)
+      for (size_t i : v) notes[i].off = song.ev.back().t;
+    char who[64];
+    std::snprintf(who, sizeof who, "channel %d (%s)", ch + 1, inst[ch]->name);
+    const PianoPedalPlan plan = planPedal(notes, qpb, baroque, 1 + ch, who);
+    std::fprintf(stderr, "%s", plan.summary.c_str());
+    if (own) std::fprintf(stderr, "  (the file's own %d sustain-pedal events on it set aside)\n", own);
+    const int logLevel = std::getenv("PJ_PIANIST_LOG") ? std::atoi(std::getenv("PJ_PIANIST_LOG")) : 0;
+    if (logLevel > 0)
+      for (const std::string& l : plan.log) std::fprintf(stderr, "  pianist ch %d: %s\n", ch + 1, l.c_str());
+    if (logLevel > 1)  // (2: every pedal event, for a comparison with a pianist's)
+      for (const PedalChange& c : plan.changes) std::fprintf(stderr, "  pianist ch %d: pedal %.4f %s\n", ch + 1, c.t, c.down ? "down" : "up");
+    song.ev.erase(std::remove_if(song.ev.begin(), song.ev.end(),
+                                 [&](const Event& e) { return (e.status & 15) == ch && (e.status & 0xf0) == 0xb0 && e.a == 64; }),
+                  song.ev.end());
+    for (const PedalChange& c : plan.changes) {
+      Event e{std::max(0.0, c.t), 0, uint8_t(0xb0 | ch), 64, uint8_t(c.down ? 127 : 0)};
+      e.tick = uint64_t(c.tick);
+      add.push_back(e);
+    }
+    any = true;
+  }
+  if (!any) {
+    std::fprintf(stderr, "pianist: no part played by a piano with dampers\n");
+    return;
+  }
+  song.ev.insert(song.ev.end(), add.begin(), add.end());
+  std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
+}
+
+}  // namespace
 
 bool setReinstrument(const std::string& spec) {
   gReinstrument.clear();
@@ -627,6 +701,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     if (moved) std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
     noteLeadsApplied() = true;
   }
+  if (gPianist) planPianists(song, dir.acts && dir.style == Direction::kBaroque);  // (-pianist: the pedalling planned)
   int prog[16] = {};
   std::map<int, int> sounding;  // part -> notes down now
   std::map<int, int> noteOwner;  // channel * 128 + key -> part
@@ -1165,6 +1240,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         SongClock& c = SongClock::get();
         c.valid = !song.tempo.empty();
         c.now = now;
+        c.playing = true;
         if (c.valid) {
           c.beatLen = song.tempo[tk].len;
           c.beat = song.tempo[tk].beat + (now - song.tempo[tk].t) / song.tempo[tk].len;
@@ -1367,7 +1443,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (dir.acts && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
           if (it->second.bplan)  // (the brass section: what the song says about this key)
             if (const BrassHint* bh = it->second.bplan->find(e.a, e.t)) it->second.ens->brassHint(*bh);
-          it->second.ens->noteOn(pk, e.b);
+          // (a drum: the stroke that sounds it at the SoundFonts' level: drumkit.h)
+          it->second.ens->noteOn(pk, ch == 9 ? drumVelocity(e.a, kitOf(prog[ch]), e.b) : e.b);
           ++it->second.played;
         } else if (kind == 0x80 || kind == 0x90) {
           auto it = noteOwner.find(ch * 128 + e.a);
@@ -1406,7 +1483,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (e.a == 64) band.pedal(ch, e.b >= 64);
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
-              if (hears(id, p) && leslieFrom(p)) p.ens->setHold(e.b >= 64);
+              if (hears(id, p) && leslieFrom(p)) p.ens->sustainPedal(e.b);
           if (e.a == 7) chVol[ch] = e.b / 127.0;
           if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Hammond's expression pedal instead
             bool swell = false;
@@ -1456,9 +1533,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       band.step(double(kBlock) / kRate);
       if (kBandLog && band.version() != bandSeen) {  // (PJ_BAND_LOG: the set whenever it changes)
         bandSeen = band.version();
-        std::fprintf(stderr, "band %.3f:", now);
-        for (const BandNote& bn : band.notes()) std::fprintf(stderr, " %d:%d%s(%.2f)", bn.ch, bn.pitch, bn.down ? "" : "~", bn.level);
-        std::fprintf(stderr, "\n");
+        std::string d = strf("band %.3f:", now);
+        for (const BandNote& bn : band.notes()) d += strf(" %d:%d%s(%.2f)", bn.ch, bn.pitch, bn.down ? "" : "~", bn.level);
+        say(stderr, "%s\n", d.c_str());
       }
       for (const BandNote& bn : band.notes()) {
         auto o = noteOwner.find(bn.ch * 128 + bn.key);
@@ -1507,6 +1584,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     }
   };
   const auto t0 = std::chrono::steady_clock::now();
+  if (streaming) heardLive(true);  // (to the device: the players' timed messages wait for their moment, src/heard.h)
   std::thread renderer(renderSong);
   int lastPct = -1;
   auto progress = [&](size_t at, const char* what) {
@@ -1526,6 +1604,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         snd_pcm_set_params(pcm, SND_PCM_FORMAT_FLOAT_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 2, kRate, 1, 200000) < 0) {
       std::fprintf(stderr, "-play: cannot open the audio device %s (write a file with -o)\n", device.c_str());
       renderer.join();
+      heardLive(false);
       return 1;
     }
     // Playing starts once 10 s are ready (PJ_PLAY_LEAD, s; or the whole song,
@@ -1566,8 +1645,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         std::fprintf(stderr, "  %d:%02d\n", s / 60, s % 60);
         nextTick += kTick;
       }
+      heardUntil(heard);
     }
     snd_pcm_drain(pcm);
+    heardLive(false);
     snd_pcm_close(pcm);
     renderer.join();
     if (waits > 1) std::fprintf(stderr, "  (the rendering fell behind: %d pauses)\n", waits - 1);

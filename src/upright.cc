@@ -41,8 +41,14 @@ PianoDesign uprightDesign() {
       s.tension = s.mu * (2 * s.len * f) * (2 * s.len * f);
       s.B = M_PI * M_PI * M_PI * kE * dia * dia * dia * dia / (256 * s.mu * f * f * s.len * s.len * s.len * s.len);
     }  // from C5 up: the grand's
-    // The dampers: the upright's lever dampers stop where the grand's do.
+    // The dampers: the upright's lever dampers stop where the grand's do. They stand on the
+    // hammers' side of the strings and are pressed onto them by springs, not their weight: they
+    // push the strings the way the hammers do, land quicker (0.18 m/s from a key, the spring
+    // behind it), and are lighter (a small head on a wooden lever: x 0.6 of the grand's).
+    s.damperMass *= 0.6;
   }
+  d.damperSide = 1;
+  d.damperFall = 0.18;
   tuneByPartials(&d);
   if (knob("PJ_UP_GRANDBOARD", 0)) return d;  // (tests: the grand's board and microphones)
   d.board.n = uprightboard::kModes;

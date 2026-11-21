@@ -30,6 +30,10 @@ bool setReinstrument(const std::string& spec);
 // semitones (12: an octave up), as the file is read, before any planning.
 void setPlayTranspose(int semitones);
 
+// A pianist's pedalling (-pianist with -play): each piano part's sustain pedal planned from its
+// notes (src/pianoplan.h), the file's own CC 64 on its channel set aside.
+void setPianist(bool on);
+
 // -inst's list of the instruments: in General MIDI's order and groups, each with its program
 // number; then those no program reaches, by family.
 std::string instrumentList();

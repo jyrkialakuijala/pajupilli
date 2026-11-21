@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "band.h"
+#include "heard.h"
 #include "brasssect.h"
 #include "ensemble.h"
 #include "knob.h"
@@ -104,7 +105,7 @@ bool Ensemble::bandEar(double dt) {
       s.bandAt = now_;
       s.bandVersion = band_->version();
       if (earLog_)
-        std::fprintf(stderr, "wind ear: t=%.3f ch %d %s note %d pull %+.1f c (w %.5f) -> %+.1f c\n", band_->now(), self_,
+        say(stderr, "wind ear: t=%.3f ch %d %s note %d pull %+.1f c (w %.5f) -> %+.1f c\n", band_->now(), self_,
                      s.v->instrument().name, note, pull, w, s.band);
       continue;
     }
@@ -117,7 +118,7 @@ bool Ensemble::bandEar(double dt) {
       // (A change under 3 c let be; with next to nothing to hear, back to the tempered pitch.)
       if (w >= kFloor && std::fabs(want - s.bandTo) >= kLetBe) {
         if (earLog_ >= 2)
-          std::fprintf(stderr, "wind ear: t=%.3f ch %d note %d to %+.1f c (w %.5f)\n", band_->now(), self_, note, want, w);
+          say(stderr, "wind ear: t=%.3f ch %d note %d to %+.1f c (w %.5f)\n", band_->now(), self_, note, want, w);
         s.bandTo = want;
       }
     }
@@ -149,7 +150,7 @@ void Ensemble::bandSend() {
     if (f_.size() > 1 && ji_ && s.tunedNote != s.earNote) continue;
     const double c = (s.tunedNote == s.earNote ? s.cents : s.band) * jiScale_;
     if (earLog_ >= 2 && c != s.shown) {
-      std::fprintf(stderr, "wind tune: t=%.4f ch %d note %d band %+.2f -> %+.2f c\n", band_->now(), self_, s.earNote, s.band, c);
+      say(stderr, "wind tune: t=%.4f ch %d note %d band %+.2f -> %+.2f c\n", band_->now(), self_, s.earNote, s.band, c);
       s.shown = c;
     }
     if (c == s.sent) continue;

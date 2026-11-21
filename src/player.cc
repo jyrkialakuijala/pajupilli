@@ -1,4 +1,5 @@
 #include "player.h"
+#include "heard.h"
 
 #include <cstdio>
 #include <cstring>
@@ -195,7 +196,7 @@ const char* Player::holesFor(int midi) {
   std::strncpy(trillHoles_, info(trillBase_)->holes, kHoles);
   for (const char* k = trill_->keys; *k; ++k) trillHoles_[*k == '1' ? 1 : 0] = 'o';
   trillCover_ = std::pow(trill_->cover, kTrillCover_);
-  std::fprintf(stderr, "%s\n", trill_->name);
+  say(stderr, "%s\n", trill_->name);
   return trillHoles_;
 }
 
@@ -277,7 +278,7 @@ void Player::render(float* out, int n) {
       lipTarget *= std::exp(trillCorr_[trill_ - kTrills]);
       if (!heldTold_ && trillClock_ > kTrillHeld_) {  // held on the key: say how the lips sit
         heldTold_ = true;
-        std::fprintf(stderr, "%s: held, lips %+.0f c\n", trill_->name,
+        say(stderr, "%s: held, lips %+.0f c\n", trill_->name,
                      116 * trillCorr_[trill_ - kTrills]);
       }
     }
