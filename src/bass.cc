@@ -441,6 +441,8 @@ void Bass::reset() {
     s.active = false;
   }
   uy_ = vy_ = uz_ = vz_ = ay_ = az_ = ut_ = vt_ = at_ = prevVy_ = prevVz_ = 0;
+  rest_ = false;
+  calm_ = 0;
   prevFootV_ = 0;  // (the microphone's last sample: a NaN there made a second reset)
   floorY_ = floorV_ = floorLp_ = 0;
   ux_ = vx_ = xt_ = vxt_ = 0;
@@ -634,6 +636,20 @@ void Bass::control() {
 }
 
 float Bass::sample(float testForce) {
+  // At rest (no string sounding, the body rung out: see below) nothing is computed but the
+  // hands' clocks, until a string is touched again. (A string section's players idle were its
+  // bodies' modes stepped all the same: most of a symphony's time.)
+  if (rest_) {
+    bool any = testForce != 0;
+    for (int k = 0; k < os_; ++k) {
+      if (ctl_ == 0) control();
+      ctl_ = (ctl_ + 1) & 15;
+    }
+    for (const Str& s : str_) any |= s.active;
+    if (!any) return 0;
+    rest_ = false;
+    calm_ = 0;
+  }
   feetYSum_ = footBSum_ = footTSum_ = 0;
   for (int k = 0; k < os_; ++k) stepStrings();
   const float inv = 1.0f / os_;
@@ -667,7 +683,21 @@ float Bass::sample(float testForce) {
   const float v = body_.bassFootV();
   const float topAcc = (v - prevFootV_) * float(fsOut_);
   prevFootV_ = v;
-  return micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
+  const float out = micTop_ * topAcc / topLevel_ + micFar_ * far / farLevel_ + micHole_ * body_.fholeSound() / holeLevel_ + micPickup_ * body_.bassFootV() / pickupLevel_;
+  // To rest: every string still and all that is heard under -140 dB (of a pluck) for a quarter
+  // of a second. PJ_BASS_REST=0: never.
+  static const bool kRest = knob("PJ_BASS_REST", 1) != 0;
+  bool still = kRest && testForce == 0 &&
+               std::fabs(out) + std::fabs(far / farLevel_) + std::fabs(side_) + std::fabs(topAcc / topLevel_) < 1e-7f;
+  if (still)
+    for (const Str& s : str_) still &= !s.active;
+  if (!still) {
+    calm_ = 0;
+  } else if (++calm_ > int(0.25 * fsOut_)) {
+    rest_ = true;
+    side_ = 0;
+  }
+  return out;
 }
 
 // One string's modes in one direction, one step: forces as a step in velocity, then each mode's
@@ -697,12 +727,12 @@ static void stepModes(float* __restrict q, float* __restrict v, const float* __r
   }
 }
 
-// The string's slope at the bridge, sum q[i] slope[i], one mode after another (as the scalar loop
-// added them: the same bits).
-static float slopeInOrder(const float* q, const float* slope) {
+// The string's slope at the bridge, sum q[i] slope[i]. (Summed sixteen modes abreast: one mode
+// after another, as the scalar loop added them, the 64 additions each waited for the last and
+// were half of the whole step's time.)
+static float slopeAt(const float* __restrict q, const float* __restrict slope) {
   float sl = 0;
-#pragma GCC novector
-  for (int i = 0; i < Bass::kModes; ++i) sl = std::fma(q[i], slope[i], sl);
+  for (int i = 0; i < Bass::kModes; ++i) sl += q[i] * slope[i];
   return sl;
 }
 
@@ -737,8 +767,11 @@ void Bass::stepStrings() {
     }
     const bool held = c < kRise_ + kHold_;
     s.fingerClock += dt_;
-    float drive[2] = {float(ff * std::sin(s.fingerAngle)) * s.invModalMass,
-                      float(ff * std::cos(s.fingerAngle)) * s.invModalMass};
+    float drive[2] = {0, 0};
+    if (ff != 0) {  // (no finger on it: no sine and cosine to find, every step of every string)
+      drive[0] = float(ff * std::sin(s.fingerAngle)) * s.invModalMass;
+      drive[1] = float(ff * std::cos(s.fingerAngle)) * s.invModalMass;
+    }
     const float* shape = s.finger;
     if (s.bowOn) {
       s.bowV += s.bowK * (s.bowVTo - s.bowV);
@@ -860,7 +893,7 @@ void Bass::stepStrings() {
       const float a = acc[d] * accOn, dr = drive[d];
       if (d == 0 && touching) stepModes<true>(q, v, w, wdt, csd, snd, dec, tch, shp, bin, boardF, dt, dr, a, eps, extra);
       else stepModes<false>(q, v, w, wdt, csd, snd, dec, tch, shp, bin, boardF, dt, dr, a, eps, extra);
-      slope[d] = slopeInOrder(q, s.slope);
+      slope[d] = slopeAt(q, s.slope);
     }
     // The plane of each mode's swing turns a little (y into z and back).
     for (int i = 0; i < kModes; ++i) {

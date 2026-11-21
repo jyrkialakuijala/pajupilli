@@ -68,6 +68,7 @@ Ensemble::Ensemble(const std::vector<Member>& members, bool verbose, const RoomS
 Ensemble::Ensemble(const Instrument& inst, const Calibration& cal, int maxFlutes, bool verbose,
                    const RoomSpec* room)
     : verbose_(verbose), ji_(std::getenv("PJ_JI") ? std::atof(std::getenv("PJ_JI")) != 0 : true) {
+  pool_ = true;  // (so many voices of one instrument, not so many players: see block())
   if (std::strcmp(inst.family, "choir") == 0) {  // (the choir: its parts' singers, src/choir.cc)
     std::fill(owner_, owner_ + 128, -1);
     std::fill(pitch_, pitch_ + 128, -1);
@@ -941,7 +942,7 @@ void Ensemble::block(float* left, float* right, int n) {
   }
   const int nf = int(f_.size());
   buf_.resize(nf);
-  int playing = 0;
+  int playing = 0, sounding = 0;
   std::vector<int> go;
   bool circuits = true;
   for (int i = 0; i < nf; ++i) {
@@ -952,7 +953,20 @@ void Ensemble::block(float* left, float* right, int n) {
     // has died away); in a room every flute listens. (Circuits always run:
     // their oscillators never stop, and they share a board.)
     if (s.active && !s.held && !s.v->player().busy() && now_ - s.lastOff > kIdle) s.active = false;
-    if (!room_ && !s.active && nf > 1 && !s.v->instrument().circuit()) continue;
+    sounding += s.active;
+  }
+  // (Every flute there is: a section's players all (a roster: each a seat on the stage); of a
+  // part's voices as many as it has players, its lines. The voices beyond those are there for
+  // the notes' tails, not instruments on the stage: silent, they are not computed. A part of two
+  // flutes held 22 voices and computed 22 bores. PJ_LISTEN_ALL=1: all of them.)
+  static const bool kListenAll = knob("PJ_LISTEN_ALL", 0) != 0;
+  int listeners = kListenAll || !pool_ ? nf : std::max(0, lines_ - sounding);
+  for (int i = 0; i < nf; ++i) {
+    Slot& s = f_[i];
+    if (!s.active && nf > 1 && !s.v->instrument().circuit()) {
+      if (!room_ || listeners <= 0) continue;
+      --listeners;
+    }
     go.push_back(i);
   }
   // Circuits on one board couple sample by sample (wires, rail, ground):

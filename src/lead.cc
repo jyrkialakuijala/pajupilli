@@ -1,4 +1,5 @@
 #include "lead.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <array>
@@ -1456,15 +1457,15 @@ float Lead::sample() {
     const double fb = 0.5 * (y_[3] + y4Prev_);
     y4Prev_ = y_[3];
     // (Each differential pair with its offset: its tanh not centred: even harmonics.)
-    const double in = std::tanh((x - 4 * res_ * fb + ka * vo[0]) / vt2_);
+    const double in = fastTanh((x - 4 * res_ * fb + ka * vo[0]) / vt2_);
     y_[0] += vt2_ * g_ * (in - w_[0]);
-    w_[0] = std::tanh((y_[0] + ka * vo[1]) / vt2_);
+    w_[0] = fastTanh((y_[0] + ka * vo[1]) / vt2_);
     y_[1] += vt2_ * g_ * (w_[0] - w_[1]);
-    w_[1] = std::tanh((y_[1] + ka * vo[2]) / vt2_);
+    w_[1] = fastTanh((y_[1] + ka * vo[2]) / vt2_);
     y_[2] += vt2_ * g_ * (w_[1] - w_[2]);
-    w_[2] = std::tanh((y_[2] + ka * vo[3]) / vt2_);
+    w_[2] = fastTanh((y_[2] + ka * vo[3]) / vt2_);
     y_[3] += vt2_ * g_ * (w_[2] - w_[3]);
-    w_[3] = std::tanh((y_[3] + ka * vo[4]) / vt2_);
+    w_[3] = fastTanh((y_[3] + ka * vo[4]) / vt2_);
   }
   // The amplifier: an OTA, gain from its bias current (the envelope), a soft
   // limit on its input.
@@ -1477,7 +1478,7 @@ float Lead::sample() {
   // The OTA: its gain from the envelope's bias current; when closed it still
   // leaks the always-running oscillator; its control feedthrough steps with
   // the bias (the DC blocker makes it a thump); hum picked up on the way out.
-  double vca = level_ * 2.0 * std::tanh(0.5 * y) + ka * (bleed_ * y + ft_ * level_) + board().hum;
+  double vca = level_ * 2.0 * fastTanh(0.5 * y) + ka * (bleed_ * y + ft_ * level_) + board().hum;
   if (!simple_ && patch_->pipes > 0) vca += pipeMid_;  // the pipes, past the amplifier
   // Into the mixer's 1 kohm: the ground's current. (A NaN stays in this voice:
   // it resets itself; the board must not keep it.)

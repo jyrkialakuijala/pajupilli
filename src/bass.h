@@ -199,7 +199,7 @@ class Bass {
   float sample(float testForce = 0);
   float side() const { return side_; }
   // The body's sound along its three axes (BassBody::dipole), on the far sound's scale.
-  float dipole(int k) const { return dipScale_ * (body_.dipole(k) + bankG_ * bank_.dipole(k)) / farLevel_; }
+  float dipole(int k) const { return rest_ ? 0.0f : dipScale_ * (body_.dipole(k) + bankG_ * bank_.dipole(k)) / farLevel_; }
   float footForce() const { return footForce_; }  // the bridge's bass foot on the top (N)  // left = sample + side, right = sample - side
   void reset();  // everything at rest (after a NaN)
   BassBody& body() { return body_; }
@@ -268,6 +268,8 @@ class Bass {
   double skin_ = 1;
   int nextFinger_ = 0;
   uint32_t rng_ = 12345;
+  bool rest_ = false;  // nothing sounds: not computed (Bass::sample)
+  int calm_ = 0;       // samples of stillness so far
   float micFar_ = 0.25f, micHole_ = 0.42f, micPickup_ = 0.33f, micTop_ = 0.08f, width_ = 0.7f, side_ = 0;
   bool kSymp_, kAfter_, kTail_, kBridge_, kTmod_, kBoard_;
   float dipScale_ = 1;  // PJ_DIPOLE: the directional parts against the physical (1; 0: none)

@@ -71,17 +71,33 @@ class BodyBank {
   void step(float bassFoot, float trebleFoot) {
     const float sum = bassFoot + trebleFoot, diff = bassFoot - trebleFoot;
     float o = 0, e0 = 0, e1 = 0, e2 = 0;
-    for (int k = 0; k < n_; ++k) {
-      const float x = ps_[k] * sum + pd_[k] * diff;
-      const float y = b0_[k] * (x - x2_[k]) - a1_[k] * y1_[k] - a2_[k] * y2_[k];
-      x2_[k] = x1_[k];
-      x1_[k] = x;
-      y2_[k] = y1_[k];
-      y1_[k] = y;
-      o += m_[k] * y;
-      e0 += d0_[k] * y;
-      e1 += d1_[k] * y;
-      e2 += d2_[k] * y;
+    // (The arrays apart, said so: sixteen resonances abreast.)
+    const int n = n_;
+    const float* __restrict b0 = b0_.data();
+    const float* __restrict a1 = a1_.data();
+    const float* __restrict a2 = a2_.data();
+    const float* __restrict ps = ps_.data();
+    const float* __restrict pd = pd_.data();
+    const float* __restrict m = m_.data();
+    const float* __restrict d0 = d0_.data();
+    const float* __restrict d1 = d1_.data();
+    const float* __restrict d2 = d2_.data();
+    float* __restrict x1 = x1_.data();
+    float* __restrict x2 = x2_.data();
+    float* __restrict y1 = y1_.data();
+    float* __restrict y2 = y2_.data();
+#pragma GCC ivdep
+    for (int k = 0; k < n; ++k) {
+      const float x = ps[k] * sum + pd[k] * diff;
+      const float y = b0[k] * (x - x2[k]) - a1[k] * y1[k] - a2[k] * y2[k];
+      x2[k] = x1[k];
+      x1[k] = x;
+      y2[k] = y1[k];
+      y1[k] = y;
+      o += m[k] * y;
+      e0 += d0[k] * y;
+      e1 += d1[k] * y;
+      e2 += d2[k] * y;
     }
     out_ = o;
     dip_[0] = e0;

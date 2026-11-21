@@ -84,6 +84,12 @@ class Room {
   std::string lateral(int s) const;
 
  private:
+  void block(const float* const* src, int o, int n, float* const* atSource, float* left, float* right,
+             const float* listenGain);
+  std::vector<int> quiet_;      // [source] samples of silence so far (up to forget_)
+  int forget_ = 0;              // silence after which a player's rings and diffusers hold nothing
+  std::vector<int> tapFrom_;    // [source] its first path in early_ (and one past the last source's)
+  std::vector<float> din_;      // [source][kBlock] the block through the diffusers
   RoomSpec spec_;
   std::vector<double> x_;
   double fs_;
@@ -103,8 +109,8 @@ class Room {
   int diffLen_[kDiff];
   std::vector<float> diff_;     // [source][kDiff][kDiffRing]
   // Each source's recent sound, for the direct paths and the reflections.
-  static constexpr int kRing = 16384;
-  std::vector<float> ring_;     // [source][kRing]
+  static constexpr int kRing = 16384, kSpan = kRing + kBlock;  // (its first block again past its end)
+  std::vector<float> ring_;     // [source][kSpan]
   int rpos_ = 0;
   std::vector<int> dDelay_;     // between players: [to][from] samples
   std::vector<float> dGain_;
@@ -120,7 +126,7 @@ class Room {
   };
   const float* const* dip_ = nullptr;
   std::vector<char> hasDip_;    // [source]
-  std::vector<float> dring_;    // [3 * source + k][kRing]
+  std::vector<float> dring_;    // [3 * source + k][kSpan]
   std::vector<float> inDirDip_; // [3 * source + k][line], unit length
   std::vector<Tap> early_;      // to the microphones: direct and reflections
 };

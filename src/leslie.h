@@ -53,7 +53,16 @@ class Leslie {
     int mask = 0, w = 0;
     void init(int n) { int s = 1; while (s < n) s <<= 1; b.assign(s, 0.0f); mask = s - 1; w = 0; }
     void push(float x) { b[w] = x; w = (w + 1) & mask; }
-    float read(double delay) const;  // samples back (>= 1), cubic
+    // samples back (>= 1), cubic (4-point Lagrange)
+    float read(double delay) const {
+      const double rp = double(w) - delay;
+      const int i = int(std::floor(rp));
+      const double t = rp - i;
+      const float y0 = b[(i - 1) & mask], y1 = b[i & mask], y2 = b[(i + 1) & mask], y3 = b[(i + 2) & mask];
+      const double c0 = -t * (t - 1) * (t - 2) / 6, c1 = (t + 1) * (t - 1) * (t - 2) / 2;
+      const double c2 = -(t + 1) * t * (t - 2) / 2, c3 = (t + 1) * t * (t - 1) / 6;
+      return float(c0 * y0 + c1 * y1 + c2 * y2 + c3 * y3);
+    }
   };
   double fs_ = 48000, dt_ = 1 / 48000.0;
   bool fast_ = false, brake_ = false;
@@ -86,6 +95,8 @@ class Leslie {
   int ctl_ = 0;
   double micX_[2] = {}, micY_[2] = {}, micEl_[2] = {};
   double rayMean_ = 0;
+  double a5000_ = 0, a1500_ = 0, a800_ = 0;  // one-pole steps at those frequencies (setup)
+  double driveFor_ = -1, drivePow_ = 1;       // drive_^0.3, for the drive_ it was found for
   double windLp_ = 0, windHp_ = 0;                                   // the horn's wind
   double rattleX_ = 0, rattleV_ = 0, rattleW_ = 1000, rattleQ_ = 20, rattleGap_ = 1, rattleHp_ = 0, rattleIn_ = 0;
   double click_ = 0, clickPh_ = 0, t_ = 0;

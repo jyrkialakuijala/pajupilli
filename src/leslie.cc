@@ -1,4 +1,5 @@
 #include "leslie.h"
+#include "vmath.h"
 #include "heard.h"
 
 #include <algorithm>
@@ -56,20 +57,12 @@ double biquad(double x, const double* b, const double* a, double* s) {
 
 }  // namespace
 
-float Leslie::Ring::read(double delay) const {
-  const double rp = double(w) - delay;
-  const int i = int(std::floor(rp));
-  const double t = rp - i;
-  const float y0 = b[(i - 1) & mask], y1 = b[i & mask], y2 = b[(i + 1) & mask], y3 = b[(i + 2) & mask];
-  // (4-point Lagrange)
-  const double c0 = -t * (t - 1) * (t - 2) / 6, c1 = (t + 1) * (t - 1) * (t - 2) / 2;
-  const double c2 = -(t + 1) * t * (t - 2) / 2, c3 = (t + 1) * t * (t - 1) / 6;
-  return float(c0 * y0 + c1 * y1 + c2 * y2 + c3 * y3);
-}
-
 void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double speed, double ratioSlow, double ratioFast) {
   fs_ = fs;
   dt_ = 1 / fs;
+  a5000_ = 1 - std::exp(-2 * M_PI * 5000 * dt_);
+  a1500_ = 1 - std::exp(-2 * M_PI * 1500 * dt_);
+  a800_ = 1 - std::exp(-2 * M_PI * 800 * dt_);
   log_ = log;
   rng_ = seed * 2654435761u + 99u;
   auto urand = [this] { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; };
@@ -185,6 +178,8 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   static const double kMic = knob("PJ_LESLIE_MIC", 0.4);
   static const double kDummy = knob("PJ_LESLIE_DUMMY", 0.16);
   static const double kBack[3] = {-4, -12, -18};  // the mouth's loss behind it, low / mid / high (dB)
+  // (the beam 10^(kBack (1 - cos) / 40), as an exponential: half a power's work)
+  static const double kBeam[3] = {kBack[0] * M_LN10 / 40, kBack[1] * M_LN10 / 40, kBack[2] * M_LN10 / 40};
   // The rotors: their motors pull them towards the set speed through belts and their own inertia.
   {
     // The motors hunt: never quite their speed, the weaker slow (chorale) motor less steady (~3 %)
@@ -236,11 +231,17 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   // The amp: a soft clip, a little asymmetric (the push-pull pair a little off balance), its
   // drive easing as the supply sags under a loud passage.
   double x = in * drive_ / (1 + 0.6 * sag_);
-  const double y = (std::tanh(x + 0.12) - std::tanh(0.12)) / (1 - std::tanh(0.12) * std::tanh(0.12));
+  static const double kT12 = std::tanh(0.12);  // (what does not change is found once: this, the one-poles' steps,
+  // the drive's power, the rays' directions: they were every sample's)
+  const double y = (std::tanh(x + 0.12) - kT12) / (1 - kT12 * kT12);
   sag_ += (std::fabs(y) - sag_) * dt_ / 0.1;
   // (a harder-driven amp: louder, and compressed as it saturates: the output grows only as
   // drive^0.7 at a low level, not drive)
-  const double amp = y / std::pow(std::max(drive_, 1e-3), 0.3);
+  if (drive_ != driveFor_) {
+    driveFor_ = drive_;
+    drivePow_ = std::pow(std::max(drive_, 1e-3), 0.3);
+  }
+  const double amp = y / drivePow_;
   // The crossover.
   const double lo = biquad(amp, xa_, xb_, lp1_);
   double hi = biquad(amp, xhb_, xb_, hp1_);
@@ -250,8 +251,8 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   double wind = 0;
   {
     const double sp = hornW_ / hornFast_;
-    windLp_ += (1 - std::exp(-2 * M_PI * 5000 * dt_)) * (normal() - windLp_);
-    windHp_ += (1 - std::exp(-2 * M_PI * 1500 * dt_)) * (windLp_ - windHp_);
+    windLp_ += a5000_ * (normal() - windLp_);
+    windHp_ += a1500_ * (windLp_ - windHp_);
     wind = noise_ * 4e-4 * sp * sp * (windLp_ - windHp_);
   }
   // The horn's bands, into their delay lines.
@@ -273,7 +274,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
     rattleV_ += a * dt_;
     rattleX_ += rattleV_ * dt_;
     const double over = rattleX_ - std::clamp(rattleX_, -rattleGap_, rattleGap_);
-    rattleHp_ += (1 - std::exp(-2 * M_PI * 800 * dt_)) * (over - rattleHp_);
+    rattleHp_ += a800_ * (over - rattleHp_);
     buzz = 0.05 * (over - rattleHp_);
   }
   // (the two rotors turn opposite ways, as in a 122: the horn counter-clockwise seen from above,
@@ -333,6 +334,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       {hx, hy, 2 * kLid, hc, hs, kSlat * kInside},             // the lid (the slats' share)
       {hx, hy, -2 * kBoard, hc, hs, kSlat * kInside},          // the motor board
   };
+  const double leak = horn_[0].read(60) + horn_[1].read(60) + horn_[2].read(60);  // (the base's, not turning)
   float mic[2] = {0, 0};
   for (int m = 0; m < 2 && !rays; ++m) {  // (the close microphones: not when radiating into a room)
     const double mx = micX_[m], my = micY_[m];
@@ -345,19 +347,19 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       const double cosPsi = (hc * vx + hs * vy) / dist;
       const double delay = dist / kC * fs_ + 2;
       const double g = 0.4 / std::max(dist, 0.1) * out(hx, hy, vx / dist, vy / dist) / kOut;  // (a louvre's way out: 1)
-      for (int b = 0; b < 2; ++b) sum += g * std::pow(10.0, kBack[b] * (1 - cosPsi) / 40) * horn_[b].read(delay);
+      for (int b = 0; b < 2; ++b) sum += g * std::exp(kBeam[b] * (1 - cosPsi)) * horn_[b].read(delay);
       // (the highs through the louvre's slots, 5 cm apart one over another: a microphone a little
       // above or below the horn hears them at slightly different times, a grating's comb)
       static const double kSlot = knob("PJ_LESLIE_SLOT", 0.05);
       const double step = kSlot * std::sin(micEl_[m]) / kC * fs_;
       double hiSum = 0;
       for (int k = 0; k < 6; ++k) hiSum += horn_[2].read(delay + (k - 2.5) * step);
-      sum += g * std::pow(10.0, kBack[2] * (1 - cosPsi) / 40) * hiSum / 6;
+      sum += g * std::exp(kBeam[2] * (1 - cosPsi)) * hiSum / 6;
     }
     for (const Img& im : img) {  // its images inside the cabinet (the mouth's beam, as the mid band's)
       const double vx = mx - im.x, vy = my - im.y, vz = -im.z, dist = std::sqrt(vx * vx + vy * vy + vz * vz);
       const double cosPsi = (im.fx * vx + im.fy * vy) / dist;
-      sum += im.r * 0.4 / std::max(dist, 0.1) * std::pow(10.0, kBack[1] * (1 - cosPsi) / 40) * hornAll_.read(dist / kC * fs_ + 2);
+      sum += im.r * 0.4 / std::max(dist, 0.1) * std::exp(kBeam[1] * (1 - cosPsi)) * hornAll_.read(dist / kC * fs_ + 2);
     }
     // The twin horn's dummy bell, at the rotor's other end: sealed, but its throat leaks a little
     // (~-16 dB), a second source turning the other way round the listener (its Doppler opposite).
@@ -366,11 +368,11 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       const double cosPsi = (-hc * vx - hs * vy) / dist;
       const double g = kDummy * 0.4 / std::max(dist, 0.1) * out(-hx, -hy, vx / dist, vy / dist) / kOut;
       const double delay = dist / kC * fs_ + 2;
-      for (int b = 0; b < 3; ++b) sum += g * std::pow(10.0, kBack[b] * (1 - cosPsi) / 40) * horn_[b].read(delay);
+      for (int b = 0; b < 3; ++b) sum += g * std::exp(kBeam[b] * (1 - cosPsi)) * horn_[b].read(delay);
     }
     // The base's leakage, not turning.
     static const double kLeak = knob("PJ_LESLIE_LEAK", 0.25);
-    sum += kLeak * (horn_[0].read(60) + horn_[1].read(60) + horn_[2].read(60));
+    sum += kLeak * leak;
     // The drum's scoop.
     {
       const double dx = kDrumR * dc, dy = kDrumR * ds;
@@ -419,25 +421,48 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   if (rays) {
     static const double kLeakR = knob("PJ_LESLIE_LEAK", 0.25), kDummyR = knob("PJ_LESLIE_DUMMY", 0.16);
     const double base = 0.6 / kC * fs_;  // (a common lag: every ray's moving delay stays positive)
+    static const double kUx[kRays] = {std::cos(rayAngle(0)), std::cos(rayAngle(1)), std::cos(rayAngle(2)),
+                                      std::cos(rayAngle(3)), std::cos(rayAngle(4)), std::cos(rayAngle(5))};
+    static const double kUy[kRays] = {std::sin(rayAngle(0)), std::sin(rayAngle(1)), std::sin(rayAngle(2)),
+                                      std::sin(rayAngle(3)), std::sin(rayAngle(4)), std::sin(rayAngle(5))};
+    static_assert(kRays == 6, "kUx");
+    // The beams first, every ray's twelve (the mouth's and the dummy bell's three bands, the six
+    // images') as one run of exponentials: sixteen at a time, not 72 calls a sample.
+    constexpr int kPer = 12;
+    alignas(64) float beamArg[kRays * kPer], beam[kRays * kPer];
+    static const float kBeamF[3] = {float(kBeam[0]), float(kBeam[1]), float(kBeam[2])};
     for (int k = 0; k < kRays; ++k) {
-      const double ux = std::cos(rayAngle(k)), uy = std::sin(rayAngle(k));
+      const double ux = kUx[k], uy = kUy[k];
+      const float cosPsi = float(hc * ux + hs * uy);
+      float* a = beamArg + k * kPer;
+      for (int b = 0; b < 3; ++b) {
+        a[b] = kBeamF[b] * (1 - cosPsi);      // the mouth
+        a[3 + b] = kBeamF[b] * (1 + cosPsi);  // the dummy bell, facing away
+      }
+      for (int q = 0; q < 6; ++q) a[6 + q] = kBeamF[1] * (1 - float(img[q].fx * ux + img[q].fy * uy));
+    }
+    for (int q = 0; q < kRays * kPer; ++q) beam[q] = vexpf(beamArg[q]);  // (src/vmath.h)
+    for (int k = 0; k < kRays; ++k) {
+      const double ux = kUx[k], uy = kUy[k];
+      const float* bm = beam + k * kPer;
       double sum = 0;
       {  // the horn's mouth (out through a louvre, or not at a corner post)
-        const double along = hx * ux + hy * uy, cosPsi = hc * ux + hs * uy;
+        const double along = hx * ux + hy * uy;
         const double delay = base - along / kC * fs_ + 2, w = out(hx, hy, ux, uy) / kOut;
-        for (int b = 0; b < 3; ++b) sum += w * std::pow(10.0, kBack[b] * (1 - cosPsi) / 40) * horn_[b].read(delay);
+        for (int b = 0; b < 3; ++b) sum += w * bm[b] * horn_[b].read(delay);
       }
       {  // the dummy bell, at the other end of the rotor, facing away
-        const double along = -(hx * ux + hy * uy), cosPsi = -(hc * ux + hs * uy);
+        const double along = -(hx * ux + hy * uy);
         const double delay = base - along / kC * fs_ + 2, w = out(-hx, -hy, ux, uy) / kOut;
-        for (int b = 0; b < 3; ++b) sum += w * kDummyR * std::pow(10.0, kBack[b] * (1 - cosPsi) / 40) * horn_[b].read(delay);
+        for (int b = 0; b < 3; ++b) sum += w * kDummyR * bm[3 + b] * horn_[b].read(delay);
       }
-      for (const Img& im : img) {  // the horn's images inside the cabinet
-        const double along = im.x * ux + im.y * uy, cosPsi = im.fx * ux + im.fy * uy;
+      for (int q = 0; q < 6; ++q) {  // the horn's images inside the cabinet
+        const Img& im = img[q];
+        const double along = im.x * ux + im.y * uy;
         const double delay = base - along / kC * fs_ + std::fabs(im.z) / kC * fs_ + 2;
-        sum += im.r * std::pow(10.0, kBack[1] * (1 - cosPsi) / 40) * hornAll_.read(delay);
+        sum += im.r * bm[6 + q] * hornAll_.read(delay);
       }
-      sum += kLeakR * (horn_[0].read(60) + horn_[1].read(60) + horn_[2].read(60));
+      sum += kLeakR * leak;
       {  // the drum's scoop
         const double along = kDrumR * (dc * ux + ds * uy), cosPsi = dc * ux + ds * uy;
         sum += (0.3 + 0.7 * 0.5 * (1 + cosPsi)) * 1.2 * drum_.read(base - along / kC * fs_ + 2);

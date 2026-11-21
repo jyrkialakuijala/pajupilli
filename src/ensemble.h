@@ -293,6 +293,7 @@ class Ensemble {
   int vel_[128] = {};
   double now_ = 0, calm_ = 0, mix_ = 1;
   int lines_ = 1;
+  bool pool_ = false;  // voices of one instrument (a part), not a roster of players
   std::string playing_ = "none";  // last printed: "2 x flute, piccolo"
   bool verbose_;
   bool ji_;                 // PJ_JI (1): the pajupilli intonation (adaptive just)

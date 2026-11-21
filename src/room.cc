@@ -1,5 +1,7 @@
 #include "room.h"
 
+#include "knob.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -98,7 +100,7 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     diffLen_[j] = n;
   }
   diff_.assign(size_t(ns) * kDiff * kDiffRing, 0.0f);
-  ring_.assign(size_t(ns) * kRing, 0.0f);
+  ring_.assign(size_t(ns) * kSpan, 0.0f);
   // Between players: direct sound.
   dDelay_.assign(ns * ns, 0);
   dGain_.assign(ns * ns, 0.0f);
@@ -164,7 +166,7 @@ void Room::setAxes(int s, const float* axes) {
   const int ns = int(x_.size());
   if (hasDip_.empty()) {
     hasDip_.assign(ns, 0);
-    dring_.assign(size_t(3) * ns * kRing, 0.0f);
+    dring_.assign(size_t(3) * ns * kSpan, 0.0f);
     // (their own random directions into the network, apart from the sources' own)
     unsigned seed = 4242;
     inDirDip_.resize(size_t(3) * ns * kLines);
@@ -203,20 +205,105 @@ std::string Room::lateral(int s) const {
   return out;
 }
 
+// A block at a time (kBlock samples or the shortest diffuser, whichever is less: within one, no
+// delay reads what the block itself writes), each part a plain loop over the block's samples:
+// the players' rings, the diffusers, the delay network, then every path (player to player, the
+// images to the microphones) a run of consecutive samples out of a ring. A player silent for
+// longer than its rings and diffusers remember costs nothing but its own ear.
 void Room::process(const float* const* src, int n, float* const* atSource, float* left, float* right,
                    const float* listenGain) {
+  const int step = std::min(kBlock, std::min(diffLen_[0], std::min(diffLen_[1], diffLen_[2])));
+  for (int o = 0; o < n; o += step) block(src, o, std::min(step, n - o), atSource, left, right, listenGain);
+}
+
+namespace {
+// out[i] += g * ring[at + i], i < n (the ring's first block stands again past its end: no wrap).
+// A whole block is two vectors' work.
+inline void addRun(float* __restrict out, const float* __restrict ring, int at, int n, float g) {
+  const float* __restrict r = ring + at;
+  if (n == Room::kBlock) {
+    for (int i = 0; i < Room::kBlock; ++i) out[i] += g * r[i];
+  } else {
+    for (int i = 0; i < n; ++i) out[i] += g * r[i];
+  }
+}
+}  // namespace
+
+void Room::block(const float* const* src, int o, int n, float* const* atSource, float* left, float* right,
+                 const float* listenGain) {
   const int ns = int(x_.size());
   const float lg = micGain_;
+  const bool dips = !hasDip_.empty();
+  if (int(quiet_.size()) != ns) {
+    quiet_.assign(ns, 0);
+    // (a diffuser's state has left the floats after 171 passes at 0.6; the rings after kRing)
+    // (PJ_ROOM_SKIP=0: none forgotten, to check that forgetting changes nothing)
+    forget_ = knob("PJ_ROOM_SKIP", 1) != 0 ? kRing + 200 * std::max(diffLen_[0], std::max(diffLen_[1], diffLen_[2])) : 1 << 30;
+    din_.assign(size_t(ns) * kBlock, 0.0f);
+    // (each player's paths to the microphones: one after another in early_, as they were made)
+    tapFrom_.assign(ns + 1, int(early_.size()));
+    for (int k = int(early_.size()) - 1; k >= 0; --k) tapFrom_[early_[k].src] = k;
+    for (int q = ns - 1; q >= 0; --q) tapFrom_[q] = std::min(tapFrom_[q], tapFrom_[q + 1]);
+  }
+  // The players' sound into their rings; who is still heard.
+  for (int s = 0; s < ns; ++s) {
+    const float* in = src[s] + o;
+    float* ring = &ring_[size_t(s) * kSpan];
+    float any = 0;
+    for (int i = 0; i < n; ++i) {
+      const int at = (rpos_ + i) & (kRing - 1);
+      ring[at] = in[i];
+      if (at < kBlock) ring[kRing + at] = in[i];  // (the ring's start again past its end: a run never wraps)
+      any += std::fabs(in[i]);
+    }
+    if (dips && hasDip_[s])
+      for (int k = 0; k < 3; ++k) {
+        const float* d = dip_ ? dip_[3 * s + k] : nullptr;
+        float* dr = &dring_[size_t(3 * s + k) * kSpan];
+        for (int i = 0; i < n; ++i) {
+          const float v = d ? d[o + i] : 0.0f;
+          const int at = (rpos_ + i) & (kRing - 1);
+          dr[at] = v;
+          if (at < kBlock) dr[kRing + at] = v;
+          any += std::fabs(v);
+        }
+      }
+    if (any != 0) {
+      quiet_[s] = 0;
+    } else if (quiet_[s] < forget_) {
+      quiet_[s] += n;
+      if (quiet_[s] >= forget_)
+        std::fill_n(&diff_[size_t(s) * kDiff * kDiffRing], size_t(kDiff) * kDiffRing, 0.0f);
+    }
+  }
+  auto heard = [&](int s) { return quiet_[s] < forget_; };
+  // The players' sound through the diffusers (Schroeder allpasses, 0.6).
+  for (int s = 0; s < ns; ++s) {
+    if (!heard(s)) continue;
+    float* in = &din_[size_t(s) * kBlock];
+    for (int i = 0; i < n; ++i) in[i] = inGain_ * src[s][o + i];
+    for (int j = 0; j < kDiff; ++j) {
+      float* buf = &diff_[(size_t(s) * kDiff + j) * kDiffRing];
+      for (int i = 0; i < n;) {
+        const int wi = (rpos_ + i) & (kDiffRing - 1), ri = (wi - diffLen_[j]) & (kDiffRing - 1);
+        const int run = std::min(n - i, kDiffRing - std::max(wi, ri));
+        float* w = buf + wi;
+        const float* r = buf + ri;
+        float* x = in + i;
+#pragma GCC ivdep
+        for (int q = 0; q < run; ++q) {
+          const float dl = r[q];
+          const float v = x[q] + 0.6f * dl;
+          w[q] = v;
+          x[q] = dl - 0.6f * v;
+        }
+        i += run;
+      }
+    }
+  }
+  // The delay network, sample by sample.
   for (int i = 0; i < n; ++i) {
     const int now = (rpos_ + i) & (kRing - 1);
-    for (int s = 0; s < ns; ++s) ring_[size_t(s) * kRing + now] = src[s][i];
-    if (!hasDip_.empty())
-      for (int s = 0; s < ns; ++s)
-        if (hasDip_[s])
-          for (int k = 0; k < 3; ++k) {
-            const float* d = dip_ ? dip_[3 * s + k] : nullptr;
-            dring_[size_t(3 * s + k) * kRing + now] = d ? d[i] : 0.0f;
-          }
     float x[kLines], y[kLines];
     for (int k = 0; k < kLines; ++k) {
       const float raw = line_[k * kLineRing + ((pos_ - len_[k]) & (kLineRing - 1))];
@@ -229,7 +316,7 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
     float g = 1;
     if (spec_.gate > 0) {
       float in = 0;
-      for (int s = 0; s < ns; ++s) in += std::fabs(src[s][i]);
+      for (int s = 0; s < ns; ++s) in += std::fabs(src[s][o + i]);
       gateFast_ = std::max(in, gateFast_ * float(std::exp(-1 / (0.002 * fs_))));
       gateSlow_ += (gateFast_ - gateSlow_) * float(1 - std::exp(-1 / (0.05 * fs_)));
       gatePeak_ = std::max(gateFast_, gatePeak_ * float(std::exp(-1 / (3.0 * fs_))));
@@ -239,21 +326,14 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
       gateGain_ += (target - gateGain_) * float(1 - std::exp(-1 / ((target > gateGain_ ? 0.0005 : 0.010) * fs_)));
       g = gateGain_;
     }
-    float amb[2] = {0, 0};  // the reverberant field at the microphones
-    // The reverberant field at each listener.
+    // The reverberant field at each listener: the players, then the microphones.
+    float amb[2] = {0, 0};
     for (int t = 0; t < ns + 2; ++t) {
       const float* dir = &outDir_[t * kLines];
       float acc = 0;
       for (int k = 0; k < kLines; ++k) acc += dir[k] * x[k];
-      if (t < ns) {
-        for (int s = 0; s < ns; ++s) {  // the others' direct sound
-          const float g = dGain_[t * ns + s];
-          if (g != 0) acc += g * ring_[size_t(s) * kRing + ((now - dDelay_[t * ns + s]) & (kRing - 1))];
-        }
-        atSource[t][i] = acc;
-      } else {
-        amb[t - ns] = lg * micDiffuse_ * acc;
-      }
+      if (t < ns) atSource[t][o + i] = acc;
+      else amb[t - ns] = lg * micDiffuse_ * acc;
     }
     if (spec_.gate > 0) {
       // The ambience compressed hard (8:1 over 20 dB under its recent peak,
@@ -266,21 +346,8 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
       const float cg = compEnv_ > th ? std::pow(compEnv_ / th, 1.0f / 8 - 1) : 1.0f;
       g *= 3 * cg;
     }
-    left[i] += g * amb[0];
-    right[i] += g * amb[1];
-    // Early sound at the microphones.
-    float e[2] = {0, 0};
-    for (const Tap& tp : early_) {
-      const int at = (now - tp.delay) & (kRing - 1);
-      float v = tp.gain * ring_[size_t(tp.src) * kRing + at];
-      if (!hasDip_.empty() && hasDip_[tp.src]) {
-        const float* dr = &dring_[size_t(3 * tp.src) * kRing];
-        v += tp.dg[0] * dr[at] + tp.dg[1] * dr[kRing + at] + tp.dg[2] * dr[2 * kRing + at];
-      }
-      e[tp.mic] += listenGain[tp.src] * v;
-    }
-    left[i] += lg * e[0];
-    right[i] += lg * e[1];
+    left[o + i] += g * amb[0];
+    right[o + i] += g * amb[1];
     // Mixing: fast Hadamard transform, / 4 (orthogonal).
     for (int k = 0; k < kLines; ++k) y[k] = x[k];
     for (int h = 1; h < kLines; h <<= 1)
@@ -291,30 +358,51 @@ void Room::process(const float* const* src, int n, float* const* atSource, float
           y[j + h] = p - q;
         }
     for (int k = 0; k < kLines; ++k) y[k] *= 0.25f;
-    // The players' sound in, through the diffusers (Schroeder allpasses, 0.6).
-    const int dp = (rpos_ + i) & (kDiffRing - 1);
+    // The players' diffused sound in.
     for (int s = 0; s < ns; ++s) {
-      float in = inGain_ * src[s][i];
-      for (int j = 0; j < kDiff; ++j) {
-        float* buf = &diff_[(size_t(s) * kDiff + j) * kDiffRing];
-        const float dl = buf[(dp - diffLen_[j]) & (kDiffRing - 1)];
-        const float w = in + 0.6f * dl;
-        buf[dp] = w;
-        in = dl - 0.6f * w;
-      }
+      if (!heard(s)) continue;
+      const float in = din_[size_t(s) * kBlock + i];
       const float* dir = &inDir_[s * kLines];
       for (int k = 0; k < kLines; ++k) y[k] += dir[k] * in;
       // (The directional parts' power into the reverberant field: each a third of what the
       // same sound sent all round would give.)
-      if (!hasDip_.empty() && hasDip_[s])
+      if (dips && hasDip_[s])
         for (int c = 0; c < 3; ++c) {
-          const float d = 0.57735f * inGain_ * dring_[size_t(3 * s + c) * kRing + now];
+          const float d = 0.57735f * inGain_ * dring_[size_t(3 * s + c) * kSpan + now];
           const float* dd = &inDirDip_[size_t(3 * s + c) * kLines];
           for (int k = 0; k < kLines; ++k) y[k] += dd[k] * d;
         }
     }
     for (int k = 0; k < kLines; ++k) line_[k * kLineRing + (pos_ & (kLineRing - 1))] = y[k];
     pos_ = (pos_ + 1) & (kLineRing - 1);
+  }
+  // The others' direct sound at each player.
+  for (int s = 0; s < ns; ++s) {
+    if (!heard(s)) continue;
+    const float* ring = &ring_[size_t(s) * kSpan];
+    for (int t = 0; t < ns; ++t) {
+      const float g = dGain_[t * ns + s];
+      if (g != 0) addRun(atSource[t] + o, ring, (rpos_ - dDelay_[t * ns + s]) & (kRing - 1), n, g);
+    }
+  }
+  // Early sound at the microphones.
+  float e[2][kBlock] = {};
+  for (int s = 0; s < ns; ++s) {
+    const float gl = listenGain[s];
+    if (!heard(s) || gl == 0) continue;
+    const float* ring = &ring_[size_t(s) * kSpan];
+    const bool dip = dips && hasDip_[s];
+    for (int k = tapFrom_[s]; k < tapFrom_[s + 1]; ++k) {
+      const Tap& tp = early_[k];
+      const int at = (rpos_ - tp.delay) & (kRing - 1);
+      addRun(e[tp.mic], ring, at, n, gl * tp.gain);
+      if (dip)
+        for (int c = 0; c < 3; ++c) addRun(e[tp.mic], &dring_[size_t(3 * s + c) * kSpan], at, n, gl * tp.dg[c]);
+    }
+  }
+  for (int i = 0; i < n; ++i) {
+    left[o + i] += lg * e[0][i];
+    right[o + i] += lg * e[1][i];
   }
   rpos_ = (rpos_ + n) & (kRing - 1);
 }
