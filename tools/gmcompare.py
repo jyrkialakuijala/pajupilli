@@ -7,6 +7,8 @@
     tools/gmcompare.py report                                             # rebuild the report
     tools/gmcompare.py kits [--pj-only] [--measure 0|1|2]                  # the drum kits, stroke by stroke: research/gm_kits.md
     tools/gmcompare.py kits --emit                                        # ... and src/drumcal_data.h: each drum at the fonts' level
+    tools/gmcompare.py levels [--pj-only] [--measure 0|1|2]                # the melodic programs against the piano: research/gm_levels.md
+    tools/gmcompare.py levels --report-only --emit                         # ... and src/gmlevels_data.h: each program at the fonts' level
 
 Each instrument plays tools/synthcompare.py's profile probe (keys a few semitones apart over the
 GM program's range, velocities 40/64/96/127, each held 2 s in a 4 s slot) and a short phrase (six
@@ -872,9 +874,207 @@ def kits_report(R, measure=0):
     print('wrote ' + KIT_REPORT, file=sys.stderr)
 
 
+# ---------------------------------------------------------------------------------------------
+# The melodic programs' levels against the piano (research/gm_levels.md)
+
+LV_SLOT, LV_HOLD = 3.5, 2.0
+LV_DATA = os.path.join(os.path.dirname(DATA), 'levels.json')
+LV_REPORT = os.path.join(ROOT, 'research', 'gm_levels.md')
+
+
+def lv_keys(p):
+    """Five keys over the middle of the program's GM range."""
+    lo, hi = sc.gm_range(p)
+    return sorted({int(round(lo + f * (hi - lo))) for f in (0.2, 0.35, 0.5, 0.65, 0.8)})
+
+
+def write_lv(path, p):
+    """The piano's yardstick (channel 1), then the program (channel 2) at lv_keys x sc.VELS."""
+    tpq = 480; tick = lambda s: int(round(s * 2 * tpq))
+    lay = [(0, k, 96) for k in KIT_ANCHOR] + [(1, k, v) for k in lv_keys(p) for v in sc.VELS]
+    lay = [(ch, k, v, i * LV_SLOT) for i, (ch, k, v) in enumerate(lay)]
+    ev = [(0, bytes([0xC0, 0])), (0, bytes([0xC1, p]))]
+    for ch, k, v, t in lay:
+        ev.append((tick(t), bytes([0x90 | ch, k, v]))); ev.append((tick(t + LV_HOLD), bytes([0x80 | ch, k, 0])))
+    ev.sort(key=lambda e: (e[0], e[1][0] & 0xF0 == 0x90))
+    body = bytearray(); last = 0
+    for t, e in ev: body += sc._enc_vlq(t - last) + e; last = t
+    body += sc._enc_vlq(tick(LV_SLOT)) + b'\xff\x2f\x00'
+    open(path, 'wb').write(b'MThd' + sc.struct.pack('>IHHH', 6, 0, 1, tpq) + b'MTrk' + sc.struct.pack('>I', len(body)) + bytes(body))
+    return lay
+
+
+def lv_levels(x, t):
+    """A note's loudest 400 ms (K-weighted), its energy over the slot, its peak (dB)."""
+    seg = x[int(t * FS):int((t + LV_SLOT - 0.05) * FS)]
+    if len(seg) < FS: return None
+    p = (sc.kweight(seg) ** 2).sum(axis=1)
+    B, H = int(0.4 * FS), int(0.02 * FS)
+    c = np.concatenate([[0], np.cumsum(p)]); idx = np.arange(0, len(p) - B, H)
+    mom = float(sc.db(((c[idx + B] - c[idx]) / B).max()))
+    return [sc.r1(mom), sc.r1(sc.db(p.sum() / FS)), sc.r1(20 * math.log10(max(float(np.abs(seg).max()), 1e-7)))]
+
+
+def lv_one(p, name, kind, font, pjbin, workroot, env_extra=None):
+    work = os.path.join(workroot, 'lv_%03d_%s' % (p, name.replace('/', '_'))); os.makedirs(work, exist_ok=True)
+    try:
+        mid = os.path.join(work, 'p.mid'); lay = write_lv(mid, p)
+        wav = os.path.join(work, 'out.wav'); log = ''
+        if kind == 'pj':
+            r = subprocess.run([pjbin, '-director', 'off', '-play', mid, '-o', wav],
+                               env=dict(os.environ, PJ_PLAY_VELMEDIAN='1000', PJ_THREADS='2', **(env_extra or {})),
+                               capture_output=True, text=True)
+            log = r.stdout + r.stderr
+            if r.returncode != 0: raise RuntimeError(log[-2000:])
+        elif kind == 'tim':
+            sc.CACHE = work
+            r = subprocess.run(['timidity', '-c', sc.timidity_cfg(SF[font]), '-s', str(FS), '-OwS2', '-EFreverb=d', '-EFchorus=d',
+                                '-o', wav, mid], capture_output=True, text=True)
+            if r.returncode != 0 or not os.path.exists(wav): raise RuntimeError((r.stdout + r.stderr)[-2000:])
+        else:
+            render_fluid(font, mid, wav)
+        x = sc.load_wav(wav)
+        m = re.search(r'peak [\d.]+: the whole song (-?[\d.]+) dB down', log)
+        if m: x = x * 10 ** (-float(m.group(1)) / 20)
+        anchor = []; S = {}
+        for ch, k, v, t in lay:
+            l = lv_levels(x, t)
+            if l is None: continue
+            if ch == 0: anchor.append(l)
+            else: S['%d/%d' % (k, v)] = l
+        return p, name, dict(anchor=[sc.r1(np.mean([a[i] for a in anchor])) for i in range(3)], notes=S,
+                             log=[l for l in log.splitlines() if 'channel' in l][:4])
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def cmd_levels(a):
+    names, _ = pj_names(os.path.abspath(a.bin))
+    progs = [p for p in parse_programs(a.programs, names) if p != 'drums']
+    R = json.load(open(LV_DATA)) if os.path.exists(LV_DATA) else {}
+    if not a.report_only:
+        synths = [s for s in SYNTHS if s[0] == 'pajupilli' or s[0] in REFS]
+        if a.pj_only: synths = synths[:1]
+        with ProcessPoolExecutor(a.jobs) as ex:
+            fut = [ex.submit(lv_one, p, n, kind, font, os.path.abspath(a.bin), a.work) for p in progs for n, kind, font in synths
+                   if a.force or n == 'pajupilli' or n not in R.get(str(p), {})]
+            for i, f in enumerate(as_completed(fut)):
+                try:
+                    p, name, res = f.result(); res['inst'] = names.get(p); R.setdefault(str(p), {})[name] = res
+                except Exception:
+                    print('FAILED\n' + traceback.format_exc(), file=sys.stderr); continue
+                if i % 20 == 0: print('%d/%d' % (i, len(fut)), file=sys.stderr, flush=True)
+        json.dump(R, open(LV_DATA, 'w'), indent=0)
+    if a.emit: lv_emit(R)
+    lv_report(R, a.measure)
+
+
+def lv_rel(D, measure=0):
+    """synth -> 'key/vel' -> the note against that synth's own piano (dB); silent notes left out."""
+    return {n: {s: l[measure] - d['anchor'][measure] for s, l in d['notes'].items() if l[2] > -80} for n, d in D.items()}
+
+
+def lv_table(R, measure=0):
+    """program -> velocity -> (pajupilli less the fonts' mean, the fonts' spread (sd over the fonts of
+    their key-mean), pajupilli, the fonts' mean, per-font), each averaged over the keys."""
+    T = {}
+    for ps, D in R.items():
+        rel = lv_rel(D, measure)
+        if 'pajupilli' not in rel: continue
+        row = {}
+        for v in sc.VELS:
+            keys = [s for s in rel['pajupilli'] if s.endswith('/%d' % v)]
+            pf = {n: [rel[n][s] for s in keys if s in rel.get(n, {})] for n in REFS}
+            per = {n: float(np.mean(x)) for n, x in pf.items() if x}
+            pj = [rel['pajupilli'][s] for s in keys]
+            if len(per) < 2 or not pj: continue
+            fm = float(np.mean(list(per.values())))
+            row[v] = (float(np.mean(pj)) - fm, float(np.std(list(per.values()))), float(np.mean(pj)), fm, per)
+        T[int(ps)] = row
+    return T
+
+
+def lv_report(R, measure=0):
+    T = lv_table(R, measure)
+    what = ['loudest 400 ms', 'whole note (energy)', 'peak'][measure]
+    L = ['# The General MIDI programs\' levels against the SoundFonts', '',
+         'tools/gmcompare.py levels. Each melodic program plays five keys over the middle of its GM range at velocities %s '
+         '(held %g s), after a piano\'s C3, C4, C5 at velocity 96 in the same file. Measure: %s, K-weighted (BS.1770), each '
+         'synth\'s note against its own piano, averaged over the keys. pajupilli less the mean of %s, dB: positive = pajupilli\'s '
+         'instrument is louder against its piano than the fonts\'. sd: the spread of the four fonts (their standard deviation) at '
+         'velocity 96. The dynamic range is v127 less v40.' % (', '.join(map(str, sc.VELS)), LV_HOLD, what, ', '.join(REFS)), '']
+    allv = {v: [T[p][v][0] for p in T if v in T[p]] for v in sc.VELS}
+    rng = [(T[p][127][2] - T[p][40][2], T[p][127][3] - T[p][40][3]) for p in T if 127 in T[p] and 40 in T[p]]
+    sd = [T[p][96][1] for p in T if 96 in T[p]]
+    L += ['## Summary', '',
+          '| | v40 | v64 | v96 | v127 |', '|---|---|---|---|---|',
+          '| mean | ' + ' | '.join('%+.1f' % np.mean(allv[v]) for v in sc.VELS) + ' |',
+          '| mean abs | ' + ' | '.join('%.1f' % np.mean(np.abs(allv[v])) for v in sc.VELS) + ' |',
+          '| within 3 dB | ' + ' | '.join('%d %%' % round(100 * np.mean(np.abs(allv[v]) <= 3)) for v in sc.VELS) + ' |', '',
+          'The fonts\' own spread at v96: median sd %.1f dB. Dynamic range v40-v127: pajupilli median %.1f dB, fonts %.1f dB.' % (
+              np.median(sd), np.median([r[0] for r in rng]), np.median([r[1] for r in rng])), '']
+    for gi in range(16):
+        L += ['## %s' % ['Piano', 'Chromatic percussion', 'Organ', 'Guitar', 'Bass', 'Strings', 'Ensemble', 'Brass', 'Reed', 'Pipe',
+                         'Synth lead', 'Synth pad', 'Synth effects', 'Ethnic', 'Percussive', 'Sound effects'][gi], '',
+              '| GM | program | pajupilli | mean | v40 | v64 | v96 | v127 | sd | range pj / fonts | re piano v96 pj / fonts |',
+              '|---|---|---|---|---|---|---|---|---|---|---|']
+        for p in range(gi * 8, gi * 8 + 8):
+            row = T.get(p)
+            if not row or 96 not in row: L.append('| %d | %s | | missing |' % (p + 1, GM[p]) + ' |' * 7); continue
+            inst = next((d.get('inst') for d in R[str(p)].values() if d.get('inst')), '')
+            r = (row[127][2] - row[40][2], row[127][3] - row[40][3]) if 127 in row and 40 in row else None
+            L.append('| %d | %s | %s | %+.1f | %s | %.1f | %s | %.1f / %.1f |' % (
+                p + 1, GM[p], inst, np.mean([x[0] for x in row.values()]),
+                ' | '.join('%+.1f' % row[v][0] if v in row else '' for v in sc.VELS), row[96][1],
+                '%.1f / %.1f' % r if r else '', row[96][2], row[96][3]))
+        L.append('')
+    open(LV_REPORT, 'w').write('\n'.join(L) + '\n')
+    print('wrote ' + LV_REPORT, file=sys.stderr)
+
+
+LV_HEADER = os.path.join(ROOT, 'src', 'gmlevels_data.h')
+LV_W = {40: 0.5, 64: 1.0, 96: 1.0, 127: 0.5}  # (the level matched: the velocities a file plays most, weighted)
+LV_ANCHOR = 'grand-piano'  # (each synth's yardstick: not moved)
+# Instruments whose level is set against another's in their own code: they take that one's.
+# (The brass section: a unison key 2 dB over one trumpet, src/brasssect.cc B.gain, as the fonts have it
+# (1.6 dB over five keys); pajupilli's trumpet and section are each uneven key to key by +-5 dB, and
+# matched apart the section came out 5 dB under a trumpet at G4: tools/test.py brass_section.)
+LV_TIED = {'brass-section': 'trumpet'}
+
+
+def lv_emit(R, gain=0.9):
+    """src/gmlevels_data.h: per instrument, the trim (dB) on top of src/levels_data.h's that brings it to the
+    SoundFonts' mean against the piano. The numbers measured are with the present table in force: what is
+    still missed is added to it (times `gain`, within +-15 dB)."""
+    T = lv_table(R); old = {}
+    if os.path.exists(LV_HEADER):
+        for nm, db in re.findall(r'\{"([^"]+)", (-?[\d.]+)f\}', open(LV_HEADER).read()): old[nm] = float(db)
+    L = []; new = dict(old)
+    for p in sorted(T):
+        row = T[p]; inst = next((d.get('inst') for d in R[str(p)].values() if d.get('inst')), None)
+        if not inst or inst == LV_ANCHOR or not row: continue
+        w = [(LV_W[v], row[v][0]) for v in row]
+        miss = sum(a * b for a, b in w) / sum(a for a, _ in w)
+        new[inst] = round(float(np.clip(old.get(inst, 0) - gain * miss, -15, 15)), 1)
+    for a, b in LV_TIED.items():
+        if b in new: new[a] = new[b]
+    for p in range(128):
+        inst = next((d.get('inst') for d in R.get(str(p), {}).values() if d.get('inst')), None)
+        if inst in new: L.append('    {"%s", %.1ff},  // GM %d %s' % (inst, new[inst], p + 1, GM[p]))
+    H = ['// Generated by tools/gmcompare.py levels --emit: do not edit.',
+         '// Per instrument, the trim (dB) on top of src/levels_data.h\'s that puts it where the SoundFonts',
+         '// (FluidR3, TimGM6mb, Jnsgm2, SGM) put that General MIDI program against their piano: its loudest 400 ms,',
+         '// K-weighted, five keys at velocities 40, 64, 96, 127 (weights 1, 2, 2, 1), against the piano\'s C3, C4, C5',
+         '// at velocity 96 in the same file. research/gm_levels.md. PJ_NOGMLEVELS: none.',
+         '#pragma once', 'namespace pajupilli {', 'struct GmLevel { const char* name; float db; };',
+         'constexpr GmLevel kGmLevels[] = {'] + L + ['};', '}  // namespace pajupilli']
+    open(LV_HEADER, 'w').write('\n'.join(H) + '\n')
+    print('wrote %s (%d instruments): build, then `levels --pj-only` to check' % (LV_HEADER, len(L)), file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['run', 'report', 'kits'])
+    ap.add_argument('cmd', choices=['run', 'report', 'kits', 'levels'])
     ap.add_argument('--bin', default=os.path.join(ROOT, 'pajupilli'))
     ap.add_argument('--programs', default='0-127,drums', help='GM programs 0-127 (0-based), ranges, pajupilli names, "drums"')
     ap.add_argument('--jobs', type=int, default=8)
@@ -885,12 +1085,13 @@ def main():
     ap.add_argument('--patterns', default=os.path.join(ROOT, 'research', 'gm_compare', 'patterns.md'))
     ap.add_argument('--tail', default=os.path.join(ROOT, 'research', 'gm_compare', 'methods.md'))
     ap.add_argument('--pj-only', action='store_true', help='kits: render pajupilli again, keep the SoundFonts\' numbers')
-    ap.add_argument('--emit', action='store_true', help='kits: measure pajupilli uncalibrated and write src/drumcal_data.h')
+    ap.add_argument('--emit', action='store_true', help='kits: measure pajupilli uncalibrated and write src/drumcal_data.h; levels: with --report-only, add what is missed to src/gmlevels_data.h')
     ap.add_argument('--refine', action='store_true', help='kits: after --emit, a build and a `kits --pj-only`: take what is still missed off the targets, write the header again')
     ap.add_argument('--report-only', action='store_true', help='kits: the report from the numbers at hand')
     ap.add_argument('--measure', type=int, default=0, help='kits: 0 the loudest 400 ms, 1 the whole stroke, 2 the peak')
     a = ap.parse_args()
     if a.cmd == 'kits': return cmd_kits(a)
+    if a.cmd == 'levels': return cmd_levels(a)
     cmd_run(a) if a.cmd == 'run' else cmd_report(a)
 
 

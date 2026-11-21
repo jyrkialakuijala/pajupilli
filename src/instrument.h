@@ -202,6 +202,7 @@ struct Instrument {
 // By name; nullptr if unknown.
 const Instrument* findInstrument(const std::string& name);
 double levelTrim(const Instrument& inst);  // the factor that brings it to the common loudness
+double gmLevelDb(const char* inst);       // -play: its GM program's level against the piano, over that (dB)
 // (-play) A MIDI file's velocity as loudness: the gain (dB, 0 at velocity 90,
 // where the levels are trimmed) that puts this instrument's own response to
 // velocity on General MIDI's curve (tools/velcurve.py).

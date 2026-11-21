@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstdint>
 #include <cstring>
 
+#include "gmlevels_data.h"
 #include "levels_data.h"
 #include "velgain_data.h"
 #include "instrument.h"
@@ -93,13 +95,34 @@ extern const int kNumChoirInstruments;
 // The instruments at a common loudness: each one's trim (tools/levels.py),
 // as a factor. PJ_NOLEVELS: none (the tool measures the untrimmed levels).
 double drumTrimDb(const char* inst);  // (drumkit.cc: a drum at the SoundFonts' level, what its gain leaves over)
+// Where the SoundFonts put the instrument's General MIDI program against their piano, over the
+// common loudness (tools/gmcompare.py levels --emit): -play's channel fader (src/midifile.cc), so the
+// room's sound follows it as the direct sound does. PJ_NOGMLEVELS: none.
+double gmLevelDb(const char* inst) {
+  static const bool off = std::getenv("PJ_NOGMLEVELS") != nullptr;
+  if (off) return 0;
+  for (const GmLevel& t : kGmLevels)
+    if (std::strcmp(t.name, inst) == 0) return t.db;
+  return 0;
+}
+namespace {
+double levelTrimByName(const char* name) {
+  const double drum = drumTrimDb(name);
+  for (const LevelTrim& t : kLevelTrims)
+    if (std::strcmp(t.name, name) == 0) return std::pow(10.0, (t.db + drum) / 20);
+  return std::pow(10.0, drum / 20);
+}
+}  // namespace
+// (Asked for every voice every block: the last answers kept, by the name's address, each
+// thread its own.)
 double levelTrim(const Instrument& inst) {
   static const bool off = std::getenv("PJ_NOLEVELS") != nullptr;
   if (off) return 1;
-  const double drum = drumTrimDb(inst.name);
-  for (const LevelTrim& t : kLevelTrims)
-    if (std::strcmp(t.name, inst.name) == 0) return std::pow(10.0, (t.db + drum) / 20);
-  return std::pow(10.0, drum / 20);
+  struct Kept { const char* name = nullptr; double trim = 1; };
+  thread_local Kept kept[64];
+  Kept& k = kept[(reinterpret_cast<std::uintptr_t>(inst.name) >> 3) & 63];
+  if (k.name != inst.name) k = {inst.name, levelTrimByName(inst.name)};
+  return k.trim;
 }
 
 // The sample players' curve (TiMidity++ with FluidR3, its median over every

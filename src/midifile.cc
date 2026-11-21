@@ -419,6 +419,7 @@ namespace {
 struct Part {
   const Instrument* inst;
   std::unique_ptr<Ensemble> ens;
+  float gmGain = 1;  // the program's level at the fader (src/gmlevels_data.h)
   // An organ played by a plan (organ-plan: src/organplan.h): its tracks to
   // the Pedal and the manuals, its registration by the bar.
   std::unique_ptr<OrganPlan> plan;
@@ -808,6 +809,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     p.ens.reset(new Ensemble(*p.inst, *cals[p.inst], poly, verbose, room));
     p.ens->setKeepTails(kTail);
     p.ens->setVelocityGain(true);
+    p.gmGain = float(std::pow(10.0, gmLevelDb(p.inst->name) / 20));
     if (p.inst->oneVoice())
       std::fprintf(stderr, "  %s %2d: %s (%d at once, one voice)\n", id / 128 == 9 ? "drums  " : "channel", id / 128 + 1,
                    p.inst->name, p.maxHeld);
@@ -1560,6 +1562,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         // (100 the usual: unity).
         const int ch = id / 128;
         float g = float(std::pow(chVol[ch] * 127 / 100.0, 2) * std::pow(chExpr[ch], 2));
+        // (and the program's level: where the SoundFonts put it against their piano, src/gmlevels_data.h;
+        // the drums have theirs key by key, src/drumcal_data.h)
+        if (ch != 9) g *= p.gmGain;
         // (one Hammond playing several channels: one fader, the channels' own by how many of its
         // notes each plays)
         if (!p.hammondChans.empty()) {
