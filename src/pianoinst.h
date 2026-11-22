@@ -67,6 +67,9 @@ class PianoPlayer : public Performer {
   void render(float* out, int n) override;
   void setHold(bool h) override;
   void sustainPedal(int cc) override;
+  // (-play) The next release's speed at the dampers (m/s), as the player chose it for the music
+  // (an on/off pedal: how hard the foot lets go there); taken by that release.
+  void planRelease(double speed) { plannedUp_ = speed; }
   void seed(unsigned) override {}
   static double hammerSpeed(int velocity, double dynamics);  // m/s
 
@@ -78,7 +81,7 @@ class PianoPlayer : public Performer {
   // (the pedal: its controller's last value and when it came (s), the time now, the speed it
   // gave, whether it is down, the draws for each release's own speed)
   int pedalCC_ = 0;
-  double pedalT_ = -1, now_ = 0, nextSpeed_ = -1;
+  double pedalT_ = -1, now_ = 0, nextSpeed_ = -1, plannedUp_ = -1;
   bool pedalDown_ = false;
   uint32_t pedalRng_ = 9157;
   int lo_ = 0, hi_ = 127;

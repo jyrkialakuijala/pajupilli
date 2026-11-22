@@ -225,7 +225,7 @@ void PianoPlayer::setHold(bool h) {
   const double speed = pedalMoved(h);
   for (int k = 0; k < Piano::kKeys; ++k)
     if (h) m_.piano().damper(k, false);
-    else if (!down_[k]) m_.piano().damper(k, true, speed);
+    else if (!down_[k]) m_.piano().damper(k, true, speed, m_.piano().design().pedalUp);
 }
 
 // The pedal's speed. Its controller moving through the values between (a continuous pedal
@@ -242,7 +242,10 @@ void PianoPlayer::sustainPedal(int cc) {
     const double dt = now_ - pedalT_;
     if (between && pedalT_ >= 0 && dt > 0 && dt < 0.25)
       nextSpeed_ = std::min(0.3, std::abs(pedalCC_ - cc) / 127.0 / std::max(dt, 1e-3) * 0.006);
+    // (an on/off release the player planned: its speed, when the controller gave none)
+    if (nextSpeed_ < 0 && cc < 64 && plannedUp_ > 0) nextSpeed_ = plannedUp_;
   }
+  if (cc < 64) plannedUp_ = -1;
   pedalCC_ = cc;
   pedalT_ = now_;
   setHold(cc >= 64);

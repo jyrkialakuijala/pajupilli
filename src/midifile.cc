@@ -37,6 +37,7 @@
 #include "instrument.h"
 #include "parallel.h"
 #include "performer.h"
+#include "modalinst.h"
 #include "songclock.h"
 
 namespace pajupilli {
@@ -904,6 +905,173 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       hp->setLeslieExternal();  // (the file's controls or the plan: the player does not ride it)
     }
   }
+  // A vibraphone's motor, set as a vibist sets it (between sections, not ridden), bar by bar by
+  // how exposed the part is: among many instruments the openings on the eighth notes (by the
+  // song's clock: the vibraphone stands out); alone (a solo piece, or a solo passage in a slow
+  // song) or very gentle, a slow shimmer of 0.7 - 1.3 Hz (the gentler, the slower). A change
+  // lasts four bars at least. A file riding the mod wheel on the channel keeps the motor.
+  for (auto& [id, p] : parts) {
+    if (std::strncmp(p.inst->name, "vibraphone", 10) != 0) continue;
+    auto* mp = dynamic_cast<ModalPlayer*>(&p.ens->player(0));
+    if (!mp) continue;
+    const int ch = id / 128;
+    auto tempoAt = [&](double t) {
+      size_t k = 0;
+      while (k + 1 < song.tempo.size() && song.tempo[k + 1].t <= t) ++k;
+      return k;
+    };
+    auto beatAt = [&](double t) {
+      if (song.tempo.empty()) return t / 0.5;
+      const size_t k = tempoAt(t);
+      return song.tempo[k].beat + (t - song.tempo[k].t) / song.tempo[k].len;
+    };
+    auto timeAt = [&](double beat) {
+      size_t k = 0;
+      while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= beat) ++k;
+      return song.tempo.empty() ? beat * 0.5 : song.tempo[k].t + (beat - song.tempo[k].beat) * song.tempo[k].len;
+    };
+    struct On { double t; int ch, vel; };
+    std::vector<On> mine, others;
+    bool wheel = false;
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15;
+      if (ech == ch && (e.status & 0xf0) == 0xb0 && e.a == 1 && e.b > 0) wheel = true;
+      if ((e.status & 0xf0) != 0x90 || e.b == 0 || ech == 9) continue;
+      (ech == ch ? mine : others).push_back({e.t, ech, e.b});
+    }
+    if (wheel || mine.empty()) continue;
+    // The part's mood (the tempo, how busy, how loud).
+    std::vector<double> q;
+    double vel = 0, playing = 0;
+    for (size_t i = 0; i < mine.size(); ++i) {
+      q.push_back(song.tempo.empty() ? 0.5 : song.tempo[tempoAt(mine[i].t)].len);
+      vel += mine[i].vel;
+      if (i) playing += std::min(2.0, mine[i].t - mine[i - 1].t);
+    }
+    std::nth_element(q.begin(), q.begin() + long(q.size() / 2), q.end());
+    const double quarter = q[q.size() / 2], bpm = 60 / quarter;
+    vel /= double(mine.size());
+    const double busy = mine.size() > 1 ? double(mine.size() - 1) / std::max(0.5, playing) : 0;
+    const double mood = std::clamp(0.45 * (bpm - 60) / 100 + 0.35 * std::min(1.0, busy / 6) + 0.2 * (vel - 40) / 70, 0.0, 1.0);
+    const bool slow = bpm < 100;
+    // How many others play around each of its onsets (within two beats), bar by bar (4 quarters).
+    std::vector<double> crowdSum, crowdN;
+    double crowdAll = 0;
+    size_t lo = 0;
+    for (const On& n : mine) {
+      const double w = 2 * (song.tempo.empty() ? 0.5 : song.tempo[tempoAt(n.t)].len);
+      while (lo < others.size() && others[lo].t < n.t - w) ++lo;
+      bool seen[16] = {};
+      int c = 0;
+      for (size_t j = lo; j < others.size() && others[j].t <= n.t + w; ++j)
+        if (!seen[others[j].ch]) seen[others[j].ch] = true, ++c;
+      const int bar = int(beatAt(n.t) / 4);
+      if (bar >= int(crowdSum.size())) crowdSum.resize(bar + 1, 0), crowdN.resize(bar + 1, 0);
+      crowdSum[bar] += c;
+      crowdN[bar] += 1;
+      crowdAll += c;
+    }
+    crowdAll /= double(mine.size());
+    // The harmony and the rhythm, bar by bar: how many pitch classes sound together at each onset
+    // (all parts but the drums: a triad 3, sevenths 4, the extended chords 5 and more), and the
+    // drums' hits a beat.
+    const size_t nBars = crowdSum.size();
+    std::vector<double> pcSum(nBars, 0), pcN(nBars, 0), drumHits(nBars, 0);
+    {
+      int held[16][128] = {};
+      int pcOn[12] = {};
+      // (counted once a moment's notes are all down: a struck chord at its full size)
+      double pendT = -1;
+      int pendBar = -1;
+      auto settle = [&]() {
+        if (pendBar < 0) return;
+        int n = 0;
+        for (int k = 0; k < 12; ++k) n += pcOn[k] > 0;
+        pcSum[pendBar] += n;
+        pcN[pendBar] += 1;
+        pendBar = -1;
+      };
+      for (const Event& e : song.ev) {
+        const int ech = e.status & 15, kind = e.status & 0xf0;
+        const bool noteOn = kind == 0x90 && e.b > 0, noteOff = kind == 0x80 || (kind == 0x90 && e.b == 0);
+        if (!noteOn && !noteOff) continue;
+        if (e.t > pendT + 0.03) settle();  // (within 30 ms: one chord, rolled or not)
+        const int bar = int(beatAt(e.t) / 4);
+        if (ech == 9) {
+          if (noteOn && bar < int(nBars)) drumHits[bar] += 1;
+          continue;
+        }
+        if (noteOff) {
+          if (held[ech][e.a] > 0) --held[ech][e.a], --pcOn[e.a % 12];
+          continue;
+        }
+        ++held[ech][e.a];
+        ++pcOn[e.a % 12];
+        if (bar < int(nBars) && pendBar < 0) pendT = e.t, pendBar = bar;
+      }
+      settle();
+    }
+    // Each bar's choice (a bar without the vibraphone keeps the last), then runs under four bars
+    // merged into the one before. A shimmer: a solo piece, a solo passage in a slow song, a very
+    // gentle part, or rich harmony with little rhythm under it; else the eighth notes.
+    const bool soloPiece = crowdAll < 0.5;
+    std::vector<int> shimmer(nBars, -1);
+    int nRich = 0, nDriven = 0;
+    for (size_t b = 0; b < nBars; ++b) {
+      if (crowdN[b] == 0) continue;
+      const double crowd = crowdSum[b] / crowdN[b];
+      const bool rich = pcN[b] > 0 && pcSum[b] / pcN[b] >= 4.5, driven = drumHits[b] / 4 >= 1.0;
+      nRich += rich;
+      nDriven += driven;
+      shimmer[b] = mood < 0.2 || soloPiece || (slow && crowd < 0.75) || (rich && !driven);
+    }
+    int last = -1;
+    for (int& v : shimmer) last = v = v >= 0 ? v : last;
+    for (int& v : shimmer) if (v < 0) v = shimmer.empty() ? 0 : shimmer.back();
+    for (size_t b = 0; b < shimmer.size();) {
+      size_t e = b;
+      while (e < shimmer.size() && shimmer[e] == shimmer[b]) ++e;
+      if (e - b < 4 && b > 0) std::fill(shimmer.begin() + long(b), shimmer.begin() + long(e), shimmer[b - 1]);
+      b = e;
+    }
+    // The rates: the shimmer by the mood; the eighth notes by the tempo there (quarters past 5 Hz;
+    // triplets or sixteenths under 0.7 Hz).
+    const double shimmerHz = 0.7 + 0.6 * std::min(1.0, mood / 0.5);
+    auto lockHz = [](double qlen, const char** name) {
+      static const struct { double perQuarter; const char* name; } kValues[] = {
+          {2, "the eighth notes"}, {1, "the quarter notes"}, {3, "the eighth triplets"}, {4, "the sixteenth notes"}};
+      for (const auto& v : kValues)
+        if (v.perQuarter / qlen >= 0.7 && v.perQuarter / qlen <= 5) {
+          *name = v.name;
+          return v.perQuarter / qlen;
+        }
+      *name = "near the eighth notes";
+      return std::clamp(2 / qlen, 0.7, 5.0);
+    };
+    std::vector<ModalPlayer::MotorStep> plan;
+    std::string said;
+    int nShimmer = 0, nLock = 0;
+    for (size_t b = 0; b < shimmer.size(); ++b) {
+      const double t = b == 0 ? 0.0 : timeAt(4.0 * b);
+      const char* name = "a slow shimmer";
+      const double hz = shimmer[b] ? shimmerHz : lockHz(song.tempo.empty() ? 0.5 : song.tempo[tempoAt(t)].len, &name);
+      (shimmer[b] ? nShimmer : nLock)++;
+      if (!plan.empty() && std::fabs(plan.back().hz - hz) < 1e-6) continue;
+      plan.push_back({t, hz, !shimmer[b]});
+      if (said.size() < 300) {
+        char buf[96];
+        std::snprintf(buf, sizeof buf, "%s%s %.2f Hz from bar %zu", said.empty() ? "" : "; ", shimmer[b] ? "shimmer" : name, hz, b + 1);
+        said += buf;
+      }
+    }
+    mp->setMotorPlan(plan);
+    int withVib = 0;
+    for (double n : crowdN) withVib += n > 0;
+    std::fprintf(stderr, "    %s: the motor %s (%.0f bpm, %s, %.1f others around it%s; of its %d bars %d rich in harmony, %d driven by drums)\n",
+                 p.inst->name, said.c_str(), bpm, mood < 0.4 ? "gentle" : mood < 0.7 ? "moderate" : "lively", crowdAll,
+                 soloPiece ? ": a solo" : "", withVib, nRich, nDriven);
+    (void)nShimmer, (void)nLock;
+  }
   // An organ played by a plan: its notes by track, planned (src/organplan.h).
   for (auto& [id, p] : parts) {
     if (std::strcmp(p.inst->name, "organ-plan") != 0) continue;
@@ -1228,6 +1396,60 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   }
   TaskPool& pool = TaskPool::shared();
   if (verbose) std::fprintf(stderr, "  rendering on %d threads (%zu parts)\n", pool.threads(), jobs.size());
+  // A piano's on/off pedal let up (the file's own, or the planned pianist's): how hard the foot
+  // lets go, chosen for the music. In a rhythmic piece (half a drum hit a beat or more) a release
+  // on the beat goes at full force (0.15 m/s at the dampers: their landing and the rail's knock as
+  // loud as they come), off it gentler (0.10); in a calm one gentler still (0.10 on the beat,
+  // 0.08 off). Into a quiet passage (no note begun within two beats, 1.5 s at least) or at the
+  // end, it is let up carefully (0.035: ~13 dB softer, the landings smeared). Each its own
+  // (x 0.85 .. 1.15). A pedal sending the values between keeps the speed its controller shows.
+  std::map<std::pair<int, long long>, double> releaseSpeed;  // (channel, t in 0.1 ms) -> m/s
+  {
+    std::vector<double> onsets;
+    double drumHits = 0;
+    bool between[16] = {};
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0x90 && e.b > 0) {
+        if (ech == 9) drumHits += 1;
+        else onsets.push_back(e.t);
+      }
+      if (kind == 0xb0 && e.a == 64 && e.b > 15 && e.b < 112) between[ech] = true;
+    }
+    std::sort(onsets.begin(), onsets.end());
+    const double beats = song.ev.empty() ? 0 : (song.tempo.empty() ? song.ev.back().t / 0.5 : [&] {
+      const auto& k = song.tempo.back();
+      return k.beat + (song.ev.back().t - k.t) / k.len;
+    }());
+    const bool rhythmic = beats > 0 && drumHits / beats >= 0.5;
+    uint32_t rng = 777;
+    int nFull = 0, nGentle = 0, nCareful = 0;
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15;
+      if ((e.status & 0xf0) != 0xb0 || e.a != 64 || e.b >= 64 || ech == 9 || between[ech]) continue;
+      bool piano = false;
+      for (auto& [id, p] : parts)
+        if (id / 128 == ech && dynamic_cast<PianoPlayer*>(&p.ens->player(0))) piano = true;
+      if (!piano) continue;
+      size_t k = 0;
+      while (k + 1 < song.tempo.size() && song.tempo[k + 1].t <= e.t) ++k;
+      const double qlen = song.tempo.empty() ? 0.5 : song.tempo[k].len;
+      const double beat = song.tempo.empty() ? e.t / 0.5 : song.tempo[k].beat + (e.t - song.tempo[k].t) / qlen;
+      const bool onBeat = std::fabs(beat - std::round(beat)) < 0.08;
+      const auto next = std::upper_bound(onsets.begin(), onsets.end(), e.t + 0.02);
+      const bool quiet = next == onsets.end() || *next - e.t > std::max(1.5, 2 * qlen);
+      double v;
+      if (quiet) v = 0.035, ++nCareful;
+      else if (rhythmic && onBeat) v = 0.15, ++nFull;
+      else v = (rhythmic || onBeat) ? 0.10 : 0.08, ++nGentle;
+      rng = rng * 1664525u + 1013904223u;
+      v *= 0.85 + 0.3 * ((rng >> 8) / 16777216.0);
+      releaseSpeed[{ech, std::llround(e.t * 1e4)}] = v;
+    }
+    if (nFull + nGentle + nCareful)
+      std::fprintf(stderr, "  the piano's pedal let up: %d at full force, %d gently, %d carefully (%s)\n", nFull, nGentle, nCareful,
+                   rhythmic ? "a rhythmic piece" : "a calm piece");
+  }
   auto renderSong = [&]() {
     std::vector<float> l(kBlock), r(kBlock);
     size_t next = 0, tk = 0, ahead = 0;
@@ -1485,7 +1707,15 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (e.a == 64) band.pedal(ch, e.b >= 64);
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
-              if (hears(id, p) && leslieFrom(p)) p.ens->sustainPedal(e.b);
+              if (hears(id, p) && leslieFrom(p)) {
+                if (e.b < 64) {
+                  const auto it = releaseSpeed.find({ch, std::llround(e.t * 1e4)});
+                  if (it != releaseSpeed.end())
+                    for (int q = 0; q < p.ens->size(); ++q)
+                      if (auto* pp = dynamic_cast<PianoPlayer*>(&p.ens->player(q))) pp->planRelease(it->second);
+                }
+                p.ens->sustainPedal(e.b);
+              }
           if (e.a == 7) chVol[ch] = e.b / 127.0;
           if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Hammond's expression pedal instead
             bool swell = false;

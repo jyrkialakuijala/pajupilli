@@ -74,6 +74,9 @@ class Tube {
   virtual int parts() const { return 0; }
   virtual const float* partPlaces() const { return nullptr; }
   virtual const float* takePart(int /*n*/, int /*j*/) { return nullptr; }
+  // Each part's lobe (4 per part: a unit direction in the instrument's frame, as its places, and
+  // a strength a: a path leaving at angle theta to it is heard x (1 + a cos theta)), or null.
+  virtual const float* partLobes() const { return nullptr; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right

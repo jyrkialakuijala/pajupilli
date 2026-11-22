@@ -99,6 +99,9 @@ struct PianoDesign {
   // release's knock.
   double pedalNoise = 0;
   double damperFall = 0.12, damperContact = 8e-3, damperSide = -1, damperSpread = 0.5e-3;
+  // The pedal let go: its dampers' landings and the rail's knock x this (by ear: a little louder
+  // than the landings' and the knock's own physics give; PJ_PIANO_PEDALUP).
+  double pedalUp = 1.6;
   double railMass = 0.6, railContact = 8e-3, rimShare = 0.5, railPress = 0.3;
   uint32_t seed = 4242;
   // The sideways swing: how far off the vertical the blow sets a string
@@ -163,11 +166,13 @@ class Piano {
   void strike(int key, double speed);
   // The key's damper: on the strings, or lifted. Let down, it lands at `speed` (m/s; < 0: the
   // design's damperFall, each time a little its own).
-  void damper(int key, bool down, double speed = -1);
+  // `loud`: x its landing's push (the pedal let go: PianoDesign::pedalUp).
+  void damper(int key, bool down, double speed = -1, double loud = 1);
   // The sustain pedal's trapwork: the lift rail rising (down: the pedal pressed) or falling back
   // onto its stop at `speed` (m/s); its knock reaches the board. (The dampers are the player's.)
   void pedal(bool down, double speed);
   bool pedalNoise() const { return noise_ > 0; }
+  const PianoDesign& design() const { return d_; }
   // The felt's hardness (1: as voiced; the stiffness K times this).
   void setVoicing(double hardness) { voicing_ = float(hardness); }
   // One sample: the two microphones' mean (Pa), side(): half their difference;

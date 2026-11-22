@@ -26,6 +26,15 @@ class SnareModel : public Tube {
     side_.clear();
     return sideOut_.data();
   }
+  // The drum's sideways parts (Snare::dipole): across the stage, and towards the listener.
+  const float* takeDipole(int n, int k) override {
+    dipOut_[k].assign(n, 0.0f);
+    const int have = int(dip_[k].size()), m = std::min(n, have);
+    std::copy(dip_[k].end() - m, dip_[k].end(), dipOut_[k].end() - m);
+    dip_[k].clear();
+    return dipOut_[k].data();
+  }
+  const float* dipoleAxes() const override { return aim_ ? kAxes : nullptr; }
   void resetAir() override;
 
  private:
@@ -34,6 +43,11 @@ class SnareModel : public Tube {
   Snare snare_;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
+  // (the drummer faces the listener: the drum's x is the listener's left, its y away from them)
+  static constexpr float kAxes[9] = {-1, 0, 0, 0, -1, 0, 0, 0, 1};
+  std::vector<float> dip_[3], dipOut_[3];
+  bool aim_ = true;
+  float trim_ = 1;
 };
 
 // The drummer, with a brush in each hand. The keys are General MIDI's (the

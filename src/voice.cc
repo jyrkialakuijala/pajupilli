@@ -148,6 +148,7 @@ const float* Voice::dipoleAxes() const { return rs_.identity() ? model_->dipoleA
 
 int Voice::parts() const { return rs_.identity() ? model_->parts() : 0; }
 const float* Voice::partPlaces() const { return rs_.identity() ? model_->partPlaces() : nullptr; }
+const float* Voice::partLobes() const { return rs_.identity() ? model_->partLobes() : nullptr; }
 
 const float* Voice::part(int n, int j) {
   if (!rs_.identity()) return nullptr;

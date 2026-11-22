@@ -429,6 +429,22 @@ float Cymbal::sample() {
     prev_[mic] = s;
   }
   const float gn = float(s_.gain);
+  if (keepGroups_) {
+    if (micMono_.size() != mic_[0].size()) {
+      micMono_.resize(mic_[0].size());
+      for (size_t k = 0; k < micMono_.size(); ++k) micMono_[k] = 0.5f * (mic_[0][k] + mic_[1][k]);
+    }
+    float acc[kGroups] = {};
+    const float* w = micMono_.data();
+    int k = 0;
+    for (; k + kGroups <= n; k += kGroups)
+      for (int j = 0; j < kGroups; ++j) acc[j] += w[k + j] * v[k + j];
+    for (; k < n; ++k) acc[k % kGroups] += w[k] * v[k];
+    for (int j = 0; j < kGroups; ++j) {
+      group_[j] = gn * (acc[j] - gPrev_[j]) * float(fs_);
+      gPrev_[j] = acc[j];
+    }
+  }
   const float l = gn * y[0], r = gn * y[1];
   side_ = 0.5f * (l - r);
   const float mono = 0.5f * (l + r);
@@ -442,7 +458,36 @@ float Cymbal::sample() {
 }
 
 CymbalModel::CymbalModel(const Instrument& inst)
-    : Tube(inst), which_(std::max(0, whichOf(inst))), cym_(inst.fs, cymbalSpec(which_), 31u + which_) {}
+    : Tube(inst), which_(std::max(0, whichOf(inst))), cym_(inst.fs, cymbalSpec(which_), 31u + which_) {
+  // (PJ_CYM_PARTS=0: the cymbal as one point in the room)
+  if (knob("PJ_CYM_PARTS", 1) == 0) return;
+  cym_.keepGroups(true);
+  const double R = cym_.plate().radius();
+  uint32_t h = 977u + 131u * uint32_t(which_);
+  auto rnd = [&h]() { h = h * 1664525u + 1013904223u; return (h >> 8) / 16777216.0 * 2 - 1; };
+  for (int j = 0; j < Cymbal::kGroups; ++j) {
+    // (round the plate, 0.6 of its radius out, the plate about level)
+    const double a = 2 * M_PI * j / Cymbal::kGroups;
+    partPlace_.insert(partPlace_.end(), {float(0.6 * R * std::cos(a)), float(0.6 * R * std::sin(a)), 0.0f});
+    // (its lobe: a direction of its own, mostly up and out, as the modes throw it)
+    double d[3] = {rnd(), rnd(), 0.3 + 0.7 * std::fabs(rnd())};
+    const double nn = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    partLobe_.insert(partLobe_.end(), {float(d[0] / nn), float(d[1] / nn), float(d[2] / nn), 0.8f});
+  }
+  partPlace_.insert(partPlace_.end(), {0.0f, 0.0f, 0.0f});
+  partLobe_.insert(partLobe_.end(), {0.0f, 0.0f, 1.0f, 0.0f});
+  part_.resize(Cymbal::kGroups + 1);
+}
+
+const float* CymbalModel::takePart(int n, int j) {
+  if (j < 0 || j >= int(part_.size())) return nullptr;
+  std::vector<float>& p = part_[j];
+  partOut_.assign(n, 0.0f);
+  const int have = int(p.size()), m = std::min(n, have);
+  std::copy(p.end() - m, p.end(), partOut_.end() - m);
+  p.clear();
+  return partOut_.data();
+}
 
 void CymbalModel::resetAir() {
   Tube::resetAir();
@@ -460,7 +505,21 @@ float CymbalModel::sample() {
   shelfS_ += kA * (sd - shelfS_);
   last_ = g * (x + kHi * (x - shelfM_));
   side_.push_back(g * float(outScale()) * (sd + kHi * (sd - shelfS_)));
-  return finish(last_);
+  const float out = finish(last_);
+  if (!part_.empty()) {
+    if (part_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
+      for (auto& p : part_) p.clear();
+    float sum = 0;
+    for (int j = 0; j < Cymbal::kGroups; ++j) {
+      const float gx = cym_.group(j);
+      gShelf_[j] += kA * (gx - gShelf_[j]);
+      const float b = g * float(outScale()) * (gx + kHi * (gx - gShelf_[j]));
+      part_[j].push_back(b);
+      sum += b;
+    }
+    part_[Cymbal::kGroups].push_back(out - sum);
+  }
+  return out;
 }
 
 CymbalPlayer::CymbalPlayer(CymbalModel& m) : Performer(m), m_(m) {

@@ -80,7 +80,9 @@ class Room {
   // (the path's direction as it leaves the source, along the part's offset: the bass bar's
   // reflection off the left wall comes a little sooner than the treble's), instead of the
   // source's own sound; the network and the other players still hear the source's whole sound.
-  void setParts(int s, int np, const float* places);
+  // lobes (4 each, or null): each part's direction and strength a: a path leaving at angle theta
+  // to it carries the part x (1 + a cos theta).
+  void setParts(int s, int np, const float* places, const float* lobes = nullptr);
   // The parts' sound for the next process() ([partFrom(s) + j], n samples each; null: none).
   void setPartSignals(const float* const* p) { part_ = p; }
   int partFrom(int s) const { return partFrom_.empty() ? 0 : partFrom_[s]; }

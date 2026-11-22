@@ -114,6 +114,7 @@ PianoDesign grandDesign() {
     s.damperMass = lerp(0.020, 0.012, (key - 1) / 69.0);
   }
   des.pedalNoise = knob("PJ_PIANO_PEDALNOISE", 1.0);
+  des.pedalUp = knob("PJ_PIANO_PEDALUP", des.pedalUp);
   des.longShare = knob("PJ_PIANO_LONG", 0.7);  // (the stretching's push on the bridge: its share moving the board at 1 kHz)
   des.damperContact = knob("PJ_PIANO_DAMPERCONTACT", des.damperContact);  // (the felt's cushion, s)
   des.rimShare = knob("PJ_PIANO_RIMSHARE", des.rimShare);                // (a knock in the case reaching the board)
@@ -574,7 +575,7 @@ void Piano::strike(int key, double speed) {
   census();
 }
 
-void Piano::damper(int key, bool down, double speed) {
+void Piano::damper(int key, bool down, double speed, double loud) {
   if (key < 0 || key >= nKeys_) return;
   Key& k = key_[key];
   if (!k.hasDamper || k.damperDown == down) return;
@@ -605,7 +606,7 @@ void Piano::damper(int key, bool down, double speed) {
     k.landN = std::max(2, int(T * fs_ + 0.5));
     k.landLeft = k.landN;
     k.landWait = int(k.landDelay / std::max(speed, 0.02) * fs_);
-    k.landAmp = float(noise_ * d_.damperSide * M_PI * d_.key[key].damperMass * speed / (2 * T) / k.ns);
+    k.landAmp = float(loud * noise_ * d_.damperSide * M_PI * d_.key[key].damperMass * speed / (2 * T) / k.ns);
     ++landing_;
     for (int j = 0; j < k.ns; ++j) str_[k.s0 + j].active = true;
     census();
@@ -623,7 +624,7 @@ void Piano::damper(int key, bool down, double speed) {
 // under 1/10 of a landing's push at 100 Hz), left out.
 void Piano::pedal(bool down, double speed) {
   if (noise_ <= 0 || speed <= 0) return;
-  knock(noise_ * (down ? d_.railPress : 1.0) * d_.railMass * speed, d_.railContact);
+  knock(noise_ * (down ? d_.railPress : d_.pedalUp) * d_.railMass * speed, d_.railContact);
 }
 
 // A knock in the case (impulse N s, a half sine of T s), the rim's share of it into the board.

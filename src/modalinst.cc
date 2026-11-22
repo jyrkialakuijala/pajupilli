@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "songclock.h"
 
 namespace pajupilli {
 
@@ -811,6 +812,47 @@ ModalPlayer::ModalPlayer(ModalModel& m) : Performer(m), m_(m), s_(m.set()) {
 
 void ModalPlayer::seed(unsigned s) { rng_ = 4711u + 7919u * s; }
 
+void ModalPlayer::setMotorPlan(const std::vector<MotorStep>& plan) {
+  motor_ = plan;
+  motorTh_.assign(plan.size(), 0.0);
+  motorCorr_.assign(plan.size(), 0.0);
+  motorAt_ = 0;
+  // (the angle at each step's start as the shaft ran on; a locked step's target there is an
+  // opening (0 mod pi): the glide takes the difference away)
+  double th = 0;
+  for (size_t k = 0; k < plan.size(); ++k) {
+    if (k > 0) {
+      const double dt = plan[k].t - plan[k - 1].t, g = std::min(dt, kMotorGlide);
+      // (through the previous step's glide its rate went from the one before to its own)
+      const double from = k > 1 ? plan[k - 2].hz : plan[k - 1].hz;
+      th = motorTh_[k - 1] + M_PI * (0.5 * (from + plan[k - 1].hz) * g + plan[k - 1].hz * (dt - g));
+    }
+    if (plan[k].locked) {
+      const double off = std::remainder(th, M_PI);  // (how far past the nearest opening)
+      motorTh_[k] = th - off;
+      motorCorr_[k] = -off;
+    } else {
+      motorTh_[k] = th;
+    }
+  }
+}
+
+// The disc angle at t: the step's start angle, its rate gliding in from the last step's over
+// kMotorGlide, and a locked step's correction to the grid fading in over the same.
+double ModalPlayer::motorAngle(double t) {
+  if (motorAt_ >= motor_.size() || (motorAt_ > 0 && t < motor_[motorAt_].t)) motorAt_ = 0;
+  while (motorAt_ + 1 < motor_.size() && motor_[motorAt_ + 1].t <= t) ++motorAt_;
+  const size_t k = motorAt_;
+  const double u = std::max(0.0, t - motor_[k].t);
+  const double from = k > 0 ? motor_[k - 1].hz : motor_[k].hz, to = motor_[k].hz;
+  const double g = std::min(u, kMotorGlide);
+  // (the rate's integral: linear from `from` to `to` over the glide, then `to`)
+  double th = motorTh_[k] + M_PI * (from * g + 0.5 * (to - from) * g * g / kMotorGlide + to * (u - g));
+  // (a locked step: the grid's angle, reached as the glide ends; until then the shaft's own)
+  if (motor_[k].locked && k > 0) th -= motorCorr_[k] * (1 - std::min(1.0, u / kMotorGlide));
+  return std::fmod(th, 2 * M_PI);
+}
+
 bool ModalPlayer::setKnob(int k, double x) {
   if (m_.type() != ModalModel::kVibraphone || (k != 3 && k != 4)) return false;
   if (k == 3) fanDepth_ = x;
@@ -818,7 +860,20 @@ bool ModalPlayer::setKnob(int k, double x) {
   return true;
 }
 
+// The damper bar on a let-go bar: fully up its felt grips (25 /s: ~0.3 s), fully down none;
+// between, a lighter touch (the grip ~ the press squared: half way ~1/4 of it, ~1 s).
+double ModalPlayer::barDamp() const { return 25 * (1 - pedalFree_) * (1 - pedalFree_); }
+
+void ModalPlayer::sustainPedal(int cc) {
+  if (m_.type() != ModalModel::kVibraphone) { Performer::sustainPedal(cc); return; }
+  // (the pedal's travel: up to ~16 the bar presses fully, from ~100 it is off the bars)
+  pedalFree_ = std::clamp((cc - 16) / 84.0, 0.0, 1.0);
+  for (int v = 0; v < ModalModel::kVibBars; ++v)
+    if (released_[v]) s_.damp(v, barDamp());
+}
+
 void ModalPlayer::setHold(bool h) {
+  if (m_.type() == ModalModel::kVibraphone) { sustainPedal(h ? 127 : 0); return; }
   hold_ = h;
   if (h) return;
   for (int k = 0; k < 128; ++k)
@@ -1078,6 +1133,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       vib = midi - ModalModel::kVibLo;
       if (vib < 0 || vib >= ModalModel::kVibBars) return;
       s_.damp(vib, 0);
+      released_[vib] = false;
       {
         // The mallets: Mike Balter's Pro Vibe series, PJ_VIB_MALLET 21 (yellow
         // cord, hard), 22 (green, medium hard), 23 (blue, medium: the default),
@@ -1157,7 +1213,8 @@ void ModalPlayer::noteOff(int midi) {
       s_.damp(vib, 3);
       break;
     case ModalModel::kVibraphone:
-      s_.damp(vib, 25);  // the damper bar (pedal up): ~0.3 s
+      released_[vib] = true;
+      s_.damp(vib, barDamp());  // the damper bar, as far as the pedal lets it
       break;
     default:
       break;  // the rest ring on
@@ -1208,7 +1265,9 @@ void ModalPlayer::render(float* out, int n) {
       static const double kFan = knob("PJ_FAN", -1), kFanHz = knob("PJ_FANHZ", -1), kFanPh = knob("PJ_FANPH", 0);
       const double depth = kFan >= 0 ? kFan : std::clamp(fanDepth_, 0.0, 1.0);
       const double rate = kFanHz > 0 ? kFanHz : std::min(5.0, fanRate_ + 4.3 * std::clamp(flutter_, 0.0, 1.0));
-      if (depth > 0) fanPh_ = std::fmod(fanPh_ + M_PI * rate * bdt, 2 * M_PI);
+      const SongClock& clk = SongClock::get();
+      if (!motor_.empty() && kFanHz <= 0 && clk.playing) fanPh_ = motorAngle(clk.now);
+      else if (depth > 0) fanPh_ = std::fmod(fanPh_ + M_PI * rate * bdt, 2 * M_PI);
       // Two shafts, the naturals' and the accidentals', on one belt: in step, but the accidentals'
       // set apart by how its pulley was tightened (PJ_FAN_ROWS rad of disc angle, ~11 degrees) and
       // swaying a little against the other once a turn (the belt's give); each disc a few degrees

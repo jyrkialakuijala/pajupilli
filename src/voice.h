@@ -52,6 +52,7 @@ class Voice {
   // Its parts at their own places (Tube::parts), or none.
   int parts() const;
   const float* partPlaces() const;
+  const float* partLobes() const;
   const float* part(int n, int j);
   // Its own early sound (Tube::ownEarly), its last n samples x g, added to l and r.
   bool ownEarly() const;

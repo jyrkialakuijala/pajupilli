@@ -170,7 +170,7 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
         if (const float* axes = f_[roomSlots_[c][k]].v->dipoleAxes()) rooms_[c]->setAxes(int(k), axes);
       // (an instrument of parts at their own places, the vibraphone's bars: each part its own paths)
       for (size_t k = 0; k < roomSlots_[c].size(); ++k)
-        if (const int np = f_[roomSlots_[c][k]].v->parts()) rooms_[c]->setParts(int(k), np, f_[roomSlots_[c][k]].v->partPlaces());
+        if (const int np = f_[roomSlots_[c][k]].v->parts()) rooms_[c]->setParts(int(k), np, f_[roomSlots_[c][k]].v->partPlaces(), f_[roomSlots_[c][k]].v->partLobes());
     }
     room_ = true;
     for (Slot& s : f_) s.room.assign(Room::kBlock, 0.0f);

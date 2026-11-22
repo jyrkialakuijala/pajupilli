@@ -108,9 +108,18 @@ class ModalPlayer : public Performer {
   void noteOff(int midi) override;
   void render(float* out, int n) override;
   void setHold(bool h) override;
+  // The vibraphone's damper bar by the pedal's depth (half pedalling: the bar resting lightly on
+  // the bars no longer held, they ring shorter); the rest as on/off.
+  void sustainPedal(int cc) override;
   void seed(unsigned s) override;
   // The vibraphone's motor live: K4 how far the discs turn the tubes off (0: left open), K5 its speed.
   bool setKnob(int k, double x) override;
+  // (-play) The motor as the vibist sets it through the piece: from each step's time (s, the
+  // song's clock) its tremolo hz, gliding there over ~1 s (the knob, the motor's inertia); a step
+  // locked to the beat brings its openings onto that grid (an opening at the step's start) within
+  // the glide, else the shaft runs on from where it was. Empty: back to the knobs.
+  struct MotorStep { double t, hz; bool locked; };
+  void setMotorPlan(const std::vector<MotorStep>& plan);
 
  private:
   int pickString(int midi) const;    // fretted/stopped strings: the string for a key
@@ -127,6 +136,17 @@ class ModalPlayer : public Performer {
   double bend_ = 0, vibPh_ = 0, clock_ = 0;
   double fanPh_ = 0;  // the vibraphone's fan shaft (rad)
   double fanDepth_ = 1, fanRate_ = 0.7;  // (its motor: running by default, the slowest tremolo)
+  // (-play: the motor's plan; each step's disc angle at its start, and the correction the glide
+  // takes away (to the grid, a locked step))
+  // (the vibraphone's damper bar: the pedal's depth 0 up .. 1 down, each bar's key let go)
+  double pedalFree_ = 0;
+  bool released_[ModalSet::kMaxVib] = {};
+  double barDamp() const;
+  static constexpr double kMotorGlide = 1.0;
+  std::vector<MotorStep> motor_;
+  std::vector<double> motorTh_, motorCorr_;
+  size_t motorAt_ = 0;
+  double motorAngle(double t);
   int bowKey_ = -1;   // the fiddle: the key under the bow
   double bowDir_ = 1, bowClock_ = 0, bowTarget_ = 0;
   uint32_t rng_ = 4711;

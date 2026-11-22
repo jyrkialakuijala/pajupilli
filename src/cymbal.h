@@ -111,6 +111,12 @@ class Cymbal {
   // Where the brush lies now, from the centre (m).
   double brushRadius() const { return std::hypot(brush_->x(), brush_->y()); }
   float sample();
+  // The plate's modes dealt into kGroups groups in turn (mode k to k mod kGroups: each group the
+  // whole range, its shine too), each group's share of sample()'s plate sound (keepGroups(true)
+  // first; the bell's and the stick's are in none).
+  static constexpr int kGroups = 8;
+  void keepGroups(bool on) { keepGroups_ = on; }
+  float group(int j) const { return group_[j]; }
   float side() const { return side_; }
   void reset();
   bool asleep() const { return asleep_; }
@@ -148,6 +154,9 @@ class Cymbal {
   // The microphones.
   std::vector<float> mic_[2];
   float prev_[2] = {}, bPrev_ = 0, side_ = 0;
+  bool keepGroups_ = false;
+  std::vector<float> micMono_;  // (the two microphones' mean weight, for the groups)
+  float group_[kGroups] = {}, gPrev_[kGroups] = {};
   bool asleep_ = true;
   int quiet_ = 0;
 };
@@ -166,8 +175,19 @@ class CymbalModel : public Tube {
     return sideOut_.data();
   }
   void resetAir() override;
+  // The plate's groups as parts at their places round it, each with its own lobe (a plate's modes
+  // throw their sound out unevenly, each group its own way); the bell, the stick and the rest at
+  // the middle: the last part. The room then gives every path its own mix of them: the shine
+  // spreads into the room, not from one point.
+  int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
+  const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
+  const float* partLobes() const override { return partLobe_.empty() ? nullptr : partLobe_.data(); }
+  const float* takePart(int n, int j) override;
 
  private:
+  std::vector<float> partPlace_, partLobe_, partOut_;
+  std::vector<std::vector<float>> part_;
+  float gShelf_[Cymbal::kGroups] = {};
   float shelfM_ = 0, shelfS_ = 0;  // (the highs' shelf)
   void controlStep() override {}
   float sample() override;

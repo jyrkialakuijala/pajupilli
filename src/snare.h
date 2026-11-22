@@ -39,6 +39,8 @@ struct SnareSpec {
   double micX = 0.22, micZ = 0.45;  // the two microphones: +- x from the centre, over the batter (m)
   double under = 0.45;         // the snare head's share at them
   double wireDirect = 1, tipDirect = 1;  // the wires' and the wire ends' own sound (x)
+  double aim = 0.5;            // the sound's directional parts (dipole(): x)
+  double tipAim = 0.6;         // the wire ends' own sound: its share that goes out to the brush's side, at the rim
   double gain = 1;
 };
 SnareSpec snareSpec();  // the jazz snare, with the PJ_SNARE_* knobs
@@ -57,6 +59,13 @@ class Snare {
   void crossStick(double speed);
   float sample();
   float side() const { return side_; }
+  // What goes out differently in different directions, level with the head (k = 0: across, the
+  // drummer's left to right; 1: from the drummer away): heard that way with this sign, the other
+  // way with the opposite, on top of sample(). The modes with an odd number of nodal diameters
+  // send their halves' difference sideways, each pair along its own two lines; which of a pair
+  // sounds is where the head is touched, so a brush going round turns the drum's sound with it.
+  // The wire ends' hiss goes out more to the side of the head the brush is on.
+  float dipole(int k) const { return dip_[k]; }
   void reset();
   bool asleep() const { return asleep_; }
   void wake() { asleep_ = false; quiet_ = 0; }
@@ -81,6 +90,8 @@ class Snare {
   // The microphones.
   std::vector<float> micB_[2], micS_[2];
   float prev_[2] = {}, hpW_ = 0, hpT_ = 0, lastW_ = 0, lastT_ = 0;
+  std::vector<float> dipB_[2], dipS_[2];
+  float dprev_[2] = {}, dip_[2] = {}, hpH_[2] = {}, lastH_[2] = {};
   // The cross-stick's knock: the stick's and the hoop's modes (each a swing:
   // x, v, and what is fixed), and its push on the head.
   struct Knock { float x = 0, v = 0, a11, a12, a21, a22, gain, pan; };

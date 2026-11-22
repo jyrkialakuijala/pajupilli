@@ -14,7 +14,13 @@ constexpr double kPi = 3.14159265358979323846;
 
 bool brushSnare(const Instrument& inst) { return std::strcmp(inst.name, "brush-snare") == 0; }
 
-SnareModel::SnareModel(const Instrument& inst) : Tube(inst), snare_(inst.fs) {}
+SnareModel::SnareModel(const Instrument& inst) : Tube(inst), snare_(inst.fs) {
+  // (The sideways parts add to what the listener gets, about as much power again at 1: the whole
+  // down by that, so the drum stays as loud as it was set against the other kits.)
+  const double a = knob("PJ_SNARE_AIM", 0.5);
+  aim_ = a > 0;
+  trim_ = float(1 / std::sqrt(1 + 0.95 * a * a));
+}
 
 void SnareModel::resetAir() {
   Tube::resetAir();
@@ -24,9 +30,15 @@ void SnareModel::resetAir() {
 float SnareModel::sample() {
   // (The microphones' pressure, Pa at half a metre over the head: a firm
   // tap peaks near 2 Pa.)
-  static const float g = float(knob("PJ_SNARE_OUT", 1.0 / 8));
+  static const float g0 = float(knob("PJ_SNARE_OUT", 1.0 / 8));
+  const float g = g0 * trim_;
   last_ = g * snare_.sample();
   side_.push_back(g * float(outScale()) * snare_.side());
+  if (aim_)
+    for (int k = 0; k < 2; ++k) {
+      if (dip_[k].size() > 4096) dip_[k].clear();  // (nobody takes them: no room)
+      dip_[k].push_back(g * float(outScale()) * snare_.dipole(k));
+    }
   return finish(last_);
 }
 

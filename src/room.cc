@@ -188,7 +188,7 @@ void Room::setAxes(int s, const float* axes) {
         tp.dg[k] = tp.gain * (axes[3 * k] * tp.n[0] + axes[3 * k + 1] * tp.n[1] + axes[3 * k + 2] * tp.n[2]);
 }
 
-void Room::setParts(int s, int np, const float* places) {
+void Room::setParts(int s, int np, const float* places, const float* lobes) {
   const int ns = int(x_.size());
   if (partFrom_.empty()) partFrom_.assign(ns + 1, 0);
   // (parts are added source by source in order: those of later sources move up)
@@ -207,7 +207,12 @@ void Room::setParts(int s, int np, const float* places) {
       const double along = tp.n[0] * o[0] + tp.n[1] * o[1] + tp.n[2] * o[2];  // (shorter by this)
       const double rp = std::max(0.3, r - along);
       dl.push_back(std::clamp(int(std::lround(rp / kC * fs_)), 1, kRing - kBlock - 1));
-      gn.push_back(float(tp.gain * std::max(r, 0.5) / std::max(rp, 0.5)));
+      double lobe = 1;
+      if (lobes) {
+        const float* L = lobes + 4 * j;
+        lobe = std::max(0.0, 1.0 + L[3] * double(tp.n[0] * L[0] + tp.n[1] * L[1] + tp.n[2] * L[2]));
+      }
+      gn.push_back(float(lobe * tp.gain * std::max(r, 0.5) / std::max(rp, 0.5)));
     }
   }
   // Insert after the parts of the sources before s.

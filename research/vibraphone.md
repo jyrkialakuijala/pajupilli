@@ -434,6 +434,22 @@ give), and each disc is up to ±3.4° off its shaft (`PJ_FAN_DISC`, fixed per se
 8 s swing 10–15 dB peak to peak at 0.69 Hz, F#3's cycle 28° ahead of F3's. Against the SoundFonts (whose
 vibraphones swing less or not at all) the GM distance went 2.03 → 2.15.
 
+### 7.5c The motor in -play, and the pedal
+
+In `-play` the vibist sets the motor for each section (src/midifile.cc), bar by bar, with changes at least four bars
+apart, unless the file rides the mod wheel on the channel. A **slow shimmer** (0.7–1.3 Hz, slower for a gentler
+part) goes with a solo piece, a solo passage in a slow song (under 100 bpm), a very gentle part, or rich harmony
+(≥ 4.5 pitch classes sounding together at an onset) with little rhythm under it (under one drum hit a beat).
+Otherwise the openings fall **on the eighth notes**, phase-locked to the song's clock: quarters when eighths would
+pass 5 Hz, triplets or sixteenths when the motor cannot go that slowly. A change glides over 1 s, and a locked step
+brings its openings onto the grid within that glide. The sound peaks ~30 ms after each eighth, the resonators'
+build-up. The bushgrafts files with a vibraphone (couldwrite, desire, loveishere to stay, manteca, shinystockings)
+are all drum-driven and lock to the eighths, or to the quarters for manteca at 180 bpm.
+
+The **sustain pedal** works as the damper bar, by its depth. Fully up, a let-go bar is gripped (25 /s: down 40 dB
+in 0.15 s). Fully down (from CC 100), it rings free. Between, the grip goes as the press squared: CC 64 gives
+0.8 s, CC 90 2.7 s. Moving the pedal changes the grip on bars already let go.
+
 ### 7.6 The bars' places in the room
 
 The bars lie in one plane, the naturals on the player's side of the damper felt and the accidentals beyond it,

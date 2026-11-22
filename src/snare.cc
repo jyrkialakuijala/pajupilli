@@ -46,6 +46,8 @@ SnareSpec snareSpec() {
   s.under = knob("PJ_SNARE_UNDER", 0.45);
   s.wireDirect = knob("PJ_SNARE_WIREDIRECT", 1);
   s.tipDirect = knob("PJ_SNARE_TIPDIRECT", 1);
+  s.aim = knob("PJ_SNARE_AIM", 0.5);      // the directional parts (0: the drum sounds alike all round; 1: all the far field's)
+  s.tipAim = knob("PJ_SNARE_TIPAIM", 0.6);
   s.gain = knob("PJ_SNARE_GAIN", 1);
   s.brush.tips = int(knob("PJ_BRUSH_TIPS", 24));
   s.brush.fan = knob("PJ_BRUSH_FAN", 400);
@@ -133,6 +135,35 @@ Snare::Snare(double fs, const SnareSpec& spec)
         out[k] = float((g[k].real() < 0 ? -1 : 1) * std::abs(g[k]) * kRho / (2 * kPi) * (head ? -s_.under : 1.0));
     }
   }
+  // The sideways parts, far off and level with the head: towards +x a mode's patches arrive
+  // each by its own path, exp(i k x); the same towards -x with x mirrored. Half the difference
+  // is the integral of the shape x sin(k x): nothing for a mode alike on both sides, the two
+  // halves' difference for the (1, n)s (a pair: one member along its own line, one across).
+  // To the microphones' scale (their distance).
+  for (int head = 0; head < 2; ++head) {
+    Membrane& h = head ? sn_ : bat_;
+    std::vector<float> ph(h.modes());
+    std::vector<double> gx(h.modes(), 0.0), gy(h.modes(), 0.0);
+    const double d0 = std::hypot(s_.micX, s_.micZ);
+    const int nR = 24, nT = 72;  // (finer than the microphones': sin(k x) has its own ripples)
+    for (int ir = 0; ir < nR; ++ir)
+      for (int it = 0; it < nT; ++it) {
+        const double r = h.radius() * (ir + 0.5) / nR, th = 2 * kPi * (it + 0.5) / nT;
+        const double dA = 2 * kPi * r * (h.radius() / nR) / nT;
+        h.shape(r, th, ph.data());
+        for (int k = 0; k < h.modes(); ++k) {
+          const double kk = 2 * kPi * h.frequency(k) / kC;
+          gx[k] += double(ph[k]) * dA * std::sin(kk * r * std::cos(th));
+          gy[k] += double(ph[k]) * dA * std::sin(kk * r * std::sin(th));
+        }
+      }
+    for (int ax = 0; ax < 2; ++ax) {
+      std::vector<float>& out = head ? dipS_[ax] : dipB_[ax];
+      out.assign((h.modes() + 15) / 16 * 16, 0.0f);
+      for (int k = 0; k < h.modes(); ++k)
+        out[k] = float(s_.aim * (ax ? gy[k] : gx[k]) * kRho / (2 * kPi * d0) * (head ? -s_.under : 1.0));
+    }
+  }
   // The cross-stick. A hickory stick, 40 cm, free at both ends: 324, 892,
   // 1749 Hz, the hand and the head on it (dead in 40 ms). The hoop, a steel
   // ring bending out of its plane: n (n^2 - 1) / sqrt(n^2 + 1) x 137 Hz for
@@ -191,6 +222,7 @@ void Snare::reset() {
   bat_.reset();
   sn_.reset();
   air_.leak = 0;
+  dprev_[0] = dprev_[1] = dip_[0] = dip_[1] = hpH_[0] = hpH_[1] = lastH_[0] = lastH_[1] = 0;
   std::fill(wq_.begin(), wq_.end(), 0.0f);
   std::fill(wv_.begin(), wv_.end(), 0.0f);
   settle();
@@ -198,7 +230,7 @@ void Snare::reset() {
 
 float Snare::sample() {
   if (asleep_) {
-    if (brush_[0]->up() && brush_[1]->up()) { side_ = 0; return 0; }
+    if (brush_[0]->up() && brush_[1]->up()) { side_ = 0; dip_[0] = dip_[1] = 0; return 0; }
     asleep_ = false;
     quiet_ = 0;
   }
@@ -269,6 +301,17 @@ float Snare::sample() {
     y[mic] = (s - prev_[mic]) * float(fs_);
     prev_[mic] = s;
   }
+  // (the sideways parts, as the microphones')
+  float dp[2];
+  for (int ax = 0; ax < 2; ++ax) {
+    float s = 0;
+    const float *vb = bat_.v(), *mb = dipB_[ax].data();
+    for (int k = 0; k < bat_.modes(); ++k) s += mb[k] * vb[k];
+    const float *vs = sn_.v(), *ms = dipS_[ax].data();
+    for (int k = 0; k < sn_.modes(); ++k) s += ms[k] * vs[k];
+    dp[ax] = (s - dprev_[ax]) * float(fs_);
+    dprev_[ax] = s;
+  }
   // What the modes do not carry: the wires' slaps and the wire ends' ticks
   // and scrape, above ~2 kHz, as their own small sources.
   // A force f on a light film sets the air moving as a whole by f / sigma
@@ -281,6 +324,17 @@ float Snare::sample() {
   const float rMic = float(std::hypot(s_.micX, s_.micZ));
   const float direct = float(s_.wireDirect * s_.under * kRho / (2 * kPi * s_.snareHead.sigma * (rMic + 0.25))) * hpW_ -
                        float(s_.tipDirect * kRho / (2 * kPi * s_.batter.sigma * rMic)) * hpT_;
+  // (The wire ends' hiss comes off the patch of head under the brush: on the side the brush is
+  // on there is only the rim in its way, to the other side the whole head and the other hand.)
+  {
+    const float kTip = float(s_.aim * s_.tipAim * s_.tipDirect * kRho / (2 * kPi * s_.batter.sigma * rMic) / bat_.radius());
+    for (int h = 0; h < 2; ++h) {
+      const float f = brush_[h]->force();
+      hpH_[h] = aT * (hpH_[h] + f - lastH_[h]); lastH_[h] = f;
+      dp[0] -= kTip * float(brush_[h]->x()) * hpH_[h];
+      dp[1] -= kTip * float(brush_[h]->y()) * hpH_[h];
+    }
+  }
   float kn = 0, knSide = 0;
   for (Knock& k : knock_) {
     const float x = k.a11 * k.x + k.a12 * k.v, v = k.a21 * k.x + k.a22 * k.v;
@@ -291,6 +345,8 @@ float Snare::sample() {
   const float g = float(s_.gain);
   const float l = g * (y[0] + direct + kn + knSide), r = g * (y[1] + direct + kn - knSide);
   side_ = 0.5f * (l - r);
+  dip_[0] = g * (dp[0] + float(s_.aim) * knSide);
+  dip_[1] = g * dp[1];
   const float mono = 0.5f * (l + r);
   if (!std::isfinite(mono)) { reset(); return 0; }
   // Asleep once both hands are up and nothing is left ringing.
