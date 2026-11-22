@@ -74,6 +74,17 @@ class Room {
   void setAxes(int s, const float* axes);
   // The sources' three parts for the next process() ([3 * source + k], n samples each; null: none).
   void setDipoles(const float* const* dip) { dip_ = dip; }
+  // A source made of parts at their own places (a vibraphone's bars; Tube::parts): np parts at
+  // places (3 each, m from the source: x to the listener's right, y towards the listener, z up).
+  // Each path to a microphone, direct or off the walls, then takes each part by its own length
+  // (the path's direction as it leaves the source, along the part's offset: the bass bar's
+  // reflection off the left wall comes a little sooner than the treble's), instead of the
+  // source's own sound; the network and the other players still hear the source's whole sound.
+  void setParts(int s, int np, const float* places);
+  // The parts' sound for the next process() ([partFrom(s) + j], n samples each; null: none).
+  void setPartSignals(const float* const* p) { part_ = p; }
+  int partFrom(int s) const { return partFrom_.empty() ? 0 : partFrom_[s]; }
+  int partCount() const { return partFrom_.empty() ? 0 : partFrom_.back(); }
   int sources() const { return int(x_.size()); }
   // The microphones' gain on everything the room delivers (early and late):
   // an instrument bringing its own early sound to the listener takes it too.
@@ -125,6 +136,16 @@ class Room {
     float dg[3] = {0, 0, 0};  // the source's three directional parts' gains on it
   };
   const float* const* dip_ = nullptr;
+  // Parts (setParts): [source] the first part's index (and one past the last source's); each
+  // part's ring and how long since it last sounded; for each of a source's taps (in early_'s
+  // order), each part's delay and gain.
+  const float* const* part_ = nullptr;
+  std::vector<int> partFrom_;
+  std::vector<float> pring_;      // [part][kSpan]
+  std::vector<int> pquiet_;       // [part]
+  std::vector<int> pDelay_;       // [part][tap of its source]
+  std::vector<float> pGain_;
+  std::vector<int> pTap_;         // [source] its parts' first entry in pDelay_ / pGain_
   std::vector<char> hasDip_;    // [source]
   std::vector<float> dring_;    // [3 * source + k][kSpan]
   std::vector<float> inDirDip_; // [3 * source + k][line], unit length

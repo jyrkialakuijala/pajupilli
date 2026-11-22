@@ -191,6 +191,7 @@ class Piano {
  private:
   struct Str {
     int key, off, n;      // its modes: [off, off + n) of the arrays
+    int live = 0;         // (those under the top: the rest, padding to 16, stay at rest)
     float tanH;           // the hammer meets it a little off the vertical
     float comply;         // its displacement under the hammer per unit force, one sample on (m/N)
     float dPrev = 0;      // the felt's compression at the last sample (m)

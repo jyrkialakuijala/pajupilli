@@ -138,11 +138,11 @@ void Ensemble::drive(int slot, int pitch, int velocity, bool on) {
   }
   const bool silent = s.held == 0 && !s.v->player().busy() && now_ - s.lastOff > 1.0;
   if (velGain_ && velocityAsGain(s.v->instrument())) {
-    s.vgTo = std::pow(10.0, velocityGainDb(s.v->instrument(), velocity) / 20);
+    s.vgTo = std::pow(10.0, velocityGainDb(s.v->instrument(), velocity, pitch) / 20);
     s.vgTau = s.held ? 0.06 : 0.005;
     if (silent) s.vg = s.vgTo;
   } else if (velGain_) {
-    velocity = velocityRemap(s.v->instrument(), velocity);
+    velocity = velocityRemap(s.v->instrument(), velocity, pitch);
   }
   ++s.held;
   s.lastNote = pitch;

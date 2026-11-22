@@ -206,7 +206,12 @@ double gmLevelDb(const char* inst);       // -play: its GM program's level again
 // (-play) A MIDI file's velocity as loudness: the gain (dB, 0 at velocity 90,
 // where the levels are trimmed) that puts this instrument's own response to
 // velocity on General MIDI's curve (tools/velcurve.py).
-double velocityGainDb(const Instrument& inst, int velocity);
+// key: the note's (-1: none), for its place on the keyboard: each key at the SoundFonts' level
+// against the instrument's others (gmKeyDb).
+double velocityGainDb(const Instrument& inst, int velocity, int key = -1);
+// (-play) Each key's level against the instrument's others where the SoundFonts have it (dB,
+// src/gmkeys_data.h: tools/gmcompare.py keys --emit). PJ_NOGMKEYS: 0.
+double gmKeyDb(const Instrument& inst, int key);
 // Whether that is a gain on the voice (a voice a note: winds, synths; a
 // one-line bowed string) or, for one voice sounding every key (a piano's,
 // a pluck's), a velocity remapped to the stroke that sounds that loud.
@@ -218,7 +223,7 @@ bool velocityAsGain(const Instrument& inst);
 // the note it gets. Live: 0, nothing early.
 double noteLead(const Instrument& inst);
 bool& noteLeadsApplied();
-int velocityRemap(const Instrument& inst, int velocity);
+int velocityRemap(const Instrument& inst, int velocity, int key = -1);
 const Instrument& concertFlute();
 // All names, comma-separated (for messages).
 std::string instrumentNames();

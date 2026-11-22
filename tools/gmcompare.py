@@ -9,6 +9,7 @@
     tools/gmcompare.py kits --emit                                        # ... and src/drumcal_data.h: each drum at the fonts' level
     tools/gmcompare.py levels [--pj-only] [--measure 0|1|2]                # the melodic programs against the piano: research/gm_levels.md
     tools/gmcompare.py levels --report-only --emit                         # ... and src/gmlevels_data.h: each program at the fonts' level
+    tools/gmcompare.py keys [--pj-only] [--report-only --emit]             # each key against the instrument's others: research/gm_keys.md, src/gmkeys_data.h
 
 Each instrument plays tools/synthcompare.py's profile probe (keys a few semitones apart over the
 GM program's range, velocities 40/64/96/127, each held 2 s in a 4 s slot) and a short phrase (six
@@ -888,25 +889,25 @@ def lv_keys(p):
     return sorted({int(round(lo + f * (hi - lo))) for f in (0.2, 0.35, 0.5, 0.65, 0.8)})
 
 
-def write_lv(path, p):
-    """The piano's yardstick (channel 1), then the program (channel 2) at lv_keys x sc.VELS."""
+def write_lv(path, p, keys=None, vels=None, slot=LV_SLOT, hold=LV_HOLD):
+    """The piano's yardstick (channel 1), then the program (channel 2) at keys x vels (lv_keys x sc.VELS)."""
     tpq = 480; tick = lambda s: int(round(s * 2 * tpq))
-    lay = [(0, k, 96) for k in KIT_ANCHOR] + [(1, k, v) for k in lv_keys(p) for v in sc.VELS]
-    lay = [(ch, k, v, i * LV_SLOT) for i, (ch, k, v) in enumerate(lay)]
+    lay = [(0, k, 96) for k in KIT_ANCHOR] + [(1, k, v) for k in (keys or lv_keys(p)) for v in (vels or sc.VELS)]
+    lay = [(ch, k, v, i * slot) for i, (ch, k, v) in enumerate(lay)]
     ev = [(0, bytes([0xC0, 0])), (0, bytes([0xC1, p]))]
     for ch, k, v, t in lay:
-        ev.append((tick(t), bytes([0x90 | ch, k, v]))); ev.append((tick(t + LV_HOLD), bytes([0x80 | ch, k, 0])))
+        ev.append((tick(t), bytes([0x90 | ch, k, v]))); ev.append((tick(t + hold), bytes([0x80 | ch, k, 0])))
     ev.sort(key=lambda e: (e[0], e[1][0] & 0xF0 == 0x90))
     body = bytearray(); last = 0
     for t, e in ev: body += sc._enc_vlq(t - last) + e; last = t
-    body += sc._enc_vlq(tick(LV_SLOT)) + b'\xff\x2f\x00'
+    body += sc._enc_vlq(tick(slot)) + b'\xff\x2f\x00'
     open(path, 'wb').write(b'MThd' + sc.struct.pack('>IHHH', 6, 0, 1, tpq) + b'MTrk' + sc.struct.pack('>I', len(body)) + bytes(body))
     return lay
 
 
-def lv_levels(x, t):
+def lv_levels(x, t, slot=LV_SLOT):
     """A note's loudest 400 ms (K-weighted), its energy over the slot, its peak (dB)."""
-    seg = x[int(t * FS):int((t + LV_SLOT - 0.05) * FS)]
+    seg = x[int(t * FS):int((t + slot - 0.05) * FS)]
     if len(seg) < FS: return None
     p = (sc.kweight(seg) ** 2).sum(axis=1)
     B, H = int(0.4 * FS), int(0.02 * FS)
@@ -915,10 +916,12 @@ def lv_levels(x, t):
     return [sc.r1(mom), sc.r1(sc.db(p.sum() / FS)), sc.r1(20 * math.log10(max(float(np.abs(seg).max()), 1e-7)))]
 
 
-def lv_one(p, name, kind, font, pjbin, workroot, env_extra=None):
-    work = os.path.join(workroot, 'lv_%03d_%s' % (p, name.replace('/', '_'))); os.makedirs(work, exist_ok=True)
+def lv_one(p, name, kind, font, pjbin, workroot, env_extra=None, probe=None):
+    """probe: (keys, vels, slot, hold); None: the levels probe."""
+    keys, vels, slot, hold = probe or (None, None, LV_SLOT, LV_HOLD)
+    work = os.path.join(workroot, 'lv%s_%03d_%s' % ('k' if probe else '', p, name.replace('/', '_'))); os.makedirs(work, exist_ok=True)
     try:
-        mid = os.path.join(work, 'p.mid'); lay = write_lv(mid, p)
+        mid = os.path.join(work, 'p.mid'); lay = write_lv(mid, p, keys, vels, slot, hold)
         wav = os.path.join(work, 'out.wav'); log = ''
         if kind == 'pj':
             r = subprocess.run([pjbin, '-director', 'off', '-play', mid, '-o', wav],
@@ -938,7 +941,7 @@ def lv_one(p, name, kind, font, pjbin, workroot, env_extra=None):
         if m: x = x * 10 ** (-float(m.group(1)) / 20)
         anchor = []; S = {}
         for ch, k, v, t in lay:
-            l = lv_levels(x, t)
+            l = lv_levels(x, t, slot)
             if l is None: continue
             if ch == 0: anchor.append(l)
             else: S['%d/%d' % (k, v)] = l
@@ -1072,9 +1075,133 @@ def lv_emit(R, gain=0.9):
     print('wrote %s (%d instruments): build, then `levels --pj-only` to check' % (LV_HEADER, len(L)), file=sys.stderr)
 
 
+# ---------------------------------------------------------------------------------------------
+# Each key's level against the instrument's others (research/gm_keys.md, src/gmkeys_data.h)
+
+KY_VELS = (64, 100)  # (not the profile probe's: the table is not fitted to the notes the distance is scored on)
+KY_SLOT, KY_HOLD = 2.2, 1.2
+KY_DATA = os.path.join(os.path.dirname(DATA), 'keys.json')
+KY_HEADER = os.path.join(ROOT, 'src', 'gmkeys_data.h')
+KY_REPORT = os.path.join(ROOT, 'research', 'gm_keys.md')
+KY_SKIP = {'grand-piano'}  # (each synth's yardstick)
+
+
+def ky_keys(p):
+    """Every key of the program's GM range."""
+    lo, hi = sc.gm_range(p)
+    return list(range(lo, hi + 1))
+
+
+def ky_rel(D, names):
+    """name -> key -> the key's level against the piano (dB, the mean over KY_VELS); silent keys left out."""
+    rel = lv_rel(D)
+    out = {}
+    for n in names:
+        if n not in rel: continue
+        by = {}
+        for s, v in rel[n].items():
+            k, _ = map(int, s.split('/')); by.setdefault(k, []).append(v)
+        out[n] = {k: float(np.mean(v)) for k, v in by.items() if len(v) == len(KY_VELS)}
+    return out
+
+
+def ky_shape(R, p):
+    """key -> (pajupilli's level less the fonts' mean, each less its own mean over the keys both have:
+    the keyboard's shape, not the instrument's level), and the fonts' sd per key; None if too few keys."""
+    D = R.get(str(p))
+    if not D or 'pajupilli' not in D: return None
+    rel = ky_rel(D, ['pajupilli'] + REFS)
+    keys = [k for k in rel.get('pajupilli', {}) if sum(k in rel.get(n, {}) for n in REFS) >= 2]
+    if len(keys) < 6: return None
+    fm = {k: float(np.mean([rel[n][k] for n in REFS if k in rel.get(n, {})])) for k in keys}
+    fs = {k: float(np.std([rel[n][k] for n in REFS if k in rel.get(n, {})])) for k in keys}
+    pm = np.mean([rel['pajupilli'][k] for k in keys]); m = np.mean([fm[k] for k in keys])
+    return {k: (rel['pajupilli'][k] - pm - (fm[k] - m), fs[k]) for k in sorted(keys)}
+
+
+def ky_stats(sh):
+    """The shape's rms (dB) and its scatter after a smooth trend (a quadratic over the keys) is taken off."""
+    k = np.array(sorted(sh)); d = np.array([sh[x][0] for x in k])
+    c = np.polyfit(k, d, 2) if len(k) > 3 else [0, 0, float(np.mean(d))]
+    return float(np.sqrt(np.mean(d ** 2))), float(np.std(d - np.polyval(c, k)))
+
+
+def cmd_keys(a):
+    names, _ = pj_names(os.path.abspath(a.bin))
+    progs = [p for p in parse_programs(a.programs, names) if p != 'drums']
+    R = json.load(open(KY_DATA)) if os.path.exists(KY_DATA) else {}
+    if not a.report_only:
+        synths = [s for s in SYNTHS if s[0] == 'pajupilli' or s[0] in REFS]
+        if a.pj_only: synths = synths[:1]
+        with ProcessPoolExecutor(a.jobs) as ex:
+            fut = [ex.submit(lv_one, p, n, kind, font, os.path.abspath(a.bin), a.work, None, (ky_keys(p), KY_VELS, KY_SLOT, KY_HOLD))
+                   for p in progs for n, kind, font in synths if a.force or n == 'pajupilli' or n not in R.get(str(p), {})]
+            for i, f in enumerate(as_completed(fut)):
+                try:
+                    p, name, res = f.result(); res['inst'] = names.get(p); R.setdefault(str(p), {})[name] = res
+                except Exception:
+                    print('FAILED\n' + traceback.format_exc(), file=sys.stderr); continue
+                if i % 20 == 0: print('%d/%d' % (i, len(fut)), file=sys.stderr, flush=True)
+        json.dump(R, open(KY_DATA, 'w'), indent=0)
+    if a.emit: ky_emit(R)
+    ky_report(R)
+
+
+def ky_emit(R, gain=0.8):
+    """src/gmkeys_data.h: per instrument and key, what is taken off (dB) to bring its keyboard to the fonts' shape;
+    the numbers measured with the present table in force, what is still missed added to it (times gain, within
+    +-10 dB). Smoothed over three keys (a key's own reading is a few tenths of a dB from the room)."""
+    old = {}
+    if os.path.exists(KY_HEADER):
+        for nm, ks, ds in re.findall(r'\{"([^"]+)", \d+, \{([^}]*)\}, \{([^}]*)\}\}', open(KY_HEADER).read()):
+            if nm: old[nm] = dict(zip(map(int, ks.split(',')), (float(x.strip().rstrip('f')) for x in ds.split(','))))
+    rows = []
+    for p in range(128):
+        D = R.get(str(p)); sh = ky_shape(R, p)
+        inst = next((d.get('inst') for d in (D or {}).values() if d.get('inst')), None)
+        if not sh or not inst or inst in KY_SKIP: continue
+        k = sorted(sh); d = np.array([sh[x][0] for x in k])
+        ds = np.convolve(np.pad(d, 1, mode='edge'), np.ones(3) / 3, 'valid')
+        o = old.get(inst, {})
+        new = [float(np.clip(o.get(x, 0) - gain * y, -10, 10)) for x, y in zip(k, ds)]
+        rows.append((p, inst, k, new))
+    L = ['    {"%s", %d, {%s}, {%s}},  // GM %d %s' % (inst, len(k), ', '.join(map(str, k)), ', '.join('%.1ff' % x for x in new), p + 1, GM[p])
+         for p, inst, k, new in rows]
+    H = ['// Generated by tools/gmcompare.py keys --emit: do not edit.',
+         '// Per instrument, each key\'s level (dB) against its others, so the keyboard has the shape the SoundFonts',
+         '// (FluidR3, TimGM6mb, Jnsgm2, SGM) give its General MIDI program: every key, velocities 64 and 100, its',
+         '// loudest 400 ms, K-weighted, against a piano\'s C3, C4, C5 in the same file. research/gm_keys.md.',
+         '// (src/instruments.cc gmKeyDb: a gain on the note, or the stroke that sounds so loud). PJ_NOGMKEYS: none.',
+         '#pragma once', 'namespace pajupilli {', 'struct GmKeys { const char* name; int n; int key[88]; float db[88]; };',
+         'const GmKeys kGmKeys[] = {'] + L + ['};', '}  // namespace pajupilli']
+    open(KY_HEADER, 'w').write('\n'.join(H) + '\n')
+    print('wrote %s (%d instruments)' % (KY_HEADER, len(L)), file=sys.stderr)
+
+
+def ky_report(R):
+    L = ['# Each key\'s level against the SoundFonts', '',
+         'tools/gmcompare.py keys. Every key of each program\'s GM range at velocities %s (held %g s), after a piano\'s C3, C4, '
+         'C5 at velocity 96 in the same file; loudest 400 ms, K-weighted, against the synth\'s own piano. **Shape**: pajupilli\'s '
+         'level per key less the fonts\' mean, each less its own mean over the keys (the instrument\'s level is '
+         'research/gm_levels.md\'s): its rms over the keys, and the **scatter** left after a smooth trend (a quadratic) is taken '
+         'off. **Fonts sd**: the four fonts\' spread per key, its median.' % (', '.join(map(str, KY_VELS)), KY_HOLD), '',
+         '| GM | program | pajupilli | shape rms (dB) | scatter (dB) | fonts sd (dB) | keys |', '|---|---|---|---|---|---|---|']
+    S = []
+    for p in range(128):
+        sh = ky_shape(R, p)
+        inst = next((d.get('inst') for d in R.get(str(p), {}).values() if d.get('inst')), '')
+        if not sh: L.append('| %d | %s | %s | | | | |' % (p + 1, GM[p], inst)); continue
+        rms, scat = ky_stats(sh); S.append((rms, scat))
+        L.append('| %d | %s | %s | %.1f | %.1f | %.1f | %d |' % (p + 1, GM[p], inst, rms, scat, np.median([v[1] for v in sh.values()]), len(sh)))
+    if S:
+        L[2:2] = ['Median over the programs: shape rms %.1f dB, scatter %.1f dB.' % (np.median([s[0] for s in S]), np.median([s[1] for s in S])), '']
+    open(KY_REPORT, 'w').write('\n'.join(L) + '\n')
+    print('wrote %s; median shape rms %.2f, scatter %.2f dB' % (KY_REPORT, np.median([s[0] for s in S]), np.median([s[1] for s in S])), file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['run', 'report', 'kits', 'levels'])
+    ap.add_argument('cmd', choices=['run', 'report', 'kits', 'levels', 'keys'])
     ap.add_argument('--bin', default=os.path.join(ROOT, 'pajupilli'))
     ap.add_argument('--programs', default='0-127,drums', help='GM programs 0-127 (0-based), ranges, pajupilli names, "drums"')
     ap.add_argument('--jobs', type=int, default=8)
@@ -1092,6 +1219,7 @@ def main():
     a = ap.parse_args()
     if a.cmd == 'kits': return cmd_kits(a)
     if a.cmd == 'levels': return cmd_levels(a)
+    if a.cmd == 'keys': return cmd_keys(a)
     cmd_run(a) if a.cmd == 'run' else cmd_report(a)
 
 

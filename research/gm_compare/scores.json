@@ -1,8 +1,8 @@
 {
  "p000": {
-  "distance": 2.0222416520427835,
+  "distance": 1.7710298895406926,
   "disagree": 1.0878099184972947,
-  "rank": 110,
+  "rank": 113,
   "top": [
    {
     "measure": "staccato_len_ms",
@@ -11,27 +11,21 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (2 vs -4.55 dB)",
-    "score": 3.22,
-    "outside": true
-   },
-   {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.07 vs 0 ERB)",
-    "score": 3.21,
+    "text": "brightens more with velocity (1.21 vs 0 ERB)",
+    "score": 3.63,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (5 vs 1.77 dB)",
-    "score": 3.02,
+    "text": "less even from key to key (4.95 vs 1.77 dB)",
+    "score": 2.98,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (28.3 vs 9.7 dB/ms)",
-    "score": 2.44,
+    "text": "a sharper onset (28.2 vs 9.7 dB/ms)",
+    "score": 2.43,
     "outside": true
    },
    {
@@ -39,104 +33,110 @@
     "text": "a narrower dynamic range (14.1 vs 16.7 dB)",
     "score": 2.08,
     "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "louder (-0.8 vs -4.55 dB)",
+    "score": 0.92,
+    "outside": false
    }
   ]
  },
  "p001": {
-  "distance": 2.1947971857985364,
+  "distance": 1.965057952369778,
   "disagree": 1.0878099184972947,
-  "rank": 100,
+  "rank": 105,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (5.14 vs 1.65 dB)",
-    "score": 3.27,
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.62 vs 0 ERB)",
+    "score": 3.1,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "brighter (11.3 vs 10.6 ERB)",
-    "score": 2.9,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (1.7 vs -3.15 dB)",
-    "score": 2.34,
+    "text": "brighter (11.2 vs 10.6 ERB)",
+    "score": 2.7,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (27.6 vs 9.55 dB/ms)",
-    "score": 2.29,
+    "text": "a sharper onset (28.3 vs 9.55 dB/ms)",
+    "score": 2.38,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.16 vs 0 ERB)",
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (4.02 vs 1.65 dB)",
     "score": 2.22,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (408 vs 256 ms)",
-    "score": 1.98,
+    "text": "rings longer after the key (385 vs 256 ms)",
+    "score": 1.73,
+    "outside": true
+   },
+   {
+    "measure": "f0_scatter_c",
+    "text": "less evenly tuned (9.8 vs 4.15 c)",
+    "score": 1.51,
     "outside": true
    }
   ]
  },
  "p002": {
-  "distance": 1.7759930301457614,
+  "distance": 2.1653592125555523,
   "disagree": 1.545833333333333,
-  "rank": 117,
+  "rank": 98,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (1.7 vs -3.1 dB)",
-    "score": 2.74,
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (2.16 vs 0 ERB)",
+    "score": 6.48,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (37.8 vs 10.9 dB/ms)",
-    "score": 2.59,
+    "text": "a sharper onset (44.6 vs 10.9 dB/ms)",
+    "score": 3.2,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.72 vs 0 ERB)",
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (1.92 vs 0.925 ERB)",
     "score": 2.16,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.64 vs 1.19 dB)",
-    "score": 2.15,
+    "measure": "release_ms",
+    "text": "rings longer after the key (393 vs 243 ms)",
+    "score": 1.98,
     "outside": true
    },
    {
-    "measure": "release_ms",
-    "text": "rings longer after the key (379 vs 243 ms)",
-    "score": 1.83,
+    "measure": "f0_scatter_c",
+    "text": "less evenly tuned (7.7 vs 2.25 c)",
+    "score": 1.45,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (39.5 vs 8.5 ms)",
-    "score": 1.56,
+    "text": "a slower attack (33.5 vs 8.5 ms)",
+    "score": 1.39,
     "outside": true
    }
   ]
  },
  "p003": {
-  "distance": 2.8788301047600373,
+  "distance": 2.66024065250585,
   "disagree": 1.166666666666667,
-  "rank": 70,
+  "rank": 75,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (14.6 vs 10.9 ERB)",
-    "score": 5.32,
+    "text": "brighter (14.3 vs 10.9 ERB)",
+    "score": 5.01,
     "outside": true
    },
    {
@@ -147,57 +147,51 @@
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (30.5 vs 9.55 dB/ms)",
+    "text": "a sharper onset (37.3 vs 9.55 dB/ms)",
     "score": 3.2,
     "outside": true
    },
    {
     "measure": "decay_db_s",
-    "text": "decays slower (6.4 vs 10.6 dB/s)",
-    "score": 2.62,
+    "text": "decays slower (6.6 vs 10.6 dB/s)",
+    "score": 2.46,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (482 vs 248 ms)",
-    "score": 2.44,
+    "text": "rings longer after the key (452 vs 248 ms)",
+    "score": 2.2,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a faster attack (6.5 vs 12.5 ms)",
-    "score": 2.3,
+    "measure": "floor_db",
+    "text": "a higher floor (-85.1 vs -123 dB)",
+    "score": 1.87,
     "outside": true
    }
   ]
  },
  "p004": {
-  "distance": 3.644757983940466,
+  "distance": 2.84493777039553,
   "disagree": 1.1833333333333333,
-  "rank": 36,
+  "rank": 60,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.63 vs 0 ERB)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (4.57 vs 1.23 dB)",
-    "score": 6.0,
+    "text": "brightens more with velocity (2.17 vs 0 ERB)",
+    "score": 6.51,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (36.0 vs 5 ms)",
-    "score": 4.24,
+    "text": "a slower attack (29.0 vs 5 ms)",
+    "score": 3.78,
     "outside": true
    },
    {
-    "measure": "centroid96_erb",
-    "text": "brighter (12.1 vs 9.24 ERB)",
-    "score": 3.63,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.17 vs 1.23 dB)",
+    "score": 3.48,
     "outside": true
    },
    {
@@ -208,145 +202,151 @@
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (13.5 vs 16.7 dB)",
-    "score": 2.19,
+    "text": "a narrower dynamic range (13.4 vs 16.7 dB)",
+    "score": 2.26,
+    "outside": true
+   },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-83.1 vs -121 dB)",
+    "score": 1.79,
     "outside": true
    }
   ]
  },
  "p005": {
-  "distance": 4.374538179570884,
+  "distance": 3.8632497760535616,
   "disagree": 1.5499999999999998,
-  "rank": 18,
+  "rank": 23,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (2.7 vs 16.6 dB)",
-    "score": 9.3,
+    "text": "a narrower dynamic range (1.6 vs 16.6 dB)",
+    "score": 9.6,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (4.32 vs 0 ERB)",
+    "text": "brightens more with velocity (4.2 vs 0 ERB)",
     "score": 7.2,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (4.6 vs -1.75 dB)",
-    "score": 5.56,
-    "outside": true
-   },
-   {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.8 vs 1.04 dB)",
-    "score": 4.97,
+    "text": "less even from key to key (3.38 vs 1.04 dB)",
+    "score": 4.21,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (44.0 vs 1.5 ms)",
-    "score": 2.97,
+    "text": "speaks later (43.0 vs 1.5 ms)",
+    "score": 2.91,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (40.0 vs 0 ms)",
+    "score": 2.4,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (148 vs 12.0 ms)",
-    "score": 1.99,
+    "text": "a slower attack (142 vs 12.0 ms)",
+    "score": 1.96,
     "outside": true
    }
   ]
  },
  "p006": {
-  "distance": 3.194272698285758,
+  "distance": 3.9928433932951553,
   "disagree": 1.2486838781504748,
-  "rank": 54,
+  "rank": 21,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (-0.6 vs 16.7 dB)",
+    "text": "a narrower dynamic range (-2.2 vs 16.7 dB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.33 vs 0.88 dB)",
-    "score": 5.01,
+    "text": "less even from key to key (5.03 vs 0.88 dB)",
+    "score": 6.02,
+    "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "quieter (-6.9 vs -1.8 dB)",
+    "score": 4.2,
+    "outside": true
+   },
+   {
+    "measure": "centroid96_erb",
+    "text": "darker (9.99 vs 13.2 ERB)",
+    "score": 3.53,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a faster attack (9 vs 38.0 ms)",
-    "score": 3.06,
-    "outside": true
-   },
-   {
-    "measure": "dissonance_log2",
-    "text": "smoother (-4.82 vs -3.38 log2)",
-    "score": 2.25,
+    "text": "a faster attack (10.5 vs 38.0 ms)",
+    "score": 2.73,
     "outside": true
    },
    {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (2 vs 3.02 ERB/oct)",
-    "score": 1.7,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (25.0 vs 0 ms)",
-    "score": 1.5,
+    "text": "brightens slower up the keyboard (1.48 vs 3.02 ERB/oct)",
+    "score": 2.57,
     "outside": true
    }
   ]
  },
  "p007": {
-  "distance": 3.6679560541173295,
+  "distance": 3.725583492134575,
   "disagree": 1.1758333333333337,
-  "rank": 35,
+  "rank": 28,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (3.71 vs 0 ERB)",
+    "text": "brightens more with velocity (3.03 vs 0 ERB)",
     "score": 7.2,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (85.0 vs 1 ms)",
-    "score": 5.77,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (4.01 vs 0.945 dB)",
+    "score": 5.52,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.43 vs 0.945 dB)",
-    "score": 4.47,
+    "measure": "attack_ms",
+    "text": "a slower attack (45.0 vs 1 ms)",
+    "score": 4.94,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (10.6 vs 16.6 dB)",
+    "score": 4.15,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (708 vs 5.5 ms)",
-    "score": 3.58,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (1.5 vs -3.15 dB)",
-    "score": 3.43,
+    "text": "rings longer after the key (656 vs 5.5 ms)",
+    "score": 3.52,
     "outside": true
    },
    {
     "measure": "odd_even_db",
-    "text": "more even partials (-13.4 vs -2.9 dB)",
-    "score": 2.62,
+    "text": "more even partials (-14.3 vs -2.9 dB)",
+    "score": 2.85,
     "outside": true
    }
   ]
  },
  "p008": {
-  "distance": 2.3206323394968784,
+  "distance": 2.005128687314637,
   "disagree": 0.9666666666666661,
-  "rank": 94,
+  "rank": 104,
   "top": [
    {
     "measure": "release_ms",
@@ -357,46 +357,40 @@
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (1.11 vs 0.202 ERB)",
-    "score": 3.19,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (9.1 vs -1.65 dB)",
-    "score": 2.76,
+    "score": 3.18,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.87 vs 0 ERB)",
-    "score": 2.61,
+    "text": "brightens more with velocity (0.84 vs 0 ERB)",
+    "score": 2.52,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.1 vs 16.7 dB)",
+    "score": 2.4,
     "outside": true
    },
    {
     "measure": "decay_db_s",
-    "text": "decays slower (7 vs 18.8 dB/s)",
-    "score": 2.36,
+    "text": "decays slower (7.1 vs 18.8 dB/s)",
+    "score": 2.33,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.39 vs 0.375 dB)",
-    "score": 2.1,
+    "measure": "staccato_len_ms",
+    "text": "shorter staccato (214 vs 363 ms)",
+    "score": 1.81,
     "outside": true
    }
   ]
  },
  "p009": {
-  "distance": 2.8694486996763215,
+  "distance": 2.299723432391684,
   "disagree": 1.55,
-  "rank": 71,
+  "rank": 90,
   "top": [
-   {
-    "measure": "level_rel_db",
-    "text": "louder (5.2 vs -4.2 dB)",
-    "score": 8.49,
-    "outside": true
-   },
    {
     "measure": "attack_ms",
     "text": "a slower attack (18.0 vs 1.5 ms)",
@@ -404,21 +398,27 @@
     "outside": true
    },
    {
+    "measure": "level_rel_db",
+    "text": "louder (-0.2 vs -4.2 dB)",
+    "score": 3.61,
+    "outside": true
+   },
+   {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (13.1 vs 16.6 dB)",
-    "score": 2.43,
+    "text": "a narrower dynamic range (12.2 vs 16.6 dB)",
+    "score": 3.05,
     "outside": true
    },
    {
     "measure": "flatness_db",
-    "text": "noisier (-38.1 vs -57.3 dB)",
-    "score": 2.16,
+    "text": "noisier (-37.8 vs -57.3 dB)",
+    "score": 2.19,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.82 vs 0.855 dB)",
-    "score": 1.7,
+    "measure": "dissonance_log2",
+    "text": "rougher (-2.98 vs -4.75 log2)",
+    "score": 1.44,
     "outside": true
    },
    {
@@ -430,26 +430,20 @@
   ]
  },
  "p010": {
-  "distance": 3.4988884779842184,
+  "distance": 2.6732082144969684,
   "disagree": 1.8714285714285712,
-  "rank": 41,
+  "rank": 70,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (7.8 vs -3.55 dB)",
-    "score": 7.95,
-    "outside": true
-   },
-   {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (6.9 vs 16.6 dB)",
-    "score": 6.69,
+    "text": "a narrower dynamic range (6 vs 16.6 dB)",
+    "score": 7.3,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.07 vs 0.53 dB)",
-    "score": 5.14,
+    "text": "less even from key to key (3.42 vs 0.53 dB)",
+    "score": 4.2,
     "outside": true
    },
    {
@@ -465,6 +459,12 @@
     "outside": true
    },
    {
+    "measure": "onset_sharp_db_ms",
+    "text": "a sharper onset (50.2 vs 11.6 dB/ms)",
+    "score": 1.81,
+    "outside": true
+   },
+   {
     "measure": "attack_ms",
     "text": "a faster attack (4 vs 17.5 ms)",
     "score": 1.68,
@@ -473,32 +473,38 @@
   ]
  },
  "p011": {
-  "distance": 2.0400040447189625,
+  "distance": 2.1481483676453186,
   "disagree": 1.8375,
-  "rank": 109,
+  "rank": 99,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (5.33 vs 0.695 dB)",
-    "score": 3.57,
+    "measure": "odd_even_db",
+    "text": "more even partials (-34.4 vs -17.8 dB)",
+    "score": 3.19,
     "outside": true
    },
    {
-    "measure": "odd_even_db",
-    "text": "more even partials (-34.0 vs -17.8 dB)",
-    "score": 3.12,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (4.26 vs 0.7 dB)",
+    "score": 2.74,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.49 vs 0.206 ERB)",
-    "score": 2.22,
+    "text": "less even in tone from key to key (1.5 vs 0.206 ERB)",
+    "score": 2.24,
     "outside": true
    },
    {
-    "measure": "dissonance_log2",
-    "text": "rougher (-4.32 vs -8.13 log2)",
-    "score": 1.86,
+    "measure": "stretch_c",
+    "text": "more stretched partials (3.5 vs -1.38 c/partial)",
+    "score": 2.2,
+    "outside": true
+   },
+   {
+    "measure": "delay_ms",
+    "text": "speaks later (32.0 vs 1.5 ms)",
+    "score": 2.13,
     "outside": true
    },
    {
@@ -506,159 +512,147 @@
     "text": "brightens more with velocity (0.58 vs -0.03 ERB)",
     "score": 1.83,
     "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (15.0 vs 17.0 dB)",
-    "score": 1.41,
-    "outside": true
    }
   ]
  },
  "p012": {
-  "distance": 2.480733837318155,
-  "disagree": 0.84125,
-  "rank": 88,
+  "distance": 2.115386043082692,
+  "disagree": 0.8425,
+  "rank": 101,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (10.0 vs -3.9 dB)",
-    "score": 5.72,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.86 vs 1.1 dB)",
-    "score": 3.16,
+    "measure": "onset_sharp_db_ms",
+    "text": "a sharper onset (59.5 vs 2.4 dB/ms)",
+    "score": 3.2,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
-    "text": "rougher (-2.46 vs -7.16 log2)",
-    "score": 2.95,
+    "text": "rougher (-2.42 vs -7.16 log2)",
+    "score": 2.98,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.1 vs 16.6 dB)",
+    "score": 2.51,
     "outside": true
    },
    {
     "measure": "sustain_db",
     "text": "sustains more (-86.3 vs -109 dB)",
-    "score": 2.34,
+    "score": 2.36,
     "outside": true
    },
    {
     "measure": "odd_even_db",
-    "text": "more even partials (-21.3 vs -5.7 dB)",
-    "score": 1.71,
+    "text": "more even partials (-21.6 vs -5.7 dB)",
+    "score": 1.75,
     "outside": true
    },
    {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (14.3 vs 16.6 dB)",
-    "score": 1.66,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.07 vs 1.1 dB)",
+    "score": 1.74,
     "outside": true
    }
   ]
  },
  "p013": {
-  "distance": 4.745349527310924,
+  "distance": 4.007165703781513,
   "disagree": 0.4666666666666667,
-  "rank": 10,
+  "rank": 20,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (2.6 vs -9.85 dB)",
-    "score": 9.96,
-    "outside": true
-   },
-   {
     "measure": "centroid96_erb",
-    "text": "brighter (15.5 vs 11.0 ERB)",
+    "text": "brighter (15.7 vs 11.0 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (9.8 vs 17.4 dB)",
+    "score": 5.18,
+    "outside": true
+   },
+   {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (0.23 vs 3.45 ERB/oct)",
+    "text": "brightens slower up the keyboard (0.2 vs 3.45 ERB/oct)",
     "score": 4.0,
     "outside": true
    },
    {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (12.6 vs 17.4 dB)",
-    "score": 3.26,
-    "outside": true
-   },
-   {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (63.8 vs 1 dB/ms)",
+    "text": "a sharper onset (59.8 vs 1 dB/ms)",
     "score": 3.2,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.08 vs 0.193 ERB)",
-    "score": 3.09,
+    "text": "less even in tone from key to key (1.1 vs 0.193 ERB)",
+    "score": 3.18,
+    "outside": true
+   },
+   {
+    "measure": "flatness_db",
+    "text": "noisier (-26.1 vs -55.1 dB)",
+    "score": 2.59,
     "outside": true
    }
   ]
  },
  "p014": {
-  "distance": 3.9827236124525167,
-  "disagree": 2.0899999999999985,
-  "rank": 25,
+  "distance": 3.385905478304839,
+  "disagree": 2.0233333333333334,
+  "rank": 38,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "darker (15.3 vs 19.8 ERB)",
-    "score": 8.61,
+    "text": "darker (16.2 vs 19.8 ERB)",
+    "score": 6.9,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.35 vs 0.005 ERB)",
-    "score": 7.04,
+    "text": "brightens more with velocity (2.19 vs 0.005 ERB)",
+    "score": 6.56,
     "outside": true
    },
    {
     "measure": "tri2",
-    "text": "weaker low partials (0.174 vs 0.997)",
+    "text": "weaker low partials (0.171 vs 0.997)",
     "score": 4.0,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (11.4 vs -1 dB)",
-    "score": 3.58,
-    "outside": true
-   },
-   {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (11.5 vs 16.6 dB)",
-    "score": 3.5,
+    "text": "a narrower dynamic range (12.1 vs 16.6 dB)",
+    "score": 3.09,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (57.0 vs 7 ms)",
-    "score": 2.21,
+    "text": "a slower attack (57.0 vs 4 ms)",
+    "score": 2.67,
+    "outside": true
+   },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-27.1 vs -58.7 dB)",
+    "score": 1.58,
     "outside": true
    }
   ]
  },
  "p015": {
-  "distance": 3.127975762277888,
+  "distance": 2.222248750969709,
   "disagree": 1.1999999999999995,
-  "rank": 58,
+  "rank": 93,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (5.03 vs 0.73 dB)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (-1.6 vs -7.35 dB)",
-    "score": 5.03,
+    "text": "less even from key to key (2.62 vs 0.73 dB)",
+    "score": 3.27,
     "outside": true
    },
    {
@@ -669,28 +663,34 @@
    },
    {
     "measure": "sustain_db",
-    "text": "sustains more (-31.5 vs -46.5 dB)",
-    "score": 2.72,
+    "text": "sustains more (-31.8 vs -46.4 dB)",
+    "score": 2.65,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (1.79 vs 0.873 ERB)",
-    "score": 2.28,
+    "score": 2.29,
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (0.77 vs -1.71 dB/oct)",
-    "score": 1.73,
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.3 vs 16.7 dB)",
+    "score": 2.27,
+    "outside": true
+   },
+   {
+    "measure": "flatness_db",
+    "text": "purer (-59.7 vs -35.9 dB)",
+    "score": 1.6,
     "outside": true
    }
   ]
  },
  "p016": {
-  "distance": 2.2454803634557248,
+  "distance": 2.2812055866505223,
   "disagree": 1.1333333333333335,
-  "rank": 99,
+  "rank": 91,
   "top": [
    {
     "measure": "vel_range_db",
@@ -717,23 +717,23 @@
     "outside": true
    },
    {
-    "measure": "wobble_c",
-    "text": "wobbles more (15.9 vs 1.8 c)",
-    "score": 1.69,
+    "measure": "envelope",
+    "text": "envelope shape (3.2x fonts' spread)",
+    "score": 1.75,
     "outside": true
    },
    {
-    "measure": "envelope",
-    "text": "envelope shape (2.9x fonts' spread)",
-    "score": 1.54,
+    "measure": "wobble_c",
+    "text": "wobbles more (15.9 vs 1.8 c)",
+    "score": 1.69,
     "outside": true
    }
   ]
  },
  "p017": {
-  "distance": 2.144703269142229,
-  "disagree": 2.04,
-  "rank": 103,
+  "distance": 2.2137737980110725,
+  "disagree": 1.9499999999999997,
+  "rank": 94,
   "top": [
    {
     "measure": "vel_range_db",
@@ -750,7 +750,7 @@
    {
     "measure": "floor_db",
     "text": "a higher floor (-53.0 vs -122 dB)",
-    "score": 2.28,
+    "score": 2.31,
     "outside": true
    },
    {
@@ -762,21 +762,21 @@
    {
     "measure": "envelope",
     "text": "envelope shape (2.7x fonts' spread)",
-    "score": 1.47,
+    "score": 1.44,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.37 vs 0 ERB)",
-    "score": 1.11,
+    "measure": "onset_sharp_db_ms",
+    "text": "a sharper onset (15.9 vs 6.4 dB/ms)",
+    "score": 1.23,
     "outside": true
    }
   ]
  },
  "p018": {
-  "distance": 2.8689607673081654,
-  "disagree": 1.1666666666666667,
-  "rank": 72,
+  "distance": 2.873863679845638,
+  "disagree": 1.15,
+  "rank": 57,
   "top": [
    {
     "measure": "vel_range_db",
@@ -787,13 +787,13 @@
    {
     "measure": "release_ms",
     "text": "rings longer after the key (462 vs 39.5 ms)",
-    "score": 6.03,
+    "score": 5.79,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (44.0 vs 7.5 ms)",
-    "score": 2.55,
+    "text": "speaks later (44.0 vs 7 ms)",
+    "score": 2.59,
     "outside": true
    },
    {
@@ -817,38 +817,32 @@
   ]
  },
  "p019": {
-  "distance": 3.456848360767321,
-  "disagree": 1.4357142857142857,
-  "rank": 44,
+  "distance": 3.4149742037107575,
+  "disagree": 1.4428571428571428,
+  "rank": 37,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (0.3 vs 16.6 dB)",
+    "text": "a narrower dynamic range (0.4 vs 16.6 dB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "level_rel_db",
-    "text": "quieter (-6.4 vs -0.1 dB)",
-    "score": 5.35,
+    "text": "quieter (-6.5 vs -0.1 dB)",
+    "score": 5.43,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (1838 vs 314 ms)",
-    "score": 3.99,
+    "text": "rings longer after the key (1838 vs 312 ms)",
+    "score": 4.0,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (222 vs 74.5 ms)",
-    "score": 3.97,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (68.0 vs 21.0 ms)",
-    "score": 2.56,
+    "text": "speaks later (222 vs 76.5 ms)",
+    "score": 3.92,
     "outside": true
    },
    {
@@ -856,288 +850,300 @@
     "text": "a higher floor (-26.0 vs -118 dB)",
     "score": 2.4,
     "outside": true
-   }
-  ]
- },
- "p020": {
-  "distance": 3.4573560813118727,
-  "disagree": 0.75,
-  "rank": 43,
-  "top": [
-   {
-    "measure": "attack_bright_erb",
-    "text": "a duller attack (-3.63 vs 0 ERB)",
-    "score": 4.8,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-3.4 vs 2.9 dB)",
-    "score": 4.3,
-    "outside": true
-   },
-   {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.38 vs 0 ERB)",
-    "score": 4.14,
-    "outside": true
-   },
-   {
-    "measure": "attack_ms",
-    "text": "a slower attack (285 vs 53.2 ms)",
-    "score": 4.07,
-    "outside": true
-   },
-   {
-    "measure": "delay_ms",
-    "text": "speaks later (86.0 vs 32.0 ms)",
-    "score": 3.78,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (380 vs 124 ms)",
-    "score": 2.86,
-    "outside": true
-   }
-  ]
- },
- "p021": {
-  "distance": 3.2754150706565004,
-  "disagree": 1.55,
-  "rank": 51,
-  "top": [
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (5.85 vs 0.57 dB)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
-    "measure": "attack_bright_erb",
-    "text": "a duller attack (-6.36 vs -0.53 ERB)",
-    "score": 4.6,
-    "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (11.1 vs 16.6 dB)",
-    "score": 3.81,
-    "outside": true
-   },
-   {
-    "measure": "delay_ms",
-    "text": "speaks later (104 vs 24.0 ms)",
-    "score": 3.61,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (616 vs 99.5 ms)",
-    "score": 3.49,
-    "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.347 vs 0.994)",
+    "text": "wider (0.175 vs 0.999)",
     "score": 2.4,
     "outside": true
    }
   ]
  },
- "p022": {
-  "distance": 4.517165103884009,
-  "disagree": 0.8500000000000001,
-  "rank": 15,
+ "p020": {
+  "distance": 2.952671265779828,
+  "disagree": 0.75,
+  "rank": 53,
   "top": [
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (524 vs 48.2 ms)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (460 vs 49.5 ms)",
-    "score": 6.4,
-    "outside": true
-   },
-   {
-    "measure": "delay_ms",
-    "text": "speaks later (148 vs 31.0 ms)",
-    "score": 5.6,
-    "outside": true
-   },
-   {
     "measure": "attack_bright_erb",
-    "text": "a duller attack (-5.53 vs -1.93 ERB)",
+    "text": "a duller attack (-3.54 vs 0 ERB)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.47 vs 0 ERB)",
-    "score": 4.41,
+    "text": "brightens more with velocity (1.48 vs 0 ERB)",
+    "score": 4.44,
     "outside": true
    },
    {
-    "measure": "envelope",
-    "text": "envelope shape (7.1x fonts' spread)",
-    "score": 3.81,
-    "outside": true
-   }
-  ]
- },
- "p023": {
-  "distance": 3.981870687404731,
-  "disagree": 1.1666666666666667,
-  "rank": 26,
-  "top": [
-   {
     "measure": "attack_ms",
-    "text": "a slower attack (278 vs 74.5 ms)",
-    "score": 6.55,
+    "text": "a slower attack (232 vs 53.2 ms)",
+    "score": 3.57,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (96.0 vs 30.5 ms)",
-    "score": 4.58,
+    "text": "speaks later (82.0 vs 32.0 ms)",
+    "score": 3.5,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.45 vs 0 ERB)",
-    "score": 4.35,
+    "measure": "release_ms",
+    "text": "rings longer after the key (384 vs 124 ms)",
+    "score": 2.99,
     "outside": true
    },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-78.6 vs -123 dB)",
+    "score": 2.13,
+    "outside": true
+   }
+  ]
+ },
+ "p021": {
+  "distance": 2.647475235567234,
+  "disagree": 1.5750000000000002,
+  "rank": 77,
+  "top": [
    {
     "measure": "attack_bright_erb",
-    "text": "a duller attack (-7.09 vs -1.14 ERB)",
-    "score": 4.18,
+    "text": "a duller attack (-6.82 vs -0.52 ERB)",
+    "score": 4.8,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.2 vs 2.1 dB)",
-    "score": 3.7,
+    "measure": "delay_ms",
+    "text": "speaks later (107 vs 24.0 ms)",
+    "score": 3.63,
+    "outside": true
+   },
+   {
+    "measure": "release_ms",
+    "text": "rings longer after the key (622 vs 99.0 ms)",
+    "score": 3.52,
     "outside": true
    },
    {
     "measure": "vel_range_db",
     "text": "a narrower dynamic range (11.9 vs 16.6 dB)",
-    "score": 3.22,
-    "outside": true
-   }
-  ]
- },
- "p024": {
-  "distance": 4.2634551136330305,
-  "disagree": 1.129166666666666,
-  "rank": 20,
-  "top": [
-   {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.12 vs 0 ERB)",
-    "score": 6.36,
-    "outside": true
-   },
-   {
-    "measure": "centroid96_erb",
-    "text": "brighter (10.9 vs 9.09 ERB)",
-    "score": 6.08,
+    "score": 3.26,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.19 vs 0.86 dB)",
-    "score": 5.99,
+    "text": "less even from key to key (2.07 vs 0.57 dB)",
+    "score": 2.7,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (7.4 vs -0.7 dB)",
-    "score": 5.53,
-    "outside": true
-   },
-   {
-    "measure": "attack_ms",
-    "text": "a slower attack (19.0 vs 6 ms)",
-    "score": 3.42,
-    "outside": true
-   },
-   {
-    "measure": "decay_db_s",
-    "text": "decays faster (16.6 vs 10.4 dB/s)",
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (318 vs 140 ms)",
     "score": 2.43,
     "outside": true
    }
   ]
  },
- "p025": {
-  "distance": 3.0752036805108736,
-  "disagree": 1.2125000000000001,
-  "rank": 61,
+ "p022": {
+  "distance": 4.380913895954689,
+  "disagree": 0.8500000000000001,
+  "rank": 12,
   "top": [
    {
+    "measure": "attack_ms",
+    "text": "a slower attack (508 vs 48.2 ms)",
+    "score": 7.2,
+    "outside": true
+   },
+   {
+    "measure": "release_ms",
+    "text": "rings longer after the key (456 vs 49.5 ms)",
+    "score": 6.4,
+    "outside": true
+   },
+   {
+    "measure": "delay_ms",
+    "text": "speaks later (106 vs 31.0 ms)",
+    "score": 5.25,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.43 vs 0.91 dB)",
+    "score": 4.54,
+    "outside": true
+   },
+   {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.99 vs 0 ERB)",
-    "score": 5.97,
+    "text": "brightens more with velocity (1.33 vs 0 ERB)",
+    "score": 3.99,
+    "outside": true
+   },
+   {
+    "measure": "envelope",
+    "text": "envelope shape (7.0x fonts' spread)",
+    "score": 3.78,
+    "outside": true
+   }
+  ]
+ },
+ "p023": {
+  "distance": 4.531756597380347,
+  "disagree": 1.1666666666666667,
+  "rank": 9,
+  "top": [
+   {
+    "measure": "attack_ms",
+    "text": "a slower attack (262 vs 74.5 ms)",
+    "score": 6.26,
     "outside": true
    },
    {
     "measure": "level_rel_db",
-    "text": "louder (8.5 vs -2 dB)",
-    "score": 4.14,
+    "text": "quieter (-3 vs 2.1 dB)",
+    "score": 5.71,
     "outside": true
    },
    {
-    "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (52.9 vs 11.8 dB/ms)",
-    "score": 3.2,
+    "measure": "delay_ms",
+    "text": "speaks later (100 vs 30.5 ms)",
+    "score": 4.87,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.44 vs 0 ERB)",
+    "score": 4.32,
+    "outside": true
+   },
+   {
+    "measure": "attack_bright_erb",
+    "text": "a duller attack (-7.16 vs -1.14 ERB)",
+    "score": 4.22,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (68.0 vs 4 ms)",
+    "score": 3.84,
+    "outside": true
+   }
+  ]
+ },
+ "p024": {
+  "distance": 3.8503854552708963,
+  "disagree": 1.129166666666666,
+  "rank": 24,
+  "top": [
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (4.43 vs 0.86 dB)",
+    "score": 6.43,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "brighter (13.6 vs 10.0 ERB)",
-    "score": 3.11,
+    "text": "brighter (10.9 vs 9.09 ERB)",
+    "score": 6.17,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.75 vs 0 ERB)",
+    "score": 5.25,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (27.0 vs 7.5 ms)",
-    "score": 3.03,
+    "text": "a slower attack (18.0 vs 6 ms)",
+    "score": 3.26,
+    "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "louder (3.3 vs -0.7 dB)",
+    "score": 2.73,
+    "outside": true
+   },
+   {
+    "measure": "sustain_db",
+    "text": "sustains less (-40.8 vs -28.6 dB)",
+    "score": 2.56,
+    "outside": true
+   }
+  ]
+ },
+ "p025": {
+  "distance": 2.679316388445796,
+  "disagree": 1.2333333333333334,
+  "rank": 69,
+  "top": [
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.74 vs 0 ERB)",
+    "score": 5.22,
+    "outside": true
+   },
+   {
+    "measure": "centroid96_erb",
+    "text": "brighter (14.3 vs 10.0 ERB)",
+    "score": 3.72,
+    "outside": true
+   },
+   {
+    "measure": "onset_sharp_db_ms",
+    "text": "a sharper onset (52.7 vs 11.7 dB/ms)",
+    "score": 3.2,
+    "outside": true
+   },
+   {
+    "measure": "attack_ms",
+    "text": "a slower attack (26.5 vs 7.5 ms)",
+    "score": 2.99,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (14.1 vs 16.7 dB)",
+    "score": 1.78,
     "outside": true
    },
    {
     "measure": "partial_corr",
-    "text": "partials living more their own lives (0.52 vs 0.964)",
-    "score": 1.78,
+    "text": "partials living more their own lives (0.561 vs 0.964)",
+    "score": 1.61,
     "outside": true
    }
   ]
  },
  "p026": {
-  "distance": 1.5930794979249336,
-  "disagree": 1.1145833333333335,
-  "rank": 125,
+  "distance": 2.2048096094877696,
+  "disagree": 1.1083333333333334,
+  "rank": 96,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.2 vs 2.05 dB)",
-    "score": 2.17,
+    "measure": "attack_ms",
+    "text": "a slower attack (25.5 vs 3.5 ms)",
+    "score": 7.03,
+    "outside": true
+   },
+   {
+    "measure": "decay_db_s",
+    "text": "decays slower (5.5 vs 10.8 dB/s)",
+    "score": 2.21,
     "outside": true
    },
    {
     "measure": "floor_db",
-    "text": "a higher floor (-83.3 vs -124 dB)",
-    "score": 1.96,
+    "text": "a higher floor (-83.4 vs -124 dB)",
+    "score": 1.97,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (20.0 vs 3.5 ms)",
-    "score": 1.96,
+    "measure": "release_ms",
+    "text": "rings longer after the key (504 vs 73.0 ms)",
+    "score": 1.72,
     "outside": true
    },
    {
@@ -1147,89 +1153,83 @@
     "outside": true
    },
    {
-    "measure": "dissonance_log2",
-    "text": "rougher (-3.97 vs -6.22 log2)",
-    "score": 1.65,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (440 vs 73.0 ms)",
-    "score": 1.61,
+    "measure": "envelope",
+    "text": "envelope shape (2.7x fonts' spread)",
+    "score": 1.48,
     "outside": true
    }
   ]
  },
  "p027": {
-  "distance": 2.1013407281704457,
-  "disagree": 1.0699999999999998,
-  "rank": 107,
+  "distance": 1.8779564849809383,
+  "disagree": 1.0949999999999998,
+  "rank": 109,
   "top": [
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.13 vs 0 ERB)",
-    "score": 6.39,
+    "measure": "release_ms",
+    "text": "rings longer after the key (378 vs 131 ms)",
+    "score": 4.89,
     "outside": true
    },
    {
-    "measure": "release_ms",
-    "text": "rings longer after the key (508 vs 129 ms)",
-    "score": 6.33,
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.34 vs 0 ERB)",
+    "score": 4.02,
     "outside": true
    },
    {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (0.47 vs 4.47 ERB/oct)",
-    "score": 2.44,
-    "outside": true
-   },
-   {
-    "measure": "decay_db_s",
-    "text": "decays faster (14.1 vs 10.5 dB/s)",
-    "score": 1.54,
+    "text": "brightens slower up the keyboard (0.17 vs 4.47 ERB/oct)",
+    "score": 2.62,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (20.0 vs 4 ms)",
-    "score": 1.52,
+    "text": "a slower attack (19.5 vs 4 ms)",
+    "score": 1.6,
     "outside": true
    },
    {
-    "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (43.7 vs 13.2 dB/ms)",
-    "score": 1.49,
+    "measure": "decay_db_s",
+    "text": "decays faster (14.2 vs 10.5 dB/s)",
+    "score": 1.58,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (14.4 vs 16.7 dB)",
+    "score": 1.53,
     "outside": true
    }
   ]
  },
  "p028": {
-  "distance": 1.7631067774451235,
-  "disagree": 2.3975,
-  "rank": 118,
+  "distance": 1.9261415730930687,
+  "disagree": 2.52,
+  "rank": 107,
   "top": [
    {
-    "measure": "release_ms",
-    "text": "rings longer after the key (430 vs 60.0 ms)",
-    "score": 6.4,
-    "outside": true
-   },
-   {
     "measure": "centroid96_erb",
-    "text": "brighter (12.7 vs 8.03 ERB)",
-    "score": 3.34,
+    "text": "brighter (13.1 vs 8.03 ERB)",
+    "score": 3.61,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (62.0 vs 11.2 dB/ms)",
+    "text": "a sharper onset (65.0 vs 11.5 dB/ms)",
     "score": 3.2,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
-    "text": "rougher (-0.22 vs -5.36 log2)",
-    "score": 2.69,
+    "text": "rougher (-0.27 vs -5.36 log2)",
+    "score": 2.66,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.8 vs 16.6 dB)",
+    "score": 1.92,
     "outside": true
    },
    {
@@ -1239,83 +1239,83 @@
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (2.23 vs -1.47 dB/oct)",
-    "score": 1.03,
+    "measure": "flatness_db",
+    "text": "noisier (-26.4 vs -54.7 dB)",
+    "score": 0.79,
     "outside": true
    }
   ]
  },
  "p029": {
-  "distance": 1.8014762334168004,
+  "distance": 1.6431270921039411,
   "disagree": 1.1,
-  "rank": 115,
+  "rank": 117,
   "top": [
    {
     "measure": "staccato_len_ms",
-    "text": "longer staccato (400 vs 136 ms)",
-    "score": 3.76,
+    "text": "longer staccato (353 vs 136 ms)",
+    "score": 3.32,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (12.3 vs 16.6 dB)",
-    "score": 2.95,
+    "text": "a narrower dynamic range (12.8 vs 16.6 dB)",
+    "score": 2.61,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (732 vs 83.5 ms)",
-    "score": 2.5,
+    "text": "rings longer after the key (720 vs 83.5 ms)",
+    "score": 2.44,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.34 vs 1.08 dB)",
-    "score": 2.26,
+    "text": "less even from key to key (2.3 vs 1.08 dB)",
+    "score": 2.19,
     "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.474 vs 1)",
-    "score": 2.1,
+    "text": "wider (0.47 vs 1)",
+    "score": 2.12,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (256 vs 41.0 ms)",
-    "score": 1.84,
+    "text": "a slower attack (264 vs 40.5 ms)",
+    "score": 1.89,
     "outside": true
    }
   ]
  },
  "p030": {
-  "distance": 4.1951816502463055,
+  "distance": 4.153984443764111,
   "disagree": 1.1666666666666667,
-  "rank": 22,
+  "rank": 16,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (4.2 vs 16.6 dB)",
-    "score": 8.54,
+    "text": "a narrower dynamic range (3.4 vs 16.6 dB)",
+    "score": 9.09,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (4.62 vs 0.065 ERB)",
+    "text": "brightens more with velocity (4.5 vs 0.065 ERB)",
     "score": 7.2,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (92.0 vs 9.5 ms)",
+    "text": "speaks later (106 vs 9.5 ms)",
     "score": 5.6,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (705 vs 75.0 ms)",
-    "score": 5.03,
+    "text": "rings longer after the key (719 vs 75.5 ms)",
+    "score": 5.06,
     "outside": true
    },
    {
@@ -1326,45 +1326,45 @@
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (29.1 vs 7.5 dB/ms)",
-    "score": 2.98,
+    "text": "a sharper onset (29.2 vs 7.5 dB/ms)",
+    "score": 2.8,
     "outside": true
    }
   ]
  },
  "p031": {
-  "distance": 4.258171386988481,
+  "distance": 4.133981289466131,
   "disagree": 1.605,
-  "rank": 21,
+  "rank": 17,
   "top": [
    {
-    "measure": "centroid96_erb",
-    "text": "darker (12.5 vs 18.4 ERB)",
-    "score": 7.22,
-    "outside": true
-   },
-   {
     "measure": "attack_ms",
-    "text": "a faster attack (2 vs 28.5 ms)",
+    "text": "a faster attack (2 vs 31.5 ms)",
     "score": 7.2,
     "outside": true
    },
    {
+    "measure": "centroid96_erb",
+    "text": "darker (12.5 vs 18.4 ERB)",
+    "score": 7.16,
+    "outside": true
+   },
+   {
     "measure": "tri1",
-    "text": "more fundamental (0.601 vs 0)",
+    "text": "more fundamental (0.597 vs 0)",
     "score": 4.8,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.77 vs 0.445 dB)",
-    "score": 4.19,
+    "measure": "tri2",
+    "text": "weaker low partials (0.138 vs 0.859)",
+    "score": 4.0,
     "outside": true
    },
    {
-    "measure": "tri2",
-    "text": "weaker low partials (0.136 vs 0.859)",
-    "score": 4.0,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.24 vs 0.445 dB)",
+    "score": 3.23,
     "outside": true
    },
    {
@@ -1376,32 +1376,26 @@
   ]
  },
  "p032": {
-  "distance": 2.3167388487183667,
-  "disagree": 1.8824999999999998,
+  "distance": 2.2076447274491695,
+  "disagree": 1.8949999999999996,
   "rank": 95,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.91 vs 0.655 dB)",
-    "score": 4.19,
-    "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (13.0 vs 16.6 dB)",
-    "score": 2.5,
-    "outside": true
-   },
-   {
-    "measure": "floor_db",
-    "text": "a higher floor (-69.8 vs -127 dB)",
-    "score": 2.4,
+    "text": "less even from key to key (3.23 vs 0.655 dB)",
+    "score": 3.31,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (70.0 vs 4 ms)",
-    "score": 2.33,
+    "text": "speaks later in a phrase (95.0 vs 4 ms)",
+    "score": 3.21,
+    "outside": true
+   },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-69.7 vs -127 dB)",
+    "score": 2.4,
     "outside": true
    },
    {
@@ -1412,145 +1406,151 @@
    },
    {
     "measure": "flatness_db",
-    "text": "purer (-81.7 vs -64.0 dB)",
-    "score": 2.03,
+    "text": "purer (-82.3 vs -64.0 dB)",
+    "score": 2.1,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (0.59 vs 0 ERB)",
+    "score": 1.77,
     "outside": true
    }
   ]
  },
  "p033": {
-  "distance": 2.2546945473276367,
+  "distance": 1.5504384427276114,
   "disagree": 1.3249999999999997,
-  "rank": 98,
+  "rank": 122,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-2.2 vs 1.45 dB)",
-    "score": 5.11,
-    "outside": true
-   },
-   {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.33 vs 0 ERB)",
-    "score": 3.99,
+    "text": "brightens more with velocity (1.29 vs 0 ERB)",
+    "score": 3.87,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (12.6 vs 16.6 dB)",
-    "score": 2.78,
+    "text": "a narrower dynamic range (12.3 vs 16.6 dB)",
+    "score": 2.98,
     "outside": true
    },
    {
     "measure": "flatness_db",
-    "text": "purer (-85.4 vs -63.5 dB)",
+    "text": "purer (-85.5 vs -63.5 dB)",
     "score": 1.65,
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (2.36 vs 0.075 dB/oct)",
-    "score": 1.6,
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (0.938 vs 0.432 ERB)",
+    "score": 1.21,
     "outside": true
    },
    {
-    "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (0.925 vs 0.432 ERB)",
-    "score": 1.18,
+    "measure": "level_rel_db",
+    "text": "louder (2.8 vs 1.45 dB)",
+    "score": 0.94,
+    "outside": false
+   },
+   {
+    "measure": "bright_key_erb_oct",
+    "text": "brightens slower up the keyboard (-0.59 vs 3.33 ERB/oct)",
+    "score": 0.85,
     "outside": true
    }
   ]
  },
  "p034": {
-  "distance": 1.633722819081667,
+  "distance": 1.471032400570032,
   "disagree": 1.44375,
-  "rank": 123,
+  "rank": 126,
   "top": [
    {
     "measure": "flatness_db",
-    "text": "purer (-88.2 vs -61.1 dB)",
-    "score": 3.04,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (4.37 vs 1.3 dB/oct)",
-    "score": 2.15,
+    "text": "purer (-88.0 vs -61.1 dB)",
+    "score": 3.02,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.56 vs 0.66 ERB)",
-    "score": 1.82,
+    "text": "less even in tone from key to key (1.57 vs 0.66 ERB)",
+    "score": 1.85,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.55 vs 0 ERB)",
-    "score": 1.65,
+    "measure": "level_key_db_oct",
+    "text": "louder toward the bottom (-0.96 vs 1.3 dB/oct)",
+    "score": 1.59,
     "outside": true
    },
    {
     "measure": "partial_corr",
-    "text": "partials living more their own lives (0.436 vs 0.883)",
-    "score": 1.6,
+    "text": "partials living more their own lives (0.459 vs 0.883)",
+    "score": 1.51,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (0.46 vs 0 ERB)",
+    "score": 1.38,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (14.9 vs 16.7 dB)",
-    "score": 1.23,
+    "text": "a narrower dynamic range (15.1 vs 16.7 dB)",
+    "score": 1.1,
     "outside": true
    }
   ]
  },
  "p035": {
-  "distance": 2.2587514005602243,
+  "distance": 2.044094084224599,
   "disagree": 1.243846867061667,
-  "rank": 97,
+  "rank": 102,
   "top": [
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.57 vs -0.005 ERB)",
-    "score": 4.73,
-    "outside": true
-   },
-   {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.49 vs 0.655 dB)",
-    "score": 3.06,
+    "text": "less even from key to key (2.88 vs 0.655 dB)",
+    "score": 3.71,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (4.5 vs 2.15 dB)",
-    "score": 2.19,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (83.0 vs 45.0 ms)",
-    "score": 2.14,
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.04 vs -0.005 ERB)",
+    "score": 3.14,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (13.6 vs 16.7 dB)",
-    "score": 2.13,
+    "text": "a narrower dynamic range (13.2 vs 16.7 dB)",
+    "score": 2.4,
+    "outside": true
+   },
+   {
+    "measure": "release_ms",
+    "text": "rings longer after the key (82.0 vs 44.0 ms)",
+    "score": 2.18,
     "outside": true
    },
    {
     "measure": "wobble_c",
-    "text": "wobbles more (17.8 vs 3.2 c)",
-    "score": 1.75,
+    "text": "wobbles more (17.6 vs 3.2 c)",
+    "score": 1.73,
+    "outside": true
+   },
+   {
+    "measure": "level_key_db_oct",
+    "text": "louder toward the top (5.07 vs -1.08 dB/oct)",
+    "score": 1.63,
     "outside": true
    }
   ]
  },
  "p036": {
-  "distance": 2.610744124923019,
+  "distance": 2.552139303419673,
   "disagree": 1.6304166666666666,
-  "rank": 84,
+  "rank": 81,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -1560,8 +1560,8 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.6 vs 0.45 dB)",
-    "score": 3.52,
+    "text": "less even from key to key (2.33 vs 0.45 dB)",
+    "score": 3.08,
     "outside": true
    },
    {
@@ -1584,16 +1584,16 @@
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (84.0 vs 17.0 ms)",
-    "score": 1.26,
+    "text": "rings longer after the key (84.0 vs 18.0 ms)",
+    "score": 1.21,
     "outside": true
    }
   ]
  },
  "p037": {
-  "distance": 2.9177389025005342,
+  "distance": 2.66635139304356,
   "disagree": 1.222462500721156,
-  "rank": 67,
+  "rank": 73,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -1615,28 +1615,28 @@
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (84.0 vs 41.5 ms)",
-    "score": 2.79,
+    "text": "rings longer after the key (84.0 vs 42.0 ms)",
+    "score": 2.74,
+    "outside": true
+   },
+   {
+    "measure": "tri2",
+    "text": "weaker low partials (0.283 vs 0.66)",
+    "score": 2.46,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (15.0 vs 0.75 ms)",
-    "score": 2.64,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (10.6 vs -1.05 dB/oct)",
-    "score": 2.62,
+    "text": "a slower attack (15.0 vs 1.25 ms)",
+    "score": 2.34,
     "outside": true
    }
   ]
  },
  "p038": {
-  "distance": 2.713816098266752,
-  "disagree": 1.2166666666666663,
-  "rank": 78,
+  "distance": 2.866343264799954,
+  "disagree": 1.2458333333333331,
+  "rank": 58,
   "top": [
    {
     "measure": "decay_db_s",
@@ -1657,29 +1657,29 @@
     "outside": true
    },
    {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (45.0 vs -1 ms)",
+    "score": 2.76,
+    "outside": true
+   },
+   {
     "measure": "partial_corr",
     "text": "partials living more their own lives (0.416 vs 1)",
     "score": 2.34,
     "outside": true
    },
    {
-    "measure": "sustain_db",
-    "text": "sustains more (-11.0 vs -21.1 dB)",
-    "score": 2.17,
-    "outside": true
-   },
-   {
     "measure": "centroid96_erb",
     "text": "darker (2.92 vs 5.14 ERB)",
-    "score": 2.14,
+    "score": 2.15,
     "outside": true
    }
   ]
  },
  "p039": {
-  "distance": 1.5174661545390942,
-  "disagree": 1.742261904761905,
-  "rank": 128,
+  "distance": 1.4615953827149677,
+  "disagree": 1.7380952380952381,
+  "rank": 127,
   "top": [
    {
     "measure": "vel_range_db",
@@ -1702,7 +1702,7 @@
    {
     "measure": "floor_db",
     "text": "a higher floor (-78.0 vs -126 dB)",
-    "score": 1.5,
+    "score": 1.51,
     "outside": true
    },
    {
@@ -1720,26 +1720,14 @@
   ]
  },
  "p040": {
-  "distance": 2.418977042374618,
-  "disagree": 1.2000000000000002,
-  "rank": 91,
+  "distance": 1.846175194842478,
+  "disagree": 1.225,
+  "rank": 111,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (770 vs 132 ms)",
-    "score": 3.99,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the bottom (-5.19 vs 0.105 dB/oct)",
-    "score": 3.53,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-3.3 vs 0.7 dB)",
-    "score": 3.11,
+    "text": "rings longer after the key (770 vs 131 ms)",
+    "score": 4.01,
     "outside": true
    },
    {
@@ -1759,13 +1747,25 @@
     "text": "a higher floor (-66.0 vs -121 dB)",
     "score": 2.4,
     "outside": true
+   },
+   {
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (400 vs 188 ms)",
+    "score": 2.14,
+    "outside": true
+   },
+   {
+    "measure": "sgram",
+    "text": "spectrogram over time (3.5x fonts' spread)",
+    "score": 1.91,
+    "outside": true
    }
   ]
  },
  "p041": {
-  "distance": 2.339767285646526,
+  "distance": 2.37398557372664,
   "disagree": 1.2,
-  "rank": 92,
+  "rank": 88,
   "top": [
    {
     "measure": "release_ms",
@@ -1781,8 +1781,8 @@
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (68.0 vs 6.5 ms)",
-    "score": 3.07,
+    "text": "speaks later in a phrase (76.0 vs 6.5 ms)",
+    "score": 3.48,
     "outside": true
    },
    {
@@ -1794,7 +1794,7 @@
    {
     "measure": "envelope",
     "text": "envelope shape (4.3x fonts' spread)",
-    "score": 2.32,
+    "score": 2.34,
     "outside": true
    },
    {
@@ -1806,20 +1806,20 @@
   ]
  },
  "p042": {
-  "distance": 1.6335629433221155,
+  "distance": 1.610026335799377,
   "disagree": 1.4600000000000002,
-  "rank": 124,
+  "rank": 118,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (683 vs 131 ms)",
-    "score": 6.18,
+    "text": "rings longer after the key (683 vs 132 ms)",
+    "score": 6.17,
     "outside": true
    },
    {
     "measure": "staccato_len_ms",
     "text": "longer staccato (400 vs 159 ms)",
-    "score": 3.2,
+    "score": 2.93,
     "outside": true
    },
    {
@@ -1849,20 +1849,20 @@
   ]
  },
  "p043": {
-  "distance": 2.1355596970475568,
+  "distance": 2.2034436597227116,
   "disagree": 1.7333333333333334,
-  "rank": 105,
+  "rank": 97,
   "top": [
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (98.0 vs 20.0 ms)",
+    "score": 3.74,
+    "outside": true
+   },
    {
     "measure": "bright_vel_erb",
     "text": "brightens less with velocity (-1.19 vs 0 ERB)",
     "score": 3.57,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.97 vs 0.87 dB)",
-    "score": 3.19,
     "outside": true
    },
    {
@@ -1878,9 +1878,9 @@
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (64.0 vs 20.0 ms)",
-    "score": 2.11,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.94 vs 0.87 dB)",
+    "score": 2.13,
     "outside": true
    },
    {
@@ -1892,96 +1892,102 @@
   ]
  },
  "p044": {
-  "distance": 3.0914820582261333,
-  "disagree": 1.2166666666666666,
-  "rank": 60,
+  "distance": 3.0276187313757865,
+  "disagree": 1.2,
+  "rank": 47,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (15.4 vs 12.5 ERB)",
-    "score": 7.34,
+    "text": "brighter (15.2 vs 12.5 ERB)",
+    "score": 6.81,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-2.07 vs -0.015 ERB)",
-    "score": 6.17,
+    "text": "brightens less with velocity (-1.98 vs -0.015 ERB)",
+    "score": 5.9,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (72.0 vs 1 ms)",
-    "score": 4.26,
+    "text": "speaks later in a phrase (85.0 vs 1 ms)",
+    "score": 4.8,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "less fundamental (0.157 vs 0.521)",
-    "score": 2.07,
+    "text": "less fundamental (0.167 vs 0.521)",
+    "score": 2.01,
+    "outside": true
+   },
+   {
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (1.69 vs 1.23 ERB)",
+    "score": 1.61,
     "outside": true
    },
    {
     "measure": "tri3",
-    "text": "stronger high partials (0.208 vs 0.037)",
-    "score": 1.47,
-    "outside": true
-   },
-   {
-    "measure": "release_ms",
-    "text": "rings longer after the key (914 vs 376 ms)",
-    "score": 1.42,
+    "text": "stronger high partials (0.213 vs 0.037)",
+    "score": 1.51,
     "outside": true
    }
   ]
  },
  "p045": {
-  "distance": 5.313161340920728,
-  "disagree": 1.741666666666667,
-  "rank": 1,
+  "distance": 5.276633168126352,
+  "disagree": 1.7541666666666669,
+  "rank": 2,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (16.8 vs 9.23 ERB)",
+    "text": "brighter (16.6 vs 9.23 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (174 vs 12.0 ms)",
-    "score": 5.4,
+    "text": "speaks later (176 vs 12.0 ms)",
+    "score": 5.47,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-1.76 vs 0.005 ERB)",
-    "score": 5.29,
+    "text": "brightens less with velocity (-1.68 vs 0.005 ERB)",
+    "score": 5.05,
     "outside": true
    },
    {
     "measure": "sustain_db",
     "text": "sustains more (-7.2 vs -116 dB)",
-    "score": 4.99,
+    "score": 4.98,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "less fundamental (0.234 vs 0.938)",
+    "text": "less fundamental (0.225 vs 0.938)",
     "score": 4.8,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (708 vs 24.0 ms)",
-    "score": 4.4,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (72.0 vs 0 ms)",
+    "score": 4.32,
     "outside": true
    }
   ]
  },
  "p046": {
-  "distance": 2.0605351453340672,
-  "disagree": 1.1,
-  "rank": 108,
+  "distance": 2.391342408332627,
+  "disagree": 1.1083333333333334,
+  "rank": 86,
   "top": [
+   {
+    "measure": "centroid96_erb",
+    "text": "brighter (10.6 vs 9.32 ERB)",
+    "score": 5.26,
+    "outside": true
+   },
    {
     "measure": "staccato_len_ms",
     "text": "shorter staccato (78.0 vs 380 ms)",
@@ -1990,57 +1996,45 @@
    },
    {
     "measure": "flatness_db",
-    "text": "purer (-81.8 vs -68.1 dB)",
-    "score": 3.43,
+    "text": "purer (-81.3 vs -68.1 dB)",
+    "score": 3.3,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (4.82 vs 1.01 dB)",
-    "score": 2.84,
-    "outside": true
-   },
-   {
-    "measure": "centroid96_erb",
-    "text": "brighter (9.89 vs 9.32 ERB)",
-    "score": 2.3,
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.6 vs 16.7 dB)",
+    "score": 2.13,
     "outside": true
    },
    {
     "measure": "odd_even_db",
-    "text": "more even partials (-9.9 vs -1.9 dB)",
-    "score": 2.0,
+    "text": "more even partials (-9.5 vs -1.9 dB)",
+    "score": 1.9,
     "outside": true
    },
    {
-    "measure": "glide_c",
-    "text": "starts sharper (16.1 vs 0.85 c)",
-    "score": 1.53,
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (1.66 vs 0.794 ERB)",
+    "score": 1.76,
     "outside": true
    }
   ]
  },
  "p047": {
-  "distance": 2.4700403010231677,
-  "disagree": 3.1333333333333337,
-  "rank": 89,
+  "distance": 1.9322336353726364,
+  "disagree": 3.325,
+  "rank": 106,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a wider dynamic range (26.4 vs 16.9 dB)",
-    "score": 6.48,
+    "text": "a wider dynamic range (24.6 vs 16.9 dB)",
+    "score": 5.25,
     "outside": true
    },
    {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (1.67 vs 3.95 ERB/oct)",
-    "score": 3.8,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (8.9 vs -3.25 dB)",
-    "score": 2.56,
+    "text": "brightens slower up the keyboard (1.63 vs 3.95 ERB/oct)",
+    "score": 3.87,
     "outside": true
    },
    {
@@ -2050,132 +2044,138 @@
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (9.5 vs 5 ms)",
-    "score": 1.54,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (21.0 vs 0 ms)",
+    "score": 1.26,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (58.6 vs 19.4 dB/ms)",
-    "score": 1.4,
+    "text": "a sharper onset (55.9 vs 19.4 dB/ms)",
+    "score": 1.21,
     "outside": true
+   },
+   {
+    "measure": "centroid96_erb",
+    "text": "darker (7.16 vs 12.0 ERB)",
+    "score": 0.96,
+    "outside": false
    }
   ]
  },
  "p048": {
-  "distance": 3.7757335213545318,
+  "distance": 3.009348450532115,
   "disagree": 1.1708333333333334,
-  "rank": 31,
+  "rank": 49,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (17.6 vs 12.8 ERB)",
-    "score": 6.5,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (6.4 vs -2.4 dB)",
-    "score": 6.32,
+    "text": "brighter (17.3 vs 12.8 ERB)",
+    "score": 6.14,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-1.59 vs -0.015 ERB)",
-    "score": 4.73,
+    "text": "brightens less with velocity (-1.52 vs -0.015 ERB)",
+    "score": 4.52,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (2.29 vs 0.987 ERB)",
-    "score": 3.88,
+    "text": "less even in tone from key to key (2.3 vs 0.987 ERB)",
+    "score": 3.91,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "less fundamental (0.222 vs 0.583)",
-    "score": 3.1,
+    "text": "less fundamental (0.217 vs 0.583)",
+    "score": 3.14,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.69 vs 1.25 dB)",
-    "score": 2.59,
+    "text": "less even from key to key (2.57 vs 1.25 dB)",
+    "score": 2.38,
+    "outside": true
+   },
+   {
+    "measure": "release_ms",
+    "text": "rings longer after the key (890 vs 407 ms)",
+    "score": 2.12,
     "outside": true
    }
   ]
  },
  "p049": {
-  "distance": 3.5584971877145337,
-  "disagree": 1.0,
-  "rank": 38,
+  "distance": 3.530005927660131,
+  "disagree": 1.1666666666666667,
+  "rank": 32,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-2.11 vs -0.015 ERB)",
-    "score": 6.28,
+    "text": "brightens less with velocity (-2.09 vs -0.015 ERB)",
+    "score": 6.22,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "brighter (17.3 vs 12.9 ERB)",
-    "score": 5.73,
+    "text": "brighter (17.1 vs 12.9 ERB)",
+    "score": 5.54,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.79 vs 1.35 dB)",
-    "score": 4.38,
+    "text": "less even from key to key (3.86 vs 1.35 dB)",
+    "score": 4.51,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (404 vs 244 ms)",
-    "score": 3.29,
+    "text": "speaks later (411 vs 248 ms)",
+    "score": 3.36,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (104 vs 40.0 ms)",
-    "score": 2.48,
+    "text": "speaks later in a phrase (106 vs 40.0 ms)",
+    "score": 2.83,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "less fundamental (0.223 vs 0.579)",
-    "score": 2.46,
+    "text": "less fundamental (0.237 vs 0.579)",
+    "score": 2.36,
     "outside": true
    }
   ]
  },
  "p050": {
-  "distance": 1.7099932101147701,
-  "disagree": 1.4000000000000001,
-  "rank": 121,
+  "distance": 1.694499331768708,
+  "disagree": 1.36,
+  "rank": 115,
   "top": [
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (106 vs 5.5 ms)",
+    "text": "speaks later in a phrase (92.0 vs 1.5 ms)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.63 vs 0.73 dB)",
-    "score": 2.05,
+    "text": "less even from key to key (2.55 vs 0.73 dB)",
+    "score": 1.96,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (301 vs 134 ms)",
-    "score": 1.63,
+    "text": "speaks later (301 vs 132 ms)",
+    "score": 1.64,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.53 vs 0 ERB)",
-    "score": 1.59,
+    "text": "brightens more with velocity (0.52 vs 0 ERB)",
+    "score": 1.56,
     "outside": true
    },
    {
@@ -2193,20 +2193,14 @@
   ]
  },
  "p051": {
-  "distance": 1.4567053557834708,
-  "disagree": 1.0125,
+  "distance": 1.2965890328335574,
+  "disagree": 1.025,
   "rank": 129,
   "top": [
    {
     "measure": "bright_vel_erb",
     "text": "brightens more with velocity (1.06 vs 0 ERB)",
     "score": 3.18,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.5 vs 0.35 dB)",
-    "score": 2.25,
     "outside": true
    },
    {
@@ -2223,8 +2217,8 @@
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (460 vs 282 ms)",
-    "score": 0.93,
+    "text": "a slower attack (460 vs 267 ms)",
+    "score": 1.08,
     "outside": true
    },
    {
@@ -2232,72 +2226,78 @@
     "text": "more even partials (-7.1 vs -3.75 dB)",
     "score": 0.84,
     "outside": true
+   },
+   {
+    "measure": "level_key_db_oct",
+    "text": "louder toward the top (0.56 vs -0.62 dB/oct)",
+    "score": 0.83,
+    "outside": true
    }
   ]
  },
  "p052": {
-  "distance": 3.233363563624014,
+  "distance": 2.695616957424032,
   "disagree": 1.1666666666666667,
-  "rank": 52,
+  "rank": 65,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.23 vs 0 ERB)",
-    "score": 6.69,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-4.8 vs -0.65 dB)",
-    "score": 4.84,
-    "outside": true
-   },
-   {
-    "measure": "centroid96_erb",
-    "text": "brighter (13.9 vs 12.7 ERB)",
-    "score": 4.21,
+    "text": "brightens more with velocity (2.21 vs 0 ERB)",
+    "score": 6.63,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
-    "text": "smoother (-2.68 vs -1.04 log2)",
-    "score": 3.29,
+    "text": "smoother (-2.78 vs -1.04 log2)",
+    "score": 3.49,
+    "outside": true
+   },
+   {
+    "measure": "centroid96_erb",
+    "text": "brighter (13.7 vs 12.7 ERB)",
+    "score": 3.39,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a wider dynamic range (21.1 vs 16.6 dB)",
+    "score": 3.05,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (314 vs 146 ms)",
-    "score": 2.98,
+    "text": "speaks later (269 vs 146 ms)",
+    "score": 2.1,
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (100 vs 4.5 ms)",
-    "score": 1.43,
+    "measure": "wobble_c",
+    "text": "wobbles more (48.5 vs 37.8 c)",
+    "score": 1.29,
     "outside": true
    }
   ]
  },
  "p053": {
-  "distance": 5.0418863636363636,
+  "distance": 5.148696969696969,
   "disagree": 0.9000000000000001,
-  "rank": 2,
+  "rank": 3,
   "top": [
    {
     "measure": "attack_ms",
-    "text": "a slower attack (760 vs 40.5 ms)",
+    "text": "a slower attack (760 vs 40.0 ms)",
     "score": 7.2,
     "outside": true
    },
    {
     "measure": "level_rel_db",
-    "text": "quieter (-6 vs 1.2 dB)",
-    "score": 6.11,
+    "text": "quieter (-7 vs 1.2 dB)",
+    "score": 6.96,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (326 vs 23.0 ms)",
+    "text": "speaks later (326 vs 23.5 ms)",
     "score": 5.6,
     "outside": true
    },
@@ -2309,8 +2309,8 @@
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (642 vs 232 ms)",
-    "score": 4.69,
+    "text": "rings longer after the key (642 vs 236 ms)",
+    "score": 4.62,
     "outside": true
    },
    {
@@ -2322,9 +2322,9 @@
   ]
  },
  "p054": {
-  "distance": 2.979812794744516,
-  "disagree": 1.41,
-  "rank": 65,
+  "distance": 2.971168658004625,
+  "disagree": 1.15,
+  "rank": 52,
   "top": [
    {
     "measure": "bright_scatter_erb",
@@ -2345,15 +2345,15 @@
     "outside": true
    },
    {
-    "measure": "vel_range_db",
-    "text": "a wider dynamic range (21.0 vs 16.7 dB)",
-    "score": 3.13,
+    "measure": "attack_ms",
+    "text": "a faster attack (54.5 vs 356 ms)",
+    "score": 3.09,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a faster attack (54.5 vs 354 ms)",
-    "score": 3.09,
+    "measure": "vel_range_db",
+    "text": "a wider dynamic range (20.9 vs 16.7 dB)",
+    "score": 3.05,
     "outside": true
    },
    {
@@ -2365,155 +2365,143 @@
   ]
  },
  "p055": {
-  "distance": 4.34984806559539,
-  "disagree": 1.3249999999999993,
-  "rank": 19,
+  "distance": 3.6115685071194807,
+  "disagree": 1.2699999999999996,
+  "rank": 29,
   "top": [
    {
-    "measure": "decay_db_s",
-    "text": "decays slower (0.6 vs 26.0 dB/s)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
-    "measure": "centroid96_erb",
-    "text": "brighter (13.3 vs 7.69 ERB)",
-    "score": 4.81,
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (2.1 vs 0.02 ERB)",
+    "score": 6.24,
     "outside": true
    },
    {
     "measure": "wobble_c",
-    "text": "wobbles less (15.9 vs 72.4 c)",
-    "score": 4.49,
-    "outside": true
-   },
-   {
-    "measure": "dissonance_log2",
-    "text": "smoother (-2.43 vs -0.265 log2)",
-    "score": 4.33,
+    "text": "wobbles less (17.4 vs 64.5 c)",
+    "score": 4.46,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (668 vs 268 ms)",
-    "score": 4.21,
+    "text": "rings longer after the key (642 vs 269 ms)",
+    "score": 4.02,
     "outside": true
    },
    {
-    "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.56 vs 0.474 ERB)",
-    "score": 3.82,
+    "measure": "dissonance_log2",
+    "text": "smoother (-2.04 vs -0.265 log2)",
+    "score": 3.55,
+    "outside": true
+   },
+   {
+    "measure": "centroid96_erb",
+    "text": "brighter (11.6 vs 7.69 ERB)",
+    "score": 3.34,
+    "outside": true
+   },
+   {
+    "measure": "attack_ms",
+    "text": "a slower attack (308 vs 72.5 ms)",
+    "score": 3.22,
     "outside": true
    }
   ]
  },
  "p056": {
-  "distance": 4.706231011635426,
+  "distance": 4.227673664081019,
   "disagree": 1.0142857142857142,
-  "rank": 11,
+  "rank": 15,
   "top": [
    {
     "measure": "centroid96_erb",
     "text": "darker (12.3 vs 17.9 ERB)",
-    "score": 8.82,
+    "score": 8.84,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.15 vs 0.555 dB)",
-    "score": 6.47,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (8.42 vs 1.15 dB/oct)",
-    "score": 5.09,
+    "text": "less even from key to key (3.46 vs 0.555 dB)",
+    "score": 5.23,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (778 vs 88.0 ms)",
-    "score": 5.05,
+    "text": "rings longer after the key (770 vs 88.0 ms)",
+    "score": 5.02,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (3.22 vs -2.11 ERB)",
+    "text": "a brighter attack (3.21 vs -2.13 ERB)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (10.9 vs 16.6 dB)",
-    "score": 3.94,
+    "text": "a narrower dynamic range (10.8 vs 16.6 dB)",
+    "score": 4.01,
+    "outside": true
+   },
+   {
+    "measure": "delay_ms",
+    "text": "speaks later (58.0 vs 15.0 ms)",
+    "score": 3.01,
     "outside": true
    }
   ]
  },
  "p057": {
-  "distance": 4.840691993464052,
+  "distance": 4.49717100041771,
   "disagree": 1.1159909062417732,
-  "rank": 6,
+  "rank": 10,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "darker (9.33 vs 13.8 ERB)",
+    "text": "darker (9.34 vs 13.8 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (630 vs 80.5 ms)",
+    "text": "rings longer after the key (624 vs 82.0 ms)",
     "score": 6.4,
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (12.2 vs 1.25 dB/oct)",
-    "score": 5.6,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.58 vs 0.855 dB)",
+    "score": 4.91,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (4.83 vs -1.23 ERB)",
-    "score": 4.49,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.31 vs 0.855 dB)",
-    "score": 4.42,
+    "text": "a brighter attack (4.81 vs -1.24 ERB)",
+    "score": 4.48,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "more fundamental (0.537 vs 0.047)",
-    "score": 4.2,
+    "text": "more fundamental (0.539 vs 0.047)",
+    "score": 4.22,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.15 vs 0 ERB)",
+    "score": 3.45,
     "outside": true
    }
   ]
  },
  "p058": {
-  "distance": 3.7237257845739578,
-  "disagree": 1.2225000000000001,
-  "rank": 33,
+  "distance": 2.6428614388869596,
+  "disagree": 1.2175,
+  "rank": 78,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (4.23 vs 0.465 dB)",
-    "score": 6.78,
-    "outside": true
-   },
-   {
     "measure": "release_ms",
-    "text": "rings longer after the key (504 vs 82.5 ms)",
-    "score": 6.4,
-    "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a wider dynamic range (24.1 vs 16.6 dB)",
-    "score": 5.11,
+    "text": "rings longer after the key (504 vs 85.0 ms)",
+    "score": 6.38,
     "outside": true
    },
    {
@@ -2523,23 +2511,35 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (9.1 vs 2.35 dB)",
-    "score": 3.63,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.6 vs 0.46 dB)",
+    "score": 3.85,
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (5.62 vs 0.565 dB/oct)",
-    "score": 3.54,
+    "measure": "vel_range_db",
+    "text": "a wider dynamic range (22.2 vs 16.6 dB)",
+    "score": 3.81,
+    "outside": true
+   },
+   {
+    "measure": "bright_key_erb_oct",
+    "text": "brightens slower up the keyboard (0.9 vs 3.51 ERB/oct)",
+    "score": 2.58,
+    "outside": true
+   },
+   {
+    "measure": "attack_bright_erb",
+    "text": "a brighter attack (2.85 vs -0.865 ERB)",
+    "score": 1.98,
     "outside": true
    }
   ]
  },
  "p059": {
-  "distance": 2.32571632992487,
-  "disagree": 1.2,
-  "rank": 93,
+  "distance": 2.4067420571211637,
+  "disagree": 1.2571428571428571,
+  "rank": 85,
   "top": [
    {
     "measure": "vel_range_db",
@@ -2548,21 +2548,21 @@
     "outside": true
    },
    {
-    "measure": "release_ms",
-    "text": "rings longer after the key (378 vs 79.5 ms)",
-    "score": 3.6,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.07 vs 1.01 dB)",
+    "score": 3.71,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.88 vs 1.01 dB)",
-    "score": 3.37,
+    "measure": "release_ms",
+    "text": "rings longer after the key (378 vs 80.0 ms)",
+    "score": 3.59,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (52.0 vs 6 ms)",
-    "score": 2.3,
+    "text": "speaks later in a phrase (54.0 vs 6 ms)",
+    "score": 2.4,
     "outside": true
    },
    {
@@ -2574,101 +2574,101 @@
    {
     "measure": "attack_ms",
     "text": "a faster attack (22.0 vs 33.0 ms)",
-    "score": 1.96,
+    "score": 2.03,
     "outside": true
    }
   ]
  },
  "p060": {
-  "distance": 4.030640570663514,
-  "disagree": 1.2,
-  "rank": 24,
+  "distance": 3.513451343487736,
+  "disagree": 1.185,
+  "rank": 33,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (4.08 vs 1.11 dB)",
-    "score": 5.34,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (7.95 vs 0.55 dB/oct)",
-    "score": 5.18,
-    "outside": true
-   },
-   {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (9.1 vs 16.6 dB)",
-    "score": 5.14,
+    "text": "a narrower dynamic range (7 vs 16.6 dB)",
+    "score": 6.58,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (5.9 vs -0.65 ERB)",
+    "text": "a brighter attack (5.88 vs -0.65 ERB)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (146 vs 74.5 ms)",
-    "score": 4.17,
+    "text": "speaks later (146 vs 73.0 ms)",
+    "score": 4.26,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.25 vs 1.12 dB)",
+    "score": 3.83,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (695 vs 174 ms)",
-    "score": 3.56,
+    "text": "rings longer after the key (695 vs 176 ms)",
+    "score": 3.54,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (62.0 vs 9 ms)",
+    "score": 2.45,
     "outside": true
    }
   ]
  },
  "p061": {
-  "distance": 3.4046346359165676,
+  "distance": 3.4804411974737173,
   "disagree": 1.3799999999999997,
-  "rank": 45,
+  "rank": 35,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (5.1 vs 16.8 dB)",
-    "score": 8.02,
+    "text": "a narrower dynamic range (4.8 vs 16.8 dB)",
+    "score": 8.23,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (952 vs 89.5 ms)",
-    "score": 5.37,
+    "text": "rings longer after the key (920 vs 89.5 ms)",
+    "score": 5.3,
     "outside": true
    },
    {
     "measure": "level_key_db_oct",
-    "text": "louder toward the top (7.59 vs 0.29 dB/oct)",
+    "text": "louder toward the top (7.6 vs 0.295 dB/oct)",
     "score": 5.11,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (5.6 vs -2.15 dB)",
-    "score": 3.29,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (70.0 vs 5 ms)",
+    "score": 3.12,
     "outside": true
    },
    {
     "measure": "envelope",
     "text": "envelope shape (4.9x fonts' spread)",
-    "score": 2.67,
+    "score": 2.65,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.84 vs 0.1 ERB)",
-    "score": 2.19,
+    "measure": "level_rel_db",
+    "text": "louder (4.1 vs -2.15 dB)",
+    "score": 2.61,
     "outside": true
    }
   ]
  },
  "p062": {
-  "distance": 2.129480440063962,
-  "disagree": 1.2,
-  "rank": 106,
+  "distance": 1.9156179310979875,
+  "disagree": 1.25,
+  "rank": 108,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -2679,44 +2679,44 @@
    {
     "measure": "release_ms",
     "text": "rings longer after the key (622 vs 139 ms)",
-    "score": 4.35,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (42.0 vs 0 ms)",
-    "score": 2.52,
+    "score": 4.56,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.19 vs 0.43 dB)",
-    "score": 2.42,
+    "text": "less even from key to key (1.91 vs 0.43 dB)",
+    "score": 2.03,
     "outside": true
    },
    {
     "measure": "staccato_len_ms",
-    "text": "longer staccato (239 vs 126 ms)",
-    "score": 2.21,
+    "text": "longer staccato (239 vs 137 ms)",
+    "score": 1.93,
     "outside": true
    },
    {
     "measure": "envelope",
     "text": "envelope shape (3.0x fonts' spread)",
-    "score": 1.61,
+    "score": 1.6,
+    "outside": true
+   },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-67.2 vs -123 dB)",
+    "score": 1.44,
     "outside": true
    }
   ]
  },
  "p063": {
-  "distance": 2.625076886037648,
+  "distance": 2.534271672211895,
   "disagree": 1.1666666666666667,
-  "rank": 81,
+  "rank": 82,
   "top": [
    {
     "measure": "release_ms",
     "text": "rings longer after the key (756 vs 133 ms)",
-    "score": 5.05,
+    "score": 5.3,
     "outside": true
    },
    {
@@ -2727,8 +2727,8 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.99 vs 0.21 dB)",
-    "score": 4.0,
+    "text": "less even from key to key (2.31 vs 0.21 dB)",
+    "score": 3.02,
     "outside": true
    },
    {
@@ -2739,8 +2739,8 @@
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (40.0 vs 0 ms)",
-    "score": 2.4,
+    "text": "speaks later in a phrase (42.0 vs 0 ms)",
+    "score": 2.52,
     "outside": true
    },
    {
@@ -2752,192 +2752,192 @@
   ]
  },
  "p064": {
-  "distance": 2.8890030486428744,
+  "distance": 2.8975721004614394,
   "disagree": 1.425,
-  "rank": 69,
+  "rank": 56,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (766 vs 83.0 ms)",
+    "text": "rings longer after the key (763 vs 82.5 ms)",
     "score": 6.4,
     "outside": true
    },
    {
-    "measure": "delay_ms",
-    "text": "speaks later (96.0 vs 31.0 ms)",
-    "score": 4.55,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (9.2 vs 2.75 dB)",
-    "score": 3.84,
-    "outside": true
-   },
-   {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (60.0 vs 0 ms)",
-    "score": 3.6,
+    "text": "speaks later in a phrase (85.0 vs 0 ms)",
+    "score": 4.8,
+    "outside": true
+   },
+   {
+    "measure": "delay_ms",
+    "text": "speaks later (99.0 vs 31.0 ms)",
+    "score": 4.76,
     "outside": true
    },
    {
     "measure": "staccato_len_ms",
-    "text": "longer staccato (322 vs 128 ms)",
-    "score": 3.19,
+    "text": "longer staccato (400 vs 128 ms)",
+    "score": 3.95,
     "outside": true
    },
    {
     "measure": "envelope",
-    "text": "envelope shape (5.4x fonts' spread)",
-    "score": 2.94,
+    "text": "envelope shape (5.5x fonts' spread)",
+    "score": 2.98,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.31 vs 1.02 dB)",
+    "score": 2.33,
     "outside": true
    }
   ]
  },
  "p065": {
-  "distance": 3.37790785582466,
+  "distance": 2.9799471408709413,
   "disagree": 1.1233333333333335,
-  "rank": 48,
+  "rank": 51,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.78 vs 0.955 dB)",
-    "score": 6.89,
+    "text": "less even from key to key (4.65 vs 0.955 dB)",
+    "score": 6.65,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (716 vs 82.5 ms)",
+    "text": "rings longer after the key (774 vs 82.5 ms)",
     "score": 6.4,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (117 vs 22.5 ms)",
+    "text": "speaks later (110 vs 22.5 ms)",
     "score": 5.6,
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (56.0 vs 2.5 ms)",
-    "score": 3.21,
-    "outside": true
-   },
-   {
-    "measure": "attack_ms",
-    "text": "a slower attack (194 vs 42.0 ms)",
-    "score": 2.86,
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (390 vs 138 ms)",
+    "score": 3.61,
     "outside": true
    },
    {
     "measure": "envelope",
-    "text": "envelope shape (4.8x fonts' spread)",
-    "score": 2.62,
+    "text": "envelope shape (5.0x fonts' spread)",
+    "score": 2.69,
+    "outside": true
+   },
+   {
+    "measure": "icc",
+    "text": "wider (0.141 vs 1)",
+    "score": 2.4,
     "outside": true
    }
   ]
  },
  "p066": {
-  "distance": 3.5484023124864,
+  "distance": 3.7387150308754515,
   "disagree": 1.15,
-  "rank": 39,
+  "rank": 27,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (676 vs 90.5 ms)",
+    "text": "rings longer after the key (662 vs 89.5 ms)",
     "score": 6.4,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (137 vs 24.5 ms)",
+    "text": "speaks later (134 vs 24.5 ms)",
     "score": 5.6,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (7.91 vs 0.045 ERB)",
+    "text": "a brighter attack (8.54 vs 0.045 ERB)",
+    "score": 4.8,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (94.0 vs 1 ms)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (191 vs 31.8 ms)",
-    "score": 4.02,
+    "text": "a slower attack (196 vs 30.2 ms)",
+    "score": 4.19,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (6.5 vs -0.25 dB)",
-    "score": 3.38,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (56.0 vs 1 ms)",
-    "score": 3.3,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.61 vs 1.52 dB)",
+    "score": 3.77,
     "outside": true
    }
   ]
  },
  "p067": {
-  "distance": 3.9037158991805923,
-  "disagree": 1.2774999999999999,
-  "rank": 29,
+  "distance": 4.087023584218047,
+  "disagree": 1.275,
+  "rank": 18,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (640 vs 84.5 ms)",
+    "text": "rings longer after the key (614 vs 84.5 ms)",
     "score": 6.4,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (168 vs 15.0 ms)",
+    "text": "speaks later (161 vs 15.0 ms)",
     "score": 5.6,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (11.3 vs 0.08 ERB)",
+    "text": "a brighter attack (10.3 vs 0.085 ERB)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (64.0 vs 2.5 ms)",
-    "score": 3.69,
+    "text": "speaks later in a phrase (88.0 vs 2.5 ms)",
+    "score": 4.8,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (5.2 vs -0.75 dB)",
-    "score": 3.54,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.21 vs 1 dB)",
+    "score": 3.97,
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (246 vs 30.2 ms)",
-    "score": 3.53,
+    "measure": "sgram",
+    "text": "spectrogram over time (6.7x fonts' spread)",
+    "score": 3.62,
     "outside": true
    }
   ]
  },
  "p068": {
-  "distance": 4.6106715541920025,
+  "distance": 4.5713510234714825,
   "disagree": 0.8800000000000001,
-  "rank": 13,
+  "rank": 8,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (22.1 vs 15.7 ERB)",
+    "text": "brighter (21.5 vs 15.7 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (746 vs 121 ms)",
-    "score": 5.45,
+    "text": "rings longer after the key (755 vs 121 ms)",
+    "score": 5.48,
     "outside": true
    },
    {
@@ -2948,28 +2948,28 @@
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (91.0 vs -1 ms)",
+    "text": "speaks later in a phrase (88.0 vs -1 ms)",
     "score": 4.8,
     "outside": true
    },
    {
     "measure": "sgram",
-    "text": "spectrogram over time (7.9x fonts' spread)",
-    "score": 4.25,
+    "text": "spectrogram over time (7.8x fonts' spread)",
+    "score": 4.23,
     "outside": true
    },
    {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (-0.77 vs 3.58 ERB/oct)",
+    "text": "brightens slower up the keyboard (-0.78 vs 3.58 ERB/oct)",
     "score": 4.0,
     "outside": true
    }
   ]
  },
  "p069": {
-  "distance": 3.675150732782252,
+  "distance": 3.8393284284645803,
   "disagree": 1.3899999999999997,
-  "rank": 34,
+  "rank": 25,
   "top": [
    {
     "measure": "centroid96_erb",
@@ -2979,8 +2979,20 @@
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (760 vs 98.5 ms)",
+    "text": "rings longer after the key (753 vs 98.5 ms)",
     "score": 6.4,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.33 vs 0 ERB)",
+    "score": 3.99,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (66.0 vs 0 ms)",
+    "score": 3.96,
     "outside": true
    },
    {
@@ -2991,51 +3003,45 @@
    },
    {
     "measure": "tri3",
-    "text": "stronger high partials (0.444 vs 0.015)",
-    "score": 3.68,
-    "outside": true
-   },
-   {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.14 vs 0 ERB)",
-    "score": 3.42,
-    "outside": true
-   },
-   {
-    "measure": "envelope",
-    "text": "envelope shape (5.6x fonts' spread)",
-    "score": 3.01,
+    "text": "stronger high partials (0.416 vs 0.015)",
+    "score": 3.44,
     "outside": true
    }
   ]
  },
  "p070": {
-  "distance": 3.191257502063828,
-  "disagree": 1.2,
-  "rank": 55,
+  "distance": 3.343650827246024,
+  "disagree": 1.1666666666666667,
+  "rank": 39,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (17.6 vs 12.8 ERB)",
+    "text": "brighter (17.3 vs 12.8 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (654 vs 78.0 ms)",
-    "score": 5.44,
+    "text": "rings longer after the key (648 vs 78.0 ms)",
+    "score": 5.42,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (53.0 vs 2 ms)",
-    "score": 3.06,
+    "text": "speaks later in a phrase (81.0 vs 2 ms)",
+    "score": 4.74,
     "outside": true
    },
    {
     "measure": "staccato_len_ms",
-    "text": "longer staccato (318 vs 139 ms)",
-    "score": 2.87,
+    "text": "longer staccato (309 vs 139 ms)",
+    "score": 2.77,
+    "outside": true
+   },
+   {
+    "measure": "attack_bright_erb",
+    "text": "a duller attack (-2.38 vs -0.41 ERB)",
+    "score": 2.66,
     "outside": true
    },
    {
@@ -3043,73 +3049,61 @@
     "text": "spectrogram over time (4.9x fonts' spread)",
     "score": 2.64,
     "outside": true
-   },
-   {
-    "measure": "attack_bright_erb",
-    "text": "a duller attack (-2.06 vs -0.41 ERB)",
-    "score": 2.25,
-    "outside": true
    }
   ]
  },
  "p071": {
-  "distance": 4.680661424928663,
+  "distance": 4.382034173517436,
   "disagree": 1.070821128635827,
-  "rank": 12,
+  "rank": 11,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.77 vs 0.69 dB)",
+    "text": "less even from key to key (4.83 vs 0.69 dB)",
     "score": 7.2,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (4.43 vs -0.055 ERB)",
+    "text": "brightens more with velocity (4.58 vs -0.055 ERB)",
     "score": 7.2,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks later (134 vs 27.5 ms)",
-    "score": 5.52,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (7.27 vs 0.995 dB/oct)",
-    "score": 4.39,
+    "text": "speaks later (131 vs 27.5 ms)",
+    "score": 5.37,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (3.3 vs 0.857 ERB)",
-    "score": 4.11,
+    "text": "less even in tone from key to key (3.11 vs 0.857 ERB)",
+    "score": 3.79,
     "outside": true
    },
    {
-    "measure": "attack_bright_erb",
-    "text": "a brighter attack (14.2 vs -1.71 ERB)",
-    "score": 3.04,
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (11.9 vs 16.6 dB)",
+    "score": 3.08,
+    "outside": true
+   },
+   {
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (358 vs 141 ms)",
+    "score": 2.95,
     "outside": true
    }
   ]
  },
  "p072": {
-  "distance": 4.824879570924452,
+  "distance": 4.334593404032377,
   "disagree": 1.25,
-  "rank": 7,
+  "rank": 14,
   "top": [
    {
     "measure": "centroid96_erb",
     "text": "brighter (20.8 vs 13.9 ERB)",
     "score": 9.6,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-5.8 vs 2.55 dB)",
-    "score": 9.35,
     "outside": true
    },
    {
@@ -3131,34 +3125,34 @@
     "outside": true
    },
    {
+    "measure": "level_rel_db",
+    "text": "quieter (-1.2 vs 2.55 dB)",
+    "score": 4.2,
+    "outside": true
+   },
+   {
     "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (-3.27 vs 3.58 ERB/oct)",
-    "score": 3.6,
+    "text": "brightens slower up the keyboard (-3.22 vs 3.58 ERB/oct)",
+    "score": 3.58,
     "outside": true
    }
   ]
  },
  "p073": {
-  "distance": 3.7371654174533413,
-  "disagree": 1.275,
-  "rank": 32,
+  "distance": 2.906178616759869,
+  "disagree": 1.1666666666666667,
+  "rank": 55,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.6 vs 3.45 dB)",
-    "score": 7.07,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.63 vs 0.88 dB)",
+    "score": 4.95,
     "outside": true
    },
    {
     "measure": "level_key_db_oct",
-    "text": "louder toward the top (16.9 vs 3.19 dB/oct)",
-    "score": 5.6,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.48 vs 0.88 dB)",
-    "score": 4.68,
+    "text": "louder toward the top (9.98 vs 3.19 dB/oct)",
+    "score": 4.75,
     "outside": true
    },
    {
@@ -3170,28 +3164,28 @@
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (1.64 vs 0.631 ERB)",
-    "score": 3.52,
+    "score": 3.51,
     "outside": true
    },
    {
     "measure": "release_ms",
     "text": "rings longer after the key (634 vs 167 ms)",
-    "score": 2.48,
+    "score": 2.58,
+    "outside": true
+   },
+   {
+    "measure": "floor_db",
+    "text": "a higher floor (-66.2 vs -123 dB)",
+    "score": 2.1,
     "outside": true
    }
   ]
  },
  "p074": {
-  "distance": 3.4858075507059723,
+  "distance": 2.6364530094065994,
   "disagree": 0.96,
-  "rank": 42,
+  "rank": 79,
   "top": [
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (5.05 vs 0.975 dB)",
-    "score": 7.12,
-    "outside": true
-   },
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (2.13 vs 0.294 ERB)",
@@ -3199,9 +3193,9 @@
     "outside": true
    },
    {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (6.67 vs 1.48 dB/oct)",
-    "score": 3.64,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.38 vs 0.975 dB)",
+    "score": 4.2,
     "outside": true
    },
    {
@@ -3217,40 +3211,40 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (2.5 vs 4.65 dB)",
-    "score": 2.41,
+    "measure": "dissonance_log2",
+    "text": "rougher (-4.53 vs -6.88 log2)",
+    "score": 1.85,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (0.56 vs 0 ERB)",
+    "score": 1.68,
     "outside": true
    }
   ]
  },
  "p075": {
-  "distance": 2.974968382006268,
-  "disagree": 1.06,
-  "rank": 66,
+  "distance": 2.661193835087003,
+  "disagree": 1.0299999999999998,
+  "rank": 74,
   "top": [
    {
+    "measure": "level_key_db_oct",
+    "text": "louder toward the bottom (-7.61 vs 0.625 dB/oct)",
+    "score": 5.31,
+    "outside": true
+   },
+   {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.8 vs 0.315 ERB)",
+    "text": "less even in tone from key to key (1.79 vs 0.315 ERB)",
     "score": 5.18,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.79 vs 0.53 dB)",
-    "score": 4.07,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the bottom (-5.6 vs 0.625 dB/oct)",
-    "score": 4.02,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-3.6 vs 3.45 dB)",
-    "score": 3.46,
+    "text": "less even from key to key (2.9 vs 0.53 dB)",
+    "score": 4.27,
     "outside": true
    },
    {
@@ -3262,38 +3256,38 @@
    {
     "measure": "release_ms",
     "text": "rings longer after the key (592 vs 94.0 ms)",
-    "score": 2.52,
+    "score": 2.53,
+    "outside": true
+   },
+   {
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (400 vs 165 ms)",
+    "score": 1.73,
     "outside": true
    }
   ]
  },
  "p076": {
-  "distance": 2.8683242299837572,
+  "distance": 2.807677056456586,
   "disagree": 1.1666666666666667,
-  "rank": 73,
+  "rank": 62,
   "top": [
    {
     "measure": "level_key_db_oct",
-    "text": "louder toward the top (18.2 vs -0.255 dB/oct)",
+    "text": "louder toward the top (9.44 vs -0.255 dB/oct)",
     "score": 5.6,
     "outside": true
    },
    {
-    "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.45 vs 0.271 ERB)",
-    "score": 4.14,
-    "outside": true
-   },
-   {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.56 vs 0.34 dB)",
-    "score": 4.0,
+    "text": "less even from key to key (3.08 vs 0.34 dB)",
+    "score": 4.93,
     "outside": true
    },
    {
-    "measure": "legato_even_db",
-    "text": "a less even scale (5.7 vs 0.95 dB)",
-    "score": 2.38,
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (1.45 vs 0.272 ERB)",
+    "score": 4.14,
     "outside": true
    },
    {
@@ -3303,21 +3297,27 @@
     "outside": true
    },
    {
+    "measure": "release_ms",
+    "text": "rings longer after the key (398 vs 116 ms)",
+    "score": 1.79,
+    "outside": true
+   },
+   {
     "measure": "legato_dip_db",
-    "text": "more separated legato (12.6 vs 5.15 dB)",
-    "score": 1.86,
+    "text": "more separated legato (11.9 vs 5.15 dB)",
+    "score": 1.69,
     "outside": true
    }
   ]
  },
  "p077": {
-  "distance": 3.5189523404784264,
-  "disagree": 1.55,
-  "rank": 40,
+  "distance": 3.5463715975331,
+  "disagree": 1.5999999999999999,
+  "rank": 31,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (6.29 vs 0.285 dB)",
+    "text": "less even from key to key (5.74 vs 0.285 dB)",
     "score": 7.2,
     "outside": true
    },
@@ -3347,29 +3347,17 @@
    },
    {
     "measure": "icc",
-    "text": "wider (0.456 vs 1)",
+    "text": "wider (0.455 vs 1)",
     "score": 2.18,
     "outside": true
    }
   ]
  },
  "p078": {
-  "distance": 4.084568242042107,
+  "distance": 3.1779511282425643,
   "disagree": 1.3466666666666667,
-  "rank": 23,
+  "rank": 43,
   "top": [
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (1.3 vs 8 dB)",
-    "score": 6.25,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (4.77 vs 0.27 dB)",
-    "score": 5.96,
-    "outside": true
-   },
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (2.97 vs 0.189 ERB)",
@@ -3389,27 +3377,33 @@
     "outside": true
    },
    {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.58 vs 0.27 dB)",
+    "score": 3.06,
+    "outside": true
+   },
+   {
     "measure": "bright_key_erb_oct",
     "text": "brightens slower up the keyboard (0.49 vs 3.17 ERB/oct)",
     "score": 2.68,
+    "outside": true
+   },
+   {
+    "measure": "legato_dip_db",
+    "text": "smoother legato (4.3 vs 13.8 dB)",
+    "score": 2.36,
     "outside": true
    }
   ]
  },
  "p079": {
-  "distance": 4.939365119646834,
+  "distance": 4.367955993331533,
   "disagree": 0.475,
-  "rank": 4,
+  "rank": 13,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (5.3 vs 0.37 dB)",
-    "score": 7.2,
-    "outside": true
-   },
-   {
     "measure": "release_ms",
-    "text": "rings longer after the key (555 vs 96.0 ms)",
+    "text": "rings longer after the key (560 vs 96.0 ms)",
     "score": 6.4,
     "outside": true
    },
@@ -3421,7 +3415,7 @@
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (2.27 vs 0.218 ERB)",
+    "text": "less even in tone from key to key (2.3 vs 0.218 ERB)",
     "score": 5.6,
     "outside": true
    },
@@ -3432,28 +3426,28 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.8 vs 7.8 dB)",
-    "score": 5.27,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.79 vs 0.37 dB)",
+    "score": 5.0,
+    "outside": true
+   },
+   {
+    "measure": "envelope",
+    "text": "envelope shape (6.6x fonts' spread)",
+    "score": 3.59,
     "outside": true
    }
   ]
  },
  "p080": {
-  "distance": 4.464378323503983,
+  "distance": 3.774894063326667,
   "disagree": 0.8,
-  "rank": 17,
+  "rank": 26,
   "top": [
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-0.7 vs 5.2 dB)",
-    "score": 7.87,
-    "outside": true
-   },
    {
     "measure": "release_ms",
     "text": "rings longer after the key (588 vs 81.0 ms)",
-    "score": 6.24,
+    "score": 6.4,
     "outside": true
    },
    {
@@ -3470,8 +3464,8 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.75 vs 0.485 dB)",
-    "score": 4.08,
+    "text": "less even from key to key (2.73 vs 0.485 dB)",
+    "score": 4.04,
     "outside": true
    },
    {
@@ -3479,13 +3473,19 @@
     "text": "more even partials (-2.2 vs 51.9 dB)",
     "score": 4.0,
     "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.12 vs 0 ERB)",
+    "score": 3.36,
+    "outside": true
    }
   ]
  },
  "p081": {
-  "distance": 2.468104912401401,
-  "disagree": 0.7500000000000001,
-  "rank": 90,
+  "distance": 2.374973326556508,
+  "disagree": 0.6833333333333335,
+  "rank": 87,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -3496,18 +3496,24 @@
    {
     "measure": "release_ms",
     "text": "rings longer after the key (586 vs 87.5 ms)",
-    "score": 4.19,
+    "score": 4.73,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.96 vs 0.42 dB)",
-    "score": 2.77,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (44.0 vs -1 ms)",
+    "score": 2.16,
     "outside": true
    },
    {
     "measure": "sgram",
     "text": "spectrogram over time (3.9x fonts' spread)",
+    "score": 2.13,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.6 vs 0.42 dB)",
     "score": 2.12,
     "outside": true
    },
@@ -3516,24 +3522,18 @@
     "text": "a higher floor (-69.3 vs -124 dB)",
     "score": 2.05,
     "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.1 vs 1.65 dB)",
-    "score": 1.97,
-    "outside": true
    }
   ]
  },
  "p082": {
-  "distance": 2.915195042079273,
-  "disagree": 1.206666666666667,
-  "rank": 68,
+  "distance": 2.799876196480613,
+  "disagree": 1.2899999999999998,
+  "rank": 63,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.83 vs 0.785 dB)",
-    "score": 5.48,
+    "text": "less even from key to key (3.74 vs 0.785 dB)",
+    "score": 5.32,
     "outside": true
    },
    {
@@ -3549,15 +3549,15 @@
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (52.0 vs 3.5 ms)",
-    "score": 2.91,
+    "measure": "staccato_len_ms",
+    "text": "longer staccato (296 vs 132 ms)",
+    "score": 2.8,
     "outside": true
    },
    {
-    "measure": "staccato_len_ms",
-    "text": "longer staccato (296 vs 135 ms)",
-    "score": 2.72,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (48.0 vs 4.5 ms)",
+    "score": 2.61,
     "outside": true
    },
    {
@@ -3569,9 +3569,9 @@
   ]
  },
  "p083": {
-  "distance": 1.9545153771580361,
+  "distance": 1.590405962465166,
   "disagree": 1.3000000000000007,
-  "rank": 111,
+  "rank": 119,
   "top": [
    {
     "measure": "release_ms",
@@ -3581,20 +3581,14 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.16 vs 0.655 dB)",
-    "score": 3.58,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.6 vs 3 dB)",
+    "text": "less even from key to key (2.57 vs 0.65 dB)",
     "score": 2.74,
     "outside": true
    },
    {
     "measure": "floor_db",
     "text": "a higher floor (-71.6 vs -124 dB)",
-    "score": 1.9,
+    "score": 1.92,
     "outside": true
    },
    {
@@ -3608,18 +3602,24 @@
     "text": "a faster attack (25.0 vs 64.5 ms)",
     "score": 1.79,
     "outside": true
+   },
+   {
+    "measure": "partial_corr",
+    "text": "partials moving more as one (0.434 vs 0.0705)",
+    "score": 1.45,
+    "outside": true
    }
   ]
  },
  "p084": {
-  "distance": 2.8274846700908958,
+  "distance": 2.671732513842472,
   "disagree": 1.1916666666666669,
-  "rank": 75,
+  "rank": 71,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (619 vs 59.0 ms)",
-    "score": 6.09,
+    "text": "rings longer after the key (619 vs 60.0 ms)",
+    "score": 6.4,
     "outside": true
    },
    {
@@ -3635,29 +3635,29 @@
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.43 vs 0.635 dB)",
-    "score": 3.23,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (44.0 vs -1 ms)",
+    "score": 2.7,
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (50.0 vs -1 ms)",
-    "score": 3.06,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.13 vs 0.635 dB)",
+    "score": 2.69,
     "outside": true
    },
    {
     "measure": "sgram",
     "text": "spectrogram over time (4.4x fonts' spread)",
-    "score": 2.36,
+    "score": 2.35,
     "outside": true
    }
   ]
  },
  "p085": {
-  "distance": 2.559111371092246,
-  "disagree": 1.4333333333333333,
-  "rank": 87,
+  "distance": 2.3490462787349404,
+  "disagree": 1.35,
+  "rank": 89,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -3667,20 +3667,14 @@
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (65.0 vs 1 ms)",
-    "score": 3.84,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.6 vs 2.65 dB)",
-    "score": 2.9,
+    "text": "speaks later in a phrase (65.0 vs 2.5 ms)",
+    "score": 3.75,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (772 vs 76.0 ms)",
-    "score": 2.42,
+    "text": "rings longer after the key (772 vs 75.5 ms)",
+    "score": 2.43,
     "outside": true
    },
    {
@@ -3692,15 +3686,21 @@
    {
     "measure": "bright_key_erb_oct",
     "text": "brightens slower up the keyboard (2.2 vs 3.55 ERB/oct)",
-    "score": 2.26,
+    "score": 2.25,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.98 vs 0.815 dB)",
+    "score": 2.1,
     "outside": true
    }
   ]
  },
  "p086": {
-  "distance": 2.5630151374545185,
-  "disagree": 0.5674999999999999,
-  "rank": 86,
+  "distance": 2.503178493329413,
+  "disagree": 0.7875,
+  "rank": 83,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -3723,13 +3723,7 @@
    {
     "measure": "floor_db",
     "text": "a higher floor (-69.2 vs -123 dB)",
-    "score": 2.4,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.54 vs 0.385 dB)",
-    "score": 2.08,
+    "score": 2.39,
     "outside": true
    },
    {
@@ -3737,13 +3731,19 @@
     "text": "smoother (-3.37 vs -1.04 log2)",
     "score": 1.65,
     "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.28 vs 0.385 dB)",
+    "score": 1.61,
+    "outside": true
    }
   ]
  },
  "p087": {
-  "distance": 3.344899154326049,
-  "disagree": 0.7666666666666666,
-  "rank": 50,
+  "distance": 3.047201862319902,
+  "disagree": 0.75,
+  "rank": 45,
   "top": [
    {
     "measure": "centroid96_erb",
@@ -3752,46 +3752,52 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (0.2 vs 4.8 dB)",
-    "score": 4.15,
-    "outside": true
-   },
-   {
     "measure": "release_ms",
     "text": "rings longer after the key (565 vs 6 ms)",
-    "score": 3.99,
+    "score": 4.43,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (96.5 vs 5.5 ms)",
-    "score": 3.73,
+    "text": "a slower attack (96.5 vs 5 ms)",
+    "score": 3.84,
     "outside": true
    },
    {
     "measure": "flatness_db",
-    "text": "noisier (-46.5 vs -61.0 dB)",
-    "score": 2.95,
+    "text": "noisier (-46.5 vs -60.9 dB)",
+    "score": 2.94,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.16 vs 0.565 dB)",
-    "score": 2.87,
+    "text": "less even from key to key (2.09 vs 0.565 dB)",
+    "score": 2.75,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (44.0 vs -1.5 ms)",
+    "score": 2.73,
     "outside": true
    }
   ]
  },
  "p088": {
-  "distance": 1.7608676752157457,
-  "disagree": 1.4166666666666665,
-  "rank": 119,
+  "distance": 1.8761330223074473,
+  "disagree": 1.416666666666667,
+  "rank": 110,
   "top": [
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.83 vs 0.445 dB)",
+    "score": 2.49,
+    "outside": true
+   },
    {
     "measure": "delay_ms",
     "text": "speaks later (162 vs 33.5 ms)",
-    "score": 2.31,
+    "score": 2.37,
     "outside": true
    },
    {
@@ -3817,19 +3823,13 @@
     "text": "more odd partials (hollower) (3.4 vs -8.4 dB)",
     "score": 1.76,
     "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.36 vs 0.445 dB)",
-    "score": 1.65,
-    "outside": true
    }
   ]
  },
  "p089": {
-  "distance": 1.645946805529606,
+  "distance": 1.6445076665944622,
   "disagree": 0.9500000000000005,
-  "rank": 122,
+  "rank": 116,
   "top": [
    {
     "measure": "release_ms",
@@ -3840,7 +3840,7 @@
    {
     "measure": "sgram",
     "text": "spectrogram over time (4.8x fonts' spread)",
-    "score": 2.59,
+    "score": 2.58,
     "outside": true
    },
    {
@@ -3851,8 +3851,8 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.16 vs 0.925 dB)",
-    "score": 2.22,
+    "text": "less even from key to key (2.1 vs 0.925 dB)",
+    "score": 2.12,
     "outside": true
    },
    {
@@ -3870,9 +3870,9 @@
   ]
  },
  "p090": {
-  "distance": 1.9124038375631245,
-  "disagree": 1.4000000000000001,
-  "rank": 112,
+  "distance": 1.546631564660189,
+  "disagree": 1.41,
+  "rank": 123,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -3887,21 +3887,9 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-1.5 vs 1.2 dB)",
-    "score": 2.8,
-    "outside": true
-   },
-   {
     "measure": "bright_key_erb_oct",
     "text": "brightens slower up the keyboard (2.54 vs 3.48 ERB/oct)",
     "score": 1.18,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (1.55 vs -0.065 dB/oct)",
-    "score": 1.13,
     "outside": true
    },
    {
@@ -3909,18 +3897,36 @@
     "text": "body spectrum shape (1.5x fonts' spread)",
     "score": 0.88,
     "outside": true
+   },
+   {
+    "measure": "icc",
+    "text": "wider (0.594 vs 0.992)",
+    "score": 0.72,
+    "outside": true
+   },
+   {
+    "measure": "wobble_c",
+    "text": "wobbles less (17.6 vs 31.5 c)",
+    "score": 0.69,
+    "outside": false
    }
   ]
  },
  "p091": {
-  "distance": 4.535313375732135,
+  "distance": 4.690397562930304,
   "disagree": 1.093486356981332,
-  "rank": 14,
+  "rank": 7,
   "top": [
    {
+    "measure": "level_rel_db",
+    "text": "quieter (-5.2 vs 1.5 dB)",
+    "score": 7.5,
+    "outside": true
+   },
+   {
     "measure": "attack_ms",
-    "text": "a slower attack (518 vs 124 ms)",
-    "score": 6.8,
+    "text": "a slower attack (518 vs 128 ms)",
+    "score": 6.66,
     "outside": true
    },
    {
@@ -3936,27 +3942,21 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-3.4 vs 1.5 dB)",
-    "score": 5.49,
-    "outside": true
-   },
-   {
     "measure": "tri3",
     "text": "stronger high partials (0.646 vs 0.002)",
     "score": 4.8,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.97 vs 0.435 dB)",
-    "score": 2.76,
+    "measure": "wobble_c",
+    "text": "wobbles less (5.5 vs 30.6 c)",
+    "score": 2.6,
     "outside": true
    }
   ]
  },
  "p092": {
-  "distance": 2.6632024239567293,
+  "distance": 2.552341738153714,
   "disagree": 1.1666666666666667,
   "rank": 80,
   "top": [
@@ -3968,26 +3968,26 @@
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.71 vs 0.665 dB)",
-    "score": 3.68,
+    "text": "less even from key to key (2.59 vs 0.665 dB)",
+    "score": 3.46,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (544 vs 211 ms)",
-    "score": 3.35,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "quieter (-6.4 vs -1.65 dB)",
-    "score": 2.61,
+    "text": "a slower attack (544 vs 206 ms)",
+    "score": 3.43,
     "outside": true
    },
    {
     "measure": "partial_corr",
     "text": "partials moving more as one (0.956 vs 0.0845)",
     "score": 1.86,
+    "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "quieter (-5 vs -1.65 dB)",
+    "score": 1.84,
     "outside": true
    },
    {
@@ -3999,20 +3999,14 @@
   ]
  },
  "p093": {
-  "distance": 2.6697188404972048,
+  "distance": 2.653177213384369,
   "disagree": 1.225,
-  "rank": 79,
+  "rank": 76,
   "top": [
    {
     "measure": "decay_db_s",
     "text": "decays slower (0.6 vs 5.3 dB/s)",
-    "score": 5.2,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.45 vs 1.4 dB)",
-    "score": 3.69,
+    "score": 5.74,
     "outside": true
    },
    {
@@ -4022,34 +4016,40 @@
     "outside": true
    },
    {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.94 vs 1.4 dB)",
+    "score": 2.77,
+    "outside": true
+   },
+   {
     "measure": "attack_ms",
-    "text": "a slower attack (762 vs 496 ms)",
-    "score": 2.23,
+    "text": "a slower attack (762 vs 474 ms)",
+    "score": 2.47,
     "outside": true
    },
    {
     "measure": "delay_ms",
-    "text": "speaks sooner (44.0 vs 253 ms)",
-    "score": 2.09,
+    "text": "speaks sooner (44.0 vs 254 ms)",
+    "score": 2.1,
     "outside": true
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (15.9 vs 6.6 dB/ms)",
-    "score": 1.86,
+    "text": "a sharper onset (15.8 vs 6.6 dB/ms)",
+    "score": 1.84,
     "outside": true
    }
   ]
  },
  "p094": {
-  "distance": 3.9392147435897433,
+  "distance": 3.9685288461538453,
   "disagree": 0.8500000000000001,
-  "rank": 27,
+  "rank": 22,
   "top": [
    {
     "measure": "centroid96_erb",
     "text": "brighter (12.2 vs 7.97 ERB)",
-    "score": 8.75,
+    "score": 8.77,
     "outside": true
    },
    {
@@ -4061,13 +4061,13 @@
    {
     "measure": "bright_scatter_erb",
     "text": "less even in tone from key to key (1.81 vs 0.464 ERB)",
-    "score": 4.71,
+    "score": 4.7,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.5 vs 0.745 dB)",
-    "score": 3.16,
+    "text": "less even from key to key (2.66 vs 0.745 dB)",
+    "score": 3.45,
     "outside": true
    },
    {
@@ -4085,20 +4085,26 @@
   ]
  },
  "p095": {
-  "distance": 1.5823035584420957,
+  "distance": 1.7998981221812498,
   "disagree": 1.7999999999999996,
-  "rank": 126,
+  "rank": 112,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.44 vs 0.87 dB)",
-    "score": 3.59,
+    "text": "less even from key to key (4.81 vs 0.87 dB)",
+    "score": 3.96,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
     "text": "brightens more with velocity (0.78 vs 0 ERB)",
     "score": 2.34,
+    "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "quieter (-8.1 vs -3.8 dB)",
+    "score": 2.19,
     "outside": true
    },
    {
@@ -4118,105 +4124,99 @@
     "text": "smoother (-6.38 vs -3.43 log2)",
     "score": 0.99,
     "outside": true
-   },
-   {
-    "measure": "delay_ms",
-    "text": "speaks later (382 vs 230 ms)",
-    "score": 0.93,
-    "outside": true
    }
   ]
  },
  "p096": {
-  "distance": 1.8147750308880006,
-  "disagree": 1.915,
+  "distance": 1.770235897021934,
+  "disagree": 1.9135714285714287,
   "rank": 114,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.09 vs 0.325 dB)",
-    "score": 4.98,
+    "text": "less even from key to key (3.27 vs 0.325 dB)",
+    "score": 5.3,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-0.98 vs 0 ERB)",
-    "score": 2.94,
+    "text": "brightens less with velocity (-1.06 vs 0 ERB)",
+    "score": 3.18,
     "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.468 vs 1)",
-    "score": 1.91,
+    "text": "wider (0.406 vs 1)",
+    "score": 2.13,
     "outside": true
    },
    {
     "measure": "flatness_db",
-    "text": "noisier (-27.6 vs -41.2 dB)",
-    "score": 1.52,
-    "outside": true
-   },
-   {
-    "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.94 vs 0.76 ERB)",
-    "score": 1.44,
+    "text": "noisier (-26.0 vs -41.2 dB)",
+    "score": 1.69,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (34.0 vs 19.0 ms)",
-    "score": 1.36,
+    "text": "a slower attack (34.0 vs 20.0 ms)",
+    "score": 1.26,
+    "outside": true
+   },
+   {
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (1.63 vs 0.76 ERB)",
+    "score": 1.06,
     "outside": true
    }
   ]
  },
  "p097": {
-  "distance": 5.006603314689162,
-  "disagree": 1.01,
-  "rank": 3,
+  "distance": 5.435923566538296,
+  "disagree": 0.9625000000000001,
+  "rank": 1,
   "top": [
    {
     "measure": "level_rel_db",
-    "text": "quieter (-23.6 vs 0.65 dB)",
+    "text": "quieter (-19.6 vs 0.65 dB)",
     "score": 11.2,
     "outside": true
    },
    {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (5.3 vs 16.6 dB)",
+    "score": 6.61,
+    "outside": true
+   },
+   {
     "measure": "delay_ms",
-    "text": "speaks later (778 vs 114 ms)",
+    "text": "speaks later (804 vs 114 ms)",
     "score": 5.6,
     "outside": true
    },
    {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (7.6 vs 16.6 dB)",
-    "score": 5.27,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.29 vs 0.32 dB)",
+    "score": 5.35,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
-    "text": "smoother (-5.35 vs -1.58 log2)",
-    "score": 4.76,
+    "text": "smoother (-5.35 vs -1.57 log2)",
+    "score": 4.77,
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.89 vs 0.32 dB)",
-    "score": 4.63,
-    "outside": true
-   },
-   {
-    "measure": "partial_corr",
-    "text": "partials moving more as one (0.829 vs -0.041)",
-    "score": 3.2,
+    "measure": "centroid96_erb",
+    "text": "darker (8.11 vs 9.96 ERB)",
+    "score": 3.53,
     "outside": true
    }
   ]
  },
  "p098": {
-  "distance": 3.1298815029595124,
-  "disagree": 1.8025000000000002,
-  "rank": 57,
+  "distance": 3.2106834415584418,
+  "disagree": 1.7858333333333336,
+  "rank": 41,
   "top": [
    {
     "measure": "bright_vel_erb",
@@ -4226,14 +4226,14 @@
    },
    {
     "measure": "tri1",
-    "text": "less fundamental (0.376 vs 0.973)",
-    "score": 4.34,
+    "text": "less fundamental (0.374 vs 0.973)",
+    "score": 4.36,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.42 vs 0.095 dB)",
-    "score": 4.18,
+    "text": "less even from key to key (2.36 vs 0.095 dB)",
+    "score": 4.08,
     "outside": true
    },
    {
@@ -4244,94 +4244,94 @@
    },
    {
     "measure": "wobble_c",
-    "text": "wobbles more (31.7 vs 1.6 c)",
-    "score": 2.35,
+    "text": "wobbles more (32.0 vs 1.6 c)",
+    "score": 2.37,
     "outside": true
    },
    {
-    "measure": "sustain_db",
-    "text": "sustains more (-19.9 vs -28.5 dB)",
-    "score": 1.35,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (72.0 vs -0.5 ms)",
+    "score": 1.98,
     "outside": true
    }
   ]
  },
  "p099": {
-  "distance": 2.1550731408227284,
+  "distance": 2.138931726951437,
   "disagree": 1.195,
-  "rank": 102,
+  "rank": 100,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (3.07 vs 1 dB)",
-    "score": 3.73,
+    "text": "less even from key to key (2.7 vs 1 dB)",
+    "score": 3.06,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.52 vs 0.694 ERB)",
-    "score": 2.9,
+    "text": "less even in tone from key to key (1.53 vs 0.694 ERB)",
+    "score": 2.94,
+    "outside": true
+   },
+   {
+    "measure": "level_rel_db",
+    "text": "quieter (-2.8 vs 1.9 dB)",
+    "score": 2.8,
     "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.289 vs 1)",
+    "text": "wider (0.29 vs 1)",
     "score": 2.4,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "darker (8.44 vs 9.98 ERB)",
-    "score": 2.38,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (37.0 vs 3.5 ms)",
-    "score": 2.01,
+    "text": "darker (8.61 vs 9.98 ERB)",
+    "score": 2.12,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (13.9 vs 16.7 dB)",
-    "score": 1.64,
+    "text": "a narrower dynamic range (14.0 vs 16.7 dB)",
+    "score": 1.58,
     "outside": true
    }
   ]
  },
  "p100": {
-  "distance": 1.5394918200107561,
-  "disagree": 2.4200000000000004,
-  "rank": 127,
+  "distance": 1.4459453652100218,
+  "disagree": 2.44,
+  "rank": 128,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.71 vs 0.425 dB)",
-    "score": 2.31,
-    "outside": true
-   },
-   {
     "measure": "dissonance_log2",
-    "text": "smoother (-4.27 vs -2.48 log2)",
-    "score": 2.29,
+    "text": "smoother (-4.29 vs -2.48 log2)",
+    "score": 2.32,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (38.0 vs 2.5 ms)",
-    "score": 2.13,
+    "text": "speaks later in a phrase (41.0 vs 2.5 ms)",
+    "score": 2.31,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.68 vs 0 ERB)",
-    "score": 2.04,
+    "text": "brightens more with velocity (0.65 vs 0 ERB)",
+    "score": 1.95,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.33 vs 0.425 dB)",
+    "score": 1.63,
     "outside": true
    },
    {
     "measure": "sustain_db",
-    "text": "sustains more (-5.7 vs -23.6 dB)",
-    "score": 1.44,
+    "text": "sustains more (-5.6 vs -23.7 dB)",
+    "score": 1.45,
     "outside": true
    },
    {
@@ -4343,181 +4343,181 @@
   ]
  },
  "p101": {
-  "distance": 4.9253787026513836,
-  "disagree": 1.7100000000000002,
-  "rank": 5,
+  "distance": 4.78675771240982,
+  "disagree": 1.8833333333333335,
+  "rank": 6,
   "top": [
    {
     "measure": "level_rel_db",
-    "text": "quieter (-29.5 vs -8.75 dB)",
+    "text": "quieter (-27.6 vs -8.8 dB)",
     "score": 11.2,
     "outside": true
    },
    {
+    "measure": "centroid96_erb",
+    "text": "brighter (13.3 vs 7.46 ERB)",
+    "score": 5.86,
+    "outside": true
+   },
+   {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (2.51 vs 0.444 ERB)",
+    "text": "less even in tone from key to key (2.23 vs 0.444 ERB)",
     "score": 5.6,
     "outside": true
    },
    {
-    "measure": "centroid96_erb",
-    "text": "brighter (12.8 vs 7.46 ERB)",
-    "score": 5.41,
+    "measure": "delay_ms",
+    "text": "speaks later (1033 vs 578 ms)",
+    "score": 4.31,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a duller attack (-4.45 vs 0.01 ERB)",
-    "score": 4.54,
+    "text": "a duller attack (-3.52 vs 0.01 ERB)",
+    "score": 3.59,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-1.37 vs 0.02 ERB)",
-    "score": 4.17,
-    "outside": true
-   },
-   {
-    "measure": "delay_ms",
-    "text": "speaks later (938 vs 578 ms)",
-    "score": 3.5,
+    "measure": "trans_spread_ms",
+    "text": "a less coherent attack (33.2 vs 9.4 ms)",
+    "score": 2.83,
     "outside": true
    }
   ]
  },
  "p102": {
-  "distance": 2.6215256765825967,
-  "disagree": 1.4235714285714283,
-  "rank": 82,
+  "distance": 2.684781267701833,
+  "disagree": 1.296428571428571,
+  "rank": 68,
   "top": [
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.95 vs 0.96 dB)",
-    "score": 4.98,
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (100 vs 6 ms)",
+    "score": 4.8,
     "outside": true
    },
    {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (104 vs 6 ms)",
-    "score": 3.56,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.73 vs 0.96 dB)",
+    "score": 4.62,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
-    "text": "smoother (-6.58 vs -2.69 log2)",
-    "score": 3.01,
-    "outside": true
-   },
-   {
-    "measure": "trans_order_ms",
-    "text": "its highs start sooner (-34.5 vs -1.5 ms)",
-    "score": 1.98,
+    "text": "smoother (-6.51 vs -2.69 log2)",
+    "score": 2.96,
     "outside": true
    },
    {
     "measure": "odd_even_db",
-    "text": "more even partials (-46.0 vs -8.45 dB)",
+    "text": "more even partials (-46.1 vs -8.45 dB)",
     "score": 1.94,
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-0.7 vs 1.85 dB)",
-    "score": 1.88,
+    "measure": "partial_corr",
+    "text": "partials moving more as one (0.491 vs 0.0125)",
+    "score": 1.91,
+    "outside": true
+   },
+   {
+    "measure": "trans_order_ms",
+    "text": "its highs start sooner (-32.5 vs -1.5 ms)",
+    "score": 1.86,
     "outside": true
    }
   ]
  },
  "p103": {
-  "distance": 3.393745955865639,
+  "distance": 3.3040126119218143,
   "disagree": 1.4892857142857143,
-  "rank": 47,
+  "rank": 40,
   "top": [
    {
     "measure": "sustain_db",
-    "text": "sustains less (-49.8 vs -11.2 dB)",
-    "score": 6.25,
+    "text": "sustains less (-51.1 vs -11.3 dB)",
+    "score": 6.4,
     "outside": true
    },
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (6.7 vs 16.6 dB)",
-    "score": 5.17,
-    "outside": true
-   },
-   {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (2.64 vs 0 ERB)",
-    "score": 4.7,
-    "outside": true
-   },
-   {
-    "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (56.6 vs 4.8 dB/ms)",
-    "score": 3.2,
+    "text": "a narrower dynamic range (6.5 vs 16.6 dB)",
+    "score": 5.27,
     "outside": true
    },
    {
     "measure": "staccato_len_ms",
-    "text": "shorter staccato (148 vs 355 ms)",
-    "score": 2.88,
+    "text": "shorter staccato (108 vs 357 ms)",
+    "score": 3.93,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (1.89 vs 0 ERB)",
+    "score": 3.37,
+    "outside": true
+   },
+   {
+    "measure": "onset_sharp_db_ms",
+    "text": "a sharper onset (57.5 vs 4.85 dB/ms)",
+    "score": 3.2,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "darker (8.49 vs 10.3 ERB)",
-    "score": 2.09,
+    "text": "darker (8.24 vs 10.3 ERB)",
+    "score": 2.37,
     "outside": true
    }
   ]
  },
  "p104": {
-  "distance": 2.8605589634524993,
+  "distance": 2.008646750607688,
   "disagree": 1.2124999999999995,
-  "rank": 74,
+  "rank": 103,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (5.9 vs -2.05 dB)",
-    "score": 5.56,
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (2.67 vs 0.485 dB)",
+    "score": 3.93,
     "outside": true
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.58 vs 0 ERB)",
-    "score": 4.74,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.1 vs 0.485 dB)",
-    "score": 4.71,
+    "text": "brightens more with velocity (1.19 vs 0 ERB)",
+    "score": 3.57,
     "outside": true
    },
    {
     "measure": "onset_jitter_ms",
-    "text": "more uneven onsets (42.6 vs 4.6 ms)",
-    "score": 2.28,
+    "text": "more uneven onsets (46.1 vs 4.6 ms)",
+    "score": 2.4,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a slower attack (12.5 vs 8.5 ms)",
-    "score": 1.96,
+    "text": "a slower attack (13.0 vs 8.5 ms)",
+    "score": 2.15,
     "outside": true
    },
    {
     "measure": "irregularity_db",
-    "text": "a more jagged overtone series (6.8 vs 2.85 dB)",
-    "score": 1.58,
+    "text": "a more jagged overtone series (6.7 vs 2.85 dB)",
+    "score": 1.54,
+    "outside": true
+   },
+   {
+    "measure": "sgram",
+    "text": "spectrogram over time (2.0x fonts' spread)",
+    "score": 1.1,
     "outside": true
    }
   ]
  },
  "p105": {
-  "distance": 2.5788430092747756,
+  "distance": 2.4457331476830797,
   "disagree": 1.1857142857142857,
-  "rank": 85,
+  "rank": 84,
   "top": [
    {
     "measure": "dissonance_log2",
@@ -4527,7 +4527,7 @@
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (51.4 vs 12.8 dB/ms)",
+    "text": "a sharper onset (49.1 vs 12.8 dB/ms)",
     "score": 3.2,
     "outside": true
    },
@@ -4550,24 +4550,18 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "louder (4.3 vs -0.95 dB)",
+    "measure": "decay_db_s",
+    "text": "decays faster (33.7 vs 15.9 dB/s)",
     "score": 2.16,
     "outside": true
    }
   ]
  },
  "p106": {
-  "distance": 4.472950721627332,
+  "distance": 3.511916529124799,
   "disagree": 0.7999999999999999,
-  "rank": 16,
+  "rank": 34,
   "top": [
-   {
-    "measure": "level_rel_db",
-    "text": "louder (4.2 vs -7 dB)",
-    "score": 10.45,
-    "outside": true
-   },
    {
     "measure": "centroid96_erb",
     "text": "darker (10.3 vs 14.2 ERB)",
@@ -4577,19 +4571,19 @@
    {
     "measure": "sgram",
     "text": "spectrogram over time (7.5x fonts' spread)",
-    "score": 4.04,
+    "score": 4.07,
     "outside": true
    },
    {
     "measure": "tri3",
-    "text": "stronger high partials (0.461 vs 0.09)",
-    "score": 3.18,
+    "text": "stronger high partials (0.534 vs 0.09)",
+    "score": 3.81,
     "outside": true
    },
    {
     "measure": "wobble_c",
-    "text": "wobbles more (21.0 vs 0.5 c)",
-    "score": 2.46,
+    "text": "wobbles more (22.7 vs 0.5 c)",
+    "score": 2.66,
     "outside": true
    },
    {
@@ -4597,30 +4591,30 @@
     "text": "wider (0.345 vs 1)",
     "score": 2.4,
     "outside": true
+   },
+   {
+    "measure": "flatness_db",
+    "text": "noisier (-33.0 vs -61.8 dB)",
+    "score": 2.32,
+    "outside": true
    }
   ]
  },
  "p107": {
-  "distance": 1.7452053635245586,
-  "disagree": 0.879795208516579,
+  "distance": 1.555868408854976,
+  "disagree": 0.9035714285714285,
   "rank": 120,
   "top": [
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (1268 vs 629 ms)",
-    "score": 3.07,
+    "text": "rings longer after the key (1268 vs 602 ms)",
+    "score": 3.25,
     "outside": true
    },
    {
     "measure": "dissonance_log2",
     "text": "rougher (-1.08 vs -3.49 log2)",
     "score": 2.89,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (-0.7 vs -3.15 dB)",
-    "score": 2.29,
     "outside": true
    },
    {
@@ -4640,13 +4634,19 @@
     "text": "a duller attack (-1.41 vs 1.71 ERB)",
     "score": 1.26,
     "outside": true
+   },
+   {
+    "measure": "stretch_c",
+    "text": "more stretched partials (1.35 vs 0.11 c/partial)",
+    "score": 1.24,
+    "outside": true
    }
   ]
  },
  "p108": {
-  "distance": 2.7944973176878802,
+  "distance": 2.782401729452586,
   "disagree": 0.49374999999999997,
-  "rank": 76,
+  "rank": 64,
   "top": [
    {
     "measure": "attack_bright_erb",
@@ -4687,9 +4687,9 @@
   ]
  },
  "p109": {
-  "distance": 4.798564016979162,
+  "distance": 4.9847222222222225,
   "disagree": 1.05,
-  "rank": 8,
+  "rank": 4,
   "top": [
    {
     "measure": "centroid96_erb",
@@ -4699,7 +4699,7 @@
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (702 vs 140 ms)",
+    "text": "rings longer after the key (702 vs 139 ms)",
     "score": 6.4,
     "outside": true
    },
@@ -4730,9 +4730,9 @@
   ]
  },
  "p110": {
-  "distance": 3.229109384513816,
+  "distance": 2.951984384513816,
   "disagree": 1.5816666666666668,
-  "rank": 53,
+  "rank": 54,
   "top": [
    {
     "measure": "release_ms",
@@ -4759,33 +4759,33 @@
     "outside": true
    },
    {
-    "measure": "level_rel_db",
-    "text": "quieter (-4.1 vs 1.05 dB)",
-    "score": 3.6,
-    "outside": true
-   },
-   {
     "measure": "sgram",
     "text": "spectrogram over time (5.1x fonts' spread)",
     "score": 2.73,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (41.0 vs 2.5 ms)",
+    "score": 2.2,
     "outside": true
    }
   ]
  },
  "p111": {
-  "distance": 4.794860683197392,
-  "disagree": 1.0714285714285712,
-  "rank": 9,
+  "distance": 4.860051415699066,
+  "disagree": 1.0,
+  "rank": 5,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (5.93 vs 0.445 dB)",
-    "score": 6.54,
+    "text": "less even from key to key (6.48 vs 0.445 dB)",
+    "score": 7.19,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (686 vs 58.0 ms)",
+    "text": "rings longer after the key (704 vs 58.0 ms)",
     "score": 6.4,
     "outside": true
    },
@@ -4808,83 +4808,77 @@
     "outside": true
    },
    {
-    "measure": "attack_ms",
-    "text": "a slower attack (222 vs 19.0 ms)",
-    "score": 4.51,
+    "measure": "envelope",
+    "text": "envelope shape (8.1x fonts' spread)",
+    "score": 4.32,
     "outside": true
    }
   ]
  },
  "p112": {
-  "distance": 2.6194391004043123,
+  "distance": 2.6714463402201485,
   "disagree": 1.4675,
-  "rank": 83,
+  "rank": 72,
   "top": [
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (2.74 vs 0.33 dB)",
-    "score": 4.34,
-    "outside": true
-   },
-   {
-    "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.1 vs 0 ERB)",
-    "score": 3.3,
+    "text": "less even from key to key (2.24 vs 0.33 dB)",
+    "score": 3.44,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.13 vs 0.261 ERB)",
-    "score": 3.04,
+    "text": "less even in tone from key to key (1.08 vs 0.261 ERB)",
+    "score": 2.88,
+    "outside": true
+   },
+   {
+    "measure": "bright_vel_erb",
+    "text": "brightens more with velocity (0.95 vs 0 ERB)",
+    "score": 2.85,
     "outside": true
    },
    {
     "measure": "legato_dip_db",
-    "text": "more separated legato (17.9 vs 7.5 dB)",
-    "score": 2.6,
+    "text": "more separated legato (18.9 vs 7.5 dB)",
+    "score": 2.85,
     "outside": true
    },
    {
     "measure": "tri2",
-    "text": "stronger low partials (0.322 vs 0.001)",
-    "score": 2.29,
+    "text": "stronger low partials (0.369 vs 0.001)",
+    "score": 2.63,
     "outside": true
    },
    {
-    "measure": "bright_key_erb_oct",
-    "text": "brightens slower up the keyboard (2.77 vs 4.71 ERB/oct)",
-    "score": 1.83,
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (13.0 vs 16.6 dB)",
+    "score": 2.58,
     "outside": true
    }
   ]
  },
  "p113": {
-  "distance": 3.6160743236100235,
+  "distance": 3.4440937005097196,
   "disagree": 1.5666666666666667,
-  "rank": 37,
+  "rank": 36,
   "top": [
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (1.97 vs 0.322 ERB)",
+    "text": "less even in tone from key to key (1.96 vs 0.322 ERB)",
     "score": 5.6,
     "outside": true
    },
    {
     "measure": "tri1",
-    "text": "more fundamental (0.469 vs 0)",
-    "score": 4.02,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the top (3.33 vs -2.33 dB/oct)",
-    "score": 3.96,
+    "text": "more fundamental (0.474 vs 0)",
+    "score": 4.06,
     "outside": true
    },
    {
     "measure": "flatness_db",
-    "text": "noisier (-11.8 vs -46.3 dB)",
-    "score": 3.45,
+    "text": "noisier (-11.6 vs -46.3 dB)",
+    "score": 3.47,
     "outside": true
    },
    {
@@ -4898,18 +4892,24 @@
     "text": "weaker low partials (0.02 vs 0.941)",
     "score": 3.23,
     "outside": true
+   },
+   {
+    "measure": "decay_db_s",
+    "text": "decays slower (34.0 vs 77.0 dB/s)",
+    "score": 3.09,
+    "outside": true
    }
   ]
  },
  "p114": {
-  "distance": 2.9950851548670427,
-  "disagree": 1.875000000000001,
-  "rank": 63,
+  "distance": 2.8592060049136627,
+  "disagree": 1.883333333333334,
+  "rank": 59,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (1.62 vs 0.015 ERB)",
-    "score": 4.82,
+    "text": "brightens more with velocity (1.59 vs 0.015 ERB)",
+    "score": 4.73,
     "outside": true
    },
    {
@@ -4920,45 +4920,39 @@
    },
    {
     "measure": "legato_even_db",
-    "text": "a less even scale (48.8 vs 0.4 dB)",
+    "text": "a less even scale (47.9 vs 0.4 dB)",
     "score": 4.0,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (2.12 vs 0.15 dB)",
-    "score": 3.55,
-    "outside": true
-   },
-   {
-    "measure": "icc",
-    "text": "wider (0.285 vs 1)",
-    "score": 2.4,
     "outside": true
    },
    {
     "measure": "attack_ms",
     "text": "a faster attack (1 vs 12.5 ms)",
-    "score": 2.31,
+    "score": 2.58,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.54 vs 0.15 dB)",
+    "score": 2.5,
+    "outside": true
+   },
+   {
+    "measure": "icc",
+    "text": "wider (0.272 vs 1)",
+    "score": 2.4,
     "outside": true
    }
   ]
  },
  "p115": {
-  "distance": 2.280908131095884,
+  "distance": 1.5553232145205365,
   "disagree": 1.77,
-  "rank": 96,
+  "rank": 121,
   "top": [
    {
-    "measure": "level_rel_db",
-    "text": "louder (1.4 vs -7.45 dB)",
-    "score": 5.27,
-    "outside": true
-   },
-   {
     "measure": "sustain_db",
-    "text": "sustains more (-82.9 vs -116 dB)",
-    "score": 3.87,
+    "text": "sustains more (-83.1 vs -116 dB)",
+    "score": 3.84,
     "outside": true
    },
    {
@@ -4975,65 +4969,71 @@
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens more with velocity (0.68 vs 0.005 ERB)",
-    "score": 2.03,
+    "text": "brightens more with velocity (0.64 vs 0.005 ERB)",
+    "score": 1.91,
+    "outside": true
+   },
+   {
+    "measure": "attack_ms",
+    "text": "a faster attack (0.5 vs 2 ms)",
+    "score": 1.61,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (1.06 vs 0.03 dB)",
-    "score": 1.85,
+    "text": "less even from key to key (0.87 vs 0.03 dB)",
+    "score": 1.51,
     "outside": true
    }
   ]
  },
  "p116": {
-  "distance": 3.9284493822392346,
+  "distance": 4.086009932991411,
   "disagree": 1.1041666666666665,
-  "rank": 28,
+  "rank": 19,
   "top": [
    {
     "measure": "centroid96_erb",
-    "text": "brighter (7.29 vs 3.01 ERB)",
+    "text": "brighter (7.25 vs 3.01 ERB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (4.7 vs 0.28 dB)",
-    "score": 7.2,
+    "text": "less even from key to key (3.6 vs 0.28 dB)",
+    "score": 5.98,
+    "outside": true
+   },
+   {
+    "measure": "stretch_c",
+    "text": "less stretched partials (-5.94 vs -0.33 c/partial)",
+    "score": 4.0,
     "outside": true
    },
    {
     "measure": "f0_scatter_c",
-    "text": "more evenly tuned (3 vs 42.8 c)",
-    "score": 2.79,
+    "text": "more evenly tuned (2.9 vs 42.8 c)",
+    "score": 2.8,
     "outside": true
    },
    {
-    "measure": "sgram",
-    "text": "spectrogram over time (4.8x fonts' spread)",
-    "score": 2.59,
+    "measure": "level_rel_db",
+    "text": "quieter (-1.8 vs 0.8 dB)",
+    "score": 2.6,
     "outside": true
    },
    {
     "measure": "wobble_c",
-    "text": "wobbles less (55.9 vs 88.5 c)",
-    "score": 2.54,
-    "outside": true
-   },
-   {
-    "measure": "icc",
-    "text": "wider (0.193 vs 0.984)",
-    "score": 2.4,
+    "text": "wobbles less (55.1 vs 88.5 c)",
+    "score": 2.6,
     "outside": true
    }
   ]
  },
  "p117": {
-  "distance": 2.986010633138685,
+  "distance": 2.8234508717618505,
   "disagree": 1.1583333333333332,
-  "rank": 64,
+  "rank": 61,
   "top": [
    {
     "measure": "centroid96_erb",
@@ -5043,14 +5043,8 @@
    },
    {
     "measure": "odd_even_db",
-    "text": "more odd partials (hollower) (22.5 vs -5 dB)",
-    "score": 3.57,
-    "outside": true
-   },
-   {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (1.7 vs 0.04 dB)",
-    "score": 2.99,
+    "text": "more odd partials (hollower) (22.3 vs -5 dB)",
+    "score": 3.55,
     "outside": true
    },
    {
@@ -5061,14 +5055,20 @@
    },
    {
     "measure": "staccato_len_ms",
-    "text": "longer staccato (212 vs 104 ms)",
-    "score": 2.47,
+    "text": "longer staccato (211 vs 104 ms)",
+    "score": 2.45,
     "outside": true
    },
    {
-    "measure": "irregularity_db",
-    "text": "a more jagged overtone series (7.95 vs 1.92 dB)",
-    "score": 2.41,
+    "measure": "floor_db",
+    "text": "a higher floor (-66.0 vs -122 dB)",
+    "score": 2.36,
+    "outside": true
+   },
+   {
+    "measure": "f0_scatter_c",
+    "text": "more evenly tuned (4.5 vs 40.5 c)",
+    "score": 2.34,
     "outside": true
    }
   ]
@@ -5076,7 +5076,7 @@
  "p118": {
   "distance": 3.031539297871544,
   "disagree": 1.26,
-  "rank": 62,
+  "rank": 46,
   "top": [
    {
     "measure": "centroid96_erb",
@@ -5117,20 +5117,20 @@
   ]
  },
  "p119": {
-  "distance": 3.1205154697013917,
+  "distance": 3.5926342936413675,
   "disagree": 1.4333333333333333,
-  "rank": 59,
+  "rank": 30,
   "top": [
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (7.1 vs 16.7 dB)",
+    "score": 6.98,
+    "outside": true
+   },
    {
     "measure": "centroid96_erb",
     "text": "darker (12.8 vs 25.9 ERB)",
     "score": 5.91,
-    "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (10.3 vs 16.7 dB)",
-    "score": 4.65,
     "outside": true
    },
    {
@@ -5146,77 +5146,77 @@
     "outside": true
    },
    {
-    "measure": "tri2",
-    "text": "stronger low partials (0.344 vs 0.03)",
-    "score": 2.24,
+    "measure": "level_rel_db",
+    "text": "quieter (-34.5 vs -12.9 dB)",
+    "score": 2.58,
     "outside": true
    },
    {
-    "measure": "release_ms",
-    "text": "rings longer after the key (555 vs 32.0 ms)",
-    "score": 2.08,
+    "measure": "tri2",
+    "text": "stronger low partials (0.344 vs 0.03)",
+    "score": 2.24,
     "outside": true
    }
   ]
  },
  "p120": {
-  "distance": 3.348023187234757,
+  "distance": 2.991536299693095,
   "disagree": 3.169925001442312,
-  "rank": 49,
+  "rank": 50,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (5.7 vs 16.6 dB)",
-    "score": 7.51,
+    "text": "a narrower dynamic range (6.3 vs 16.6 dB)",
+    "score": 7.1,
     "outside": true
    },
    {
     "measure": "sustain_db",
-    "text": "sustains more (-49.8 vs -119 dB)",
-    "score": 4.57,
-    "outside": true
-   },
-   {
-    "measure": "onset_ms",
-    "text": "speaks later in a phrase (54.0 vs -1 ms)",
-    "score": 3.3,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (-0.5 vs -8.7 dB)",
-    "score": 3.23,
+    "text": "sustains more (-50.0 vs -119 dB)",
+    "score": 4.56,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "brighter (23.1 vs 19.1 ERB)",
-    "score": 2.76,
+    "text": "brighter (22.8 vs 19.1 ERB)",
+    "score": 2.54,
+    "outside": true
+   },
+   {
+    "measure": "onset_ms",
+    "text": "speaks later in a phrase (40.0 vs -1 ms)",
+    "score": 2.46,
     "outside": true
    },
    {
     "measure": "decay_db_s",
-    "text": "decays slower (27.1 vs 42.2 dB/s)",
-    "score": 2.3,
+    "text": "decays slower (26.8 vs 42.2 dB/s)",
+    "score": 2.36,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (1.24 vs 0.235 dB)",
+    "score": 1.81,
     "outside": true
    }
   ]
  },
  "p121": {
-  "distance": 3.1724344372317086,
+  "distance": 3.0247947923829406,
   "disagree": 2.8083333333333336,
-  "rank": 56,
+  "rank": 48,
   "top": [
    {
     "measure": "vel_range_db",
-    "text": "a narrower dynamic range (0.3 vs 16.8 dB)",
+    "text": "a narrower dynamic range (0.4 vs 16.8 dB)",
     "score": 9.6,
     "outside": true
    },
    {
     "measure": "sustain_db",
     "text": "sustains more (-3.5 vs -112 dB)",
-    "score": 4.53,
+    "score": 4.52,
     "outside": true
    },
    {
@@ -5232,109 +5232,109 @@
     "outside": true
    },
    {
-    "measure": "level_scatter_db",
-    "text": "less even from key to key (3.22 vs 0.345 dB)",
-    "score": 1.98,
-    "outside": true
-   },
-   {
     "measure": "envelope",
     "text": "envelope shape (2.7x fonts' spread)",
     "score": 1.48,
+    "outside": true
+   },
+   {
+    "measure": "legato_dip_db",
+    "text": "smoother legato (2.5 vs 10.1 dB)",
+    "score": 1.28,
     "outside": true
    }
   ]
  },
  "p122": {
-  "distance": 2.183275660873163,
+  "distance": 2.692193880523587,
   "disagree": 2.6125000000000003,
-  "rank": 101,
+  "rank": 66,
   "top": [
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-1.11 vs 0.23 ERB)",
-    "score": 3.3,
+    "text": "brightens less with velocity (-2.75 vs 0.23 ERB)",
+    "score": 7.2,
+    "outside": true
+   },
+   {
+    "measure": "bright_scatter_erb",
+    "text": "less even in tone from key to key (2.69 vs 0.167 ERB)",
+    "score": 3.2,
     "outside": true
    },
    {
     "measure": "attack_bright_erb",
-    "text": "a brighter attack (3.89 vs -0.685 ERB)",
-    "score": 2.63,
+    "text": "a brighter attack (3.33 vs -0.685 ERB)",
+    "score": 2.31,
+    "outside": true
+   },
+   {
+    "measure": "level_scatter_db",
+    "text": "less even from key to key (3.97 vs 1.01 dB)",
+    "score": 2.03,
+    "outside": true
+   },
+   {
+    "measure": "f0_c",
+    "text": "flatter (-16.5 vs 16.9 c)",
+    "score": 1.91,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "darker (13.1 vs 20.6 ERB)",
-    "score": 2.47,
-    "outside": true
-   },
-   {
-    "measure": "level_key_db_oct",
-    "text": "louder toward the bottom (-5.03 vs 0.45 dB/oct)",
-    "score": 2.04,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (-0.8 vs -11.8 dB)",
-    "score": 2.01,
-    "outside": true
-   },
-   {
-    "measure": "vel_range_db",
-    "text": "a narrower dynamic range (8.1 vs 16.6 dB)",
-    "score": 1.89,
+    "text": "darker (14.9 vs 20.6 ERB)",
+    "score": 1.87,
     "outside": true
    }
   ]
  },
  "p123": {
-  "distance": 1.8440022672051122,
+  "distance": 1.539442522114377,
   "disagree": 3.12,
-  "rank": 113,
+  "rank": 124,
   "top": [
    {
     "measure": "glide_c",
-    "text": "starts sharper (44.0 vs 0 c)",
-    "score": 3.93,
+    "text": "starts sharper (54.3 vs 0 c)",
+    "score": 4.0,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (583 vs 23.5 ms)",
-    "score": 3.26,
+    "text": "rings longer after the key (539 vs 23.5 ms)",
+    "score": 3.19,
     "outside": true
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (48.0 vs -1 ms)",
-    "score": 2.94,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (3.9 vs -0.6 dB)",
-    "score": 2.14,
+    "text": "speaks later in a phrase (33.0 vs -1 ms)",
+    "score": 2.04,
     "outside": true
    },
    {
     "measure": "level_scatter_db",
-    "text": "less even from key to key (1.5 vs 0.67 dB)",
-    "score": 1.49,
+    "text": "less even from key to key (1.7 vs 0.67 dB)",
+    "score": 1.85,
     "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.645 vs 1)",
-    "score": 1.42,
+    "text": "wider (0.643 vs 1)",
+    "score": 1.43,
+    "outside": true
+   },
+   {
+    "measure": "flatness_db",
+    "text": "purer (-53.2 vs -24.1 dB)",
+    "score": 1.16,
     "outside": true
    }
   ]
  },
  "p124": {
-  "distance": 2.14277896914088,
-  "disagree": 2.7624999999999997,
-  "rank": 104,
+  "distance": 2.234954640008029,
+  "disagree": 2.7499999999999996,
+  "rank": 92,
   "top": [
    {
     "measure": "vel_range_db",
@@ -5350,39 +5350,39 @@
    },
    {
     "measure": "onset_ms",
-    "text": "speaks later in a phrase (40.0 vs 1.5 ms)",
-    "score": 2.31,
+    "text": "speaks later in a phrase (38.0 vs 1.5 ms)",
+    "score": 2.19,
     "outside": true
    },
    {
     "measure": "icc",
-    "text": "wider (0.527 vs 1)",
-    "score": 1.89,
+    "text": "wider (0.491 vs 1)",
+    "score": 2.04,
     "outside": true
    },
    {
     "measure": "release_ms",
-    "text": "rings longer after the key (692 vs 153 ms)",
-    "score": 1.75,
+    "text": "rings longer after the key (746 vs 153 ms)",
+    "score": 1.84,
     "outside": true
    },
    {
     "measure": "floor_db",
-    "text": "a higher floor (-59.5 vs -121 dB)",
-    "score": 1.68,
+    "text": "a higher floor (-59.2 vs -121 dB)",
+    "score": 1.69,
     "outside": true
    }
   ]
  },
  "p125": {
-  "distance": 3.4027553210113823,
+  "distance": 3.1934527810665596,
   "disagree": 2.2499999999999996,
-  "rank": 46,
+  "rank": 42,
   "top": [
    {
     "measure": "level_rel_db",
-    "text": "louder (5.6 vs -22.0 dB)",
-    "score": 11.2,
+    "text": "louder (-10.1 vs -22.0 dB)",
+    "score": 9.76,
     "outside": true
    },
    {
@@ -5399,14 +5399,14 @@
    },
    {
     "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-0.66 vs 0 ERB)",
-    "score": 1.98,
+    "text": "brightens less with velocity (-0.68 vs 0 ERB)",
+    "score": 2.04,
     "outside": true
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "less even in tone from key to key (0.632 vs 0.0955 ERB)",
-    "score": 1.88,
+    "text": "less even in tone from key to key (0.631 vs 0.0955 ERB)",
+    "score": 1.87,
     "outside": true
    },
    {
@@ -5418,52 +5418,52 @@
   ]
  },
  "p126": {
-  "distance": 2.727254678351119,
+  "distance": 2.6896121727474362,
   "disagree": 1.6999999999999997,
-  "rank": 77,
+  "rank": 67,
   "top": [
    {
     "measure": "delay_ms",
-    "text": "speaks sooner (32.0 vs 444 ms)",
+    "text": "speaks sooner (40.0 vs 444 ms)",
     "score": 5.6,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
-    "text": "darker (16.0 vs 21.8 ERB)",
-    "score": 3.2,
+    "text": "darker (15.9 vs 21.8 ERB)",
+    "score": 3.24,
     "outside": true
    },
    {
     "measure": "attack_ms",
-    "text": "a faster attack (435 vs 804 ms)",
-    "score": 3.17,
+    "text": "a faster attack (432 vs 760 ms)",
+    "score": 2.93,
     "outside": true
    },
    {
     "measure": "level_rel_db",
-    "text": "louder (-0.7 vs -14.5 dB)",
-    "score": 3.09,
-    "outside": true
-   },
-   {
-    "measure": "icc",
-    "text": "wider (0.353 vs 0.982)",
-    "score": 2.4,
+    "text": "louder (-2.2 vs -14.5 dB)",
+    "score": 2.76,
     "outside": true
    },
    {
     "measure": "tri3",
-    "text": "weaker high partials (0.428 vs 0.864)",
-    "score": 2.2,
+    "text": "weaker high partials (0.326 vs 0.864)",
+    "score": 2.71,
+    "outside": true
+   },
+   {
+    "measure": "icc",
+    "text": "wider (0.355 vs 0.982)",
+    "score": 2.4,
     "outside": true
    }
   ]
  },
  "p127": {
-  "distance": 1.7986248329938683,
+  "distance": 1.522454728103345,
   "disagree": 1.9600000000000002,
-  "rank": 116,
+  "rank": 125,
   "top": [
    {
     "measure": "staccato_len_ms",
@@ -5473,14 +5473,8 @@
    },
    {
     "measure": "onset_sharp_db_ms",
-    "text": "a sharper onset (63.6 vs 8.7 dB/ms)",
+    "text": "a sharper onset (63.1 vs 8.65 dB/ms)",
     "score": 3.2,
-    "outside": true
-   },
-   {
-    "measure": "level_rel_db",
-    "text": "louder (5.4 vs -2.6 dB)",
-    "score": 2.84,
     "outside": true
    },
    {
@@ -5498,32 +5492,38 @@
    {
     "measure": "wobble_c",
     "text": "wobbles less (91.7 vs 110 c)",
-    "score": 1.87,
+    "score": 1.84,
+    "outside": true
+   },
+   {
+    "measure": "vel_range_db",
+    "text": "a narrower dynamic range (14.6 vs 16.6 dB)",
+    "score": 1.41,
     "outside": true
    }
   ]
  },
  "drums": {
-  "distance": 3.855872912965586,
+  "distance": 3.0665152171675585,
   "disagree": 1.3166666666666664,
-  "rank": 30,
+  "rank": 44,
   "top": [
    {
     "measure": "level_rel_db",
-    "text": "louder (1.7 vs -7.85 dB)",
-    "score": 11.2,
+    "text": "louder (-3.2 vs -7.85 dB)",
+    "score": 6.51,
     "outside": true
    },
    {
     "measure": "sustain_db",
-    "text": "sustains more (-76.3 vs -121 dB)",
-    "score": 4.72,
+    "text": "sustains more (-76.2 vs -121 dB)",
+    "score": 4.73,
     "outside": true
    },
    {
     "measure": "centroid96_erb",
     "text": "darker (12.4 vs 16.5 ERB)",
-    "score": 4.13,
+    "score": 4.07,
     "outside": true
    },
    {
@@ -5534,14 +5534,14 @@
    },
    {
     "measure": "bright_scatter_erb",
-    "text": "more even in tone from key to key (8.78 vs 10.0 ERB)",
-    "score": 2.84,
+    "text": "more even in tone from key to key (8.93 vs 10.0 ERB)",
+    "score": 2.49,
     "outside": true
    },
    {
-    "measure": "bright_vel_erb",
-    "text": "brightens less with velocity (-0.79 vs 0 ERB)",
-    "score": 2.37,
+    "measure": "attack_ms",
+    "text": "a slower attack (6 vs 3.5 ms)",
+    "score": 1.43,
     "outside": true
    }
   ]

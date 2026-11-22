@@ -149,6 +149,53 @@ ModalModel::ModalModel(const Instrument& inst) : Tube(inst), set_(inst.fs) {
     if (std::strcmp(inst.name, names[i]) == 0) type_ = Type(i);
   if (std::strncmp(inst.name, "vibraphone", 10) == 0) type_ = kVibraphone;  // (and its mallet variants)
   build();
+  // (PJ_VIB_BARS=0: the vibraphone as one point in the room, its bars' places only in its sides)
+  if (type_ == kVibraphone && !sfx && knob("PJ_VIB_BARS", 1) != 0) {
+    for (int i = 0; i < kVibBars; ++i) {
+      double x, y;
+      vibPlace(i, &x, &y);
+      static const double kSpread = knob("PJ_VIB_SPREAD", 1);  // (tests: 0 puts every bar at the centre)
+      partPlace_.insert(partPlace_.end(), {float(kSpread * x), float(kSpread * y), 0.0f});
+    }
+    partPlace_.insert(partPlace_.end(), {0.0f, 0.0f, 0.0f});
+    part_.resize(kVibBars + 1);
+    set_.keepEach(true);
+  }
+}
+
+// research/vibraphone.md 1: the bars 381 -> 175 mm long and 57 -> 38 mm wide, geometric from F3
+// to F6, in one plane on two rows either side of the damper felt: the naturals on the player's
+// side, the accidentals beyond them, each bar's middle (over its resonator) half its length and
+// ~9 mm (half the gap the felt presses into) from the felt's line, so the rows close in from
+// ~39 cm apart at F3 to ~19 cm at F6. Along the frame the naturals in order, ~12 mm apart (the
+// 22 under the 1295 mm felt), an accidental over the gap between its two neighbours.
+void ModalModel::vibPlace(int i, double* x, double* y) {
+  auto len = [](int b) { return 0.381 * std::pow(0.175 / 0.381, b / 36.0); };
+  auto wid = [](int b) { return 0.057 * std::pow(0.038 / 0.057, b / 36.0); };
+  auto natural = [](int midi) { const int pc = midi % 12; return !(pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10); };
+  constexpr double kGap = 0.012, kFelt = 0.018;
+  // The naturals' middles along the frame, from F3's left edge.
+  double at[kVibBars], edge = 0;
+  for (int b = 0; b < kVibBars; ++b) {
+    if (!natural(kVibLo + b)) continue;
+    at[b] = edge + wid(b) / 2;
+    edge += wid(b) + kGap;
+  }
+  const double span = edge - kGap;
+  for (int b = 0; b < kVibBars; ++b)
+    if (!natural(kVibLo + b)) at[b] = 0.5 * (at[b - 1] + at[b + 1]);  // (F3 and F6 are naturals)
+  *x = at[i] - span / 2;
+  *y = (natural(kVibLo + i) ? -1 : 1) * (len(i) / 2 + kFelt / 2);
+}
+
+const float* ModalModel::takePart(int n, int j) {
+  if (j < 0 || j >= int(part_.size())) return nullptr;
+  std::vector<float>& p = part_[j];
+  partOut_.assign(n, 0.0f);
+  const int have = int(p.size()), m = std::min(n, have);
+  std::copy(p.end() - m, p.end(), partOut_.end() - m);
+  p.clear();
+  return partOut_.data();
 }
 
 void ModalModel::resetAir() {
@@ -261,7 +308,20 @@ float ModalModel::sample() {
   }
   last_ = y;
   side_.push_back(float(gain * outScale()) * sd);
-  return finish(float(gain) * y);
+  const float out = finish(float(gain) * y);
+  if (!part_.empty()) {
+    if (part_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
+      for (auto& p : part_) p.clear();
+    const float g = float(gain * outScale());
+    float sum = 0;
+    for (int i = 0; i < kVibBars; ++i) {
+      const float b = g * set_.each(i);
+      part_[i].push_back(b);
+      sum += b;
+    }
+    part_[kVibBars].push_back(out - sum);
+  }
+  return out;
 }
 
 }  // namespace pajupilli
@@ -572,6 +632,15 @@ void ModalModel::build1() {
       for (int i = 0; i < kVibBars; ++i) {
         const int midi = kVibLo + i;
         const double f = hz(midi), u = i / double(kVibBars - 1);  // 0 at F3, 1 at F6
+        // (its place along the frame, -1 at F3's end .. 1 at F6's: the sides follow it)
+        double px, py_;
+        vibPlace(i, &px, &py_);
+        {
+          double x0, x1, yy;
+          vibPlace(0, &x0, &yy);
+          vibPlace(kVibBars - 1, &x1, &yy);
+          px = (2 * px - (x0 + x1)) / (x1 - x0);
+        }
         auto lerp = [](double a, double b, double t) { return a + (b - a) * std::clamp(t, 0.0, 1.0); };
         auto logl = [](double a, double b, double t) { return a * std::pow(b / a, std::clamp(t, 0.0, 1.0)); };
         double r[6];
@@ -612,8 +681,8 @@ void ModalModel::build1() {
         d.exc[kVibAir] = 0;
         static const double kAirRad = knob("PJ_VIBAIR", 6);  // the tube's mouth: a monopole
         d.rad[kVibAir] = float(kAirRad);
-        d.side[kVibAir] = float(kAirRad * 0.4 * (2 * u - 1));  // low bars left, high right (the player's view)
-        for (int k = 0; k < 6; ++k) d.side[k] += float(rad[k] * 0.4 * (2 * u - 1));
+        d.side[kVibAir] = float(kAirRad * 0.4 * -px);  // low bars left, high right (the player's view; left = out + side)
+        for (int k = 0; k < 6; ++k) d.side[k] += float(rad[k] * 0.4 * -px);
         // The bar's dense high modes (bending beyond the fourth, torsion's
         // overtones), ~6-16 kHz: only a hard mallet's short contact reaches
         // them, and they die in a fraction of a second (radiation and the
@@ -628,7 +697,7 @@ void ModalModel::build1() {
           d.t60[m] = float(kHiT60 * std::sqrt(8000 / fk));
           d.exc[m] = float(kHiExc * (k % 2 ? 0.7 : 1.0) / (1 + 0.15 * k));
           d.rad[m] = 0.5f;
-          d.side[m] = float(0.5 * 0.4 * (2 * u - 1) * (k % 2 ? 1 : -1));
+          d.side[m] = float(0.5 * 0.4 * -px * (k % 2 ? 1 : -1));
         }
         d.nl = 1;
         d.lin[0] = {0, kVibAir, float(7e3 * std::pow(f / 175, 1.739))};
@@ -741,6 +810,13 @@ ModalPlayer::ModalPlayer(ModalModel& m) : Performer(m), m_(m), s_(m.set()) {
 }
 
 void ModalPlayer::seed(unsigned s) { rng_ = 4711u + 7919u * s; }
+
+bool ModalPlayer::setKnob(int k, double x) {
+  if (m_.type() != ModalModel::kVibraphone || (k != 3 && k != 4)) return false;
+  if (k == 3) fanDepth_ = x;
+  else fanRate_ = 0.7 + 4.3 * x;
+  return true;
+}
 
 void ModalPlayer::setHold(bool h) {
   hold_ = h;
@@ -1122,18 +1198,32 @@ void ModalPlayer::render(float* out, int n) {
       }
     }
     // The vibraphone's fan: discs on a shaft over the tubes' mouths, open
-    // twice a turn (the tremolo at 0.7-5 Hz: K5); open, the tube couples
-    // to its bar fully, closed ~15 %. K4: the motor on and how deep (off:
-    // the discs left open).
+    // twice a turn: the opening a rectified sine (open, the tube couples to
+    // its bar fully; closed, ~15 %). The motor runs by default at the
+    // slowest tremolo, 0.7 Hz; the mod wheel speeds it up to 5 Hz (live:
+    // K5 its speed, K4 how deep, 0 the discs left open). (Not the voice's
+    // vibrato: a vibist sets the motor and leaves it.)
     if (m_.type() == ModalModel::kVibraphone) {
       // (Tests: PJ_FAN the depth, PJ_FANHZ the tremolo's rate, in place of the knobs.)
       static const double kFan = knob("PJ_FAN", -1), kFanHz = knob("PJ_FANHZ", -1), kFanPh = knob("PJ_FANPH", 0);
-      const double depth = kFan >= 0 ? kFan : std::clamp(vibDepth_ / 0.15, 0.0, 1.0);
-      const double rate = kFanHz > 0 ? kFanHz : 0.7 + 4.3 * std::clamp((vibRate_ - 4) / 3, 0.0, 1.0);
+      const double depth = kFan >= 0 ? kFan : std::clamp(fanDepth_, 0.0, 1.0);
+      const double rate = kFanHz > 0 ? kFanHz : std::min(5.0, fanRate_ + 4.3 * std::clamp(flutter_, 0.0, 1.0));
       if (depth > 0) fanPh_ = std::fmod(fanPh_ + M_PI * rate * bdt, 2 * M_PI);
-      const double open = 0.15 + 0.85 * std::fabs(std::cos(fanPh_ + kFanPh));
-      const float s = float(1 - depth * (1 - open));
-      for (int v = 0; v < ModalModel::kVibBars; ++v) s_.setCoupling(v, s);
+      // Two shafts, the naturals' and the accidentals', on one belt: in step, but the accidentals'
+      // set apart by how its pulley was tightened (PJ_FAN_ROWS rad of disc angle, ~11 degrees) and
+      // swaying a little against the other once a turn (the belt's give); each disc a few degrees
+      // off its shaft's angle (its set screw: PJ_FAN_DISC rad at most, fixed for its seat).
+      static const double kRows = knob("PJ_FAN_ROWS", 0.2), kDisc = knob("PJ_FAN_DISC", 0.06);
+      const double rowAcc = kRows + 0.15 * kRows * std::sin(fanPh_);
+      for (int v = 0; v < ModalModel::kVibBars; ++v) {
+        const int pc = (ModalModel::kVibLo + v) % 12;
+        const bool acc = pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10;
+        uint32_t h = 2654435761u * uint32_t(v + 1);
+        h ^= h >> 15;
+        const double disc = kDisc * ((h & 0xffff) / 32767.5 - 1);
+        const double open = 0.15 + 0.85 * std::fabs(std::cos(fanPh_ + kFanPh + disc + (acc ? rowAcc : 0)));
+        s_.setCoupling(v, float(1 - depth * (1 - open)));
+      }
     }
     m_.process(out + i, m);
   }

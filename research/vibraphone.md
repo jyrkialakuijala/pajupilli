@@ -423,6 +423,35 @@ bars. Expect well under 1 % of a core at 48 kHz **[calc, by comparison with exis
 
 ---
 
+### 7.5b The motor as played
+
+The motor runs by default at the slowest tremolo, 0.7 Hz, the discs turning the tubes off fully (open 0.15 +
+0.85·|cos θ|, a rectified sine). The mod wheel speeds it up to 5 Hz; live, K5 sets its speed and K4 its depth
+(0: the discs left open). It no longer follows the voice's vibrato cue: a vibist sets the motor and leaves it.
+The tubes are in step but not exactly: the two shafts (naturals, accidentals) on one belt are set ~11° of disc
+angle apart (`PJ_FAN_ROWS`, 0.2 rad; ~23° of the tremolo cycle) and sway ±15 % of that once a turn (the belt's
+give), and each disc is up to ±3.4° off its shaft (`PJ_FAN_DISC`, fixed per seat). Measured: F3, F#3 and C5 held
+8 s swing 10–15 dB peak to peak at 0.69 Hz, F#3's cycle 28° ahead of F3's. Against the SoundFonts (whose
+vibraphones swing less or not at all) the GM distance went 2.03 → 2.15.
+
+### 7.6 The bars' places in the room
+
+The bars lie in one plane, the naturals on the player's side of the damper felt and the accidentals beyond it,
+towards the audience. Each bar's middle (over its resonator's mouth) is half its length plus half the ~18 mm gap
+the felt presses into from the felt's line, so the rows close in from ~39 cm apart (centre to centre) at F3 to
+~19 cm at F6. Along the frame the naturals stand in order, ~12 mm apart (22 bars of 57 → 38 mm under the 1295 mm
+felt); each accidental is over the gap between its two neighbours. Left to right runs low to high (the player's
+view, as the piano's), the accidentals nearer the listener.
+
+`ModalModel::vibPlace` gives each bar's place; the model offers the bars as parts (`Tube::parts`), plus the rest
+of its sound (the DC blocker's share) at the centre. The room (`Room::setParts`) gives every early path, direct
+or off the walls, each bar's own length: the path's direction as it leaves the instrument, along the bar's
+offset. Measured in the hall: the direct sound of F3 reaches the left microphone 1.1 ms before the right, D6's
+the right 0.9 ms before the left; an accidental arrives ~1.1 ms (F#3) to ~0.6 ms (D#6) before its natural
+neighbour. The late field still takes the whole sound (diffuse). Without a room the bars' sides place them
+(by the same layout). `PJ_VIB_BARS=0`: one point; `PJ_VIB_SPREAD` scales the places (0: all at the centre, the
+sum then the same as one point's, -132 dB).
+
 ## 8. Validation against recordings
 
 - **Recordings:** the University of Iowa Electronic Music Studios "Musical Instrument Samples" have a vibraphone,

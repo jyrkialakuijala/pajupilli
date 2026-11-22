@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include "gmkeys_data.h"
 #include "gmlevels_data.h"
 #include "levels_data.h"
 #include "velgain_data.h"
@@ -147,9 +148,29 @@ double tableDb(const VelGain& t, double v) {
 double gmDb(double v) { return 33.3 * std::log10(v / 90); }
 }  // namespace
 
-double velocityGainDb(const Instrument& inst, int velocity) {
+double gmKeyDb(const Instrument& inst, int key) {
+  static const bool off = std::getenv("PJ_NOGMKEYS") != nullptr;
+  if (off || key < 0) return 0;
+  // (asked at every note: the instrument's row kept, by the name's address)
+  thread_local const char* name = nullptr;
+  thread_local const GmKeys* row = nullptr;
+  if (name != inst.name) {
+    name = inst.name;
+    row = nullptr;
+    for (const GmKeys& t : kGmKeys)
+      if (std::strcmp(t.name, inst.name) == 0) row = &t;
+  }
+  if (!row || row->n == 0) return 0;
+  if (key <= row->key[0]) return row->db[0];
+  for (int i = 1; i < row->n; ++i)
+    if (key <= row->key[i])
+      return row->db[i - 1] + (key - row->key[i - 1]) * (row->db[i] - row->db[i - 1]) / double(row->key[i] - row->key[i - 1]);
+  return row->db[row->n - 1];
+}
+
+double velocityGainDb(const Instrument& inst, int velocity, int key) {
   const VelGain* t = velGainOf(inst);
-  return t ? std::min(6.0, tableDb(*t, velocity)) : 0;
+  return std::min(6.0, (t ? tableDb(*t, velocity) : 0) + gmKeyDb(inst, key));
 }
 
 double noteLead(const Instrument& inst) {
@@ -193,12 +214,15 @@ bool velocityAsGain(const Instrument& inst) {
 
 // The instrument's own loudness at velocity u is the GM curve's less the
 // table's gain: the softest u whose loudness reaches the GM curve at v.
-int velocityRemap(const Instrument& inst, int velocity) {
+// (A key's level, gmKeyDb, is asked of the stroke too: the player evening the scale. Without
+// the instrument's own curve, General MIDI's is taken for it.)
+int velocityRemap(const Instrument& inst, int velocity, int key) {
   const VelGain* t = velGainOf(inst);
-  if (!t) return velocity;
-  const double want = gmDb(velocity);
+  const double kdb = gmKeyDb(inst, key);
+  if (!t && kdb == 0) return velocity;
+  const double want = gmDb(velocity) + kdb;
   for (int u = 1; u < 127; ++u)
-    if (gmDb(u) - tableDb(*t, u) >= want) return u;
+    if (gmDb(u) - (t ? tableDb(*t, u) : 0) >= want) return u;
   return 127;
 }
 

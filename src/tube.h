@@ -66,6 +66,14 @@ class Tube {
   // violins have their resonances in the same places).
   virtual void vary(unsigned /*seat*/) {}
   virtual const float* dipoleAxes() const { return nullptr; }
+  // A model made of parts at their own places (a vibraphone's bars): their number, each one's
+  // place (3 per part, m from the instrument's centre: x to the listener's right, y towards the
+  // listener, z up), and each one's last n samples (taken once, in the output's units, without
+  // the instrument's gain: as takeDipole). The parts add up to the output; the room gives every
+  // path from the instrument each part's own length.
+  virtual int parts() const { return 0; }
+  virtual const float* partPlaces() const { return nullptr; }
+  virtual const float* takePart(int /*n*/, int /*j*/) { return nullptr; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right

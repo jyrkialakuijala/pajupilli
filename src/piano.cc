@@ -331,6 +331,7 @@ void Piano::build() {
       const int n = i + 1, m = st.off + i;
       const double f = n * f0 * std::sqrt(1 + s.B * n * n);
       if (f > 0.47 * fs_) continue;  // (left at rest: all its numbers 0)
+      st.live = i + 1;
       const double w = 2 * M_PI * f, wdt = w / fs_;
       double sigma = s.loss + b2 * f + b3 * f * f + (supportFc > 0 ? support / (1 + (supportFc / f) * (supportFc / f)) : support);
       // The top two and a half octaves (from F#5, fully from C6): the second partial dies away
@@ -509,6 +510,7 @@ void Piano::reset() {
   }
   std::memset(bx_, 0, sizeof(float) * kB);
   std::memset(bv_, 0, sizeof(float) * kB);
+  std::memset(ba_, 0, sizeof(float) * kB);
   for (Key& k : key_) {
     k.hammerOn = false;
     k.acc = k.force = 0;
@@ -834,6 +836,62 @@ void Piano::hammer(Key& k) {
   }
 }
 
+// One sample of a string's modes, both directions of swing: the bridge's motion dy0 / dy1 into
+// them, the damper's grip e (0: free), and what they passed back to the bridge (sum0 / sum1).
+static inline void swing(int n, float e, float dy0, float dy1, const float* __restrict in,
+                         const float* __restrict out, const float* __restrict dm, float* __restrict x0,
+                         float* __restrict v0, float* __restrict x1, float* __restrict v1,
+                         const float* __restrict c0, const float* __restrict s0, const float* __restrict c1,
+                         const float* __restrict s1, float* sum0p, float* sum1p) {
+  float sum0 = 0, sum1 = 0;
+  if (e > 0) {
+    for (int i = 0; i < n; ++i) {
+      const float g = 1 - e * (1 - dm[i]);
+      const float xa = x0[i] + in[i] * dy0, xb = x1[i] + in[i] * dy1;
+      const float va = g * (v0[i] * c0[i] - xa * s0[i]), vb = g * (v1[i] * c1[i] - xb * s1[i]);
+      x0[i] = g * (xa * c0[i] + v0[i] * s0[i]);
+      x1[i] = g * (xb * c1[i] + v1[i] * s1[i]);
+      sum0 += out[i] * (va - v0[i]);
+      sum1 += out[i] * (vb - v1[i]);
+      v0[i] = va;
+      v1[i] = vb;
+    }
+  } else {
+    for (int i = 0; i < n; ++i) {
+      const float xa = x0[i] + in[i] * dy0, xb = x1[i] + in[i] * dy1;
+      const float va = v0[i] * c0[i] - xa * s0[i], vb = v1[i] * c1[i] - xb * s1[i];
+      x0[i] = xa * c0[i] + v0[i] * s0[i];
+      x1[i] = xb * c1[i] + v1[i] * s1[i];
+      sum0 += out[i] * (va - v0[i]);
+      sum1 += out[i] * (vb - v1[i]);
+      v0[i] = va;
+      v1[i] = vb;
+    }
+  }
+  *sum0p = sum0;
+  *sum1p = sum1;
+}
+
+// Four sums over the board's modes at once (independent chains: no wait on each other).
+static inline void dot4(const float* const* r, const float* __restrict x, int n, float* out) {
+  const float *__restrict a = r[0], *__restrict b = r[1], *__restrict c = r[2], *__restrict d = r[3];
+  float sa = 0, sb = 0, sc = 0, sd = 0;
+  for (int m = 0; m < n; ++m) {
+    sa += a[m] * x[m];
+    sb += b[m] * x[m];
+    sc += c[m] * x[m];
+    sd += d[m] * x[m];
+  }
+  out[0] = sa, out[1] = sb, out[2] = sc, out[3] = sd;
+}
+
+// y += the four rows times their weights.
+static inline void axpy4(float* __restrict y, const float* const* r, const float* f, int n) {
+  const float *__restrict a = r[0], *__restrict b = r[1], *__restrict c = r[2], *__restrict d = r[3];
+  const float fa = f[0], fb = f[1], fc = f[2], fd = f[3];
+  for (int m = 0; m < n; ++m) y[m] += a[m] * fa + b[m] * fb + c[m] * fc + d[m] * fd;
+}
+
 float Piano::sample(float testForce) {
   if (boardStale_) boardNow();
   if (asleep_) {
@@ -848,61 +906,48 @@ float Piano::sample(float testForce) {
   }
   std::memset(bf_, 0, sizeof(float) * kB);
   float pick = 0;
-  for (int a = 0; a < nActive_; ++a) {
-    const int ki = activeKeys_[a];
-    Key& k = key_[ki];
-    if (k.landWait > 0 || k.landLeft > 0) {
-      // (Landing: no grip until the felt touches; then half of it within the push (the felt
-      // closing on the swinging strings: the first contact is quick), the rest as it beds in.)
-      const bool touching = k.landWait == 0;
-      land(k);
-      if (touching) k.engage = std::min(1.0f, k.engage + 0.5f / k.landN);
-    } else if (k.damperDown && k.engage < 1) k.engage = std::min(1.0f, k.engage + dt_ / 0.05f);
-    const float e = k.engage;
-    float F = 0, Fp = 0;
-    for (int j = 0; j < k.ns; ++j) {
-      const Str& s = str_[k.s0 + j];
-      if (!s.active) continue;
-      const float* in = in_ + s.off;
-      const float* out = out_ + s.off;
-      const float* dm = damp_ + s.off;
-      for (int d = 0; d < 2; ++d) {
-        float* x = x_[d] + s.off;
-        float* v = v_[d] + s.off;
-        const float* cs = (d == 0 ? cs_ : cs1_) + s.off;
-        const float* sn = (d == 0 ? sn_ : sn1_) + s.off;
-        const float dy = d == 0 ? k.acc : kSide * k.acc;
-        float sum = 0;
-        if (e > 0) {
-          for (int i = 0; i < s.n; ++i) {
-            const float g = 1 - e * (1 - dm[i]);
-            const float xx = x[i] + in[i] * dy;
-            const float vn = g * (v[i] * cs[i] - xx * sn[i]);
-            x[i] = g * (xx * cs[i] + v[i] * sn[i]);
-            sum += out[i] * (vn - v[i]);
-            v[i] = vn;
-          }
-        } else {
-          for (int i = 0; i < s.n; ++i) {
-            const float xx = x[i] + in[i] * dy;
-            const float vn = v[i] * cs[i] - xx * sn[i];
-            x[i] = xx * cs[i] + v[i] * sn[i];
-            sum += out[i] * (vn - v[i]);
-            v[i] = vn;
-          }
+  // The keys four at a time: how far the bridge moved under each in the last sample (four
+  // independent sums over the board's modes), their strings, their push on the board (its force
+  // read and written once for the four).
+  for (int a0 = 0; a0 < nActive_; a0 += 4) {
+    const int g = std::min(4, nActive_ - a0);
+    const float* ph[4];
+    for (int u = 0; u < 4; ++u) ph[u] = phi_ + size_t(activeKeys_[a0 + std::min(u, g - 1)]) * kB;
+    float acc[4], F4[4] = {0, 0, 0, 0};
+    dot4(ph, ba_, kB, acc);
+    for (int u = 0; u < g; ++u) {
+      const int ki = activeKeys_[a0 + u];
+      Key& k = key_[ki];
+      k.acc = acc[u];
+      if (k.landWait > 0 || k.landLeft > 0) {
+        // (Landing: no grip until the felt touches; then half of it within the push (the felt
+        // closing on the swinging strings: the first contact is quick), the rest as it beds in.)
+        const bool touching = k.landWait == 0;
+        land(k);
+        if (touching) k.engage = std::min(1.0f, k.engage + 0.5f / k.landN);
+      } else if (k.damperDown && k.engage < 1) k.engage = std::min(1.0f, k.engage + dt_ / 0.05f);
+      const float e = k.engage;
+      float F = 0, Fp = 0;
+      for (int j = 0; j < k.ns; ++j) {
+        const Str& s = str_[k.s0 + j];
+        if (!s.active) continue;
+        // Both directions of swing in one pass (the bridge's coupling and output weights shared).
+        float sum0, sum1;
+        const size_t o = s.off;
+        swing(s.live, e, k.acc, kSide * k.acc, in_ + o, out_ + o, damp_ + o, x_[0] + o, v_[0] + o, x_[1] + o,
+              v_[1] + o, cs_ + o, sn_ + o, cs1_ + o, sn1_ + o, &sum0, &sum1);
+        F -= sum0 + kSide * sum1;
+        if (pickup_) Fp -= sum0 + pickSide_ * sum1;
+        if (s.longLeft > 0) {
+          const float fl = stretch(str_[k.s0 + j]);
+          F += fl;
+          if (pickup_) Fp += fl;
         }
-        F -= d == 0 ? sum : kSide * sum;
-        if (pickup_) Fp -= d == 0 ? sum : pickSide_ * sum;
       }
-      if (s.longLeft > 0) {
-        const float fl = stretch(str_[k.s0 + j]);
-        F += fl;
-        if (pickup_) Fp += fl;
-      }
+      pick += d_.pickupGain[ki] * Fp;
+      F4[u] = F;
     }
-    pick += d_.pickupGain[ki] * Fp;
-    const float* ph = phi_ + size_t(ki) * kB;
-    for (int m = 0; m < kB; ++m) bf_[m] += ph[m] * F;
+    axpy4(bf_, ph, F4, kB);
   }
   if (knocks_ > 0) {  // (the knocks in the case, at the rim)
     float f = 0;
@@ -930,27 +975,25 @@ float Piano::sample(float testForce) {
     bv_[m] = vn;
     bacc_[m] = a;
   }
-  // How far the bridge moved under each sounding key.
-  for (int a = 0; a < nActive_; ++a) {
-    const int ki = activeKeys_[a];
-    const float* ph = phi_ + size_t(ki) * kB;
-    float acc = 0;
-    for (int m = 0; m < kB; ++m) acc += ph[m] * ba_[m];
-    key_[ki].acc = acc;
-  }
+  // (How far the bridge moved under each sounding key: taken at the next sample's start.)
   // The air each patch of the board moves, and what of it reaches the two
   // microphones now.
   ringPos_ = (ringPos_ + 1) & (kRing - 1);
   float l = 0, r = 0;
-  for (int p = 0; p < kP; ++p) {
-    const float* pv = pvol_ + size_t(p) * kB;
-    float q = 0;
-    for (int m = 0; m < kB; ++m) q += pv[m] * bacc_[m];
-    float* ring = ring_ + size_t(p) * kRing;
-    ring[ringPos_] = q;
-    const int i0 = (ringPos_ - tapI_[0][p]) & (kRing - 1), i1 = (ringPos_ - tapI_[1][p]) & (kRing - 1);
-    l += tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
-    r += tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+  for (int p0 = 0; p0 < kP; p0 += 4) {
+    const int g = std::min(4, kP - p0);
+    const float* pv[4];
+    for (int u = 0; u < 4; ++u) pv[u] = pvol_ + size_t(p0 + std::min(u, g - 1)) * kB;
+    float q4[4];
+    dot4(pv, bacc_, kB, q4);
+    for (int u = 0; u < g; ++u) {
+      const int p = p0 + u;
+      float* ring = ring_ + size_t(p) * kRing;
+      ring[ringPos_] = q4[u];
+      const int i0 = (ringPos_ - tapI_[0][p]) & (kRing - 1), i1 = (ringPos_ - tapI_[1][p]) & (kRing - 1);
+      l += tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
+      r += tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+    }
   }
   side_ = pickup_ ? 0 : 0.5f * (l - r);
   pick_ = pick * fs;  // (what the strings gave the bridge in this sample, as a force)
@@ -997,6 +1040,7 @@ float Piano::sample(float testForce) {
       }
       std::memset(bx_, 0, sizeof(float) * kB);
       std::memset(bv_, 0, sizeof(float) * kB);
+      std::memset(ba_, 0, sizeof(float) * kB);
       for (Key& k : key_) k.acc = 0;
       std::memset(ring_, 0, sizeof(float) * kP * kRing);
       asleep_ = true;

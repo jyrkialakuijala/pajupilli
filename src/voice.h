@@ -49,6 +49,10 @@ class Voice {
   // Its sound along its three axes (Tube::takeDipole) and those axes in the room, or null.
   const float* dipole(int n, int k);
   const float* dipoleAxes() const;
+  // Its parts at their own places (Tube::parts), or none.
+  int parts() const;
+  const float* partPlaces() const;
+  const float* part(int n, int j);
   // Its own early sound (Tube::ownEarly), its last n samples x g, added to l and r.
   bool ownEarly() const;
   void early(int n, float* l, float* r, float g);

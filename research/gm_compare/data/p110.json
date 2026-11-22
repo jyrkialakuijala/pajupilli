@@ -24,20 +24,20 @@
 96,
 127
 ],
-"made": "2026-11-20 16:40",
+"made": "2026-11-22 03:11",
 "seconds": {
-"pajupilli": 12.4,
-"FluidR3": 37.3,
-"TimGM6mb": 35.2,
-"Jnsgm2": 26.2,
-"SGM": 25.5,
-"FluidR3/fs": 19.3,
-"TimGM6mb/fs": 14.2,
-"Jnsgm2/fs": 12.8
+"pajupilli": 73.0,
+"FluidR3": 72.3,
+"TimGM6mb": 91.2,
+"Jnsgm2": 104.1,
+"SGM": 95.0,
+"FluidR3/fs": 92.4,
+"TimGM6mb/fs": 74.5,
+"Jnsgm2/fs": 44.3
 },
 "summaries": {
 "pajupilli": {
-"level96_db": -27.1,
+"level96_db": -21.8,
 "vel_curve_db": {
 "40": -11.7,
 "64": -5.0,
@@ -45,8 +45,8 @@
 "127": 3.9
 },
 "vel_range_db": 15.6,
-"level_key_db_oct": 1.08,
-"level_scatter_db": 1.92,
+"level_key_db_oct": 1.19,
+"level_scatter_db": 1.88,
 "centroid96_erb": 23.28,
 "centroid96_hz": 2671.0,
 "bright_vel_erb": 0.11,
@@ -1442,9 +1442,9 @@
 "phrase": {
 "pajupilli": {
 "onset_ms": 41.0,
-"onset_jitter_ms": 46.5,
-"legato_even_db": 2.0,
-"legato_dip_db": 8.1,
+"onset_jitter_ms": 52.1,
+"legato_even_db": 2.4,
+"legato_dip_db": 8.2,
 "staccato_len_ms": 250.0,
 "phrase_tail_ms": 800.0
 },
@@ -1507,10 +1507,10 @@
 },
 "pair": {
 "spectrum": {
-"pajupilli|FluidR3": 15.1419,
-"pajupilli|TimGM6mb": 17.3297,
-"pajupilli|Jnsgm2": 12.7141,
-"pajupilli|SGM": 15.2557,
+"pajupilli|FluidR3": 15.141,
+"pajupilli|TimGM6mb": 17.3289,
+"pajupilli|Jnsgm2": 12.711,
+"pajupilli|SGM": 15.2541,
 "FluidR3|TimGM6mb": 7.7387,
 "FluidR3|Jnsgm2": 7.663,
 "FluidR3|SGM": 6.7207,
@@ -1522,7 +1522,7 @@
 "Jnsgm2|Jnsgm2/fs": 0.7355
 },
 "attack_spectrum": {
-"pajupilli|FluidR3": 21.0138,
+"pajupilli|FluidR3": 21.0148,
 "pajupilli|TimGM6mb": 20.489,
 "pajupilli|Jnsgm2": 15.525,
 "pajupilli|SGM": 18.5221,
@@ -1597,5 +1597,5 @@
 "pj_log": [
 "  channel  1: fiddle (1 at once, one voice)"
 ],
-"build_md5": "40f1eb3b86d6028fe6407018615743d3"
+"build_md5": "a8b790266195d96f500cdf8fc1ba4cfb"
 }

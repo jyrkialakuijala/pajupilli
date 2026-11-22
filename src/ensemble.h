@@ -315,6 +315,7 @@ class Ensemble {
   static int reverbChannel(const Instrument& in);
   float roomFb_ = std::getenv("PJ_ROOMFB") ? float(std::atof(std::getenv("PJ_ROOMFB"))) : 1.0f;  // room into the bores
   std::vector<float> srcBuf_;  // physical pressures for the room
+  std::vector<float> partBuf_;  // ... the sources' parts at their places (Tube::parts)
   std::vector<float> dipBuf_;  // ... and the sources' directional parts
   std::vector<float> qL_, qR_; // rendered, not yet handed out
   size_t qPos_ = 0;

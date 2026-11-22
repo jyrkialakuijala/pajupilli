@@ -30,6 +30,14 @@ class ModalModel : public Tube {
   double testResponse() const override { return last_; }
   const float* takeSide(int n) override;
   void resetAir() override;
+  // The vibraphone's bars at their places on the frame (vibPlace()), and the rest of the sound (the
+  // DC blocker's share, the key ticks) at its centre: the last part.
+  int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
+  const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
+  const float* takePart(int n, int j) override;
+  // Bar i's place (m from the frame's centre: x to the player's right, y away from the player,
+  // towards the audience; z 0: one plane, the damper pressing both rows).
+  static void vibPlace(int i, double* x, double* y);
 
   // The instrument's own data (set by its builder, used by its player).
   struct Str {
@@ -88,6 +96,9 @@ class ModalModel : public Tube {
   ModalSet set_;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
+  std::vector<float> partPlace_;
+  std::vector<std::vector<float>> part_;
+  std::vector<float> partOut_;
 };
 
 class ModalPlayer : public Performer {
@@ -98,6 +109,8 @@ class ModalPlayer : public Performer {
   void render(float* out, int n) override;
   void setHold(bool h) override;
   void seed(unsigned s) override;
+  // The vibraphone's motor live: K4 how far the discs turn the tubes off (0: left open), K5 its speed.
+  bool setKnob(int k, double x) override;
 
  private:
   int pickString(int midi) const;    // fretted/stopped strings: the string for a key
@@ -113,6 +126,7 @@ class ModalPlayer : public Performer {
   bool held_[128] = {};
   double bend_ = 0, vibPh_ = 0, clock_ = 0;
   double fanPh_ = 0;  // the vibraphone's fan shaft (rad)
+  double fanDepth_ = 1, fanRate_ = 0.7;  // (its motor: running by default, the slowest tremolo)
   int bowKey_ = -1;   // the fiddle: the key under the bow
   double bowDir_ = 1, bowClock_ = 0, bowTarget_ = 0;
   uint32_t rng_ = 4711;

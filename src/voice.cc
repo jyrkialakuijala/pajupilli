@@ -146,6 +146,14 @@ const float* Voice::dipole(int n, int k) {
 
 const float* Voice::dipoleAxes() const { return rs_.identity() ? model_->dipoleAxes() : nullptr; }
 
+int Voice::parts() const { return rs_.identity() ? model_->parts() : 0; }
+const float* Voice::partPlaces() const { return rs_.identity() ? model_->partPlaces() : nullptr; }
+
+const float* Voice::part(int n, int j) {
+  if (!rs_.identity()) return nullptr;
+  return finite(model_->takePart(n, j), n);
+}
+
 bool Voice::ownEarly() const { return rs_.identity() && model_->ownEarly(); }
 bool Voice::ownLate() const { return ownEarly() && model_->ownLate(); }
 

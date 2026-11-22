@@ -124,6 +124,10 @@ class ModalSet {
   // One sample: the sound (and its side signal, left = out + side).
   float sample();
   float side() const { return side_; }
+  // Each vibrator's own share of sample()'s sound (keepEach(true) first; the body's is not in any):
+  // a vibraphone's bars, each at its own place in the room.
+  void keepEach(bool on) { keepEach_ = on; }
+  float each(int i) const { return eachY_[i]; }
   void reset();
 
  private:
@@ -147,6 +151,7 @@ class ModalSet {
     float bowV = 0, bowF = 0, bowVTo = 0, bowFTo = 0, bowK = 0.01f, bowSum = 0, bowNoise = 0;
     bool awake = false;
     int quiet = 0;
+    float oNow = 0, oPrev = 0;  // (keepEach: its radiated velocity sum, now and a sample ago)
     int nv = 16;  // the modes stepped: n rounded up to a vector
   };
   void coefs(Vib& v);  // the modes' step matrices at the present tuning and damping
@@ -162,6 +167,8 @@ class ModalSet {
   float extF_ = 0;
   double prevOut_ = 0, prevSide_ = 0;
   float side_ = 0;
+  bool keepEach_ = false;
+  float eachY_[kMaxVib] = {};
   int ctl_ = 0;
   uint32_t rng_ = 99991;
   float urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0f / 16777216.0f) - 1; }

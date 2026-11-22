@@ -24,60 +24,60 @@
 96,
 127
 ],
-"made": "2026-11-20 16:38",
+"made": "2026-11-22 03:10",
 "seconds": {
-"pajupilli": 16.5,
-"FluidR3": 12.0,
-"TimGM6mb": 12.9,
-"Jnsgm2": 10.5,
-"SGM": 12.8,
-"FluidR3/fs": 12.1,
-"TimGM6mb/fs": 11.4,
-"Jnsgm2/fs": 11.2
+"pajupilli": 119.3,
+"FluidR3": 55.6,
+"TimGM6mb": 53.9,
+"Jnsgm2": 198.6,
+"SGM": 111.5,
+"FluidR3/fs": 134.0,
+"TimGM6mb/fs": 72.3,
+"Jnsgm2/fs": 44.7
 },
 "summaries": {
 "pajupilli": {
-"level96_db": -18.8,
+"level96_db": -25.9,
 "vel_curve_db": {
-"40": -12.2,
-"64": -5.1,
+"40": -12.1,
+"64": -5.2,
 "96": 0.0,
-"127": 4.6
+"127": 2.4
 },
-"vel_range_db": 16.8,
-"level_key_db_oct": -1.75,
-"level_scatter_db": 1.78,
+"vel_range_db": 14.5,
+"level_key_db_oct": -0.62,
+"level_scatter_db": 1.89,
 "centroid96_erb": 10.3,
 "centroid96_hz": 653.0,
-"bright_vel_erb": -0.64,
-"bright_key_erb_oct": 0.59,
-"bright_scatter_erb": 1.79,
+"bright_vel_erb": -0.7,
+"bright_key_erb_oct": 0.55,
+"bright_scatter_erb": 1.813,
 "delay_ms": 10.0,
 "attack_ms": 2.5,
-"onset_sharp_db_ms": 63.2,
+"onset_sharp_db_ms": 59.9,
 "trans_spread_ms": 1.0,
 "trans_order_ms": -0.4,
 "decay_db_s": 30.5,
 "sustain_db": -69.2,
-"release_ms": 294.0,
-"floor_db": -126.2,
-"attack_bright_erb": 1.55,
+"release_ms": 268.0,
+"floor_db": -122.4,
+"attack_bright_erb": 1.5,
 "flatness_db": -33.0,
 "ild_db": 0.2,
 "icc": 0.345,
 "glide_c": 0.8,
-"wobble_c": 21.0,
+"wobble_c": 22.7,
 "odd_even_db": -0.4,
 "irregularity_db": 3.1,
 "salience_db": -12.6,
-"stretch_c": 0.36,
+"stretch_c": 0.35,
 "partial_corr": 0.933,
 "dissonance_log2": -0.84,
 "f0_c": 2.8,
-"f0_scatter_c": 2.8,
-"tri1": 0.035,
-"tri2": 0.291,
-"tri3": 0.461,
+"f0_scatter_c": 3.3,
+"tri1": 0.038,
+"tri2": 0.288,
+"tri3": 0.534,
 "pan_key_db_oct": -0.09,
 "spectrum_db": [
 -43.1,
@@ -87,29 +87,29 @@
 -18.5,
 -16.7,
 -14.7,
--12.4,
+-12.3,
 -12.8,
 -12.4,
 -14.8,
 -14.7,
 -14.4,
--15.1,
+-15.0,
 -9.7,
--16.9,
+-17.0,
 -14.7,
--13.7,
+-13.8,
 -17.3,
 -16.4,
 -16.8,
--21.8,
+-21.9,
 -24.4,
--25.8,
--28.6,
--33.4,
--35.4,
+-25.6,
+-28.4,
+-33.5,
+-35.3,
 -38.1,
+-38.5,
 -39.1,
--39.4,
 -45.9,
 -46.7,
 -52.1,
@@ -117,16 +117,16 @@
 -61.9,
 -60.8,
 -63.9,
--73.5
+-73.4
 ],
 "formants": [
 [
 122.0,
-23.7
+23.9
 ],
 [
 1050.0,
-5.7
+5.5
 ],
 [
 2211.0,
@@ -134,7 +134,7 @@
 ],
 [
 6198.0,
-2.8
+3.0
 ]
 ],
 "env_db": [
@@ -915,8 +915,8 @@
 "127": 4.9
 },
 "vel_range_db": 20.1,
-"level_key_db_oct": -0.8,
-"level_scatter_db": 0.38,
+"level_key_db_oct": -0.79,
+"level_scatter_db": 0.36,
 "centroid96_erb": 14.65,
 "centroid96_hz": 918.0,
 "bright_vel_erb": 0.37,
@@ -1443,8 +1443,8 @@
 "pajupilli": {
 "onset_ms": 7.0,
 "onset_jitter_ms": 0.4,
-"legato_even_db": 1.1,
-"legato_dip_db": 8.3,
+"legato_even_db": 1.2,
+"legato_dip_db": 8.6,
 "staccato_len_ms": 136.0,
 "phrase_tail_ms": 491.0
 },
@@ -1509,8 +1509,8 @@
 "spectrum": {
 "pajupilli|FluidR3": 17.39,
 "pajupilli|TimGM6mb": 16.1085,
-"pajupilli|Jnsgm2": 16.3724,
-"pajupilli|SGM": 16.9184,
+"pajupilli|Jnsgm2": 16.4629,
+"pajupilli|SGM": 16.6801,
 "FluidR3|TimGM6mb": 8.2524,
 "FluidR3|Jnsgm2": 8.3011,
 "FluidR3|SGM": 9.1697,
@@ -1552,10 +1552,10 @@
 "Jnsgm2|Jnsgm2/fs": 2.0655
 },
 "sgram": {
-"pajupilli|FluidR3": 0.4282,
-"pajupilli|TimGM6mb": 0.4438,
-"pajupilli|Jnsgm2": 0.4411,
-"pajupilli|SGM": 0.4375,
+"pajupilli|FluidR3": 0.4296,
+"pajupilli|TimGM6mb": 0.4558,
+"pajupilli|Jnsgm2": 0.4463,
+"pajupilli|SGM": 0.4396,
 "FluidR3|TimGM6mb": 0.0987,
 "FluidR3|Jnsgm2": 0.0998,
 "FluidR3|SGM": 0.1294,
@@ -1570,7 +1570,7 @@
 "pajupilli|FluidR3": 14.4484,
 "pajupilli|TimGM6mb": 10.6965,
 "pajupilli|Jnsgm2": 10.7439,
-"pajupilli|SGM": 12.5068,
+"pajupilli|SGM": 12.4476,
 "FluidR3|TimGM6mb": 4.983,
 "FluidR3|Jnsgm2": 4.952,
 "FluidR3|SGM": 6.9515,
@@ -1595,8 +1595,7 @@
 }
 },
 "pj_log": [
-"  channel  1: shamisen (1 at once, one voice)",
-"  (peak 1.17: the whole song -1.5 dB down)"
+"  channel  1: shamisen (1 at once, one voice)"
 ],
-"build_md5": "40f1eb3b86d6028fe6407018615743d3"
+"build_md5": "a8b790266195d96f500cdf8fc1ba4cfb"
 }

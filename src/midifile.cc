@@ -1503,7 +1503,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Hammond's Leslie (fast from 64); the timpani's roll
             for (auto& [id, p] : parts)
               if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || std::strcmp(p.inst->name, "timpani") == 0 ||
-                                   std::strcmp(p.inst->name, "fretless-bass") == 0 ||
+                                   std::strcmp(p.inst->name, "fretless-bass") == 0 || std::strncmp(p.inst->name, "vibraphone", 10) == 0 ||
                                    (std::strcmp(p.inst->family, "hammond") == 0 && leslieFrom(p))))
                 p.ens->all(&Performer::setFlutter, e.b / 127.0);
           if (e.a == 82)  // the Leslie's switch (as the Leslie 2101's default): stop, slow, fast

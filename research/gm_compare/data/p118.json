@@ -24,20 +24,20 @@
 96,
 127
 ],
-"made": "2026-11-20 16:42",
+"made": "2026-11-22 03:12",
 "seconds": {
-"pajupilli": 19.4,
-"FluidR3": 10.9,
-"TimGM6mb": 11.6,
-"Jnsgm2": 14.6,
-"SGM": 13.9,
-"FluidR3/fs": 15.8,
-"TimGM6mb/fs": 9.1,
-"Jnsgm2/fs": 7.8
+"pajupilli": 64.1,
+"FluidR3": 163.0,
+"TimGM6mb": 76.3,
+"Jnsgm2": 147.6,
+"SGM": 21.3,
+"FluidR3/fs": 12.4,
+"TimGM6mb/fs": 11.1,
+"Jnsgm2/fs": 13.8
 },
 "summaries": {
 "pajupilli": {
-"level96_db": -22.0,
+"level96_db": -16.1,
 "vel_curve_db": {
 "40": -10.7,
 "64": -4.8,
@@ -45,13 +45,13 @@
 "127": 3.3
 },
 "vel_range_db": 14.0,
-"level_key_db_oct": 0.67,
-"level_scatter_db": 1.1,
+"level_key_db_oct": -0.42,
+"level_scatter_db": 0.79,
 "centroid96_erb": 7.14,
 "centroid96_hz": 274.0,
-"bright_vel_erb": 0.03,
+"bright_vel_erb": 0.02,
 "bright_key_erb_oct": 3.52,
-"bright_scatter_erb": 0.192,
+"bright_scatter_erb": 0.194,
 "delay_ms": 12.0,
 "attack_ms": 36.0,
 "onset_sharp_db_ms": 26.6,
@@ -62,15 +62,15 @@
 "release_ms": 2000.0,
 "floor_db": -66.7,
 "attack_bright_erb": 3.18,
-"flatness_db": -39.0,
+"flatness_db": -38.3,
 "ild_db": 0.0,
 "icc": 0.978,
 "glide_c": 0.0,
 "wobble_c": 35.6,
 "odd_even_db": 3.2,
 "irregularity_db": 3.25,
-"salience_db": -8.3,
-"stretch_c": -0.04,
+"salience_db": -8.4,
+"stretch_c": -0.06,
 "partial_corr": 0.986,
 "dissonance_log2": -2.65,
 "f0_c": 0.9,
@@ -1371,10 +1371,10 @@
 },
 "phrase": {
 "pajupilli": {
-"onset_ms": 8.0,
-"onset_jitter_ms": 29.6,
-"legato_even_db": 1.6,
-"legato_dip_db": 11.9,
+"onset_ms": 7.0,
+"onset_jitter_ms": 29.7,
+"legato_even_db": 1.7,
+"legato_dip_db": 12.2,
 "staccato_len_ms": 124.0,
 "phrase_tail_ms": 184.0
 },
@@ -1454,8 +1454,8 @@
 "attack_spectrum": {
 "pajupilli|FluidR3": 15.6981,
 "pajupilli|TimGM6mb": 15.9271,
-"pajupilli|Jnsgm2": 16.0375,
-"pajupilli|SGM": 15.4365,
+"pajupilli|Jnsgm2": 16.0263,
+"pajupilli|SGM": 15.4371,
 "FluidR3|TimGM6mb": 8.9149,
 "FluidR3|Jnsgm2": 8.5861,
 "FluidR3|SGM": 8.967,
@@ -1467,7 +1467,7 @@
 "Jnsgm2|Jnsgm2/fs": 12.7654
 },
 "envelope": {
-"pajupilli|FluidR3": 19.7633,
+"pajupilli|FluidR3": 19.7679,
 "pajupilli|TimGM6mb": 20.8097,
 "pajupilli|Jnsgm2": 20.717,
 "pajupilli|SGM": 12.4028,
@@ -1482,7 +1482,7 @@
 "Jnsgm2|Jnsgm2/fs": 3.5641
 },
 "sgram": {
-"pajupilli|FluidR3": 0.5212,
+"pajupilli|FluidR3": 0.5194,
 "pajupilli|TimGM6mb": 0.4653,
 "pajupilli|Jnsgm2": 0.4836,
 "pajupilli|SGM": 0.7009,
@@ -1499,8 +1499,8 @@
 "overtones": {
 "pajupilli|FluidR3": 15.1443,
 "pajupilli|TimGM6mb": 20.3363,
-"pajupilli|Jnsgm2": 18.8549,
-"pajupilli|SGM": 19.2903,
+"pajupilli|Jnsgm2": 18.5404,
+"pajupilli|SGM": 19.2845,
 "FluidR3|TimGM6mb": 9.866,
 "FluidR3|Jnsgm2": 8.2935,
 "FluidR3|SGM": 7.8537,
@@ -1527,5 +1527,5 @@
 "pj_log": [
 "  channel  1: synth-drum (1 held at once; 1 voices for their tails)"
 ],
-"build_md5": "40f1eb3b86d6028fe6407018615743d3"
+"build_md5": "a8b790266195d96f500cdf8fc1ba4cfb"
 }

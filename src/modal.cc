@@ -45,7 +45,9 @@ void ModalSet::reset() {
     v.bowOn = false;
     v.bowF = v.bowV = 0;
     v.awake = false;
+    v.oNow = v.oPrev = 0;
   }
+  std::fill(eachY_, eachY_ + kMaxVib, 0.0f);
   std::fill(bx_, bx_ + kBody, 0.0f);
   std::fill(bv_, bv_ + kBody, 0.0f);
   bridgeA_ = 0;
@@ -452,7 +454,15 @@ float ModalSet::sample() {
     }
     out += o;
     side += s;
+    v.oNow = o;
   }
+  if (keepEach_)
+    for (int i = 0; i < nVib_; ++i) {
+      Vib& v = vib_[i];
+      if (!v.awake) v.oNow = 0;
+      eachY_[i] = float((v.oNow - v.oPrev) * fs_ * 1e-3);
+      v.oPrev = v.oNow;
+    }
   // The pressure ~ the volume acceleration.
   const float y = float((out - prevOut_) * fs_ * 1e-3);
   side_ = float((side - prevSide_) * fs_ * 1e-3);

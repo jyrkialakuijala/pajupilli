@@ -188,6 +188,44 @@ void Room::setAxes(int s, const float* axes) {
         tp.dg[k] = tp.gain * (axes[3 * k] * tp.n[0] + axes[3 * k + 1] * tp.n[1] + axes[3 * k + 2] * tp.n[2]);
 }
 
+void Room::setParts(int s, int np, const float* places) {
+  const int ns = int(x_.size());
+  if (partFrom_.empty()) partFrom_.assign(ns + 1, 0);
+  // (parts are added source by source in order: those of later sources move up)
+  const int old = partFrom_[s + 1] - partFrom_[s];
+  if (old != 0 || np <= 0) return;
+  int ntap = 0;
+  for (const Tap& tp : early_) ntap += tp.src == s;
+  // Each part's delay and gain on each of its source's taps.
+  std::vector<int> dl;
+  std::vector<float> gn;
+  for (int j = 0; j < np; ++j) {
+    const float* o = places + 3 * j;
+    for (const Tap& tp : early_) {
+      if (tp.src != s) continue;
+      const double r = tp.delay * kC / fs_;  // (the path's length)
+      const double along = tp.n[0] * o[0] + tp.n[1] * o[1] + tp.n[2] * o[2];  // (shorter by this)
+      const double rp = std::max(0.3, r - along);
+      dl.push_back(std::clamp(int(std::lround(rp / kC * fs_)), 1, kRing - kBlock - 1));
+      gn.push_back(float(tp.gain * std::max(r, 0.5) / std::max(rp, 0.5)));
+    }
+  }
+  // Insert after the parts of the sources before s.
+  const int at = partFrom_[s];
+  size_t tapAt = 0;  // (pDelay_ holds, per part, its source's taps)
+  for (int q = 0; q < s; ++q) {
+    int nt = 0;
+    for (const Tap& tp : early_) nt += tp.src == q;
+    tapAt += size_t(partFrom_[q + 1] - partFrom_[q]) * nt;
+  }
+  pDelay_.insert(pDelay_.begin() + long(tapAt), dl.begin(), dl.end());
+  pGain_.insert(pGain_.begin() + long(tapAt), gn.begin(), gn.end());
+  pring_.insert(pring_.begin() + long(size_t(at) * kSpan), size_t(np) * kSpan, 0.0f);
+  pquiet_.insert(pquiet_.begin() + at, np, 1 << 30);
+  for (int q = s + 1; q <= ns; ++q) partFrom_[q] += np;
+  (void)ntap;
+}
+
 std::string Room::lateral(int s) const {
   std::string out;
   for (int u : {-1, 1}) {
@@ -244,6 +282,9 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
     tapFrom_.assign(ns + 1, int(early_.size()));
     for (int k = int(early_.size()) - 1; k >= 0; --k) tapFrom_[early_[k].src] = k;
     for (int q = ns - 1; q >= 0; --q) tapFrom_[q] = std::min(tapFrom_[q], tapFrom_[q + 1]);
+    pTap_.assign(ns + 1, 0);
+    for (int q = 0; q < ns; ++q)
+      pTap_[q + 1] = pTap_[q] + (partFrom_.empty() ? 0 : (partFrom_[q + 1] - partFrom_[q]) * (tapFrom_[q + 1] - tapFrom_[q]));
   }
   // The players' sound into their rings; who is still heard.
   for (int s = 0; s < ns; ++s) {
@@ -267,6 +308,21 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
           if (at < kBlock) dr[kRing + at] = v;
           any += std::fabs(v);
         }
+      }
+    if (!partFrom_.empty())
+      for (int j = partFrom_[s]; j < partFrom_[s + 1]; ++j) {
+        const float* p = part_ ? part_[j] : nullptr;
+        float* pr = &pring_[size_t(j) * kSpan];
+        float pa = 0;
+        for (int i = 0; i < n; ++i) {
+          const float v = p ? p[o + i] : 0.0f;
+          const int at = (rpos_ + i) & (kRing - 1);
+          pr[at] = v;
+          if (at < kBlock) pr[kRing + at] = v;
+          pa += std::fabs(v);
+        }
+        if (pa != 0) pquiet_[j] = 0;
+        else if (pquiet_[j] < kRing + kBlock) pquiet_[j] += n;
       }
     if (any != 0) {
       quiet_[s] = 0;
@@ -390,6 +446,19 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
   for (int s = 0; s < ns; ++s) {
     const float gl = listenGain[s];
     if (!heard(s) || gl == 0) continue;
+    if (!partFrom_.empty() && partFrom_[s + 1] > partFrom_[s]) {
+      // (its parts, each by its own paths; a part silent longer than its ring holds: nothing)
+      const int nt = tapFrom_[s + 1] - tapFrom_[s];
+      for (int j = partFrom_[s]; j < partFrom_[s + 1]; ++j) {
+        if (pquiet_[j] >= kRing) continue;
+        const float* pr = &pring_[size_t(j) * kSpan];
+        const int* dl = &pDelay_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
+        const float* gn = &pGain_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
+        for (int k = 0; k < nt; ++k)
+          addRun(e[early_[tapFrom_[s] + k].mic], pr, (rpos_ - dl[k]) & (kRing - 1), n, gl * gn[k]);
+      }
+      continue;
+    }
     const float* ring = &ring_[size_t(s) * kSpan];
     const bool dip = dips && hasDip_[s];
     for (int k = tapFrom_[s]; k < tapFrom_[s + 1]; ++k) {
