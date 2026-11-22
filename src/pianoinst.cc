@@ -90,6 +90,24 @@ static PianoDesign designFor(const Instrument& inst) {
 }
 
 PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, designFor(inst)) {
+  // (the grand: its board's regions at their places in the room)
+  if (std::strcmp(inst.name, "grand-piano") == 0 && knob("PJ_PIANO_PARTS", 1) != 0) {
+    piano_.keepRegions(true);
+    double cx = 0, cy = 0;
+    for (int j = 0; j < Piano::kRegions; ++j) {
+      double x, y;
+      piano_.regionPlace(j, &x, &y);
+      cx += x / Piano::kRegions;
+      cy += y / Piano::kRegions;
+    }
+    for (int j = 0; j < Piano::kRegions; ++j) {
+      double x, y;
+      piano_.regionPlace(j, &x, &y);
+      partPlace_.insert(partPlace_.end(), {float(y - cy), float(-(x - cx)), 0.0f});
+    }
+    partPlace_.insert(partPlace_.end(), {0.0f, 0.0f, 0.0f});
+    part_.resize(Piano::kRegions + 1);
+  }
   if (honkyTonk(inst)) {
     treble_ = float(std::pow(10.0, knob("PJ_HONKY_TREBLE", 6.0) / 20) - 1);
     trebleA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_TREBLEHZ", 2000) / inst.fs));
@@ -173,7 +191,30 @@ float PianoModel::sample() {
   }
   last_ = y;
   side_.push_back(sd);
-  return finish(last_);
+  const float out = finish(last_);
+  if (!part_.empty()) {
+    if (part_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
+      for (auto& p : part_) p.clear();
+    const float gp = g * float(outScale());
+    float sum = 0;
+    for (int j = 0; j < Piano::kRegions; ++j) {
+      const float b = gp * piano_.region(j);
+      part_[j].push_back(b);
+      sum += b;
+    }
+    part_[Piano::kRegions].push_back(out - sum);
+  }
+  return out;
+}
+
+const float* PianoModel::takePart(int n, int j) {
+  if (j < 0 || j >= int(part_.size())) return nullptr;
+  std::vector<float>& p = part_[j];
+  partOut_.assign(n, 0.0f);
+  const int have = int(p.size()), m = std::min(n, have);
+  std::copy(p.end() - m, p.end(), partOut_.end() - m);
+  p.clear();
+  return partOut_.data();
 }
 
 PianoPlayer::PianoPlayer(PianoModel& m) : Performer(m), m_(m) {

@@ -147,7 +147,9 @@ class Ensemble {
   int resets() const;
   int lines() const { return lines_; }
   int size() const { return int(f_.size()); }
-  Performer& player(int i) { return f_[i].v->player(); }  // (an organ's plan talks to its player)
+  Performer& player(int i) { return f_[i].v->player(); }
+  Tube& model(int i) { return f_[i].v->model(); }
+  void placeParts();  // (the rooms take the parts a model has taken on since: Tube::spreadOn)  // (an organ's plan talks to its player)
   int lo() const { return lo_; }  // sounding range of the whole ensemble
   int hi() const { return hi_; }
   std::string describe() const;

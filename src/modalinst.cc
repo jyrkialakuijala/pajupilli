@@ -190,6 +190,7 @@ void ModalModel::vibPlace(int i, double* x, double* y) {
 }
 
 const float* ModalModel::takePart(int n, int j) {
+  if (part_.empty()) return Tube::takePart(n, j);
   if (j < 0 || j >= int(part_.size())) return nullptr;
   std::vector<float>& p = part_[j];
   partOut_.assign(n, 0.0f);

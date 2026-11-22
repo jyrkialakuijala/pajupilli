@@ -179,6 +179,15 @@ class Piano {
   // or the pickup (N).
   float sample(float testForce = 0);
   float side() const { return side_; }
+  // The board in regions (keepRegions(true) first): its patches in kRegions groups by where they
+  // lie (four across, bass to treble; two deep, the keyboard's half and the tail's), each group's
+  // share of sample()'s sound (the microphones' mean), and its middle on the board (m: x from the
+  // belly rail along the strings, y from the spine across). Each key's sound, its hammer's thump
+  // with it, comes most from where its bridge drives the board.
+  static constexpr int kRegions = 8;
+  void keepRegions(bool on);
+  float region(int j) const { return region_[j]; }
+  void regionPlace(int j, double* x, double* y) const { *x = regionX_[j]; *y = regionY_[j]; }
   void reset();
   bool asleep() const { return asleep_; }
 
@@ -280,6 +289,10 @@ class Piano {
   int tapI_[2][kMaxPatches];
   float tapF_[2][kMaxPatches], tapG_[2][kMaxPatches];
   float side_ = 0;
+  bool keepRegions_ = false;
+  int regionOf_[kMaxPatches] = {};
+  float region_[kRegions] = {};
+  double regionX_[kRegions] = {}, regionY_[kRegions] = {};
   int activeKeys_[kKeys], nActive_ = 0;
   bool asleep_ = true;
   int clock_ = 0;

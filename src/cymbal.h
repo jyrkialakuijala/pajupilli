@@ -111,6 +111,8 @@ class Cymbal {
   // Where the brush lies now, from the centre (m).
   double brushRadius() const { return std::hypot(brush_->x(), brush_->y()); }
   float sample();
+  // The cymbal's rock on its tilter now (rad, about x and y): how its narrow high lobes are aimed.
+  double tilt(int k) const { return k ? ay_ : ax_; }
   // The plate's modes dealt into kGroups groups in turn (mode k to k mod kGroups: each group the
   // whole range, its shine too), each group's share of sample()'s plate sound (keepGroups(true)
   // first; the bell's and the stick's are in none).
@@ -179,15 +181,18 @@ class CymbalModel : public Tube {
   // throw their sound out unevenly, each group its own way); the bell, the stick and the rest at
   // the middle: the last part. The room then gives every path its own mix of them: the shine
   // spreads into the room, not from one point.
-  int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
-  const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
-  const float* partLobes() const override { return partLobe_.empty() ? nullptr : partLobe_.data(); }
+  int parts() const override { return partPlace_.empty() ? Tube::parts() : int(partPlace_.size()) / 3; }
+  const float* partPlaces() const override { return partPlace_.empty() ? Tube::partPlaces() : partPlace_.data(); }
+  const float* partLobes() const override { return partLobe_.empty() ? Tube::partLobes() : partLobe_.data(); }
   const float* takePart(int n, int j) override;
 
  private:
   std::vector<float> partPlace_, partLobe_, partOut_;
   std::vector<std::vector<float>> part_;
   float gShelf_[Cymbal::kGroups] = {};
+  // (the brush lying on the plate: the groups' highs dealt towards its side, sample())
+  float aimW_[Cymbal::kGroups], aimTo_[Cymbal::kGroups];
+  int aimAge_ = 0;
   float shelfM_ = 0, shelfS_ = 0;  // (the highs' shelf)
   void controlStep() override {}
   float sample() override;
@@ -243,6 +248,14 @@ class CymbalPlayer : public Performer {
   bool swirl_ = false, swirling_ = false;
   double swLoad_ = 0, swPhase_ = 0, swR_ = 0.6, swRTo_ = 0.6, swTh_ = 0, swPause_ = 0;
   int swHold_ = 0, swSide_ = 1;
+  // One turn's own way (PJ_CYM_SWIRLVARY: how much, 0: all alike): how long its arc is and how
+  // wide across the grooves, its weight, how much the hand hurries through one part of it and
+  // where, the fan's slant; where round the plate the arc's middle is going. What the hand aims
+  // for this turn, and where it is on the way.
+  struct Turn { double arc = 1, wid = 1, load = 1, pull = 0, at = 0, slant = 0; };
+  Turn swAim_, swNow_;
+  double swThTo_ = 0, swThHome_ = 0;
+  int swTurn_ = 0;
   uint32_t rng_ = 52361u;
   // The drift: where the hand is, where it goes, strokes left at this place.
   double bow_ = 0, bowTo_ = 0, home_ = 0, wander_ = 0, thWander_ = 0;

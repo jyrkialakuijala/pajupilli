@@ -46,7 +46,7 @@ SnareSpec snareSpec() {
   s.under = knob("PJ_SNARE_UNDER", 0.45);
   s.wireDirect = knob("PJ_SNARE_WIREDIRECT", 1);
   s.tipDirect = knob("PJ_SNARE_TIPDIRECT", 1);
-  s.aim = knob("PJ_SNARE_AIM", 0.5);      // the directional parts (0: the drum sounds alike all round; 1: all the far field's)
+  s.aim = knob("PJ_SNARE_AIM", 0.65);      // the directional parts (0: the drum sounds alike all round; 1: all the far field's)
   s.tipAim = knob("PJ_SNARE_TIPAIM", 0.6);
   s.gain = knob("PJ_SNARE_GAIN", 1);
   s.brush.tips = int(knob("PJ_BRUSH_TIPS", 24));

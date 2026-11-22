@@ -147,6 +147,12 @@ class HandDrumPlayer : public Performer {
   double ur();
   HandDrumModel& m_;
   uint32_t rng_ = 6007u;
+  // The two hands (0 right, 1 left): each lands on its own side of the head, the left a little
+  // further in and lighter. A drum's strokes in quick succession alternate them; after a pause
+  // its lead hand (the right) starts again. Per drum: the last stroke's time, hand and velocity.
+  double now_ = 0;
+  double lastT_[2] = {-1e9, -1e9};
+  int lastHand_[2] = {1, 1}, lastVel_[2] = {0, 0};
 };
 
 }  // namespace pajupilli

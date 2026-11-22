@@ -168,10 +168,8 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
       // (an instrument whose sound differs with direction: how it stands in the room)
       for (size_t k = 0; k < roomSlots_[c].size(); ++k)
         if (const float* axes = f_[roomSlots_[c][k]].v->dipoleAxes()) rooms_[c]->setAxes(int(k), axes);
-      // (an instrument of parts at their own places, the vibraphone's bars: each part its own paths)
-      for (size_t k = 0; k < roomSlots_[c].size(); ++k)
-        if (const int np = f_[roomSlots_[c][k]].v->parts()) rooms_[c]->setParts(int(k), np, f_[roomSlots_[c][k]].v->partPlaces(), f_[roomSlots_[c][k]].v->partLobes());
     }
+    placeParts();
     room_ = true;
     for (Slot& s : f_) s.room.assign(Room::kBlock, 0.0f);
   }
@@ -326,7 +324,19 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   s.lastNote = pitch;
   s.active = true;
   s.v->player().noteOn(pitch, velocity);
+  s.v->model().hit();  // (a spread drum: this stroke's own throw into the room)
   if (silent) s.v->model().startFresh();
+}
+
+// (an instrument of parts at their own places, the vibraphone's bars, a drum's rim: each part
+// its own paths; again after a model takes on parts later: those the rooms do not have yet)
+void Ensemble::placeParts() {
+  for (int c = 0; c < 3; ++c) {
+    if (!rooms_[c]) continue;
+    for (size_t k = 0; k < roomSlots_[c].size(); ++k)
+      if (const int np = f_[roomSlots_[c][k]].v->parts())
+        rooms_[c]->setParts(int(k), np, f_[roomSlots_[c][k]].v->partPlaces(), f_[roomSlots_[c][k]].v->partLobes());
+  }
 }
 
 void Ensemble::release(int key) {
@@ -1059,6 +1069,7 @@ void Ensemble::block(float* left, float* right, int n) {
         const int i = roomSlots_[c][q];
         const int np = f_[i].v->parts();
         if (!np || !std::count(go.begin(), go.end(), i)) continue;
+        if (rooms_[c]->partFrom(int(q) + 1) - rooms_[c]->partFrom(int(q)) != np) continue;  // (the room does not know them)
         const float gp = float(f_[i].vg) / k;
         for (int j = 0; j < np; ++j)
           if (const float* p = f_[i].v->part(n, j)) {

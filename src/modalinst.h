@@ -32,8 +32,8 @@ class ModalModel : public Tube {
   void resetAir() override;
   // The vibraphone's bars at their places on the frame (vibPlace()), and the rest of the sound (the
   // DC blocker's share, the key ticks) at its centre: the last part.
-  int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
-  const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
+  int parts() const override { return partPlace_.empty() ? Tube::parts() : int(partPlace_.size()) / 3; }
+  const float* partPlaces() const override { return partPlace_.empty() ? Tube::partPlaces() : partPlace_.data(); }
   const float* takePart(int n, int j) override;
   // Bar i's place (m from the frame's centre: x to the player's right, y away from the player,
   // towards the audience; z 0: one plane, the damper pressing both rows).

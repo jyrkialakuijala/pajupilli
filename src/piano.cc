@@ -896,7 +896,10 @@ static inline void axpy4(float* __restrict y, const float* const* r, const float
 float Piano::sample(float testForce) {
   if (boardStale_) boardNow();
   if (asleep_) {
-    if (testForce == 0) return 0;
+    if (testForce == 0) {
+      if (keepRegions_) std::fill(region_, region_ + kRegions, 0.0f);
+      return 0;
+    }
     wake();
   }
   const int kB = nB_, kP = nP_;
@@ -981,6 +984,7 @@ float Piano::sample(float testForce) {
   // microphones now.
   ringPos_ = (ringPos_ + 1) & (kRing - 1);
   float l = 0, r = 0;
+  if (keepRegions_) std::fill(region_, region_ + kRegions, 0.0f);
   for (int p0 = 0; p0 < kP; p0 += 4) {
     const int g = std::min(4, kP - p0);
     const float* pv[4];
@@ -992,8 +996,11 @@ float Piano::sample(float testForce) {
       float* ring = ring_ + size_t(p) * kRing;
       ring[ringPos_] = q4[u];
       const int i0 = (ringPos_ - tapI_[0][p]) & (kRing - 1), i1 = (ringPos_ - tapI_[1][p]) & (kRing - 1);
-      l += tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
-      r += tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+      const float cl = tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
+      const float cr = tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+      l += cl;
+      r += cr;
+      if (keepRegions_) region_[regionOf_[p]] += 0.5f * (cl + cr);
     }
   }
   side_ = pickup_ ? 0 : 0.5f * (l - r);
@@ -1048,6 +1055,35 @@ float Piano::sample(float testForce) {
     }
   }
   return pickup_ ? pick_ : 0.5f * (l + r);
+}
+
+// The patches in regions: four bands across the board by where they lie (bass to treble, as many
+// patches in each), each band halved along the strings (the keyboard's half, the tail's).
+void Piano::keepRegions(bool on) {
+  keepRegions_ = on && !pickup_ && nP_ > 0;
+  if (!keepRegions_) return;
+  const int kP = nP_;
+  std::vector<int> byY(kP);
+  for (int p = 0; p < kP; ++p) byY[p] = p;
+  const float* pos = d_.board.patchPos;
+  std::sort(byY.begin(), byY.end(), [&](int a, int b) { return pos[2 * a + 1] < pos[2 * b + 1]; });
+  double sx[kRegions] = {}, sy[kRegions] = {};
+  int n[kRegions] = {};
+  for (int band = 0; band < 4; ++band) {
+    std::vector<int> in(byY.begin() + band * kP / 4, byY.begin() + (band + 1) * kP / 4);
+    std::sort(in.begin(), in.end(), [&](int a, int b) { return pos[2 * a] < pos[2 * b]; });
+    for (size_t i = 0; i < in.size(); ++i) {
+      const int j = 2 * band + (2 * i >= in.size() ? 1 : 0);
+      regionOf_[in[i]] = j;
+      sx[j] += pos[2 * in[i]];
+      sy[j] += pos[2 * in[i] + 1];
+      ++n[j];
+    }
+  }
+  for (int j = 0; j < kRegions; ++j) {
+    regionX_[j] = n[j] ? sx[j] / n[j] : 0;
+    regionY_[j] = n[j] ? sy[j] / n[j] : 0;
+  }
 }
 
 }  // namespace pajupilli

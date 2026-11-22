@@ -59,7 +59,11 @@ CymbalSpec cymbalSpec(int which) {
   // ride: 3.9 s at 1-2 kHz, 2.6 s at 4 kHz, 1.65 s at 8 kHz, 1.06 s at
   // 12.5 kHz), a little longer in the lows (the user: free cymbals die
   // slowly); a crash on its stand ~3 s at 1 kHz, under 1 s above 10 kHz
-  // (research/jazz_drums.md 3.3).
+  // (research/jazz_drums.md 3.3). The crashes ring longer than that, x PJ_CYM_CRASHRING (1.7: ~5.4 s
+  // at 1 kHz, 2.8 s at 4 kHz, 1.5 s at 12.5 kHz): built to those figures they died away too soon
+  // by ear (the user's, in manteca.mid); the plate's cascade that would keep a crash's shimmer up
+  // is not built.
+  static const double kCrashRing = knob("PJ_CYM_CRASHRING", 1.7);
   switch (which) {
     default:
     case 0:  // 22" thin jazz ride: hammered, a small bell, the bow 3 cm high
@@ -85,6 +89,7 @@ CymbalSpec cymbalSpec(int which) {
     case 2: {  // 16" thin crash
       p.radius = 0.2032; p.thickness = 0.9e-3; p.domeRadius = sphere(p.radius, 0.025);
       p.lossA = 0.008; p.lossB = 0.7; p.split = 0.010; p.seed = 23;
+      p.lossA /= kCrashRing; p.lossB /= kCrashRing;
       s.ride = false; s.bellR = 0.05; s.bellGain = 0.5;
       const double f[6] = {1150, 1760, 2420, 3090, 3900, 4810};
       std::copy(f, f + 6, s.bellF);
@@ -93,6 +98,7 @@ CymbalSpec cymbalSpec(int which) {
     case 3: {  // 18" thin crash
       p.radius = 0.2286; p.thickness = 0.95e-3; p.domeRadius = sphere(p.radius, 0.026);
       p.lossA = 0.008; p.lossB = 0.65; p.split = 0.010; p.seed = 24;
+      p.lossA /= kCrashRing; p.lossB /= kCrashRing;
       s.ride = false; s.bellR = 0.055; s.bellGain = 0.5;
       const double f[6] = {1000, 1530, 2110, 2690, 3400, 4190};
       std::copy(f, f + 6, s.bellF);
@@ -469,17 +475,22 @@ CymbalModel::CymbalModel(const Instrument& inst)
     // (round the plate, 0.6 of its radius out, the plate about level)
     const double a = 2 * M_PI * j / Cymbal::kGroups;
     partPlace_.insert(partPlace_.end(), {float(0.6 * R * std::cos(a)), float(0.6 * R * std::sin(a)), 0.0f});
-    // (its lobe: a direction of its own, mostly up and out, as the modes throw it)
-    double d[3] = {rnd(), rnd(), 0.3 + 0.7 * std::fabs(rnd())};
+    // (its lobe: out round the cymbal on a bearing of its own, a little raised, full strength:
+    // each group throws its highs towards its own part of the room)
+    const double b = a + 0.3 * rnd();
+    double d[3] = {std::cos(b), std::sin(b), 0.35};
     const double nn = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-    partLobe_.insert(partLobe_.end(), {float(d[0] / nn), float(d[1] / nn), float(d[2] / nn), 0.8f});
+    partLobe_.insert(partLobe_.end(), {float(d[0] / nn), float(d[1] / nn), float(d[2] / nn), 1.0f});
   }
   partPlace_.insert(partPlace_.end(), {0.0f, 0.0f, 0.0f});
   partLobe_.insert(partLobe_.end(), {0.0f, 0.0f, 1.0f, 0.0f});
   part_.resize(Cymbal::kGroups + 1);
+  std::fill(aimW_, aimW_ + Cymbal::kGroups, 1.0f);
+  std::fill(aimTo_, aimTo_ + Cymbal::kGroups, 1.0f);
 }
 
 const float* CymbalModel::takePart(int n, int j) {
+  if (part_.empty()) return Tube::takePart(n, j);
   if (j < 0 || j >= int(part_.size())) return nullptr;
   std::vector<float>& p = part_[j];
   partOut_.assign(n, 0.0f);
@@ -509,12 +520,52 @@ float CymbalModel::sample() {
   if (!part_.empty()) {
     if (part_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
       for (auto& p : part_) p.clear();
+    // A brush lying on the plate (the swirl): its hiss is made under the wires and is loudest
+    // off the plate there, before it has gone round and into the whole. The groups' highs
+    // (over ~3 kHz) are dealt towards the parts on the brush's side, more the further out it
+    // lies, their power kept: as the hand goes along its arc and wanders in and out, the shine
+    // leaves the plate from another side, and each wall gets another share of it.
+    // (PJ_CYM_SWIRLAIM: how much, 0: none; PJ_CYM_SWIRLBEAM: how narrowly.)
+    static const float kAim = float(knob("PJ_CYM_SWIRLAIM", 0.65)), kBeam = float(knob("PJ_CYM_SWIRLBEAM", 2.0));
+    if (--aimAge_ <= 0) {
+      aimAge_ = 64;
+      const Brush& br = cym_.brush();
+      const double bx = br.x(), by = br.y(), rr = std::hypot(bx, by);
+      const double d = kAim > 0 && br.load() > 0 ? kAim * std::min(1.0, 1.4 * rr / cym_.plate().radius()) : 0;
+      // The cymbal rocks on its tilter after each stroke (~1.5 Hz, dying over ~15 s, longer than
+      // it sounds): its highs leave the plate in narrow lobes (a few degrees wide at 10 kHz on a
+      // plate this size), so even its small sway sweeps them across the room. Each group's highs
+      // swell and fade with the tilt through its own lobe pattern, one lobe every 0.5 degrees
+      // (PJ_CYM_ROCK: how deep, 0: not; PJ_CYM_ROCKDEG: the lobes' spacing: narrower than the
+      // plate's own at 10 kHz, ~3 degrees, so that the model's small sway, ~0.1 degree under a
+      // ride pattern, carries the shine round the room as a real cymbal's wider one does).
+      static const double kRock = knob("PJ_CYM_ROCK", 0.6), kLobe = 2 * M_PI / (knob("PJ_CYM_ROCKDEG", 0.5) * M_PI / 180);
+      const double tx = cym_.tilt(0), ty = cym_.tilt(1);
+      double w[Cymbal::kGroups], p2 = 0;
+      for (int j = 0; j < Cymbal::kGroups; ++j) {
+        const double a = 2 * M_PI * j / Cymbal::kGroups;
+        const double c = rr > 0 ? (bx * std::cos(a) + by * std::sin(a)) / rr : 0;
+        w[j] = 1 - d + d * std::exp(kBeam * (c - 1));
+        if (kRock > 0) {
+          uint32_t hs = 2654435761u * uint32_t(j + 1 + 17 * which_);
+          hs ^= hs >> 15;
+          const double ua = (hs & 1023) / 1023.0, ub = ((hs >> 10) & 1023) / 1023.0, uc = ((hs >> 20) & 1023) / 1023.0;
+          const double dir = 2 * M_PI * ua, k = kLobe * (0.7 + 0.6 * ub);
+          w[j] *= 1 + kRock * std::sin(k * (std::cos(dir) * tx + std::sin(dir) * ty) + 2 * M_PI * uc);
+        }
+        p2 += w[j] * w[j];
+      }
+      const double nrm = std::sqrt(Cymbal::kGroups / p2);
+      for (int j = 0; j < Cymbal::kGroups; ++j) aimTo_[j] = float(w[j] * nrm);
+    }
     float sum = 0;
     for (int j = 0; j < Cymbal::kGroups; ++j) {
       const float gx = cym_.group(j);
       gShelf_[j] += kA * (gx - gShelf_[j]);
+      aimW_[j] += 0.002f * (aimTo_[j] - aimW_[j]);  // (~10 ms)
+      const float hi = g * float(outScale()) * (1 + kHi) * (gx - gShelf_[j]);
       const float b = g * float(outScale()) * (gx + kHi * (gx - gShelf_[j]));
-      part_[j].push_back(b);
+      part_[j].push_back(b + (aimW_[j] - 1) * hi);
       sum += b;
     }
     part_[Cymbal::kGroups].push_back(out - sum);
@@ -619,6 +670,8 @@ void CymbalPlayer::noteOn(int midi, int velocity) {
       swR_ = swRTo_ = c.spec().ride ? c.spec().bowAt + 0.05 : 0.7;
       swHold_ = 1;
       swTh_ = 2 * kPi * (0.1 + 0.05 * (ur() - 0.5));
+      swThTo_ = swThHome_ = swTh_;
+      swAim_ = swNow_ = Turn();
     }
     c.wake();
     return;
@@ -712,7 +765,9 @@ void CymbalPlayer::swirl(double dt) {
   const SongClock& clk = SongClock::get();
   const double B = clk.valid ? clk.beatLen : 0.6;
   const double P = 2 * B > 2.6 ? B : 2 * B < 0.8 ? 4 * B : 2 * B;
-  swPhase_ += 2 * kPi * dt / P;
+  static const double kVary = knob("PJ_CYM_SWIRLVARY", 0.6);
+  // (the hand hurries through one part of the turn and eases round the rest, each turn its own)
+  swPhase_ += 2 * kPi * dt / P * (1 + swNow_.pull * std::cos(swPhase_ - swNow_.at));
   if (swPhase_ >= 2 * kPi) {
     swPhase_ -= 2 * kPi;
     // The loops' middle wanders: held two to four turns, then moved, more
@@ -724,20 +779,54 @@ void CymbalPlayer::swirl(double dt) {
       const double home = s.ride ? s.bowAt : 0.62;
       swRTo_ = std::clamp(home + swSide_ * (0.12 + 0.12 * ur()), 0.3, 0.86);
     }
-    swTh_ += 0.15 * (ur() - 0.5);
+    // No two turns alike: each has its own arc (short dabs, long strokes round a third of the
+    // plate), its own width across the grooves (a line along them, or an open loop), weight, pace
+    // and slant; now and then (every sixth turn or so) one long light sweep. The arc's middle
+    // goes round the plate with them, within the arm's reach of where it began.
+    ++swTurn_;
+    const double v = kVary;
+    const bool sweep = v > 0 && swTurn_ % 6 == 5 && ur() < 0.6 * v;
+    swAim_.arc = sweep ? 1.9 : 1 + v * (ur() < 0.3 ? -0.45 * ur() : 0.9 * (ur() - 0.4));
+    swAim_.wid = sweep ? 0.6 : 1 + v * 1.6 * (ur() * ur() - 0.33);
+    swAim_.load = sweep ? 0.9 : 1 - v * 0.2 * ur();  // (never heavier than the plain turn)
+    swAim_.pull = v * 0.45 * ur();
+    swAim_.at = 2 * kPi * ur();
+    swAim_.slant = v * 0.5 * (ur() - 0.5);
+    static const double kRound = knob("PJ_CYM_SWIRLROUND", 0.6);
+    swThTo_ = std::clamp(swThTo_ + kRound * (0.15 + 0.75 * v * ur()) * (ur() < 0.5 ? -1 : 1) * (ur() < 0.45 ? 1.0 : 0.25),
+                         swThHome_ - 1.1, swThHome_ + 1.1);
   }
   static const double kAt = knob("PJ_CYM_SWIRLAT", 0);  // (the loops' middle held there, a share of the radius; 0: wandering)
   if (kAt > 0) swRTo_ = kAt;
   swR_ += (swRTo_ - swR_) * std::min(1.0, dt / P);
+  {
+    const double e = std::min(1.0, 3 * dt / P);  // (a third of a turn to get there)
+    swNow_.arc += (swAim_.arc - swNow_.arc) * e; swNow_.wid += (swAim_.wid - swNow_.wid) * e;
+    swNow_.load += (swAim_.load - swNow_.load) * e; swNow_.pull += (swAim_.pull - swNow_.pull) * e;
+    swNow_.slant += (swAim_.slant - swNow_.slant) * e;
+    swNow_.at = swAim_.at;
+    swTh_ += (swThTo_ - swTh_) * std::min(1.0, 1.5 * dt / P);
+  }
   // The loop: long along the grooves (an arc of ~70 degrees), narrow across
   // them, the fan's wires pointing in towards the bell.
-  const double ph = swPhase_, r = (swR_ + 0.05 * std::cos(ph)) * R, th = swTh_ + 0.6 * std::sin(ph);
-  const double x = r * std::cos(th), y = r * std::sin(th), ang = th + kPi + 0.3 * std::cos(ph);
+  const double ph = swPhase_;
+  const double r = std::clamp(swR_ + 0.05 * swNow_.wid * std::cos(ph), 0.22, 0.93) * R, th = swTh_ + 0.6 * swNow_.arc * std::sin(ph);
+  const double x = r * std::cos(th), y = r * std::sin(th), ang = th + kPi + 0.3 * std::cos(ph) + swNow_.slant;
   // The press eases and leans: a little more weight as the hand comes back
   // round towards the drummer (on the beat).
   // (Lighter in towards the bell, where a pressed brush sounds pinched;
   // leaning in out at the edge, for its roar.)
-  const double load = swLoad_ * (0.8 + 0.4 * std::pow(0.5 + 0.5 * std::sin(ph), 2)) * (0.35 + 0.8 * std::min(r / R, 1.0));
+  // (The variety is in the hand's way, not in the loudness: a turn that takes the brush faster
+  // over the plate than the plain one (a longer arc, a wider loop, the hurried part) is that much
+  // lighter, PJ_CYM_SWIRLEVEN: its power; no turn is louder than the plain swirl, some a little
+  // under it.)
+  static const double kEven = knob("PJ_CYM_SWIRLEVEN", 0.5);
+  const double quick = std::hypot(0.6 * swNow_.arc * swR_, 0.05 * swNow_.wid) / std::hypot(0.6 * swR_, 0.05) *
+                       (1 + swNow_.pull * std::cos(ph - swNow_.at));
+  // (... and the whole a little lighter, PJ_CYM_SWIRLUNDER x the variety: it stays just under the plain swirl)
+  static const double kUnder = knob("PJ_CYM_SWIRLUNDER", 0.4);
+  const double even = (quick > 1 ? std::pow(quick, -kEven) : 1.0) * (1 - kUnder * kVary);
+  const double load = swLoad_ * (0.8 + 0.4 * std::pow(0.5 + 0.5 * std::sin(ph), 2)) * (0.35 + 0.8 * std::min(r / R, 1.0)) * swNow_.load * even;
   static const double kShare = knob("PJ_CYM_SWIRLFAN", 0.25);
   if (!swirling_ || b.up()) {
     b.jump(x, y, ang);

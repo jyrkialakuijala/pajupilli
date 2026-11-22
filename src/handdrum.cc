@@ -1,5 +1,7 @@
 #include "handdrum.h"
 
+#include "songclock.h"
+
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -403,19 +405,59 @@ void HandDrumPlayer::noteOn(int midi, int velocity) {
   // of damping), and now and then the hand drops further in, heavier, and is
   // lifted at once: a rebound off the head, a bigger, rounder sound (more
   // often on accents). A closed tone presses a little harder or longer.
-  double r = d.spec().where + 0.08 * (ur() - 0.5);
-  const double th = -kPi / 2 + 0.6 * (ur() - 0.5);
+  // Which hand: in quick succession on one drum (under 0.25 s) the other one; after a pause the
+  // lead (right) hand. Each its own side and weight.
+  const double gap = now_ - lastT_[drum];
+  const int hand = m_.kind() == 2 ? 0 : gap < 0.25 ? 1 - lastHand_[drum] : 0;
+  const bool repeat = gap < 0.3 && std::abs(velocity - lastVel_[drum]) <= 8;
+  lastT_[drum] = now_;
+  lastHand_[drum] = hand;
+  lastVel_[drum] = velocity;
+  // Where it lands: on a bongo's small head ~1 cm either way already changes its overtones
+  // (nearer the rim brighter and ringier, further in drier): +-0.1 of its radius there, +-0.04
+  // on a conga's. The left hand a little further in.
+  const double spread = m_.kind() == 1 ? 0.2 : 0.08;
+  double r = d.spec().where - (hand ? 0.04 : 0.0) + spread * (ur() - 0.5);
+  const double th = -kPi / 2 + (hand ? -0.35 : 0.35) + 0.4 * (ur() - 0.5);
   HandDrum::Gesture g;
+  // Two strokes in a row on a drum, written the same: rarely played the same. The one off the
+  // beat (-play: the song's clock) becomes the lighter partner, further in and drier, now and
+  // then a heel's muted thud (heel-toe, the martillo's motion); the accent stays open.
+  bool partner = false;
+  double partnerSpeed = 1;
+  if (repeat && m_.kind() != 2) {
+    const SongClock& clk = SongClock::get();
+    if (clk.valid && clk.playing) {
+      const double f = clk.beat - std::floor(clk.beat);
+      const bool onBeat = f < 0.08 || f > 0.92;
+      if (!onBeat) {
+        partner = true;
+        partnerSpeed = 0.7 + 0.15 * ur();
+      }
+    }
+  }
   if (m_.kind() != 2) {
     const double open = ur();  // 0 closed, cupped fingers .. 1 a flat open hand
     g.band = 0.6 + 0.8 * open;
     g.K = 1.5 - 0.8 * open;
     g.mass = 0.85 + 0.3 * ur();
     g.lift = 0.8 + 0.5 * ur();
+    if (hand) g.mass *= 0.92;  // (the weaker hand)
     if (mute) {
       g.muteForce = 0.6 + 0.8 * ur();
       g.muteTime = 0.6 + 0.7 * ur();
       g.muteDamp = 0.7 + 0.6 * ur();
+    } else if (partner && ur() < 0.35) {  // the heel: the hand's base dropped in, left a moment
+      r = d.spec().where - 0.35 - 0.1 * ur();
+      g.mass *= 1.8;
+      g.K *= 0.6;
+      g.band *= 1.4;
+      g.muteForce = 0.4 + 0.3 * ur();
+      g.muteTime = 0.2 + 0.2 * ur();
+      g.muteDamp = 0.6 + 0.4 * ur();
+      g.muteR = std::max(0.2, r);
+    } else if (partner) {  // a lighter tone, further in: drier
+      r -= 0.08 + 0.08 * ur();
     } else if (ur() < 0.12 + 0.25 * v) {  // a rebound stroke into the head
       r = d.spec().where - 0.15 - 0.15 * ur();
       g.mass *= 1.6 + 0.6 * ur();
@@ -431,7 +473,7 @@ void HandDrumPlayer::noteOn(int midi, int velocity) {
   } else if (mute) {
     g.muteForce = 1; g.muteTime = 1;
   }
-  d.strike(speed, r, th, g);
+  d.strike(speed * partnerSpeed, r, th, g);
 }
 
 void HandDrumPlayer::render(float* out, int n) {
@@ -441,6 +483,7 @@ void HandDrumPlayer::render(float* out, int n) {
     tick(m / fs_);
     m_.process(out + i, m);
   }
+  now_ += n / fs_;
   blowing_ = !(m_.drum(0).asleep() && m_.drum(1).asleep());
 }
 

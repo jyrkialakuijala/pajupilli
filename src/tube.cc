@@ -534,7 +534,61 @@ float Tube::finish(float y) {
   const float yd = y - dcX_ + dcPole_ * dcY_;
   dcX_ = y;
   dcY_ = yd;
-  return float(yd * kOut_);
+  const float out = float(yd * kOut_);
+  if (spread_) {
+    if (spreadBuf_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
+      for (auto& b : spreadBuf_) b.clear();
+    spreadLow_ += spreadA_ * (out - spreadLow_);
+    const float high = out - spreadLow_;
+    float sum = 0;
+    for (int j = 0; j < kSpread; ++j) {
+      spreadW_[j] += spreadX_ * (spreadTo_[j] - spreadW_[j]);
+      const float p = spreadW_[j] * high;
+      spreadBuf_[j].push_back(p);
+      sum += p;
+    }
+    spreadBuf_[kSpread].push_back(out - sum);  // (the lows, and what the weights leave)
+  }
+  return out;
+}
+
+void Tube::spreadOn(double radius, unsigned seed) {
+  spread_ = true;
+  spreadRng_ = 2654435761u * (seed + 1);
+  spreadA_ = float(1 - std::exp(-2 * M_PI * 400 / fs_));
+  spreadX_ = float(1 - std::exp(-1 / (0.003 * fs_)));
+  auto rnd = [this]() { spreadRng_ = spreadRng_ * 1664525u + 1013904223u; return (spreadRng_ >> 8) / 16777216.0 * 2 - 1; };
+  for (int j = 0; j < kSpread; ++j) {
+    const double a = 2 * M_PI * (j + 0.1 * rnd()) / kSpread;  // (even round the rim: the drum's image stays where it stands)
+    spreadPlace_[3 * j] = float(radius * std::cos(a));
+    spreadPlace_[3 * j + 1] = float(radius * std::sin(a));
+    spreadPlace_[3 * j + 2] = 0;
+    // (its lobe: out round the drum, a little up; strength 0.8)
+    double d[3] = {std::cos(a) + 0.15 * rnd(), std::sin(a) + 0.15 * rnd(), 0.5};
+    const double nn = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    for (int k = 0; k < 3; ++k) spreadLobe_[4 * j + k] = float(d[k] / nn);
+    spreadLobe_[4 * j + 3] = 0.8f;
+    spreadW_[j] = spreadTo_[j] = 1.0f / kSpread;
+  }
+  spreadLobe_[4 * kSpread + 2] = 1;  // (the middle: no lobe)
+}
+
+void Tube::hit() {
+  if (!spread_) return;
+  auto rnd = [this]() { spreadRng_ = spreadRng_ * 1664525u + 1013904223u; return (spreadRng_ >> 8) / 16777216.0 * 2 - 1; };
+  double w[kSpread], sum = 0;
+  for (int j = 0; j < kSpread; ++j) sum += (w[j] = std::exp(0.9 * (rnd() + rnd())));
+  for (int j = 0; j < kSpread; ++j) spreadTo_[j] = float(w[j] / sum);
+}
+
+const float* Tube::takePart(int n, int j) {
+  if (!spread_ || j < 0 || j > kSpread) return nullptr;
+  std::vector<float>& p = spreadBuf_[j];
+  spreadOut_.assign(n, 0.0f);
+  const int have = int(p.size()), m = std::min(n, have);
+  std::copy(p.end() - m, p.end(), spreadOut_.end() - m);
+  p.clear();
+  return spreadOut_.data();
 }
 
 }  // namespace pajupilli

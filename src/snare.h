@@ -39,7 +39,7 @@ struct SnareSpec {
   double micX = 0.22, micZ = 0.45;  // the two microphones: +- x from the centre, over the batter (m)
   double under = 0.45;         // the snare head's share at them
   double wireDirect = 1, tipDirect = 1;  // the wires' and the wire ends' own sound (x)
-  double aim = 0.5;            // the sound's directional parts (dipole(): x)
+  double aim = 0.65;           // the sound's directional parts (dipole(): x)
   double tipAim = 0.6;         // the wire ends' own sound: its share that goes out to the brush's side, at the rim
   double gain = 1;
 };

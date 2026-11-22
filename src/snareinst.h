@@ -130,6 +130,11 @@ class SnarePlayer : public Performer {
   double tapSwoosh_ = 0.7, held_ = 0.42, meat_ = 1.0, flatShare_ = 0.22, flatHard_ = 0.8;
   bool lastFlat_ = false, rhAway_ = false;
   double rhT_ = -1, rhDur_ = 0, rhV0_ = 0, rhX_ = 0, rhY_ = 0, rhDx_ = 0, rhDy_ = 0, rhAng_ = 1.2, phaseR_ = 3.1;
+  // A swirl that goes on and on is shaped (PJ_SNARE_ARC, PJ_SNARE_SLAPS: how much, 0: not): after
+  // eight bars of it, phrase by phrase (four bars) now and then lighter, and when the file gives
+  // the snare nothing for a while, a slap of the right hand now and then on two or four.
+  double swirlFor_ = 0, arc_ = 1, arcTo_ = 1, slapT_ = 0;  // (slapT_: the slap's hand off the circle a moment)
+  long arcPhrase_ = -1, lastBeat_ = -1;
 };
 
 }  // namespace pajupilli

@@ -2838,14 +2838,15 @@ def brush_swirl():
     after = 10 * math.log10(np.mean(hi[int(8.5 * fs):int(9 * fs)] ** 2) + 1e-30)
     drift = np.mean(lev[-4:]) - np.mean(lev[:4])
     check('brush swirl on the ride: a sustained high swoosh (2-16 kHz, half seconds over 8 s)',
-          min(lev) > med - 12 and abs(drift) < 8 and after < med - 15,
+          min(lev) > med - 14 and abs(drift) < 10 and after < med - 14,  # (each turn its own arc, width and weight)
           f'median {med:.1f} dB, lowest {min(lev) - med:+.1f}, last 2 s vs first {drift:+.1f}, after the release {after - med:+.1f}')
     cs = [centroid(x, fs, t, t + 0.5) for t in np.arange(0.5, 8, 0.5)]
     check('brush swirl on the ride: its brightness moves (the hand wandering)', max(cs) > 1.2 * min(cs),
           f'centroid {min(cs):.0f} .. {max(cs):.0f} Hz')
     # Towards the bell brighter, at the edge washier (more of it low).
     def place(at):
-        fs, y = render('on 84 60 wait 5 off 84', {'PJ_CYM_SWIRLAT': str(at)})
+        # (every turn alike, PJ_CYM_SWIRLVARY=0: the place alone is compared)
+        fs, y = render('on 84 60 wait 5 off 84', {'PJ_CYM_SWIRLAT': str(at), 'PJ_CYM_SWIRLVARY': '0'})
         seg = y[fs:5 * fs]
         sp = np.abs(np.fft.rfft(seg)) ** 2
         f = np.fft.rfftfreq(len(seg), 1 / fs)

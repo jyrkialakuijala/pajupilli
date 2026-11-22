@@ -30,8 +30,16 @@ class PianoModel : public Tube {
     return sideOut_.data();
   }
   void resetAir() override;
+  // The grand's board as regions at their places (Piano::keepRegions; across: the bass at the
+  // listener's left, as the player sees it; along the strings: the tail away), the rest of its
+  // sound at the middle: the last part. PJ_PIANO_PARTS=0: one point.
+  int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
+  const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
+  const float* takePart(int n, int j) override;
 
  private:
+  std::vector<float> partPlace_, partOut_;
+  std::vector<std::vector<float>> part_;
   float treble_ = 0, trebleA_ = 0, trebleM_ = 0, trebleS_ = 0;  // (the honky-tonk's lifted highs)
   float air_ = 0, airA_ = 0, airM_ = 0, airS_ = 0;              // (... and its top)
   float lpB_[3] = {}, lpA_[2] = {}, lpZm_[2] = {}, lpZs_[2] = {};  // (... rolled off: no hiss)

@@ -71,12 +71,21 @@ class Tube {
   // listener, z up), and each one's last n samples (taken once, in the output's units, without
   // the instrument's gain: as takeDipole). The parts add up to the output; the room gives every
   // path from the instrument each part's own length.
-  virtual int parts() const { return 0; }
-  virtual const float* partPlaces() const { return nullptr; }
-  virtual const float* takePart(int /*n*/, int /*j*/) { return nullptr; }
+  virtual int parts() const { return spread_ ? kSpread + 1 : 0; }
+  virtual const float* partPlaces() const { return spread_ ? spreadPlace_ : nullptr; }
+  virtual const float* takePart(int n, int j);
+  // A drum's sound spread over its rim (spreadOn): below ~400 Hz from its middle (the last part;
+  // the lows go out alike all round), above it in kSpread parts round the rim of `radius` (m), each
+  // with its own lobe; every hit (hit()) deals the highs out over the lobes anew (x 0.4 .. 2.5
+  // about evenly, weights summing to 1: the parts still add up to the output), crossfading in
+  // ~3 ms as the new stroke begins. In a room every path takes its own mix: the drum sounds from
+  // a place, not a point, and each stroke throws its sound a little differently.
+  static constexpr int kSpread = 6;
+  void spreadOn(double radius, unsigned seed);
+  void hit();
   // Each part's lobe (4 per part: a unit direction in the instrument's frame, as its places, and
   // a strength a: a path leaving at angle theta to it is heard x (1 + a cos theta)), or null.
-  virtual const float* partLobes() const { return nullptr; }
+  virtual const float* partLobes() const { return spread_ ? spreadLobe_ : nullptr; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right
@@ -190,6 +199,13 @@ class Tube {
     return int32_t(rng_) * (1.0 / 2147483648.0) * 1.732 * noiseNorm_;
   }
   float dcX_ = 0, dcY_ = 0, dcPole_ = 0.99935f;
+  // (spreadOn: the rim's parts, their places and lobes, the weights now and dealt for this hit,
+  // the lows' one pole, the parts' samples waiting for the room)
+  bool spread_ = false;
+  float spreadPlace_[3 * (kSpread + 1)] = {}, spreadLobe_[4 * (kSpread + 1)] = {};
+  float spreadW_[kSpread] = {}, spreadTo_[kSpread] = {}, spreadLow_ = 0, spreadA_ = 0, spreadX_ = 0;
+  uint32_t spreadRng_ = 1;
+  std::vector<float> spreadBuf_[kSpread + 1], spreadOut_;
   int ctl_ = 0;
   double testDp_ = 0;
   const float* room_ = nullptr;

@@ -11,6 +11,7 @@
 #include <alsa/asoundlib.h>
 
 #include <algorithm>
+#include <functional>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -38,6 +39,7 @@
 #include "parallel.h"
 #include "performer.h"
 #include "modalinst.h"
+#include "knob.h"
 #include "songclock.h"
 
 namespace pajupilli {
@@ -905,6 +907,24 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       hp->setLeslieExternal();  // (the file's controls or the plan: the player does not ride it)
     }
   }
+  // The drums spread over their rims (Tube::spreadOn): each a place in the room, not a point,
+  // every stroke thrown a little differently. (Not those with their own: the cymbals' plate
+  // groups, the snare's directional parts.) PJ_DRUM_SPREAD=0: points.
+  if (knob("PJ_DRUM_SPREAD", 1) != 0)
+    for (auto& [id, p] : parts) {
+      if (id / 128 != 9) continue;
+      const std::string nm = p.inst->name;
+      auto has = [&](const char* w) { return nm.find(w) != std::string::npos; };
+      const double radius = has("kick") ? 0.25 : has("bongo") ? 0.09
+                          : (has("tom") || has("conga") || has("timbale") || has("surdo") || has("taiko") || has("tabla")) ? 0.15
+                          : 0.06;
+      for (int q = 0; q < p.ens->size(); ++q) {
+        Tube& t = p.ens->model(q);
+        if (t.parts() > 0 || t.dipoleAxes()) continue;
+        t.spreadOn(radius, unsigned(std::hash<std::string>()(nm)) + 977u * unsigned(q));
+      }
+      p.ens->placeParts();
+    }
   // A vibraphone's motor, set as a vibist sets it (between sections, not ridden), bar by bar by
   // how exposed the part is: among many instruments the openings on the eighth notes (by the
   // song's clock: the vibraphone stands out); alone (a solo piece, or a solo passage in a slow

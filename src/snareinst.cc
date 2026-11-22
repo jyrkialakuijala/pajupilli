@@ -17,7 +17,7 @@ bool brushSnare(const Instrument& inst) { return std::strcmp(inst.name, "brush-s
 SnareModel::SnareModel(const Instrument& inst) : Tube(inst), snare_(inst.fs) {
   // (The sideways parts add to what the listener gets, about as much power again at 1: the whole
   // down by that, so the drum stays as loud as it was set against the other kits.)
-  const double a = knob("PJ_SNARE_AIM", 0.5);
+  const double a = knob("PJ_SNARE_AIM", 0.65);
   aim_ = a > 0;
   trim_ = float(1 / std::sqrt(1 + 0.95 * a * a));
 }
@@ -236,11 +236,53 @@ void SnarePlayer::control(double dt) {
   }
   const bool own = loop_ && brushing_;
   if (!asked && !own) {
+    swirlFor_ = 0;
     lh.rest(0);
     if (!rhBusy && !rh.up() && rhT_ < 0) rh.rest(0);
     return;
   }
   const bool time = own && sinceTap_ < 1.5 * gap_;  // strokes are coming
+  // A swirl going on and on: after eight bars of it, its phrases (four bars) now and then
+  // lighter (about one in three, to 55 .. 70 %), easing there over a beat; and when no strokes
+  // come, a slap of the right hand into the round now and then, on two or four (fewer in the
+  // lighter phrases). Seeded by the phrase and the beat: the same song, the same shaping.
+  {
+    static const double kArc = knob("PJ_SNARE_ARC", 1), kSlaps = knob("PJ_SNARE_SLAPS", 1);
+    const SongClock& ck = SongClock::get();
+    swirlFor_ += dt;
+    const double beatNow = ck.valid ? ck.beat : swirlFor_ / std::max(pulse_, 0.2);
+    const double barLen = 4 * (ck.valid ? ck.beatLen : std::max(pulse_, 0.2));
+    if (kArc > 0 && swirlFor_ > 8 * barLen) {
+      const long phrase = ck.valid ? long(beatNow / 16) : long(swirlFor_ / 8);
+      if (phrase != arcPhrase_) {
+        arcPhrase_ = phrase;
+        uint32_t hsh = 2654435761u * uint32_t(phrase + 7);
+        hsh ^= hsh >> 13;
+        const double u = (hsh & 0xffff) / 65536.0, w = ((hsh >> 16) & 0xffff) / 65536.0;
+        arcTo_ = u < 0.35 ? 1 - kArc * (0.3 + 0.15 * w) : 1;
+      }
+    } else {
+      arcTo_ = 1;
+    }
+    arc_ += (arcTo_ - arc_) * std::min(1.0, dt / (barLen / 4));
+    const long beatI = long(std::floor(beatNow));
+    if (beatI != lastBeat_) {
+      lastBeat_ = beatI;
+      const int inBar = int(((beatI % 4) + 4) % 4);
+      uint32_t hsh = 40503u * uint32_t(beatI + 11);
+      hsh ^= hsh >> 11;
+      const double u = (hsh & 0xffff) / 65536.0;
+      if (kSlaps > 0 && swirlFor_ > 8 * barLen && (inBar == 1 || inBar == 3) && !time && !rhAway_ && rhT_ < 0 &&
+          sinceTap_ > 2 * barLen / 4 && u < kSlaps * 0.22 * arc_) {
+        const double R0 = s.batter().radius();
+        const double r = (0.3 + 0.15 * ur()) * R0, th = -0.6 + 0.3 * (ur() - 0.5);
+        rh.jump(r * std::cos(th), r * std::sin(th), 1.2);
+        rh.strike(strokeSpeed(55 + int(25 * ur()), dyn_), 0.5e-3, 3e-3, 0.035);
+        rhT_ = -1;
+        slapT_ = 0.15;
+      }
+    }
+  }
   // One whoosh that never stops: the left hand goes round in smooth circles.
   //   - Its tempo is the song's beat (a MIDI file's own; alone: the pulse
   //     heard in the strokes), a turn every two beats; at a slow beat (two
@@ -309,7 +351,7 @@ void SnarePlayer::control(double dt) {
   }
   const Round& rl = now_[0];
   const double pull = 1 + rl.pull * (warpW_[ti] - 1);  // 1 at ease .. more at the pull's middle
-  const double load = asked ? held_ * load_ : ownLoad_;
+  const double load = (asked ? held_ * load_ : ownLoad_) * arc_;
   phase_ += 2 * kPi / P * (1 + rl.pull * (warpN_ - 1)) * pull * (1 + lock) * dt;
   if (phase_ >= 2 * kPi) phase_ -= 2 * kPi;
   // (The sweep across and back: the same turn, its far side folded flat.)
@@ -323,7 +365,8 @@ void SnarePlayer::control(double dt) {
   // the left hand eases). Between strokes that are coming it is in the air
   // (its stroke's own sweep done), on its way to the next.
   if (rhAway_ && !rhBusy && rhT_ < 0) rh.rest(0);  // (swirling on a cymbal: only the left hand circles here)
-  if (!time && !rhBusy && !rhAway_) {
+  slapT_ -= dt;
+  if (!time && !rhBusy && !rhAway_ && slapT_ <= 0) {
     const Round& rr = now_[1];
     double pr = phase_ + kPi;
     if (pr >= 2 * kPi) pr -= 2 * kPi;
