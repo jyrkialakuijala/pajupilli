@@ -103,6 +103,12 @@ struct PianoDesign {
   // than the landings' and the knock's own physics give; PJ_PIANO_PEDALUP).
   double pedalUp = 1.6;
   double railMass = 0.6, railContact = 8e-3, rimShare = 0.5, railPress = 0.3;
+  // The key's own knock at a stroke (the key's front landing on its felt punching on the keybed,
+  // the hammer's shank and the action's wood): an impulse of keyKnock N s per m/s of the hammer,
+  // a half sine of keyKnockTime s, into the board at the key's own bridge point (through the key
+  // frame and the case to where its strings stand). Under the strings in the middle of the
+  // keyboard; at the top, where the strings' sound is short, it is much of the note: the thunk.
+  double keyKnock = 0, keyKnockTime = 3e-3;
   uint32_t seed = 4242;
   // The sideways swing: how far off the vertical the blow sets a string
   // swinging, how far sideways is tuned from up-and-down (cents), and the
@@ -110,6 +116,11 @@ struct PianoDesign {
   double tilt = 0.4, sideTuneCents = 1.0, sideLoad = 0.4;
   double top = 10000, topTreble = 20000;  // modes up to here (Hz): the bass, from about key 40 up
   double hammerWidth = 0.010;             // the felt's width on the string (m)
+  // The concert grand's own voicing (designFor sets these; what is built on the grand keeps
+  // the plain values): the treble bridge's admittance above ~1 kHz at the top key, the top
+  // strings' own extra loss (partials above the first, the first), and how the nap gives out
+  // under a blow (0: never quite, a hyperbola; else it packs down within this share of its depth).
+  double topBridge = 1, topUp = 2.5, topF0 = 1.5, napPack = 0;
   // The bridge: a soundboard's resonances (tools/pianoboard.py), loaded by
   // the damped strings standing on it; or a heavy lossy support that does
   // not move (each string's end gives to a resistance of supportR kg/s: a
@@ -187,6 +198,9 @@ class Piano {
   static constexpr int kRegions = 8;
   void keepRegions(bool on);
   float region(int j) const { return region_[j]; }
+  // The regions as the hall hears them (no microphones: PianoModel::concertHall).
+  void hallSound(bool on) { regionSrc_ = on && keepRegions_; }
+  bool hallSound() const { return regionSrc_; }
   void regionPlace(int j, double* x, double* y) const { *x = regionX_[j]; *y = regionY_[j]; }
   void reset();
   bool asleep() const { return asleep_; }
@@ -212,6 +226,7 @@ class Piano {
     float hard = 1, gap = 0;  // (a tacked hammer: this string's felt stiffness x, its face's distance (m))
     float tack = 0;           // (... its metal's sharp knock: peak force per m/s of the hammer (N s/m))
     float tickAmp = 0;        // (... the knock under way: its peak (N), samples left)
+    float dampR = 0;          // (the damper's felt, its friction on this string pressed in (N s/m))
     int tickLeft = 0, tickN = 1;
     bool active = false;
     // Its stretching (research/piano.md 3): nl lengthwise modes, each as the transverse ones
@@ -229,7 +244,7 @@ class Piano {
     int s0, ns;
     double f1, B, len;
     float mh, K, p;       // the hammer: mass (kg), felt stiffness (N/m^p), exponent
-    float nap = 0, napK = 0;  // the felt's nap: thickness (m), stiffness (N/m a string)
+    float nap = 0, napK = 0, napPack = 0;  // the felt's nap: thickness (m), stiffness (N/m a string), packing
     float pluckK = 0, pluckLimit = 0, pluckSide = 0;  // a plectrum in the hammer's place
     float eta = 0, vh = 0, force = 0;  // its place (m, from the strings' rest) and speed
     bool hammerOn = false;
@@ -241,7 +256,12 @@ class Piano {
     // touches, those left of the push and its length)
     float landAmp = 0, landDelay = 0;
     int landWait = 0, landLeft = 0, landN = 1;
+    // (the damper as a contact (PJ_PIANO_DCONTACT): its head's place (m, up from the strings'
+    // rest: the felt's face) and speed; its mass and its weight on the strings (N))
+    float hy = 0, hv = 0, dM = 0.016f, dW = 0.16f;
+    bool seated = true;  // (the strings' rest is where its weight holds them: their motion counted from there)
   };
+  void damperContact(Key& k);
   void build();
   void hammer(Key& k);
   void pluck(Key& k);
@@ -275,6 +295,13 @@ class Piano {
   float *hk_;             // the hammer's force into the mode's velocity (x dt / mass)
   float *hc_, *hs_;       // the string's place under the hammer one sample on, from x and v
   float *dk_;             // a force on the damper's felt into the mode's velocity (x dt / mass)
+  // The damper's felt as kDPts contacts along its length (each a quarter of it): per contact,
+  // the mode's shape there (the mean over its quarter), / omega (the place from x), and x dt / mass.
+  static constexpr int kDPts = 4;
+  float *dsh_[kDPts], *dshw_[kDPts], *dkp_[kDPts];
+  bool dContact_ = false;
+  float dFeltK_ = 300;    // the damper felt's stiffness (N/m a string: thick, soft wool, the strings sunk ~1 mm into it)
+  float dHold_ = 0;       // the drag on its head's motion (N s/m: the guide rail's bushings, the underlever)
   float *nw_;             // n / omega: the mode's x to its slope's share (n a_n, m)
   // The soundboard.
   float *bx_, *bv_, *bcs_, *bsn_, *bf_, *ba_, *binv_;
@@ -290,6 +317,15 @@ class Piano {
   float tapF_[2][kMaxPatches], tapG_[2][kMaxPatches];
   float side_ = 0;
   bool keepRegions_ = false;
+  // (the regions as sources (PJ_PIANO_PARTSRC, 1): each patch's own sound, one common delay and
+  // gain (the microphones' distance straight down), the room doing the rest; 0: the two close
+  // microphones' mean, as heard there)
+  bool regionSrc_ = false;
+  int srcD_ = 0;
+  float srcG_ = 0;
+  int srcI_[kMaxPatches] = {};      // (each patch's delay toward the audience, within its region)
+  float srcF_[kMaxPatches] = {};
+  float srcW_[kMaxPatches] = {};      // (its gain: the keyboard's balance kept, band by band)
   int regionOf_[kMaxPatches] = {};
   float region_[kRegions] = {};
   double regionX_[kRegions] = {}, regionY_[kRegions] = {};
@@ -303,12 +339,12 @@ class Piano {
   // the draws for each landing's own speed.
   float noise_ = 0;
   int landing_ = 0;
-  struct Knock { float amp = 0; int left = 0, n = 1; };  // (a half sine at the rim: peak (N), samples)
-  static constexpr int kKnocks = 4;
+  struct Knock { float amp = 0; int left = 0, n = 1, at = -1; };  // (a half sine: peak (N), samples; at: a key's bridge point, -1 the rim)
+  static constexpr int kKnocks = 8;
   Knock knock_[kKnocks];
   int knocks_ = 0;           // (those under way)
   std::vector<float> trapPhi_;
-  void knock(double impulse, double T);
+  void knock(double impulse, double T, int at = -1);
   uint32_t noiseRng_ = 1;
   void land(Key& k);
   float stretch(Str& s);

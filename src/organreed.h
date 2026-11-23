@@ -105,11 +105,27 @@ class ReedPipe {
   void open(double secs = 0) {
     on_ = true;
     awake_ = true;
-    moveTime_ = secs > 0 ? secs : v_.valve;
+    moveTime_ = (secs > 0 ? secs : v_.valve) * valveScale_;
   }
   void close(double secs = 0) {
     on_ = false;
-    moveTime_ = secs > 0 ? secs : v_.release;
+    moveTime_ = (secs > 0 ? secs : v_.release) * closeScale_;
+  }
+  // The wind behind the pallet as a damped Helmholtz system: the air slug through the pallet and the
+  // toe (its flow q, its inertance) fills the groove and the foot (their compliance; their pressure
+  // foot_), which the pipe bleeds (bleed sqrt(p)). The pallet's opening a sets the turbulent loss,
+  // turb |q| q / a^2; resist is the toe's linear loss. So the overshoot is the response to the valve:
+  // a quicker pallet or a more open toe overshoots more. The drive is raised by the steady losses, so
+  // that the settled foot pressure is the chest's, and the tone unchanged. hz: the system's frequency.
+  void setReleaseDamp(double x) { releaseDamp_ = float(x); }
+  void setReleaseNoise(double x) { releaseNoise_ = float(x); }
+  void setCloseScale(double x) { closeScale_ = x; }  // (the airflow's closing time x this)
+  void setValveScale(double x) { valveScale_ = x; }  // (the pallet's opening time x this: a snappier one)
+  void setGroove(double hz, double resist, double turb, double bleed) {
+    grooveW_ = float(2 * M_PI * hz / fs_);
+    grooveR_ = float(resist), grooveK_ = float(turb), grooveB_ = float(bleed);
+    grooveDrive_ = float(1 + resist * bleed + turb * bleed * bleed);
+    grooveOn_ = true;
   }
   bool awake() const { return awake_; }
   bool openPipe() const { return false; }
@@ -133,18 +149,29 @@ class ReedPipe {
   void reset() {
     std::fill(y1_.begin(), y1_.end(), 0.0f);
     std::fill(y2_.begin(), y2_.end(), 0.0f);
-    valvePos_ = foot_ = y_ = yv_ = u1_ = u2_ = pr_ = prev_ = lp_ = 0;
+    valvePos_ = foot_ = y_ = yv_ = u1_ = u2_ = pr_ = prev_ = lp_ = grooveQ_ = 0;
+    turbState_ = 1;
   }
 
  private:
   float step(float wind, float room) {
     valvePos_ += float(((on_ ? 1.0 : 0.0) - valvePos_) / (moveTime_ * fs_));
     valvePos_ = std::clamp(valvePos_, 0.0f, 1.0f);
-    foot_ += float((valvePos_ * wind - foot_) / (v_.footRise * fs_));
+    if (grooveOn_) {
+      const float loss = grooveR_ + grooveK_ * std::fabs(grooveQ_) / (valvePos_ * valvePos_ + 1e-3f);
+      grooveQ_ = (grooveQ_ + grooveW_ * (wind * grooveDrive_ * std::min(valvePos_ * 1e3f, 1.0f) - foot_)) / (1 + grooveW_ * loss);
+      foot_ += grooveW_ * (grooveQ_ - grooveB_ * std::sqrt(std::max(foot_, 0.0f)));
+      foot_ = std::max(foot_, 0.0f);
+    } else {
+      foot_ += float((valvePos_ * wind - foot_) / (v_.footRise * fs_));
+    }
     const float pf = std::max(foot_, 0.0f) * float(v_.pressure);
     // The tongue: closed by the pressure across it (semi-implicit Euler).
     const float dp = pf - pr_;
-    yv_ += wt2_ * (dp - y_) - damp_ * yv_;
+    // (as the wind falls at a release, the tongue's swing dies instead of blatting: its damping
+    // grows as the pallet closes, releaseDamp times at the pallet shut)
+    const float damp = on_ || releaseDamp_ <= 0 ? damp_ : std::min(0.5f, damp_ * (1 + releaseDamp_ * (1 - valvePos_)));
+    yv_ += wt2_ * (dp - y_) - damp * yv_;
     y_ += yv_;
     if (y_ > 1) {  // it beats on the shallot: stopped, a little bounce
       y_ = 1;
@@ -167,7 +194,16 @@ class ReedPipe {
     for (int i = 0; i < K; ++i) rest += z_[i] * (a1_[i] * y1_[i] + a2_[i] * y2_[i]);
     const float inst = inst_;
     rest += 0.02f * room;
-    const float ev = float(v_.viscous), gain = h * (1 + float(v_.noise) * white);
+    // (order to chaos has hysteresis: at a release the flow stays organised while the wind dies, its
+    // turbulence following the foot's pressure x down as x^releaseNoise and never back up, so that
+    // the gap the stopped tongue leaves open does not hiss; a new press rebuilds it over ~20 ms)
+    float turb = float(v_.noise);
+    if (releaseNoise_ > 0) {
+      if (!on_) turbState_ = std::min(turbState_, std::pow(std::clamp(foot_ / std::max(wind, 1e-3f), 0.0f, 1.0f), releaseNoise_));
+      else if (turbState_ < 1) turbState_ = std::min(1.0f, turbState_ + (1 - turbState_) * float(1 / (0.02 * fs_)) + 1e-6f);
+      turb *= turbState_;
+    }
+    const float ev = float(v_.viscous), gain = h * (1 + turb * white);
     float u = u1_;
     for (int it = 0; it < 2; ++it) {  // (from the last sample's flow: two steps converge)
       const float d = pf - rest - inst * u;
@@ -201,6 +237,11 @@ class ReedPipe {
   std::vector<float> a1_, a2_, b0_, z_, w_, y1_, y2_;
   float wt2_ = 0, damp_ = 0, inst_ = 0;
   double moveTime_ = 0.01;
+  bool grooveOn_ = false;
+  float releaseDamp_ = 0, releaseNoise_ = 0, turbState_ = 1;
+  double closeScale_ = 1;
+  double valveScale_ = 1;
+  float grooveW_ = 0, grooveR_ = 0, grooveK_ = 0, grooveB_ = 0, grooveDrive_ = 1, grooveQ_ = 0;
   float valvePos_ = 0, foot_ = 0, y_ = 0, yv_ = 0, u1_ = 0, u2_ = 0, pr_ = 0, prev_ = 0, lp_ = 0;
   int quiet_ = 0;
   bool on_ = false, awake_ = false;

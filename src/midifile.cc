@@ -320,6 +320,8 @@ static int gPlayTranspose = 0;
 void setPlayTranspose(int semitones) { gPlayTranspose = semitones; }
 static bool gPianist = false;
 void setPianist(bool on) { gPianist = on; }
+static double gPlayVolumeDb = 0;
+void setPlayVolume(double dB) { gPlayVolumeDb = dB; }
 
 namespace {
 
@@ -907,6 +909,51 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       hp->setLeslieExternal();  // (the file's controls or the plan: the player does not ride it)
     }
   }
+  // A piano among an orchestra is not miked: it is heard through the hall, as the players around
+  // it are. An orchestra here: bowed strings with at least two kinds of wind or brass, and next to
+  // no drum kit (a band with a string pad keeps its close-miked piano). PJ_PIANO_HALL: 0 never,
+  // 1 always.
+  {
+    const double hall = knob("PJ_PIANO_HALL", -1);
+    int prog[16] = {};
+    size_t notes = 0, kit = 0, bowed = 0;
+    std::set<int> blown;
+    for (const Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) prog[ch] = e.a;
+      if (kind != 0x90 || e.b == 0) continue;
+      ++notes;
+      if (ch == 9) { ++kit; continue; }
+      const int g = prog[ch];
+      if ((g >= 40 && g <= 45) || (g >= 48 && g <= 49)) ++bowed;
+      if ((g >= 56 && g <= 61) || (g >= 64 && g <= 75)) blown.insert(g);
+    }
+    const bool orchestra = bowed > 0 && blown.size() >= 2 && kit * 10 < notes;
+    if (hall > 0 || (hall < 0 && orchestra))
+      for (auto& [id, p] : parts)
+        for (int q = 0; q < p.ens->size(); ++q)
+          if (auto* pm = dynamic_cast<PianoModel*>(&p.ens->model(q))) pm->concertHall(true);
+    // (the plan says how each piano is heard: what feeds the room, and what the audience's
+    // microphones then take of it, as energy)
+    const bool wanted = hall > 0 || (hall < 0 && orchestra);
+    for (auto& [id, p] : parts) {
+      if (p.ens->size() < 1) continue;
+      const auto* pm = dynamic_cast<PianoModel*>(&p.ens->model(0));
+      if (!pm) continue;
+      const int board = pm->inConcertHall() ? 100 : 0;
+      const char* why = board ? (hall > 0 ? "PJ_PIANO_HALL=1" : "with an orchestra")
+                        : wanted ? "this piano has no board regions to send"
+                        : hall == 0 ? "PJ_PIANO_HALL=0" : "no orchestra";
+      std::fprintf(stderr, "  piano   %2d: %s: close mics %d %%, board into the room %d %%, hammers' direct sound %d %% (%s)", id / 128 + 1, p.inst->name, 100 - board, board, int(std::lround(100 * pm->actionShare())), why);
+      if (const Room* rm = p.ens->mainRoom()) {
+        const int direct = int(std::lround(100 * rm->directShare()));
+        std::fprintf(stderr, "; audience mics in the %s: direct %d %%, reverberant %d %%", rm->spec().name, direct, 100 - direct);
+      } else {
+        std::fprintf(stderr, "; no room");
+      }
+      std::fprintf(stderr, "\n");
+    }
+  }
   // The drums spread over their rims (Tube::spreadOn): each a place in the room, not a point,
   // every stroke thrown a little differently. (Not those with their own: the cymbals' plate
   // groups, the snare's directional parts.) PJ_DRUM_SPREAD=0: points.
@@ -1122,6 +1169,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       bpm.push_back({tk, 60 / song.tempo[i].len});
     }
     p.plan.reset(new OrganPlan(planOrgan(notes, song.div, song.barTicks ? song.barTicks : 4L * song.div, starts, bpm)));
+    {
+      int stops, ranks, pipes;
+      organSize(stops, ranks, pipes);
+      std::fprintf(stderr, "  the organ (%s): %d stops, %d ranks, %d pipes\n", organDispositionName(), stops, ranks, pipes);
+    }
     std::string sum = p.plan->summary;
     for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
     std::fprintf(stderr, "    %s", sum.c_str());
@@ -1470,6 +1522,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       std::fprintf(stderr, "  the piano's pedal let up: %d at full force, %d gently, %d carefully (%s)\n", nFull, nGentle, nCareful,
                    rhythmic ? "a rhythmic piece" : "a calm piece");
   }
+  const float masterGain = float(std::pow(10.0, gPlayVolumeDb / 20));
+  float mixPeak = 0;  // (the mix's highest sample, and how many the output's limit had to bend)
+  size_t kneeSamples = 0;
   auto renderSong = [&]() {
     std::vector<float> l(kBlock), r(kBlock);
     size_t next = 0, tk = 0, ahead = 0;
@@ -1829,12 +1884,17 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
       float* o = &all[2 * n];
       for (int j = 0; j < kBlock; ++j) {
-        o[2 * j] = l[j];
-        o[2 * j + 1] = r[j];
+        o[2 * j] = masterGain * l[j];
+        o[2 * j + 1] = masterGain * r[j];
       }
-      if (streaming)  // (no second look at the whole: a soft knee over 0.9 instead of scaling it down)
-        for (int j = 0; j < 2 * kBlock; ++j)
-          if (std::fabs(o[j]) > 0.9f) o[j] = std::copysign(0.9f + 0.1f * std::tanh((std::fabs(o[j]) - 0.9f) / 0.1f), o[j]);
+      for (int j = 0; j < 2 * kBlock; ++j) {
+        const float m = std::fabs(o[j]);
+        if (m > mixPeak) mixPeak = m;
+        if (streaming && m > 0.9f) {  // (no second look at the whole: a soft knee over 0.9 instead of scaling it down)
+          ++kneeSamples;
+          o[j] = std::copysign(0.9f + 0.1f * std::tanh((m - 0.9f) / 0.1f), o[j]);
+        }
+      }
       ready.store(n + kBlock, std::memory_order_release);
     }
   };
@@ -1907,6 +1967,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     snd_pcm_close(pcm);
     renderer.join();
     if (waits > 1) std::fprintf(stderr, "  (the rendering fell behind: %d pauses)\n", waits - 1);
+    if (kneeSamples)
+      std::fprintf(stderr, "  (the mix peaked at %.1f dBFS: %zu samples limited; -volume %.0f would clear them)\n",
+                   20 * std::log10(mixPeak), kneeSamples, std::floor(gPlayVolumeDb + 20 * std::log10(0.9f / mixPeak)));
   }
   int resets = 0;
   for (auto& [id, p] : parts) {

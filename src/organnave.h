@@ -189,6 +189,11 @@ class OrganNave {
     std::fill(line_.begin(), line_.end(), 0.0f);
     std::fill(preRing_.begin(), preRing_.end(), 0.0f);
     for (auto& a : ap_) std::fill(a.begin(), a.end(), 0.0f);
+    for (Zone& Z : zones_) {
+      std::fill(Z.pre.begin(), Z.pre.end(), 0.0f);
+      for (auto& a : Z.ap) std::fill(a.begin(), a.end(), 0.0f);
+      Z.pos = Z.apPos[0] = Z.apPos[1] = Z.apPos[2] = Z.left = 0;
+    }
     for (int k = 0; k < kLines; ++k)
       for (Bq& q : eq_[k]) q.clear();
     for (Bq* q : {&lpU_, &hpV_, &hpW_}) q->clear();
@@ -197,6 +202,26 @@ class OrganNave {
 
   // n samples: in, the organ's sound at 1 m (Pa); out (added to): the
   // microphones' l and r (Pa), the pressure at the organ (Pa; null: none).
+  // Inputs by place (the puffs, enclosure by enclosure): each enters the lines by its own weights
+  // through its own predelay and diffusers. What is given here is also in process()'s `in`, so
+  // the common weights are taken off it: the same energy, in its own place in the church.
+  void setZones(int n) {
+    zones_.assign(n, Zone{});
+    uint32_t seed = 0x51ed27u;
+    for (int z = 0; z < n; ++z) {
+      Zone& Z = zones_[z];
+      double nn = 0;
+      for (int k = 0; k < kLines; ++k) {
+        seed = seed * 1664525u + 1013904223u;
+        const double v = (seed >> 8) / 16777216.0 < 0.5 ? -1 : 1;
+        Z.v[k] = float(v);
+        nn += v * v;
+      }
+      for (int k = 0; k < kLines; ++k) Z.v[k] = float(Z.v[k] / std::sqrt(nn)) - in_[k];
+      Z.pre.assign(preRing_.size(), 0.0f);
+      for (int j = 0; j < 3; ++j) Z.ap[j].assign(ap_[j].size(), 0.0f);
+    }
+  }
   // A line's length moved by a static offset (samples; an air event: a draft,
   // a warm plume in its part of the church), read fractionally while any is set.
   void setStatic(int k, double samples) {
@@ -206,7 +231,7 @@ class OrganNave {
     for (int j = 0; j < kLines; ++j) anyStatic_ |= std::fabs(static_[j]) > 1e-4;
   }
   static constexpr int lines() { return kLines; }
-  void process(const float* in, int n, float* l, float* r, float* atOrgan) {
+  void process(const float* in, int n, float* l, float* r, float* atOrgan, const float* const* zoneIn = nullptr) {
     const int mask = ring_ - 1;
     for (int i = 0; i < n; ++i) {
       // The input: predelayed, diffused.
@@ -247,6 +272,27 @@ class OrganNave {
           }
       const double s = 1 / std::sqrt(double(kLines));
       for (int k = 0; k < kLines; ++k) line_[size_t(k) * ring_ + (pos_ & mask)] = float(s * x[k] + in_[k] * d);
+      if (zoneIn)
+        for (size_t z = 0; z < zones_.size(); ++z) {
+          Zone& Z = zones_[z];
+          const float u = zoneIn[z] ? zoneIn[z][i] : 0.0f;
+          if (u != 0) Z.left = int(Z.pre.size() + 12 * (Z.ap[0].size() + Z.ap[1].size() + Z.ap[2].size()));
+          if (Z.left <= 0) continue;  // (nothing in it: its weights not run)
+          --Z.left;
+          float e = Z.pre[Z.pos];
+          Z.pre[Z.pos] = inGain_ * u;
+          Z.pos = Z.pos + 1 == int(Z.pre.size()) ? 0 : Z.pos + 1;
+          for (int j = 0; j < 3; ++j) {
+            std::vector<float>& a = Z.ap[j];
+            const float dl = a[Z.apPos[j]];
+            const float w = e + 0.6f * dl;
+            a[Z.apPos[j]] = w;
+            e = dl - 0.6f * w;
+            Z.apPos[j] = Z.apPos[j] + 1 == int(a.size()) ? 0 : Z.apPos[j] + 1;
+          }
+          float* out = &line_[pos_ & mask];
+          for (int k = 0; k < kLines; ++k) out[size_t(k) * ring_] += Z.v[k] * e;
+        }
       pos_ = (pos_ + 1) & mask;
     }
   }
@@ -452,6 +498,12 @@ class OrganNave {
   std::vector<float> preRing_;
   std::vector<float> ap_[3];
   int apPos_[3] = {};
+  struct Zone {
+    float v[kLines] = {};
+    std::vector<float> pre, ap[3];
+    int pos = 0, apPos[3] = {}, left = 0;
+  };
+  std::vector<Zone> zones_;
   bool lens_ = false, anyStatic_ = false;
   double static_[kLines] = {};
   float lensA_[kLines] = {}, lensB_[kLines] = {}, lensPh_[kLines] = {}, lensRate_[kLines] = {};

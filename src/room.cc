@@ -130,18 +130,22 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
         const double sx = std::clamp(wid / 2 + x[s], 0.3, wid - 0.3), sy = ys, sz = std::min(1.2, hei / 2);
         const double mx = wid / 2 + (mic ? 1.0 : -1.0), my = ym, mz = std::min(1.5, hei / 2);
         const double ax = std::sin(kMicAngle) * (mic ? 1 : -1), ay = -std::cos(kMicAngle);  // towards the stage
-        for (int u = -2; u <= 2; ++u)
-          for (int w = -2; w <= 2; ++w)
-            for (int z = -2; z <= 2; ++z) {
+        // (PJ_ROOM_ORDER: how many bounces the paths are followed for, 2 .. 5.)
+        static const int kOrder = std::clamp(int(knob("PJ_ROOM_ORDER", 2)), 2, 5);
+        for (int u = -kOrder; u <= kOrder; ++u)
+          for (int w = -kOrder; w <= kOrder; ++w)
+            for (int z = -kOrder; z <= kOrder; ++z) {
               const int order = std::abs(u) + std::abs(w) + std::abs(z);
-              if (order > 2) continue;
+              if (order > kOrder) continue;
               const double dx = image(u, sx, wid) - mx, dy = image(w, sy, len) - my, dz = image(z, sz, hei) - mz;
               const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
               const int d = int(std::lround(r / kC * fs));
               if (d >= kRing - kBlock) continue;
               double g = std::pow(bSide, std::abs(u)) * std::pow(bEnd, std::abs(w));
-              if (z == -1 || std::abs(z) == 2) g *= bFloor;
-              if (z == 1 || std::abs(z) == 2) g *= bCeil;
+              // (the height's bounces alternate: an image above met the ceiling first, one below the floor)
+              const int hits = std::abs(z), first = (hits + 1) / 2, second = hits / 2;
+              g *= std::pow(bFloor, z < 0 ? first : second);
+              g *= std::pow(bCeil, z > 0 ? first : second);
               const double cosT = (dx * ax + dy * ay) / std::max(r, 1e-9);
               g *= kMicPattern + (1 - kMicPattern) * cosT;
               Tap tp{s, mic, d, float(g / std::max(r, 0.5)), u, w, z};
@@ -150,7 +154,28 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
               tp.n[0] = float(-dx / std::max(r, 1e-9)) * (u & 1 ? -1 : 1);
               tp.n[1] = float(-dy / std::max(r, 1e-9)) * (w & 1 ? -1 : 1);
               tp.n[2] = float(-dz / std::max(r, 1e-9)) * (z & 1 ? -1 : 1);
+              // A large hall's walls are not mirrors: balcony fronts, boxes and panels throw part
+              // of each first and second reflection back a little later and from nearby, a cluster
+              // around the mirror path. Half of its energy (PJ_ROOM_SCATTER) goes there, the side
+              // walls' into six arrivals, the others' into three, each up to 0.6 mean free paths
+              // later, its own for each microphone: the sound mixes before the reverberation.
+              static const double kScatter = std::clamp(knob("PJ_ROOM_SCATTER", 0.5), 0.0, 0.95);
+              const int nScat = spec.volume >= 1000 && spec.gate == 0 && kScatter > 0 && order >= 1 && order <= 2 ? (u != 0 ? 6 : 3) : 0;
+              const float whole = tp.gain;
+              if (nScat) tp.gain = float(whole * std::sqrt(1 - kScatter));
               early_.push_back(tp);
+              unsigned h = unsigned(s + 1) * 2654435761u ^ unsigned(mic + 1) * 40503u ^ unsigned(u + 8) * 6151u ^ unsigned(w + 8) * 769u ^ unsigned(z + 8) * 97u;
+              for (int q = 0; q < nScat; ++q) {
+                h = h * 1664525u + 1013904223u;
+                const double extra = mfp * (0.08 + 0.52 * ((h >> 8) / 16777216.0));
+                const int ds = int(std::lround((r + extra) / kC * fs));
+                if (ds >= kRing - kBlock) continue;
+                Tap sc = tp;
+                sc.delay = ds;
+                sc.gain = float(whole * std::sqrt(kScatter / nScat) * r / (r + extra));
+                sc.scattered = true;
+                early_.push_back(sc);
+              }
             }
       }
     // The reverberant field reaches a directional microphone weaker than an
@@ -159,6 +184,7 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     const double on = kMicPattern + (1 - kMicPattern) * std::cos(kMicAngle);  // the stage's centre, about
     micGain_ = float(spec.listener /
                      std::sqrt(on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_));
+    directShare_ = on * on / (on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_);
   }
 }
 
@@ -236,7 +262,7 @@ std::string Room::lateral(int s) const {
   for (int u : {-1, 1}) {
     double t = 0, g[2] = {0, 0};
     for (const Tap& tp : early_)
-      if (tp.src == s && tp.u == u && tp.w == 0 && tp.z == 0) {
+      if (tp.src == s && !tp.scattered && tp.u == u && tp.w == 0 && tp.z == 0) {
         g[tp.mic] = tp.gain;
         if (tp.mic == (u > 0)) t = tp.delay * 1000.0 / fs_;  // at the microphone on its side
       }
@@ -460,7 +486,15 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
         const int* dl = &pDelay_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
         const float* gn = &pGain_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
         for (int k = 0; k < nt; ++k)
-          addRun(e[early_[tapFrom_[s] + k].mic], pr, (rpos_ - dl[k]) & (kRing - 1), n, gl * gn[k]);
+          if (!early_[tapFrom_[s] + k].scattered)
+            addRun(e[early_[tapFrom_[s] + k].mic], pr, (rpos_ - dl[k]) & (kRing - 1), n, gl * gn[k]);
+      }
+      // (the walls' scattered clusters: diffuse, they take the whole source's sound, once)
+      {
+        const float* whole = &ring_[size_t(s) * kSpan];
+        for (int k = tapFrom_[s]; k < tapFrom_[s + 1]; ++k)
+          if (early_[k].scattered)
+            addRun(e[early_[k].mic], whole, (rpos_ - early_[k].delay) & (kRing - 1), n, gl * early_[k].gain);
       }
       continue;
     }

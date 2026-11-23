@@ -91,6 +91,9 @@ class Room {
   // The microphones' gain on everything the room delivers (early and late):
   // an instrument bringing its own early sound to the listener takes it too.
   float micGain() const { return micGain_; }
+  // Of the energy a steady source at the stage's centre brings to the microphones, the share
+  // that comes straight from it (the rest: the room's reverberant field; a dry room: all direct).
+  double directShare() const { return directShare_; }
   const RoomSpec& spec() const { return spec_; }
   // Source s's first reflections off the side walls: when, and how much louder
   // in the right channel than the left.
@@ -112,6 +115,7 @@ class Room {
   int len_[kLines], pos_ = 0;
   float b0_[kLines], a1_[kLines], lp_[kLines] = {};
   float inGain_, micGain_ = 1, micDiffuse_ = 1;
+  double directShare_ = 1;
   // The microphones' pattern a + (1 - a) cos (0.6: between omni and cardioid,
   // 14 dB down at the back) and their angle out from the stage (55 degrees).
   static constexpr double kMicPattern = 0.6, kMicAngle = 55 * 3.14159265358979 / 180;
@@ -136,6 +140,7 @@ class Room {
     int u, w, z;              // the image (walls hit)
     float n[3] = {0, 0, 0};   // the path's direction as it leaves the source
     float dg[3] = {0, 0, 0};  // the source's three directional parts' gains on it
+    bool scattered = false;   // (a part of a wall's scattered cluster, not the mirror path)
   };
   const float* const* dip_ = nullptr;
   // Parts (setParts): [source] the first part's index (and one past the last source's); each

@@ -33,6 +33,7 @@ void setPlayTranspose(int semitones);
 // A pianist's pedalling (-pianist with -play): each piano part's sustain pedal planned from its
 // notes (src/pianoplan.h), the file's own CC 64 on its channel set aside.
 void setPianist(bool on);
+void setPlayVolume(double dB);  // -volume: the whole mix, before the output's limit
 
 // -inst's list of the instruments: in General MIDI's order and groups, each with its program
 // number; then those no program reaches, by family.

@@ -92,6 +92,11 @@ class BassPlayer : public Performer {
   double since_[4] = {1e9, 1e9, 1e9, 1e9};  // s since its note began
   int lastVel_ = 64, lastString_ = -1;
   bool harm_[4] = {};  // a harmonic sounds on the string
+  // The same note plucked again: the two as one gesture (bassinst.cc: BassPlayer::noteOn). The
+  // last pluck's key and finger, the place in the pair (0 the first, 1 the second), and the
+  // strings whose note has a quick, narrow vibrato of its own (the second's bloom).
+  int lastMidi_ = -1, lastFinger_ = -1, pairPos_ = 0;
+  bool vibSoon_[4] = {};
   double sinceAny_ = 1e9;  // s since the last pluck
   int hand_ = -1;          // where the left hand is (semitones above the open strings)
   double scoop_[4] = {};   // each note's slide into pitch (cents)

@@ -30,14 +30,43 @@ class PianoModel : public Tube {
     return sideOut_.data();
   }
   void resetAir() override;
+  // With an orchestra (-play): no microphones on it, the board's regions heard through the hall.
+  // (The hammers and the action speak above the soundboard, which stands between them and much of
+  // the hall: only part of their direct sound reaches it, PJ_PIANO_HALLACT, 0.5; the close
+  // microphones, over the strings, take it whole.)
+  void concertHall(bool on);
+  float actionShare() const { return hallAct_; }
+  bool inConcertHall() const { return static_cast<const Piano&>(piano_).hallSound(); }
   // The grand's board as regions at their places (Piano::keepRegions; across: the bass at the
   // listener's left, as the player sees it; along the strings: the tail away), the rest of its
   // sound at the middle: the last part. PJ_PIANO_PARTS=0: one point.
   int parts() const override { return partPlace_.empty() ? 0 : int(partPlace_.size()) / 3; }
   const float* partPlaces() const override { return partPlace_.empty() ? nullptr : partPlace_.data(); }
   const float* takePart(int n, int j) override;
+  // The action's own knock at a stroke, heard through the air (the key's front on its felt
+  // punching, the hammer's shank, the wood of the action): a few wooden resonances (~250 Hz ..
+  // 2 kHz, gone in 10-25 ms), ~ the hammer's speed^1.5, from the quarter of the keyboard the key
+  // is in (the front region of the board over it, for the room). Under the strings in the middle
+  // of the keyboard; in the top octave much of the note: its thunk. (PJ_PIANO_ACTION: how loud.)
+  void actionKnock(int key, double hammerSpeed);
 
  private:
+  static constexpr int kActBands = 4, kActModes = 4;
+  float actRe_[kActBands][kActModes] = {}, actIm_[kActBands][kActModes] = {};
+  float actC_[kActBands][kActModes] = {}, actS_[kActBands][kActModes] = {}, actD_[kActBands][kActModes] = {};
+  bool actOn_ = false;
+  float actGain_ = 0, hallAct_ = 1;
+  // The top keys' hammer tick: the hard felt on a short, thin string, a faint hiss of high,
+  // inharmonic overtones gone in a few ms (above ~4 kHz; from D6, fully from E7).
+  float tick_[kActBands] = {}, tickD_ = 0, tickHp_[kActBands][2] = {}, tickA_ = 0;
+  uint32_t tickRng_ = 12345;
+  // The top keys' thump as pearls: resonances on the note's subharmonics (an octave, two and
+  // three below), round and short, from C6, fully from C7, in place of the wooden knock's highs.
+  static constexpr int kPearls = 8, kPearlModes = 3;
+  struct Pearl { float re[kPearlModes] = {}, im[kPearlModes] = {}, c[kPearlModes] = {}, s[kPearlModes] = {}; int band = 0; bool on = false; };
+  Pearl pearl_[kPearls];
+  int pearlNext_ = 0;
+  float pearlGain_ = 0;
   std::vector<float> partPlace_, partOut_;
   std::vector<std::vector<float>> part_;
   float treble_ = 0, trebleA_ = 0, trebleM_ = 0, trebleS_ = 0;  // (the honky-tonk's lifted highs)

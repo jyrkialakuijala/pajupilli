@@ -387,6 +387,7 @@ struct Stop {
   double cents = 0;  // tuned off (a céleste: sharp, beating against its unison)
   int fromKey = 0;   // its compass's start (a céleste: tenor C)
   int breakKey = 0;  // a reprise: from this key up an octave lower (the Clairon's top octave)
+  int toKey = 0;     // its compass's end, if short (a rank shared below another: Janakkala's Querflöt)
 };
 const Stop kStops[] = {
     // Hauptwerk: the principal chorus.
@@ -470,6 +471,71 @@ const Stop kStops[] = {
     {"gedacktbass8", kPed, kStoppedWood, 1, 9, -3},
     {"contraposaune32", kPed, kTrumpet, 0.25, 10, 1},
     {"klarine4", kPed, kTrumpet, 2, 11, -2},
+    // ---- After the organ of Janakkala church (Martti Porthan, opus 11, 1993; 40/III, North German
+    // baroque after Stade, St. Cosmae; Organ.md). The tokens start j_; the page gives the stops and
+    // footages, not the mixtures' compositions: those are typical ones, as above.
+    // I Rückpositiv (the Positiv's case on the gallery's rail).
+    {"j_rp_principal8", kPos, kOpenPrincipal, 1, 0, -1},
+    {"j_rp_gedackt8", kPos, kStoppedWood, 1, 1, -1},
+    {"j_rp_quintadena8", kPos, kStoppedWood, 1, 2, -3},
+    {"j_rp_octav4", kPos, kOpenPrincipal, 2, 3, -2},
+    {"j_rp_rohrflot4", kPos, kChimney, 2, 4, -3},
+    {"j_rp_waltflot2", kPos, kOpenFlute, 4, 5, -5},
+    {"j_rp_sieflot113", kPos, kOpenFlute, 6, 6, -7},
+    {"j_rp_sesquialter", kPos, kOpenFlute, 3, 7, -6},
+    {"j_rp_sesquialter", kPos, kOpenFlute, 5, 7, -8},
+    {"j_rp_scharff4", kPos, kOpenPrincipal, 0, 8, -10, {8, 6, 4, 3, 2}},
+    {"j_rp_scharff4", kPos, kOpenPrincipal, 0, 8, -10, {12, 8, 6, 4, 3}},
+    {"j_rp_scharff4", kPos, kOpenPrincipal, 0, 9, -10, {16, 12, 8, 6, 4}},
+    {"j_rp_scharff4", kPos, kOpenPrincipal, 0, 9, -10, {24, 16, 12, 8, 6}},
+    {"j_rp_dulcian16", kPos, kFagott, 0.5, 10, -3},
+    {"j_rp_trechterregal8", kPos, kOboe, 1, 11, -4},
+    // II Hauptwerk.
+    {"j_hw_quintadena16", kHW, kStoppedWood, 0.5, 8, -3},
+    {"j_hw_principal8", kHW, kOpenPrincipal, 1, 0, 0},
+    {"j_hw_rohrflot8", kHW, kChimney, 1, 4, -1},
+    {"j_hw_octav4", kHW, kOpenPrincipal, 2, 1, -2},
+    {"j_hw_flot4", kHW, kOpenFlute, 2, 9, -3},
+    {"j_hw_nassat3", kHW, kOpenFlute, 3, 10, -6},
+    {"j_hw_octav2", kHW, kOpenPrincipal, 4, 2, -4},
+    {"j_hw_mixtur5", kHW, kOpenPrincipal, 0, 5, -9, {4, 3, 2, 1.5, 1}},
+    {"j_hw_mixtur5", kHW, kOpenPrincipal, 0, 5, -9, {6, 4, 3, 2, 1.5}},
+    {"j_hw_mixtur5", kHW, kOpenPrincipal, 0, 6, -9, {8, 6, 4, 3, 2}},
+    {"j_hw_mixtur5", kHW, kOpenPrincipal, 0, 6, -9, {12, 8, 6, 4, 3}},
+    {"j_hw_mixtur5", kHW, kOpenPrincipal, 0, 7, -9, {16, 12, 8, 6, 4}},
+    {"j_hw_cimbel3", kHW, kOpenPrincipal, 0, 3, -11, {16, 8, 4, 3, 2}},
+    {"j_hw_cimbel3", kHW, kOpenPrincipal, 0, 3, -11, {24, 12, 6, 4, 3}},
+    {"j_hw_cimbel3", kHW, kOpenPrincipal, 0, 3, -11, {32, 16, 8, 6, 4}},
+    {"j_hw_trommet16", kHW, kTrumpet, 0.5, 11, 0},
+    {"j_hw_trommet8", kHW, kTrumpet, 1, 12, 1},
+    // III Brustwerk (printed "BW<": here in the swell boxes, with their shutters).
+    {"j_bw_gedackt8", kSW, kStoppedWood, 1, 0, 0},
+    // (the Querflöt: its own pipes from c1; "C-h0 komb. Ged.": below them a stopped rank)
+    {"j_bw_querflot8", kSW, kOpenFlute, 1, 1, -2, {0, 0, 0, 0, 0}, 0, 60},
+    {"j_bw_querflot8", kSW, kStoppedWood, 1, 1, -2, {0, 0, 0, 0, 0}, 0, 0, 0, 59},
+    {"j_bw_gedacktflot4", kSW, kStoppedWood, 2, 2, -3},
+    {"j_bw_octav2", kSW, kOpenPrincipal, 4, 3, -4},
+    {"j_bw_sedetz1", kSW, kOpenPrincipal, 8, 4, -7},
+    {"j_bw_tertia", kSW, kOpenFlute, 5, 5, -8},
+    {"j_bw_tertia", kSW, kOpenFlute, 6, 5, -8},
+    {"j_bw_scharff3", kSW, kOpenPrincipal, 0, 6, -10, {8, 6, 4, 3, 2}},
+    {"j_bw_scharff3", kSW, kOpenPrincipal, 0, 6, -10, {12, 8, 6, 4, 3}},
+    {"j_bw_scharff3", kSW, kOpenPrincipal, 0, 7, -10, {16, 12, 8, 6, 4}},
+    {"j_bw_krumphorn8", kSW, kCromorne, 1, 8, -2},
+    {"j_bw_schalmey4", kSW, kOboe, 2, 9, -4},
+    // Pedal.
+    {"j_p_principal16", kPed, kOpenPrincipal, 0.5, 6, 0},
+    {"j_p_subbass16", kPed, kStoppedWood, 0.5, 1, 0},
+    {"j_p_octav8", kPed, kOpenPrincipal, 1, 0, -2},
+    {"j_p_octav4", kPed, kOpenPrincipal, 2, 2, -4},
+    {"j_p_nachthorn2", kPed, kOpenFlute, 4, 7, -6},
+    {"j_p_mixtur4", kPed, kOpenPrincipal, 0, 3, -9, {3, 3, 3, 3, 3}},
+    {"j_p_mixtur4", kPed, kOpenPrincipal, 0, 3, -9, {4, 4, 4, 4, 4}},
+    {"j_p_mixtur4", kPed, kOpenPrincipal, 0, 3, -9, {6, 6, 6, 6, 6}},
+    {"j_p_mixtur4", kPed, kOpenPrincipal, 0, 3, -9, {8, 8, 8, 8, 8}},
+    {"j_p_posaun16", kPed, kTrumpet, 0.5, 4, 1},
+    {"j_p_dulcian16", kPed, kFagott, 0.5, 5, -2},
+    {"j_p_trommet8", kPed, kTrumpet, 1, 8, 0},
 };
 
 // The regulation (the voicer's on site): each stop's output against the
@@ -549,8 +615,76 @@ const Regulation kRegulation[] = {
     {"chamade8", 31.2f},
     {"gedacktbass8", 13.2f},
     {"contraposaune32", 49.7f},
-    {"klarine4", 39.7f}
+    {"klarine4", 39.7f},
+    // (Janakkala's: each as its nearest stop above, to be regulated by ear)
+    {"j_rp_principal8", 4.2f},
+    {"j_rp_gedackt8", 2.4f},
+    {"j_rp_quintadena8", 2.4f},
+    {"j_rp_octav4", 0.0f},
+    {"j_rp_rohrflot4", 1.3f},
+    {"j_rp_waltflot2", 0.7f},
+    {"j_rp_sieflot113", 3.7f},
+    {"j_rp_sesquialter", 2.1f},
+    {"j_rp_scharff4", 6.2f},
+    {"j_rp_dulcian16", 38.4f},
+    {"j_rp_trechterregal8", 24.2f},
+    {"j_hw_quintadena16", 6.8f},
+    {"j_hw_principal8", 0.0f},
+    {"j_hw_rohrflot8", 7.4f},
+    {"j_hw_octav4", 1.3f},
+    {"j_hw_flot4", 8.0f},
+    {"j_hw_nassat3", 3.4f},
+    {"j_hw_octav2", 2.8f},
+    {"j_hw_mixtur5", 6.2f},
+    {"j_hw_cimbel3", 10.0f},
+    {"j_hw_trommet16", 33.5f},
+    {"j_hw_trommet8", 30.3f},
+    {"j_bw_gedackt8", 2.4f},
+    {"j_bw_querflot8", 3.0f},
+    {"j_bw_gedacktflot4", 1.3f},
+    {"j_bw_octav2", 4.5f},
+    {"j_bw_sedetz1", 3.7f},
+    {"j_bw_tertia", 2.1f},
+    {"j_bw_scharff3", 6.2f},
+    {"j_bw_krumphorn8", 31.7f},
+    {"j_bw_schalmey4", 24.2f},
+    {"j_p_principal16", 14.1f},
+    {"j_p_subbass16", 8.2f},
+    {"j_p_octav8", 2.0f},
+    {"j_p_octav4", 3.4f},
+    {"j_p_nachthorn2", 3.0f},
+    {"j_p_mixtur4", 7.1f},
+    {"j_p_posaun16", 39.0f},
+    {"j_p_dulcian16", 38.4f},
+    {"j_p_trommet8", 37.9f},
 };
+int gDisposition = 0;
+OrganTemperament gTemperament = kEqualTemperament;
+// A temperament against equal temperament, in cents, A kept at its pitch. Quarter-comma meantone: a
+// key's place on the chain of fifths from Eb to G# (PJ_ORGAN_MEANTONE_LOW, -3; -4: Ab for G#). The
+// well temperaments: each fifth of the circle from C by how far it is tempered from pure.
+double temperamentCents(int key) {
+  const int pc = key % 12;
+  if (gTemperament == kMeantone) {
+    static const int kLow = int(knob("PJ_ORGAN_MEANTONE_LOW", -3));
+    const double kFifth = 1200 * std::log2(5.0) / 4;
+    const int f = kLow + ((pc * 7 - kLow) % 12 + 12) % 12;
+    return (kFifth - 700) * (f - 3);
+  }
+  const double kPure = 1200 * std::log2(1.5), P = 12 * kPure - 8400, S = 1200 * std::log2(81.0 / 80);  // (the Pythagorean and syntonic commas)
+  // (C-G G-D D-A A-E E-B B-F# F#-C# C#-G# G#-Eb Eb-Bb Bb-F F-C)
+  const double kirnberger[12] = {-S / 4, -S / 4, -S / 4, -S / 4, 0, 0, -(P - S), 0, 0, 0, 0, 0};
+  const double neidhardt[12] = {-P / 6, -P / 6, -P / 6, -P / 12, 0, -P / 12, -P / 12, -P / 12, 0, -P / 12, -P / 12, 0};
+  const double lehman[12] = {-P / 6, -P / 6, -P / 6, -P / 6, 0, 0, 0, -P / 12, -P / 12, -P / 12, P / 12, -P / 6};
+  const double* d = gTemperament == kKirnberger3 ? kirnberger : gTemperament == kNeidhardt ? neidhardt : lehman;
+  auto at = [&](int target) {  // (up the circle from C to this pitch class: against equal)
+    double c = 0;
+    for (int i = 0, q = 0; q != target; ++i, q = (q + 7) % 12) c += kPure + d[i] - 700;
+    return c;
+  };
+  return at(pc) - at(9);
+}
+bool ofThisOrgan(const Stop& st) { return (std::strncmp(st.token, "j_", 2) == 0) == (gDisposition == 1); }
 float regulationDb(const char* token) {
   for (const Regulation& r : kRegulation)
     if (std::strcmp(r.token, token) == 0) return r.db;
@@ -670,7 +804,7 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
   std::string stops = name == "gedackt-8" ? "gedackt8" : name == "rohrgedackt-8" ? "rohrgedackt8"
                     : name == "gedackt-rohrgedackt" ? "gedackt8,rohrgedackt8" : name == "principal-8" ? "principal8"
                     : name == "organ-crescendo" ? "crescendo" : name == "organ-88" || name == "organ-plan" ? "all"
-                    : "principal8,gedackt8,subbass16";
+                    : gDisposition == 1 ? "j_hw_principal8,j_bw_gedackt8,j_p_subbass16" : "principal8,gedackt8,subbass16";
   zones_ = name == "organ-88";
   if (name == "organ")
     if (const char* e = std::getenv("PJ_ORGAN_STOPS")) stops = e;
@@ -701,13 +835,15 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
     bool found = false;
     if (tok == "all") {  // (every stop built, none drawn: played by manuals, registered as it goes)
       byManual_ = true;
-      for (const Stop& st : kStops) addRank(int(&st - kStops));
+      for (const Stop& st : kStops)
+        if (ofThisOrgan(st)) addRank(int(&st - kStops));
       at = e + 1;
       continue;
     }
     if (tok == "crescendo") {  // (the roller: every stop built, drawn by the roller's position)
       crescendo_ = true;
-      for (const Stop& st : kStops) addRank(int(&st - kStops));
+      for (const Stop& st : kStops)  // (the roller's steps name the large organ's stops)
+        if (std::strncmp(st.token, "j_", 2) != 0) addRank(int(&st - kStops));
       at = e + 1;
       continue;
     }
@@ -726,8 +862,11 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
   drawn_.assign(std::size(kStops), !crescendo_ && !byManual_);  // (else every stop built is drawn)
   if (name == "organ-plan")  // (until a plan registers it: -inst organ's default, every key on every manual)
     for (size_t i = 0; i < std::size(kStops); ++i)
-      drawn_[i] = !std::strcmp(kStops[i].token, "principal8") || !std::strcmp(kStops[i].token, "gedackt8") ||
-                  !std::strcmp(kStops[i].token, "subbass16");
+      drawn_[i] = gDisposition == 1
+                      ? !std::strcmp(kStops[i].token, "j_hw_principal8") || !std::strcmp(kStops[i].token, "j_bw_gedackt8") ||
+                            !std::strcmp(kStops[i].token, "j_p_subbass16")
+                      : !std::strcmp(kStops[i].token, "principal8") || !std::strcmp(kStops[i].token, "gedackt8") ||
+                            !std::strcmp(kStops[i].token, "subbass16");
   if (crescendo_ || byManual_) manualRanks_ = true;
   calibrate();
   linkNeighbours();
@@ -795,7 +934,7 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
       }
       std::fprintf(stderr, "organ: %d pipes retuned from %s\n", n, tf);
     }
-  ji_ = knob("PJ_ORGAN_JI", 1) != 0;
+  ji_ = knob("PJ_ORGAN_JI", 1) != 0 && gTemperament == kEqualTemperament;  // (the temperament is the tuning: nothing retunes it)
   std::fill(std::begin(jiSince_), std::end(jiSince_), -1L);
   pitchLog_ = std::getenv("PJ_ORGAN_PITCHLOG") != nullptr;
   if (pitchLog_)
@@ -933,7 +1072,7 @@ void OrganModel::addRank(int stop) {
   const double warm = st.div == kSW ? knob("PJ_SWELL_WARM", 0.3) : 0.0;  // degrees C over the church
   const double warmCents = 1200 * std::log2(std::sqrt((293.15 + warm) / 293.15));
   const bool pedal = st.div == kPed;
-  const int lo = std::max(kLo, st.fromKey), hi = pedal ? kLo + 31 : kHi;  // (the Pedal: 32 keys, C2..G4 as played)
+  const int lo = std::max(kLo, st.fromKey), hi = std::min(pedal ? kLo + 31 : kHi, st.toKey ? st.toKey : 127);  // (the Pedal: 32 keys, C2..G4 as played)
   if (!pedal) manualRanks_ = true;
   // Which pipes stand apart (the façade, the offset basses): the big ones.
   auto offset = [&](double hz) {
@@ -958,7 +1097,7 @@ void OrganModel::addRank(int stop) {
     // the others: two pipes beat at most ~0.44 Hz whatever their pitch, a slow
     // swell; pure intervals alone sound clinical)
     static const double kPipeHz = knob("PJ_ORGAN_DETUNE_HZ", 1.0 / 4.5), kRankHz = knob("PJ_ORGAN_RANK_HZ", 1.0 / 4.5);
-    const double cents = warmCents + st.cents + kDetune * rng.uniform();
+    const double cents = warmCents + st.cents + kDetune * rng.uniform() + (gTemperament != kEqualTemperament ? temperamentCents(m) : 0.0);
     const double hz = 440 * std::exp2((m - 69) / 12.0 + cents / 1200) * ratio(m) + rankHz * kRankHz + kPipeHz * rng.uniform();
     Pipe pp;
     // (the smallest pipes run oversampled: their jet's travel a few samples
@@ -974,7 +1113,9 @@ void OrganModel::addRank(int stop) {
       if (pedal) {  // (the pedal's pipes in their towers, behind walls: their breath and puff dark and softer)
         v.noiseLp = knob("PJ_PEDAL_NOISELP", 800);
         v.breath *= 0.5;
-        v.puff *= 0.5;
+        // (their attack's puff: PJ_PEDAL_PUFF_DB further down)
+        static const double kPedalPuff = std::pow(10.0, knob("PJ_PEDAL_PUFF_DB", 0) / 20);
+        v.puff *= 0.5 * kPedalPuff;
       }
       pp.p.f.setup(fs * pp.os, hz, v, randomSeed(stop, m));
     }
@@ -1053,6 +1194,35 @@ void OrganModel::addRank(int stop) {
       pp.caseA = float(1 - std::exp(-2 * M_PI * pp.caseHz / fs));
       pp.caseG = float(std::pow(10.0, -knob("PJ_PEDREED_CASE_DB", 5) / 20));
     }
+    if (pedal && (std::string(kStops[stop].token) == "posaune16" || std::string(kStops[stop].token) == "j_p_posaun16")) {
+      // Each Posaune pipe's speech by its own place: its height over the floor, the boxes and
+      // intermediate walls near it give a broad peak or dip, its way out more or less highs.
+      static const double kDb = knob("PJ_POSAUNE_ATTACK_DB", -2), kColor = knob("PJ_POSAUNE_COLOR_DB", 2.5);
+      static const double kHoldMs = knob("PJ_POSAUNE_ATTACK_MS", 170), kFadeMs = knob("PJ_POSAUNE_ATTACK_FADE", 60);
+      uint64_t h = (uint64_t(m) + 1) * 0x9E3779B97F4A7C15ull;
+      auto draw = [&h] { h ^= h >> 29; h *= 0xBF58476D1CE4E5B9ull; h ^= h >> 32; h += 0x9E3779B97F4A7C15ull; return double(h >> 40) / double(1 << 24); };
+      const double fc = 400 * std::exp2(2 * draw()), peakDb = kColor * (2 * draw() - 1), tiltDb = 0.6 * kColor * (2 * draw() - 1);
+      const double A = std::pow(10.0, peakDb / 40), w = 2 * M_PI * fc / fs, al = std::sin(w) / (2 * 0.8), a0 = 1 + al / A;
+      // (the groove and the foot behind the pallet, ReedPipe::setGroove: PJ_POSAUNE_TOE, the toe's
+      // resistance, smaller for a more open toe and more overshoot; < 0, by default: off)
+      static const double kToe = knob("PJ_POSAUNE_TOE", -1), kGrooveHz = knob("PJ_POSAUNE_GROOVE_HZ", 45);
+      static const double kTurb = knob("PJ_POSAUNE_TURB", 0.3), kBleed = knob("PJ_POSAUNE_BLEED", 0.25);
+      if (kToe >= 0) pp.p.r.setGroove(kGrooveHz, kToe, kTurb, kBleed);
+      if (kToe >= 0) pp.p.r.setValveScale(knob("PJ_POSAUNE_PALLET", 1));  // (its pallet's time x this)
+      // (the release's blat: its tongue damped as the wind falls; Janakkala's Posaun its own)
+      pp.p.r.setReleaseDamp(std::strncmp(kStops[stop].token, "j_", 2) == 0 ? knob("PJ_JPOSAUN_RELDAMP", 200) : knob("PJ_POSAUNE_RELDAMP", 200));
+      pp.p.r.setReleaseNoise(knob("PJ_POSAUNE_RELNOISE", 4));  // (the release's hiss: its turbulence gone with the wind, not back)
+      pp.p.r.setCloseScale(knob("PJ_POSAUNE_CLOSE", 0.5));       // (the airflow's closing time x this)
+      Pipe::Speech& sp = pp.speech;
+      sp.on = kDb != 0 || kColor != 0 || knob("PJ_POSAUNE_DARK_DB", -8) != 0;
+      sp.b0 = float((1 + al * A) / a0), sp.b1 = float(-2 * std::cos(w) / a0), sp.b2 = float((1 - al * A) / a0);
+      sp.a1 = sp.b1, sp.a2 = float((1 - al / A) / a0);
+      sp.tiltA = float(1 - std::exp(-2 * M_PI * 1500 / fs)), sp.tiltG = float(std::pow(10.0, tiltDb / 20));
+      sp.gain = float(std::pow(10.0, kDb / 20));
+      static const double kDarkDb = knob("PJ_POSAUNE_DARK_DB", -8), kDarkHz = knob("PJ_POSAUNE_DARK_HZ", 500);
+      sp.darkA = float(1 - std::exp(-2 * M_PI * kDarkHz / fs)), sp.darkG = float(std::pow(10.0, kDarkDb / 20));
+      sp.holdN = int(kHoldMs * 1e-3 * fs), sp.decay = float(std::exp(-1 / (kFadeMs * 1e-3 * fs)));
+    }
     pp.target = hz;
     pipes_.push_back(pp);
     (pedal ? byPedal_ : byKey_)[m].push_back(int(pipes_.size()) - 1);
@@ -1076,6 +1246,8 @@ static std::string organCachePath(const char* inst) {
   };
   mix(&st.st_size, sizeof st.st_size);
   mix(&st.st_mtime, sizeof st.st_mtime);
+  mix(&gDisposition, sizeof gDisposition);
+  mix(&gTemperament, sizeof gTemperament);
   std::vector<std::string> env;
   for (char** e = environ; *e; ++e)
     if (std::strncmp(*e, "PJ_", 3) == 0) {
@@ -1361,7 +1533,40 @@ void OrganModel::closeOn(int division, int midi) {
   refreshKeys();
 }
 
+void setOrganDisposition(int d) { gDisposition = d; }
+int organDisposition() { return gDisposition; }
+void setOrganTemperament(OrganTemperament t) { gTemperament = t; }
+const char* organDispositionName() {
+  if (gDisposition != 1) return "the large organ";
+  switch (gTemperament) {
+    case kMeantone: return "after Janakkala (Porthan 1993), quarter-comma meantone";
+    case kKirnberger3: return "after Janakkala (Porthan 1993), Kirnberger III";
+    case kNeidhardt: return "after Janakkala (Porthan 1993), Neidhardt 1724 for a large town";
+    case kLehman: return "after Janakkala (Porthan 1993), Lehman's Bach tuning";
+    default: return "after Janakkala (Porthan 1993)";
+  }
+}
+
+void organSize(int& stops, int& ranks, int& pipes) {
+  std::vector<std::string> seen;
+  stops = ranks = pipes = 0;
+  for (const Stop& st : kStops) {
+    if (!ofThisOrgan(st)) continue;
+    ++ranks;
+    const std::string name = std::to_string(int(st.div)) + st.token;
+    if (std::find(seen.begin(), seen.end(), name) == seen.end()) seen.push_back(name), ++stops;
+    const int lo = std::max(OrganModel::kLo, st.fromKey), hi = std::min(st.div == kPed ? OrganModel::kLo + 31 : OrganModel::kHi, st.toKey ? st.toKey : 127);
+    pipes += hi - lo + 1;
+  }
+}
+
 void OrganModel::setRegistration(const std::string& list) {
+  // (PJ_ORGAN_ONLY: these stops whatever a plan draws, to hear a stop alone through the church)
+  if (const char* only = std::getenv("PJ_ORGAN_ONLY"))
+    if (list != only) {
+      setRegistration(only);
+      return;
+    }
   std::string stops = list;
   for (const Preset& pr : kPresets)  // (presets expand, as in PJ_ORGAN_STOPS)
     for (size_t at; (at = (',' + stops + ',').find(',' + std::string(pr.name) + ',')) != std::string::npos;)
@@ -1610,6 +1815,34 @@ void OrganModel::buildPaths() {
       const bool facade = pp.enc == kFacC || pp.enc == kFacCis;
       pp.rtop = nave_.addSource(world(pp.enc, top), kPlace[pp.enc].caseId, facade, 0.5 * occl(pp), 0.0, setOf(pp.enc), pp.hz);
     }
+  // The attack's puff, out of each flue's own mouth: at that pipe's place, with its own aim. The
+  // mouths of a rank look mostly into the church, each a little its own way (+-55 degrees
+  // across, +-20 up and down), so one puff finds the side wall and another the vault.
+  puffPaths_ = knob("PJ_ORGAN_PUFFPATH", 1) != 0;
+  if (puffPaths_) {
+    static const double kLobe = knob("PJ_ORGAN_PUFFLOBE", 0.8);
+    for (Pipe& pp : pipes_) {
+      // (a reed: only the Posaune's speech has a place of its own: at its resonator's top, out at
+      // the tower's front, in the open, where the side walls and the floor can see it)
+      int from = pp.rsrc;
+      if (pp.p.reed) {
+        if (!pp.speech.on) continue;
+        Vec3 top = pp.at;
+        top.y += 0.95 * 343 / (2 * pp.hz);
+        OrganRoom::V3 w = world(pp.enc, top);
+        w.z = nave_.caseBox(kPlace[pp.enc].caseId).hi.z + 0.05;
+        from = nave_.addSource(w, OrganRoom::kNoCase, false, 0.25, 0.0, setOf(pp.enc), pp.hz);
+      }
+      uint32_t h = uint32_t(pp.stop + 1) * 2654435761u ^ uint32_t(pp.key + 1) * 40503u ^ uint32_t(pp.enc + 1) * 769u;
+      auto draw = [&] { h = h * 1664525u + 1013904223u; return 2 * ((h >> 8) / 16777216.0) - 1; };
+      const double yaw = draw() * 55 * M_PI / 180, pitch = draw() * 20 * M_PI / 180;
+      pp.rpuff = nave_.addAimed(from, {std::sin(yaw) * std::cos(pitch), std::sin(pitch), std::cos(yaw) * std::cos(pitch)}, kLobe);
+    }
+  }
+  zoneNow_.assign(enc_.size(), {});
+  zoneIn_.assign(enc_.size(), {});
+  zonePtr_.assign(enc_.size(), nullptr);
+  repointZones();
   regionSrc_.assign(enc_.size(), -1);
   for (int e = 0; e < int(enc_.size()); ++e) {
     const EncPlace& P = kPlace[e];
@@ -1627,6 +1860,10 @@ void OrganModel::buildPaths() {
         const auto m = nave_.tapSum(pp.rsrc);
         const auto t = pp.rtop >= 0 ? nave_.tapSum(pp.rtop) : std::array<double, 2>{};
         std::fprintf(stderr, "tap %s %d mouth %.3f %.3f top %.3f %.3f y %.2f\n", kStops[pp.stop].token, pp.key, m[0], m[1], t[0], t[1], pp.at.y);
+        if (pp.rpuff >= 0)
+          std::fprintf(stderr, "puffaim %s %d mouth L/R %.2f puff L/R %.2f dB, level %+.2f dB\n", kStops[pp.stop].token, pp.key,
+                       20 * std::log10(nave_.tapGain(pp.rsrc, 0) / nave_.tapGain(pp.rsrc, 1)), 20 * std::log10(nave_.tapGain(pp.rpuff, 0) / nave_.tapGain(pp.rpuff, 1)),
+                       20 * std::log10((nave_.tapGain(pp.rpuff, 0) + nave_.tapGain(pp.rpuff, 1)) / (nave_.tapGain(pp.rsrc, 0) + nave_.tapGain(pp.rsrc, 1))));
       }
   encField_.assign(enc_.size(), {});
 }
@@ -1639,6 +1876,7 @@ void OrganModel::scatterPaths(int mic) {
     if (!pp.live) continue;
     nave_.scatter(pp.rsrc, mic, pp.blk);
     if (pp.rtop >= 0) nave_.scatter(pp.rtop, mic, pp.blkTop);
+    if (pp.puffLive) nave_.scatter(pp.rpuff, mic, pp.blkPuff);
   }
   for (size_t e = 0; e < enc_.size(); ++e) nave_.scatter(regionSrc_[e], mic, encField_[e].data());
   nave_.endBlock(mic, roomOut_[mic]);
@@ -1692,6 +1930,7 @@ void OrganModel::setupNave() {
   np.lensDepth = knob("PJ_NAVE_LENS", 0.0);
   np.lensSecs = knob("PJ_NAVE_LENS_SECS", np.lensSecs);
   late_.setup(fs_, np);
+  if (puffPaths_) late_.setZones(int(enc_.size()));
   naveFb_ = float(knob("PJ_NAVE_FB", 1.0));
   lateTrim_ = float(1 / (inst_.gain * levelTrim(inst_)));
   naveGain_ = float(std::pow(10.0, knob("PJ_NAVE_GAIN", 0.0) / 20));
@@ -1699,11 +1938,15 @@ void OrganModel::setupNave() {
 
 // One block of the nave: the organ's last block in; the microphones' late
 // field and the pressure at the case for the next.
+void OrganModel::repointZones() {
+  for (size_t e = 0; e < zoneIn_.size(); ++e) zonePtr_[e] = zoneIn_[e].data();
+}
+
 void OrganModel::runNave() {
   std::fill(naveL_, naveL_ + kBlock, 0.0f);
   std::fill(naveR_, naveR_ + kBlock, 0.0f);
   std::fill(naveP_, naveP_ + kBlock, 0.0f);
-  late_.process(naveIn_, kBlock, naveL_, naveR_, naveP_);
+  late_.process(naveIn_, kBlock, naveL_, naveR_, naveP_, puffPaths_ ? zonePtr_.data() : nullptr);
 }
 
 // One enclosure's block: its sounding pipes (each the field at its mouth,
@@ -1717,7 +1960,9 @@ void OrganModel::renderEnclosure(int e) {
   for (int i : encPipes_[e]) {
     any |= pipes_[i].p.awake();
     pipes_[i].live = false;
+    pipes_[i].puffLive = false;
   }
+  if (puffPaths_) zoneNow_[e].fill(0.0f);
   if (!any && enc.quiet()) {
     encOut_[e].fill(0.0f);
     if (paths_) encField_[e].fill(0.0f);
@@ -1734,11 +1979,12 @@ void OrganModel::renderEnclosure(int e) {
       pp.live = true;
       float heard = enc.heard(pp.src);
       for (int c = 0; c < 4 && pp.near[c] >= 0; ++c) heard += pp.nearG[c] * pipes_[pp.near[c]].y;
-      float y = 0, top = 0;
+      float y = 0, top = 0, puff = 0;
       const float wind = windOn_ ? windNow_[pp.div] : 1.0f;
       for (int k = 0; k < pp.os; ++k) {
         y += pp.p.sample(wind, pp.hear * heard);
         top += pp.p.top();
+        puff += pp.p.puff();
       }
       pp.y = y / float(pp.os);
       if (pitchLog_) {
@@ -1788,10 +2034,22 @@ void OrganModel::renderEnclosure(int e) {
         pp.caseLp2 += pp.caseA * (pp.caseLp - pp.caseLp2);
         out = pp.caseLp2 + pp.caseG * (out - pp.caseLp2);
       }
+      if (pp.speech.on) out = pp.speech.process(out, pp.keyed);
       enc.add(pp.src, pp.gain * out, pp.p.reed ? kReedField : 1.0f);
       if (pp.srcTop >= 0) enc.add(pp.srcTop, pp.gain * top / float(pp.os));
       pp.blk[s] = pp.gain * out;
       pp.blkTop[s] = pp.gain * top / float(pp.os);
+      if (pp.rpuff >= 0) {  // (the puff apart from the tone, on the paths its mouth's aim gives it)
+        static const float kSpeechOpen = float(knob("PJ_POSAUNE_OPEN", 0.6));  // (how much of its speech leaves from the open)
+        const float pf = pp.p.reed ? pp.gain * out * kSpeechOpen * pp.speech.e : pp.gain * puff / float(pp.os);
+        pp.blkPuff[s] = pf;
+        pp.blk[s] -= pf;
+        if (pf != 0) pp.puffLive = true;
+        if (!pp.p.reed && e != kSwellC && e != kSwellCis) {  // (a swell's goes through its shutters, in the common feed)
+          static const float kOut = float(knob("PJ_ORGAN_OUT", 0.05));  // (the nave's feed is the output's scale)
+          zoneNow_[e][s] += kOut * pf;
+        }
+      }
     }
     encOut_[e][s] = enc.step(church_[s]);
     if (paths_) encField_[e][s] = enc.lastField();
@@ -2099,6 +2357,7 @@ void OrganModel::renderBlock() {
       if (late) runNave();
     }
     nave_.advance();
+    if (puffPaths_) zoneIn_.swap(zoneNow_), repointZones();
   }
   // The wind: the block's flows, averaged, drawn sample by sample.
   double demand[4] = {0, 0, 0, 0};

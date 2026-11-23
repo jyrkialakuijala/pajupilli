@@ -44,6 +44,15 @@
 namespace pajupilli {
 
 bool organRank(const Instrument& inst);
+void organSize(int& stops, int& ranks, int& pipes);  // the whole organ: its stops, ranks and pipes
+// Which organ: 0 the large one (Hauptwerk, Schwellwerk, Positiv, Pedal), 1 after Janakkala's
+// (Porthan 1993, 40/III: Rückpositiv, Hauptwerk, Brustwerk, Pedal; -organ janakkala). See Organ.md.
+void setOrganDisposition(int d);
+// The temperament (-organ janakkala-NAME; see Organ.md); kEqual: the adaptive just intonation as before.
+enum OrganTemperament { kEqualTemperament, kMeantone, kKirnberger3, kNeidhardt, kLehman };
+void setOrganTemperament(OrganTemperament t);
+int organDisposition();
+const char* organDispositionName();
 
 // A pipe of either kind (a flue, a reed), one interface.
 struct AnyPipe {
@@ -58,6 +67,7 @@ struct AnyPipe {
   bool openPipe() const { return !reed && f.openPipe(); }
   float sample(float wind, float room) { return reed ? r.sample(wind, room) : f.sample(wind, room); }
   float top() const { return reed ? 0.0f : f.top(); }
+  float puff() const { return reed ? 0.0f : f.puffOut(); }
   float foot() const { return reed ? r.foot() : f.foot(); }
   double hz() const { return reed ? r.hz() : f.hz(); }
   void reset() { reed ? r.reset() : f.reset(); }
@@ -139,6 +149,35 @@ class OrganModel : public Tube {
     int rsrc = -1, rtop = -1;
     float blk[16] = {}, blkTop[16] = {};
     bool live = false;
+    // (its attack's puff, out of its own mouth the way that mouth faces: PJ_ORGAN_PUFFPATH)
+    int rpuff = -1;
+    float blkPuff[16] = {};
+    bool puffLive = false;
+    // (the Posaune's speech, the first ~200 ms of each note: a little softer and coloured by where
+    // that pipe stands, PJ_POSAUNE_ATTACK_DB, PJ_POSAUNE_COLOR_DB; the settled tone untouched)
+    struct Speech {
+      bool on = false, was = false;
+      int hold = 0, holdN = 0;
+      float e = 0, decay = 0, gain = 1;
+      float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;  // (a broad peak or dip: floor, boxes, walls)
+      float tiltA = 0, tiltG = 1, tiltLp = 0;                        // (its highs: how open its way out is)
+      float darkA = 0, darkG = 1, darkLp = 0;                        // (the speech's highs down: PJ_POSAUNE_DARK_DB above PJ_POSAUNE_DARK_HZ)
+      float process(float x, bool keyed) {
+        const float v = b0 * x + z1;
+        z1 = b1 * x - a1 * v + z2;
+        z2 = b2 * x - a2 * v;
+        tiltLp += tiltA * (v - tiltLp);
+        const float c = tiltLp + tiltG * (v - tiltLp);
+        darkLp += darkA * (c - darkLp);
+        if (keyed && !was) e = 1, hold = holdN;
+        was = keyed;
+        if (e < 1e-3f) return x;
+        const float y = x + e * (gain * (darkLp + darkG * (c - darkLp)) - x);
+        if (hold > 0) --hold;
+        else e *= decay;
+        return y;
+      }
+    } speech;
     // (a pedal reed on its open chest inside the case: its sound's mids and
     // highs shelved down by the casework on their way out; caseG 1: none)
     float caseA = 1, caseG = 1, caseLp = 0, caseLp2 = 0, caseHz = 0;
@@ -266,10 +305,15 @@ class OrganModel : public Tube {
   bool naveOn_ = false;
   OrganNave late_;
   float naveIn_[16] = {}, naveL_[16] = {}, naveR_[16] = {}, naveP_[16] = {};
+  // (the puffs by enclosure: this block's, and the last, which enters the nave with naveIn_)
+  std::vector<std::array<float, 16>> zoneNow_, zoneIn_;
+  std::vector<const float*> zonePtr_;
+  bool puffPaths_ = false;
   float naveGain_ = 1, naveFb_ = 1, lateTrim_ = 1;
   std::vector<float> lateL_, lateR_;
   void setupNave();
   void runNave();
+  void repointZones();
   // The rendering, by blocks: each enclosure (its pipes, their field) on its
   // own (they meet only in the wind, which moves slowly: its pressures read
   // at a block's start, its flows averaged over it), on a few threads.

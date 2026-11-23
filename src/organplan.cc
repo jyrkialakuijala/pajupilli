@@ -1,5 +1,7 @@
 #include "organplan.h"
 
+#include "organ.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -14,27 +16,54 @@ const char* const kLevelName[8] = {"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff
 // Each division's ladder: its stops at each level (0 ppp .. 7 fff), from its
 // own stops only (the user's disposition, research/church_organ.md §6) and no
 // couplers between the manuals: each line its own colour and character.
-const char* const kHW[8] = {
+const char* const kMainHW[8] = {
     "rohrflote8", "rohrflote8", "fluteharm8", "principal8,rohrflote8", "principal8,fluteharm8,octave4",
     "principal8,octave4,superoctave2,mixtur5",
     "principal16,principal8,octave4,quinte223,superoctave2,mixtur5,cymbel3,trompete8",
     "principal16,principal8,fluteharm8,rohrflote8,octave4,quinte223,superoctave2,mixtur5,cymbel3,trompete16,trompete8"};
-const char* const kSW[8] = {
+const char* const kMainSW[8] = {
     "gedackt8", "gamba8,celeste8", "gedackt8,flute4", "gedackt8,flute4,nasard223", "gedackt8,gamba8,flute4,waldflote2",
     "gedackt8,flute4,nasard223,waldflote2,terz135",
     "bourdon16,gedackt8,flute4,waldflote2,trompette8,oboe8",
     "bourdon16,gedackt8,flute4,waldflote2,fagott16,trompette8,oboe8,clairon4"};
 const double kSwellOf[8] = {0.25, 0.5, 0.8, 1, 1, 1, 1, 1};  // (the swell box's opening at each level)
-const char* const kPos[8] = {
+const char* const kMainPos[8] = {
     "rohrgedackt8", "rohrgedackt8", "rohrgedackt8,gedacktflote4", "rohrgedackt8,posoctave4",
     "rohrgedackt8,posoctave4,gedacktflote4", "rohrgedackt8,gedacktflote4,sesquialtera",
     "rohrgedackt8,posoctave4,cromorne8", "rohrgedackt8,posoctave4,gedacktflote4,sesquialtera,cromorne8"};
-const char* const kPed[8] = {
+const char* const kMainPed[8] = {
     "subbass16", "subbass16,gedacktbass8", "subbass16,gedacktbass8", "subbass16,octavbass8", "subbass16,violonbass16,octavbass8,choralbass4",
     "principalbass16,octavbass8,choralbass4,posaune16",  // (f: the organo pleno's pedal)
     "principalbass16,subbass16,violonbass16,octavbass8,choralbass4,pedmixtur4,posaune16",
     "principalbass16,subbass16,violonbass16,octavbass8,choralbass4,pedmixtur4,posaune16,pedtrompete8,untersatz32"};
-const char* const kDivName[4] = {"Hauptwerk", "Schwellwerk", "Positiv", "Pedal"};
+// After Janakkala (Organ.md): the same eight levels from its own stops; the Pedal's reeds from f.
+const char* const kJanHW[8] = {
+    "j_hw_rohrflot8", "j_hw_rohrflot8", "j_hw_rohrflot8,j_hw_flot4", "j_hw_principal8,j_hw_rohrflot8",
+    "j_hw_principal8,j_hw_octav4,j_hw_flot4", "j_hw_principal8,j_hw_octav4,j_hw_octav2,j_hw_mixtur5",
+    "j_hw_quintadena16,j_hw_principal8,j_hw_octav4,j_hw_nassat3,j_hw_octav2,j_hw_mixtur5,j_hw_cimbel3,j_hw_trommet8",
+    "j_hw_quintadena16,j_hw_principal8,j_hw_rohrflot8,j_hw_octav4,j_hw_nassat3,j_hw_octav2,j_hw_mixtur5,j_hw_cimbel3,j_hw_trommet16,j_hw_trommet8"};
+const char* const kJanSW[8] = {
+    "j_bw_gedackt8", "j_bw_querflot8", "j_bw_gedackt8,j_bw_gedacktflot4", "j_bw_querflot8,j_bw_gedacktflot4",
+    "j_bw_gedackt8,j_bw_gedacktflot4,j_bw_octav2", "j_bw_gedackt8,j_bw_gedacktflot4,j_bw_octav2,j_bw_tertia",
+    "j_bw_gedackt8,j_bw_gedacktflot4,j_bw_octav2,j_bw_sedetz1,j_bw_scharff3,j_bw_krumphorn8",
+    "j_bw_gedackt8,j_bw_gedacktflot4,j_bw_octav2,j_bw_sedetz1,j_bw_scharff3,j_bw_krumphorn8,j_bw_schalmey4"};
+const char* const kJanPos[8] = {
+    "j_rp_gedackt8", "j_rp_quintadena8", "j_rp_gedackt8,j_rp_rohrflot4", "j_rp_principal8,j_rp_gedackt8",
+    "j_rp_principal8,j_rp_octav4,j_rp_rohrflot4", "j_rp_gedackt8,j_rp_rohrflot4,j_rp_sesquialter",
+    "j_rp_principal8,j_rp_octav4,j_rp_waltflot2,j_rp_scharff4,j_rp_trechterregal8",
+    "j_rp_principal8,j_rp_gedackt8,j_rp_octav4,j_rp_rohrflot4,j_rp_waltflot2,j_rp_sieflot113,j_rp_sesquialter,j_rp_scharff4,j_rp_dulcian16,j_rp_trechterregal8"};
+const char* const kJanPed[8] = {
+    "j_p_subbass16", "j_p_subbass16", "j_p_subbass16,j_p_octav8", "j_p_subbass16,j_p_octav8", "j_p_subbass16,j_p_octav8,j_p_octav4",
+    "j_p_principal16,j_p_octav8,j_p_octav4,j_p_posaun16", "j_p_principal16,j_p_subbass16,j_p_octav8,j_p_octav4,j_p_mixtur4,j_p_posaun16",
+    "j_p_principal16,j_p_subbass16,j_p_octav8,j_p_octav4,j_p_nachthorn2,j_p_mixtur4,j_p_posaun16,j_p_dulcian16,j_p_trommet8"};
+const char* const* ladderHW() { return organDisposition() == 1 ? kJanHW : kMainHW; }
+const char* const* ladderSW() { return organDisposition() == 1 ? kJanSW : kMainSW; }
+const char* const* ladderPos() { return organDisposition() == 1 ? kJanPos : kMainPos; }
+const char* const* ladderPed() { return organDisposition() == 1 ? kJanPed : kMainPed; }
+const char* divName(int d) {
+  static const char* const kMain[4] = {"Hauptwerk", "Schwellwerk", "Positiv", "Pedal"}, *const kJan[4] = {"Hauptwerk", "Brustwerk", "Rückpositiv", "Pedal"};
+  return (organDisposition() == 1 ? kJan : kMain)[d];
+}
 
 struct TrackStats {
   int track = 0, n = 0, lo = 127, hi = 0, poly = 0;
@@ -46,8 +75,8 @@ struct TrackStats {
 
 std::string organRegistration(int level, int handsOn, bool pedal) {
   level = std::clamp(level, 0, 7);
-  std::string r = handsOn == 2 ? kPos[level] : handsOn == 1 ? kSW[level] : kHW[level];
-  if (pedal) r += std::string(",") + kPed[level];
+  std::string r = handsOn == 2 ? ladderPos()[level] : handsOn == 1 ? ladderSW()[level] : ladderHW()[level];
+  if (pedal) r += std::string(",") + ladderPed()[level];
   return r;
 }
 
@@ -55,7 +84,7 @@ ZoneRegistration organZoneRegistration(int level) {
   level = std::clamp(level, 0, 7);
   ZoneRegistration z;
   z.rightHand = level <= 2 ? 2 : 0;
-  z.stops = std::string(z.rightHand == 2 ? kPos[level] : kHW[level]) + "," + kSW[level] + "," + kPed[level];
+  z.stops = std::string(z.rightHand == 2 ? ladderPos()[level] : ladderHW()[level]) + "," + ladderSW()[level] + "," + ladderPed()[level];
   z.swell = kSwellOf[level];
   return z;
 }
@@ -380,9 +409,9 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
       }
       if (!grandChoeur)
         for (int d = 0; d < 3; ++d)
-          if (used[d]) reg += std::string(reg.empty() ? "" : ",") + (d == 0 ? kHW : d == 1 ? kSW : kPos)[shown];
+          if (used[d]) reg += std::string(reg.empty() ? "" : ",") + (d == 0 ? ladderHW() : d == 1 ? ladderSW() : ladderPos())[shown];
       if (pedal >= 0) {
-        reg += std::string(",") + kPed[shown];
+        reg += std::string(",") + ladderPed()[shown];
         man[pedal] = 3;
       }
       const int hands = man.empty() ? 0 : man.begin()->second;
@@ -394,15 +423,15 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
       OrganPlanChange c{f.at, reg, grandChoeur ? 0.3 + 0.1 * shown : used[1] ? kSwellOf[shown] : 1.0, man, ""};
       std::string lines;
       for (size_t u = 0; u < upper.size(); ++u)
-        lines += std::string(u ? ", " : "") + "line " + std::to_string(upper[u]) + " " + kDivName[man[upper[u]]];
+        lines += std::string(u ? ", " : "") + "line " + std::to_string(upper[u]) + " " + divName(man[upper[u]]);
       // (every division's stops: the lines' manuals, then the pedal)
       std::string stops;
       if (grandChoeur) {
         stops = std::string("coupled: ") + reg;
       } else {
         for (int d = 0; d < 3; ++d)
-          if (used[d]) stops += std::string(stops.empty() ? "" : "; ") + kDivName[d] + " " + (d == 0 ? kHW : d == 1 ? kSW : kPos)[shown];
-        if (pedal >= 0) stops += std::string("; Pedal ") + kPed[shown] + (!f.pedal ? " (resting)" : "");
+          if (used[d]) stops += std::string(stops.empty() ? "" : "; ") + divName(d) + " " + (d == 0 ? ladderHW() : d == 1 ? ladderSW() : ladderPos())[shown];
+        if (pedal >= 0) stops += std::string("; Pedal ") + ladderPed()[shown] + (!f.pedal ? " (resting)" : "");
       }
       std::snprintf(buf, sizeof buf, "bar %ld: %s: %s | %s", f.at / barTicks + 1, kLevelName[shown], lines.c_str(), stops.c_str());
       c.what = buf;

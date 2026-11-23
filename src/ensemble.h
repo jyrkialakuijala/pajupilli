@@ -153,6 +153,7 @@ class Ensemble {
   int lo() const { return lo_; }  // sounding range of the whole ensemble
   int hi() const { return hi_; }
   std::string describe() const;
+  const Room* mainRoom() const { return rooms_[1].get(); }  // (null: played without a room)
 
  private:
   struct Slot {

@@ -98,6 +98,16 @@ class OrganRoom {
     srcs_.push_back(s);
     return int(srcs_.size()) - 1;
   }
+  // A second source at a mouth (of: its index; its paths are that one's), radiating most towards
+  // aim (a unit vector): each path carries it x (1 + lobe cos theta), the mean power kept.
+  int addAimed(int of, V3 aim, double lobe) {
+    Source s = srcs_[of];
+    s.alias = of;
+    s.aim = aim;
+    s.lobe = lobe;
+    srcs_.push_back(s);
+    return int(srcs_.size()) - 1;
+  }
   int sources() const { return int(srcs_.size()); }
 
   // Every source's paths traced; the common delay, the classes' path splits,
@@ -110,7 +120,7 @@ class OrganRoom {
     std::vector<double> r1, r2;
     for (size_t i = 0; i < srcs_.size(); ++i)
       for (int m = 0; m < 2; ++m) {
-        ps[m][i] = paths(srcs_[i], lis_.mic[m]);
+        ps[m][i] = srcs_[i].alias >= 0 ? ps[m][srcs_[i].alias] : paths(srcs_[i], lis_.mic[m]);
         for (const Path& p : ps[m][i]) {
           rmin = std::min(rmin, p.r);
           if (int(i) < mouths && m == 0) (p.order == 1 ? r1 : p.order == 2 ? r2 : r0_).push_back(p.r);
@@ -174,9 +184,10 @@ class OrganRoom {
           const double g = std::pow(10.0, (p.reflDb - 3.0 * p.shadow - p.diffDb) / 20) / p.r * (lis_.pattern + (1 - lis_.pattern) * cosA) *
                            (cls(p) == 0 ? kDirect : 1.0);
           const Source& s = srcs_[i];
+          const double aimed = s.lobe > 0 ? std::max(0.0, 1 + s.lobe * dot(p.firstDir, s.aim)) / std::sqrt(1 + s.lobe * s.lobe / 3) : 1.0;
           // (bent round the edge, its harmonics more than its fundamental: darker)
           const double o = std::clamp(s.occl + s.dirDark * 0.5 * (1 - p.firstDir.z) + 0.7 * p.shadow + p.diffDb / 15, 0.0, 1.0);
-          taps_[m][i].push_back({ringIndex(m, cls(p), int(std::lround(2 * o))), d, float(g)});
+          taps_[m][i].push_back({ringIndex(m, cls(p), int(std::lround(2 * o))), d, float(g * aimed)});
         }
       }
     for (RingSet& r : sets_) r.buf.assign(size_t(kRings) * kRingN, 0.0f);
@@ -191,6 +202,12 @@ class OrganRoom {
     for (int m = 0; m < 2; ++m)
       for (const Tap& t : taps_[m][src]) r[t.ring / kDark % kCls == 0 ? 0 : 1] += t.g;
     return r;
+  }
+  // (its taps' gains summed at one microphone)
+  double tapGain(int src, int mic) const {
+    double g = 0;
+    for (const Tap& t : taps_[mic][src]) g += t.g;
+    return g;
   }
   // The first arrival's delay (samples, after the common delay) at a microphone.
   int firstDelay(int src, int mic) const {
@@ -410,6 +427,9 @@ class OrganRoom {
     double occl, dirDark;
     int set;
     double hz = 250;  // (its fundamental: the wavelength the gallery's edge bends)
+    int alias = -1;   // (addAimed: the source whose paths it shares)
+    V3 aim;
+    double lobe = 0;
   };
   struct Path {
     double r;

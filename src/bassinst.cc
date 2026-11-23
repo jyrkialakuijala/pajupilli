@@ -376,6 +376,38 @@ void BassPlayer::noteOn(int midi, int velocity) {
   // lower stopped, and touched at its half (third, quarter).
   int harmonic = 0, stopNote = midi;
   int s = -1;
+  // The same note again (within ~1.2 s): a bassist does not pluck it twice alike. The two make
+  // one gesture: the second changes the spectrum, the envelope or the resonance, one or two of
+  //   - the finger: the other one, or a fingertip after the stacked pull, the flat finger or
+  //     the thumb (clearer, punchier);
+  //   - the place: nearer the bridge (brighter, focused), or (an echo) further up the board;
+  //   - the pull: turned a little up, off the fingerboard (a snap against the ebony);
+  //   - the string: the same pitch on the next one (open to stopped, or back), its own colour
+  //     and decay;
+  //   - a slide into it from a quarter- to a semitone below, on the attack;
+  //   - a quick, narrow vibrato blooming on it (the first one straight);
+  // and the two are never as loud: soft to strong (an upbeat) or strong to soft (an echo), when
+  // the keys themselves are alike. The finger lands on the still swinging string a moment
+  // before it pulls (Bass::pluck's holdDamp): a clean second attack. In a run of the same note
+  // the pairs follow one another. (PJ_BASS_PAIRS=0: off.)
+  static const bool kPairs = knob("PJ_BASS_PAIRS", 1) > 0;
+  const bool again = kPairs && midi == lastMidi_ && midi <= top_ && sinceAny_ < 1.2 && pluckPlace(brightness_) >= 0;
+  pairPos_ = again ? pairPos_ ^ 1 : 0;
+  const bool second = again && pairPos_ == 1;
+  enum { kWFinger = 1, kWPlace = 2, kWAngle = 4, kWString = 8, kWSlide = 16, kWVib = 32 };
+  int ways = 0;
+  bool echo = false;
+  if (second) {
+    static const int kAll[6] = {kWFinger, kWPlace, kWAngle, kWString, kWSlide, kWVib};
+    static const double kP[6] = {0.25, 0.25, 0.12, 0.14, 0.1, 0.14};  // (how often each is the one)
+    for (int pick = 0; pick < 2; ++pick) {
+      double r = 0.5 * (urand() + 1);
+      for (int w = 0; w < 6; ++w)
+        if ((r -= kP[w]) <= 0 || w == 5) { ways |= kAll[w]; break; }
+      if (urand() < 0) break;  // (one way, half the time)
+    }
+    echo = urand() < -0.2;  // (an upbeat more often than an echo)
+  }
   if (midi > top_) {
     static const int kSemis[5] = {12, 19, 24, 28, 31};
     for (int n = 2; n <= 6 && s < 0; ++n)
@@ -388,17 +420,35 @@ void BassPlayer::noteOn(int midi, int velocity) {
     }
   } else {
     s = pickString(midi);
+    if (ways & kWString) {  // the same pitch on a neighbouring string, if the hand reaches it
+      int alt = -1;
+      for (int k : {s - 1, s + 1})
+        if (k >= 0 && k < 4 && midi - open_[k] >= 0 && midi - open_[k] <= 9 && (key_[k] < 0 || key_[k] == midi)) {
+          alt = k;
+          break;
+        }
+      if (alt >= 0) {
+        if (key_[s] == midi) key_[s] = -1;
+        b.damp(s, 45);  // (the first string let go under the hand)
+        s = alt;
+      } else {
+        ways = (ways & ~kWString) | kWPlace;
+      }
+    }
   }
   const int semis = stopNote - open_[s];
   // The pull: 2 mm (pp) to 9 mm (ff), with the dynamics knob; no two alike.
   const double v = velocity / 127.0;
-  const double depth = std::min(0.012, (0.002 + 0.007 * v * v) * (0.6 + 0.8 * dyn_) * (1 + 0.06 * urand()));
+  double depth = std::min(0.012, (0.002 + 0.007 * v * v) * (0.6 + 0.8 * dyn_) * (1 + 0.06 * urand()));
+  if (second && std::abs(velocity - lastVel_) < 12)  // (keys alike: the hand shapes the two)
+    depth = std::min(0.012, depth * (echo ? 0.78 : 1.2));
   // Where: the brightness knob (pluckPlace); loud notes a little nearer the
   // bridge.
   const double place = pluckPlace(brightness_);
   if (place < 0) {  // the wrong side of the bridge: the short length there pings
     const int sb = pickString(std::min(midi, top_));
     b.pluckBehind(sb, 0.6 * depth);
+    lastMidi_ = -1;
     key_[sb] = midi;
     since_[sb] = 0;
     harm_[sb] = true;
@@ -415,6 +465,7 @@ void BassPlayer::noteOn(int midi, int velocity) {
   // the two fingertips take turns.
   const double fast = std::clamp((0.25 - sinceAny_) / 0.13, 0.0, 1.0);
   where += fast * (std::min(where, 0.09) - where);
+  if (ways & kWPlace) where = std::clamp(where * (echo ? 1.35 : 0.7), 0.06, 0.5);
   // The pull's direction, the air knob: along the top (round, sustaining) at
   // its rest and below; turned up, more and more outward, so that the string
   // swings back onto the fingerboard (the growl, then the slap).
@@ -422,15 +473,18 @@ void BassPlayer::noteOn(int midi, int velocity) {
   // outward (the snap), fully at 127 (the slap).
   const double snap = std::clamp((velocity - 100) / 27.0, 0.0, 1.0);
   const double angle = std::max(std::clamp(0.05 + 1.25 * (air_ - 0.35) / 0.65, 0.0, 1.3),
-                                1.25 * snap * snap * (3 - 2 * snap)) + 0.06 * urand();
+                                1.25 * snap * snap * (3 - 2 * snap)) + 0.06 * urand() + (ways & kWAngle ? 0.3 : 0.0);
   // The hand, by the key's velocity: soft (up to 45) the thumb; then (to
   // 72) the flat finger, the index's side along the string; then the stacked
   // pull (index and middle as one); hard (from 100) the same pull turned
   // outward: snap, then slap. Fingertips taking turns when the
   // notes come fast (under ~210 ms apart); the thumb always with the
   // hardness knob turned down.
-  const int finger = hardness_ <= 0.75 || (velocity <= kThumbVel && fast <= 0.3) ? 3
-                     : fast > 0.3 ? -1 : velocity <= kFlatVel ? 4 : 2;
+  int finger = hardness_ <= 0.75 || (velocity <= kThumbVel && fast <= 0.3) ? 3
+               : fast > 0.3 ? -1 : velocity <= kFlatVel ? 4 : 2;
+  if ((ways & kWFinger) && hardness_ > 0.75)  // (the other finger: a tip after a pad, the other tip after a tip)
+    finger = lastFinger_ == 0 ? 1 : lastFinger_ == 1 ? 0 : (urand() < 0 ? 0 : 1);
+  lastFinger_ = finger;
   if (harmonic) {  // a fingertip near the bridge; the other hand's finger touches
     b.pluck(s, semis ? b.openLength(s) / std::exp2((semis + b.spec().openFlat[s]) / 12.0) : 0, 1.3 * depth, 0.085 + 0.01 * urand(), 0.05, 0);
     b.touch(s, harmonic);
@@ -449,6 +503,9 @@ void BassPlayer::noteOn(int midi, int velocity) {
   // Stopped notes are slid into a little from below (5-20 c, more when loud;
   // gone in ~50 ms): the finger settles.
   scoop_[s] = semis > 0 && !harmonic && fast < 0.3 ? (5 + 15 * v) * (0.5 + 0.5 * std::fabs(urand())) : 0;
+  if ((ways & kWSlide) && semis > 0) scoop_[s] = 50 + 50 * std::fabs(urand());  // (a quarter- to a semitone below)
+  vibSoon_[s] = (ways & kWVib) && semis > 0;
+  lastMidi_ = midi;
   if (semis > 0) hand_ = semis;
   key_[s] = midi;
   since_[s] = 0;
@@ -506,7 +563,9 @@ void BassPlayer::render(float* out, int n) {
       // The stopping finger: the joystick slides it (sideways: up to two
       // semitones either way; pushed forward: it rocks, a vibrato on top of
       // the knob's), and it settles into each note from a little below.
-      const double vib = 230 * (vibDepth_ * in + 0.3 * std::max(0.0, breathCtl_)) * std::sin(vibPhase_);
+      // (the second of a pair blooming: its own narrow vibrato, from 80 ms, ~12 c)
+      const double soon = vibSoon_[s] ? 12 / 230.0 * std::clamp((since_[s] - 0.08) / 0.15, 0.0, 1.0) : 0.0;
+      const double vib = 230 * (vibDepth_ * in + soon + 0.3 * std::max(0.0, breathCtl_)) * std::sin(vibPhase_);
       m_.bass().bend(s, key_[s] > open_[s] && !harm_[s] ? vib + 200 * roll_ - scoop_[s] * std::exp(-since_[s] / 0.05) : 0.0);
     }
     // The strings' height over the fingerboard, the air knob: at its rest and

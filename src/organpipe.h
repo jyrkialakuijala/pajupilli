@@ -300,10 +300,14 @@ class FluePipe {
     const float pf = float(v_.puff) * puffEnv_ * v * puffLp_;
     puffEnv_ *= puffDecay_;
     float noise = b + pf;
+    puffOut_ = pf;
     if (noiseA_ < 1) {  // (behind a wall: its breath and puff dark)
       nl1_ += noiseA_ * (noise - nl1_);
       nl2_ += noiseA_ * (nl1_ - nl2_);
       noise = nl2_;
+      pl1_ += noiseA_ * (pf - pl1_);  // (the puff's own share of that)
+      pl2_ += noiseA_ * (pl1_ - pl2_);
+      puffOut_ = pl2_;
     }
     const float y = (mouth - prev_) * float(fs_) * 1e-3f + float(v_.jetRad) * (jl4_ - prevD_) * float(fs_) * 1e-3f + noise;
     prev_ = mouth;
@@ -316,7 +320,9 @@ class FluePipe {
     }
     return y;
   }
+  float puffOut() const { return puffOut_; }  // (the last sample's puff, within its output)
   void reset() {
+    puffOut_ = pl1_ = pl2_ = 0;
     std::fill(re_.begin(), re_.end(), 0.0f);
     std::fill(im_.begin(), im_.end(), 0.0f);
     std::fill(hist_.begin(), hist_.end(), 0.0f);
@@ -383,6 +389,7 @@ class FluePipe {
   std::vector<float> re_, im_, c_, s_, in_, hist_, top_;
   int mask_ = 0, w_ = 0, quiet_ = 0;
   float valvePos_ = 0, foot_ = 0, prev_ = 0, prevD_ = 0, jl1_ = 0, jl2_ = 0, jl3_ = 0, jl4_ = 0, prevHiss_ = 0, jetA_ = 1, puffLp_ = 0, puffEnv_ = 0, puffDecay_ = 0, bl1_ = 0, bl2_ = 0, prevTop_ = 0, topOut_ = 0, swing_ = 0;
+  float puffOut_ = 0, pl1_ = 0, pl2_ = 0;
   bool on_ = false, awake_ = false;
   Rng rng_;
   float chiffEnv_ = 0, chiffDecay_ = 0, chiffBoost_ = 1, chiffScale_ = 1, sympEnv_ = 0, sympDecay_ = 0;

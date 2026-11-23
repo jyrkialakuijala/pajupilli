@@ -61,7 +61,23 @@ PianoDesign grandDesign() {
     // the middle up as voiced on two recorded grands: three to ten times
     // softer than their C4 and C7, by how little of a note's sound those
     // pianos have above its second partial (research/piano.md, 11).
-    s.mh = 1e-3 * std::exp(lerp(std::log(10.5), std::log(4.5), (key - 1) / 87.0));
+    // The hammers' strike weights (the mass the string meets, the shank's share included):
+    // Stanwood's medium set (PTG Journal, April 2000, Table I: 11.9 g at A0, 11.6 g at key 9,
+    // 6.4 g at key 80, 5.5 g at C8), smooth between (log-linear), as a voiced action's are.
+    // Heavier than the 10.5 .. 4.5 g used before: the wound strings' hammers by ~1.5-2 g, the top's
+    // by ~1 g. PJ_PIANO_SW scales them (Stanwood's light 0.94, heavy 1.06); PJ_PIANO_WOUNDMH
+    // adds to the wound strings' alone (0).
+    {
+      static const double kk[] = {1, 9, 80, 88}, kw[] = {11.9, 11.6, 6.4, 5.5};
+      double w = kw[3];
+      for (int i = 0; i < 3; ++i)
+        if (key <= kk[i + 1]) {
+          w = std::exp(lerp(std::log(kw[i]), std::log(kw[i + 1]), (key - kk[i]) / (kk[i + 1] - kk[i])));
+          break;
+        }
+      static const double kSw = knob("PJ_PIANO_SW", 1.0), kWoundMh = knob("PJ_PIANO_WOUNDMH", 0.0);
+      s.mh = 1e-3 * w * kSw + (key <= 20 ? kWoundMh : 0.0);
+    }
     static const double pk[] = {1, 16, 40, 76, 88}, hp[] = {2.2, 2.3, 2.5, 3.0, 3.1};
     static const double hk[] = {1, 16, 30, 49, 64, 76, 88};
     static const double hK[] = {1.5e8, 4.0e8, 1.3e9, 1.7e9, 2.5e10, 1.0e12, 3.0e12};
@@ -90,11 +106,20 @@ PianoDesign grandDesign() {
     // gave even the softest notes there a clear second partial).
     s.colour += knob("PJ_PIANO_COLOURHIGH", 2.0) * std::clamp((key - 68) / 8.0, 0.0, 1.0);
     s.K *= std::pow(knob("PJ_PIANO_KHIGH", 0.3), std::clamp((key - 68) / 8.0, 0.0, 1.0));
+    // The top two octaves (from C6, fully from C7): rounder, softer heads, voiced for pearls,
+    // not glass: the felt softer still (x PJ_PIANO_KTOP2, 0.5) and hardening less under a hard
+    // blow (its colour - PJ_PIANO_COLOURTOP2, 1.0); the face rounder (Piano: the contact wider and
+    // tapering, PJ_PIANO_HAMROUND).
+    {
+      const double soft2 = std::clamp((key - 64) / 12.0, 0.0, 1.0);
+      s.K *= std::pow(knob("PJ_PIANO_KTOP2", 0.5), soft2);
+      s.colour = std::max(0.0, s.colour - knob("PJ_PIANO_COLOURTOP2", 1.0) * soft2);
+    }
     s.pivot = knob("PJ_PIANO_PIVOT", 2.0);
     {
       // The nap: thinner and firmer up the keyboard, as the hammers are lighter and the notes' periods shorter.
       const double oct = (key - 40) / 12.0;
-      s.nap = knob("PJ_PIANO_NAP", 0.9e-3) * std::exp2(-knob("PJ_PIANO_NAPTHIN", 2.0) * std::max(oct, 0.0));
+      s.nap = knob("PJ_PIANO_NAP", 1.4e-3) * std::exp2(-knob("PJ_PIANO_NAPTHIN", 1.2) * std::max(oct, 0.0));
       s.napK = knob("PJ_PIANO_NAPK", 1200) * std::exp2(oct * (oct > 0 ? knob("PJ_PIANO_NAPSLOPE", 2.5) : knob("PJ_PIANO_NAPSLOPEBASS", 0.8)));
     }
     s.loss = knob("PJ_PIANO_LOSS", 0.05) * std::exp2(3.5 * (key - 1) / 87.0);
@@ -102,7 +127,9 @@ PianoDesign grandDesign() {
     s.b2 = lerp(knob("PJ_PIANO_LOSS2BASS", 3.5e-4), knob("PJ_PIANO_LOSS2", 2e-4), (key - 16) / 24.0);
     s.b3 = knob("PJ_PIANO_LOSS3", 3e-8);    // and with frequency^2 (1/s per Hz^2)
     s.damper = s.strike + 0.035;
-    s.damperLen = lerp(0.07, 0.025, (key - 1) / 69.0);
+    // (the felt's length along the strings: ~75 mm in the bass, still ~55 mm at the last damper, as
+    // a Steinway D's heads are seen from above)
+    s.damperLen = lerp(0.075, 0.055, (key - 1) / 69.0);
     // The damper: a length of felt; a mode loses by its mean square motion under it.
     // (A released note is gone in about 0.15 s in the middle, 0.3 s in the bass: from memory, not
     // measured. A key struck again sooner meets what is left of its own sound.) A Steinway D has 71:
@@ -116,6 +143,7 @@ PianoDesign grandDesign() {
   }
   des.pedalNoise = knob("PJ_PIANO_PEDALNOISE", 1.0);
   des.pedalUp = knob("PJ_PIANO_PEDALUP", des.pedalUp);
+  des.keyKnock = knob("PJ_PIANO_KEYKNOCK", 0);  // (through the board: weak; the knock is heard through the air, PianoModel)
   des.longShare = knob("PJ_PIANO_LONG", 0.7);  // (the stretching's push on the bridge: its share moving the board at 1 kHz)
   des.damperContact = knob("PJ_PIANO_DAMPERCONTACT", des.damperContact);  // (the felt's cushion, s)
   des.rimShare = knob("PJ_PIANO_RIMSHARE", des.rimShare);                // (a knock in the case reaching the board)
@@ -219,12 +247,23 @@ void Piano::build() {
     key_[k].p = float(s.p);
     key_[k].nap = float(s.nap);
     key_[k].napK = float(s.napK);
+    key_[k].napPack = float(d_.napPack);
     key_[k].pluckK = float(s.pluckK);
     key_[k].pluckLimit = float(s.pluckLimit);
     key_[k].pluckSide = float(s.pluckSide);
+    dContact_ = knob("PJ_PIANO_DCONTACT", 1) != 0;
+    dFeltK_ = float(knob("PJ_PIANO_DFELTK", 300));
+    dHold_ = float(knob("PJ_PIANO_DHOLD", 0));
     key_[k].hasDamper = s.hasDamper;
     key_[k].damperDown = key_[k].hasDamper;
     key_[k].engage = key_[k].hasDamper ? 1 : 0;
+    // (the damper as a contact: its head's mass, and its weight on the strings, x PJ_PIANO_DFORCE
+    // for the underlever's share and any spring)
+    {
+      static const double kDForce = knob("PJ_PIANO_DFORCE", 2.0);
+      key_[k].dM = float(std::max(1e-3, s.damperMass));
+      key_[k].dW = float(kDForce * 9.81 * std::max(1e-3, s.damperMass));
+    }
     for (int j = 0; j < s.strings; ++j) {
       Str st;
       st.key = k;
@@ -237,7 +276,7 @@ void Piano::build() {
       str_.push_back(st);
     }
   }
-  const size_t words = size_t(total_) * 16 + size_t(kB) * 12 + size_t(kB) * (kKeys + kP) + size_t(kP) * (kRing + 16) + 64;
+  const size_t words = size_t(total_) * (16 + 3 * kDPts) + size_t(kB) * 12 + size_t(kB) * (kKeys + kP) + size_t(kP) * (kRing + 16) + 64;
   mem_ = static_cast<float*>(std::aligned_alloc(64, (words * sizeof(float) + 63) / 64 * 64));
   std::memset(mem_, 0, words * sizeof(float));
   float* p = mem_;
@@ -245,6 +284,7 @@ void Piano::build() {
   x_[0] = take(total_); x_[1] = take(total_); v_[0] = take(total_); v_[1] = take(total_);
   cs_ = take(total_); sn_ = take(total_); cs1_ = take(total_); sn1_ = take(total_); in_ = take(total_); out_ = take(total_);
   damp_ = take(total_); hk_ = take(total_); hc_ = take(total_); hs_ = take(total_); dk_ = take(total_); nw_ = take(total_);
+  for (int q = 0; q < kDPts; ++q) { dsh_[q] = take(total_); dshw_[q] = take(total_); dkp_[q] = take(total_); }
   bx_ = take(kB); bv_ = take(kB); bcs_ = take(kB); bsn_ = take(kB); bf_ = take(kB); ba_ = take(kB); binv_ = take(kB);
   bacc_ = take(kB);
   phi_ = take(size_t(kB) * kKeys);
@@ -280,7 +320,9 @@ void Piano::build() {
     // one true, the outer ones either side, never quite evenly.
     rng_ = rng_ * 1664525u + 1013904223u;
     const double r = (rng_ >> 8) / 16777216.0;
-    const double spread = lerp(d_.unisonCents[0], d_.unisonCents[1], st.key / 87.0) * (0.7 + 0.6 * r);
+    // (PJ_PIANO_UNIDET >= 0: every unison exactly that far apart (cents), for the coupling study)
+    static const double kUniDet = knob("PJ_PIANO_UNIDET", -1);
+    const double spread = kUniDet >= 0 ? kUniDet : lerp(d_.unisonCents[0], d_.unisonCents[1], st.key / 87.0) * (0.7 + 0.6 * r);
     double cents = s.strings == 1 ? 0 : s.strings == 2 ? (j == 0 ? -0.5 : 0.5) * spread : (j - 1) * spread;
     // (an out-of-tune piano: a trichord's outer strings either side of its true middle one, by a
     // spread growing from the bass (x 0.67) to the treble (x 1.33), each key x 0.6 .. 1.4; the
@@ -331,7 +373,13 @@ void Piano::build() {
     double comply = 0;
     for (int i = 0; i < st.n; ++i) {
       const int n = i + 1, m = st.off + i;
-      const double f = n * f0 * std::sqrt(1 + s.B * n * n);
+      // The top two octaves (from C6, fully from C7) less stiff than measured: their partials
+      // nearer whole multiples (B x (1 - PJ_PIANO_TOPHARM), 0.75), the fundamental where it was:
+      // a round, pearly tone instead of a bell's clang.
+      static const double kTopHarm = knob("PJ_PIANO_TOPHARM", 0.75);
+      const double top2 = std::clamp((st.key + 21 - 84) / 12.0, 0.0, 1.0);
+      const double Bf = s.B * (1 - kTopHarm * top2);
+      const double f = n * f0 * std::sqrt((1 + Bf * n * n) * (1 + s.B) / (1 + Bf));
       if (f > 0.47 * fs_) continue;  // (left at rest: all its numbers 0)
       st.live = i + 1;
       const double w = 2 * M_PI * f, wdt = w / fs_;
@@ -345,6 +393,12 @@ void Piano::build() {
         const double top = std::clamp((st.key + 21 - 78) / 6.0, 0.0, 1.0);  // (key 0 is A0, MIDI 21)
         if (n == 2) sigma *= 1 + (kTopH2 - 1) * top;
         else if (n > 2) sigma *= 1 + (kTopHi - 1) * top;
+        // The top octaves (from C6, fully from E7): the partials above the fundamental dying a
+        // little faster in the wire itself (x PJ_PIANO_TOPUP, 1.5), the fundamental not (x
+        // PJ_PIANO_TOPF0, 1.0): their short life is the bridge's (TOPBRIDGE below), as sound.
+        const double kTopUp = d_.topUp, kTopF0 = d_.topF0;
+        const double top8 = std::clamp((st.key + 21 - 84) / 16.0, 0.0, 1.0);
+        sigma *= 1 + ((n >= 2 ? kTopUp : kTopF0) - 1) * top8;
       }
       const double g = std::exp(-sigma / fs_);
       cs_[m] = float(g * std::cos(wdt));
@@ -355,8 +409,23 @@ void Piano::build() {
       in_[m] = float(-2 * sign / (n * M_PI) * w);
       nw_[m] = float(n / w);
       out_[m] = float(s.mu * s.len * sign / (n * M_PI));
-      const double a = n * M_PI * s.strike, hw = n * M_PI * hamW / (2 * s.len);
-      const double shape = std::sin(a) * (hw > 1e-6 ? std::sin(hw) / hw : 1.0);
+      // (The felt's footprint on the string, as the head's crown makes it: the bass and middle
+      // hammers big, their crowns broad and round, pressing a wide patch most at its middle (a
+      // raised cosine 24 mm across at A0, 18 at C4); up the keyboard smaller and more pointed,
+      // the patch narrower (12 mm at C6, 7 at C8; PJ_PIANO_HAMW scales them, 0.010 = 1).
+      // A round crown holds back the high partials smoothly, a point lets them through:
+      // the sinc of a flat patch with its side lobes never was either.)
+      static const double kWscale = hamW / 0.010;
+      static const double kKw[] = {1, 40, 64, 88}, kW[] = {0.024, 0.018, 0.012, 0.007};
+      double crown = kW[3];
+      for (int j = 0; j < 3; ++j)
+        if (st.key + 1 <= kKw[j + 1]) {
+          crown = kW[j] + (kW[j + 1] - kW[j]) * (st.key + 1 - kKw[j]) / (kKw[j + 1] - kKw[j]);
+          break;
+        }
+      const double a = n * M_PI * s.strike, hw = n * M_PI * crown * kWscale / (2 * s.len);
+      const double q = hw / M_PI, flat = hw > 1e-6 ? std::sin(hw) / hw : 1.0;
+      const double shape = std::sin(a) * (std::fabs(1 - q * q) > 1e-6 ? flat / (1 - q * q) : 0.5);
       hk_[m] = float(shape / modalMass / fs_);
       hc_[m] = float(shape * cs_[m] / w);
       hs_[m] = float(shape * sn_[m] / w);
@@ -367,7 +436,17 @@ void Piano::build() {
       damp_[m] = float(std::exp(-rate0 * mean / fs_));
       // (The felt's push, spread over its length: the mean of sin there.)
       dk_[m] = float(std::sin(c0) * (hl > 1e-6 ? std::sin(hl) / hl : 1.0) / modalMass / fs_);
+      for (int q = 0; q < kDPts; ++q) {  // (its quarters: their middles at -3/8 .. +3/8 of the felt)
+        const double cq = n * M_PI * (s.damper + s.damperLen / s.len * (q - 1.5) / kDPts), hq = hl / kDPts;
+        const double sh = std::sin(cq) * (hq > 1e-6 ? std::sin(hq) / hq : 1.0);
+        dsh_[q][m] = float(sh);
+        dshw_[q][m] = float(sh / w);
+        dkp_[q][m] = float(sh / modalMass / fs_);
+      }
     }
+    // (the felt pressed in, its friction: as much as the loss per mode above at a small swing,
+    // the felt always on the string: rate0 mean = R shape^2 / 2 m)
+    st.dampR = float(2 * rate0 * modalMass);
     st.comply = float(comply);
     // Its lengthwise modes. The wire's core carries the stretch (a wound string's copper winding
     // only weighs): its diameter from the stiffness, B = pi^3 E d^4 / 64 T L^2, the string's
@@ -420,6 +499,24 @@ void Piano::build() {
   // no grand has). A lifted damper takes its key's load away: the strings
   // are then themselves, computed.
   if (kB) std::memcpy(phi_, d_.board.phi, sizeof(float) * kB * kKeys);
+  // The treble's bridge: thin and on the board's thinner, freer part, it gives far more at high
+  // frequencies than the board's broad resonances alone do there (the top strings' mobility,
+  // Re Z0 Y, some 3e-3 .. 8e-3: Weinreich; Giordano). Most of a top string's life goes into it:
+  // its unison's strings, drawn by one bridge, pull together within its bandwidth (a few cents
+  // at C8: one tone, no beats), and what they lose is sound. Its admittance above ~1 kHz x
+  // PJ_PIANO_TOPBRIDGE (4.8) at the top key, rising from C5 (the board's resonances there moving
+  // sqrt of it more at those bridge points).
+  {
+    const double kTopBridge = d_.topBridge;
+    for (int k = 0; k < kKeys && kTopBridge != 1; ++k) {
+      const double kr = std::clamp((k + 21 - 72) / 36.0, 0.0, 1.0);
+      if (kr <= 0) continue;
+      for (int m = 0; m < kB; ++m) {
+        const double fr = std::clamp((d_.board.freq[m] - 800) / 1200.0, 0.0, 1.0);
+        phi_[size_t(k) * kB + m] *= float(std::sqrt(1 + (kTopBridge - 1) * kr * fr));
+      }
+    }
+  }
   loadR_.assign(size_t(kKeys) * kB, 0.0f);
   loadX_.assign(size_t(kKeys) * kB, 0.0f);
   const double kSideLoad = d_.sideLoad;
@@ -478,6 +575,14 @@ void Piano::build() {
       tapG_[c][p] = float(1.18 / (2 * M_PI * r) * ((1 - pat) + pat * cosine));
     }
   }
+  // (the regions as sources: as a patch straight under the pair is heard by it, its delay and
+  // gain, the same for every patch)
+  {
+    const double mz = d_.mic[0].z, ang = d_.mic[0].angleDeg * M_PI / 180, pat = d_.mic[0].pattern;
+    regionSrc_ = knob("PJ_PIANO_PARTSRC", 0) != 0;
+    srcD_ = std::min(int(std::lround(mz / 345.0 * fs_)), kRing - 2);
+    srcG_ = float(1.18 / (2 * M_PI * mz) * ((1 - pat) + pat * std::cos(ang)));
+  }
   reset();
 }
 
@@ -517,6 +622,9 @@ void Piano::reset() {
     k.hammerOn = false;
     k.acc = k.force = 0;
     k.landWait = k.landLeft = 0;
+    k.hy = k.damperDown ? 0.0f : 1.0f;  // (resting on its strings, or lifted)
+    k.hv = 0;
+    k.seated = k.damperDown;
   }
   landing_ = knocks_ = 0;
   for (Knock& q : knock_) q.left = 0;
@@ -572,6 +680,7 @@ void Piano::strike(int key, double speed) {
   k.eta = k.pluckK > 0 ? lowest : lowest - 1e-4f;  // (a plectrum starts touching its string)
   k.vh = float(speed);
   k.hammerOn = true;
+  if (d_.keyKnock > 0 && speed > 0) knock(d_.keyKnock * speed, d_.keyKnockTime, key);
   wake();
   census();
 }
@@ -584,10 +693,32 @@ void Piano::damper(int key, bool down, double speed, double loud) {
   boardStale_ = true;
   if (!down) {
     k.engage = 0;
+    k.hy = 1.0f;  // (lifted off: out of reach)
+    k.hv = 0;
+    k.seated = false;
     if (k.landWait > 0 || k.landLeft > 0) --landing_;  // (lifted again before it landed)
     k.landWait = k.landLeft = 0;
     for (int j = 0; j < k.ns; ++j) str_[k.s0 + j].active = true;
     census();
+  } else if (dContact_) {
+    // (the contact: the head let go from where it was lifted to, falling; the felt meets the
+    // strings when it gets there, and takes them as the contact does)
+    if (speed < 0) {
+      noiseRng_ = noiseRng_ * 1664525u + 1013904223u;
+      speed = d_.damperFall * (0.75 + 0.5 * ((noiseRng_ >> 8) / 16777216.0));
+    }
+    if (noise_ > 0) {
+      k.hy = 0.3e-3f + k.landDelay + k.dW / (dFeltK_ * std::max(1, k.ns));  // (from its rest)
+      k.hv = -float(speed * noise_ * std::max(0.3, std::min(1.0, loud)));
+      k.engage = 0;
+    } else {  // (the landings unheard (PJ_PIANO_PEDALNOISE=0): set down on its strings at rest)
+      k.hy = k.hv = 0;
+      k.seated = true;
+      k.engage = 1;
+    }
+    for (int j = 0; j < k.ns; ++j) str_[k.s0 + j].active = true;
+    census();
+    wake();
   } else if (noise_ > 0 && d_.key[key].damperMass > 0) {
     // The damper falls onto its strings (research/piano.md 6). Its momentum m v is taken up by
     // the felt (a cushion: the head does not bounce, it stays on the strings) in a half sine of
@@ -629,7 +760,7 @@ void Piano::pedal(bool down, double speed) {
 }
 
 // A knock in the case (impulse N s, a half sine of T s), the rim's share of it into the board.
-void Piano::knock(double impulse, double T) {
+void Piano::knock(double impulse, double T, int at) {
   if (!nB_ || impulse <= 0) return;
   Knock* q = &knock_[0];
   for (Knock& k : knock_)
@@ -637,7 +768,8 @@ void Piano::knock(double impulse, double T) {
   if (q->left == 0) ++knocks_;
   q->n = std::max(2, int(T * fs_ + 0.5));
   q->left = q->n;
-  q->amp = float(d_.rimShare * M_PI * impulse / (2 * T));
+  q->amp = float((at >= 0 ? 1.0 : d_.rimShare) * M_PI * impulse / (2 * T));
+  q->at = at;
   wake();
 }
 
@@ -679,6 +811,67 @@ float Piano::stretch(Str& s) {
   if (--s.longLeft == 0)
     for (int j = 0; j < s.nl; ++j) s.lx[j] = s.lv[j] = 0;
   return push;
+}
+
+// The damper as a contact (PJ_PIANO_DCONTACT): its head, a mass on the felt, lies on its strings
+// by its weight (and the underlever's). The felt only pushes: while a string, swinging up, presses
+// into it, a spring (dFeltK_, N/m) and its friction (the string's dampR, N s/m, as the
+// per-mode loss was) push it back down and the head up; the head flies off a swing bigger than
+// its weight can hold, and falls back. So a loud bass note is caught only by and by, the felt
+// patting it (a buzz), the strings tuned a little higher while it presses (its stiffness on
+// them), and its push, at one place, hands energy from the low partials to the higher ones.
+// The sideways swing: the felt's friction while it touches (the swing's own loss as before,
+// by how much of the time it touches).
+void Piano::damperContact(Key& k) {
+  // (Counted from rest: the head's place hy from where it sits on resting strings, each pressed
+  // F0 / kDPts at each quarter of the felt (d0 deep); the strings' motion from their rest under
+  // that weight once it has sat on them, only what differs from it moving them. At rest every
+  // term is exactly 0.)
+  const float F0 = k.dW / std::max(1, k.ns), d0 = F0 / dFeltK_;
+  bool any = false;
+  for (int j = 0; j < k.ns; ++j) any = any || str_[k.s0 + j].active;
+  if (!any) {  // (all at rest: the head too, on them)
+    k.hy = k.hv = 0;
+    k.engage = 1;
+    k.seated = true;
+    return;
+  }
+  float head = 0;  // (the felt's push on the head, less its weight)
+  bool touch = false;
+  const float Fq0 = F0 / kDPts, Kq = dFeltK_ / kDPts;
+  for (int j = 0; j < k.ns; ++j) {
+    const Str& s = str_[k.s0 + j];
+    if (!s.active) continue;
+    const float* x = x_[0] + s.off;
+    float* v = v_[0] + s.off;
+    const int n = s.live;
+    const float Rq = s.dampR / kDPts;
+    for (int q = 0; q < kDPts; ++q) {  // (each quarter of the felt: its own contact, lifting by itself)
+      const float* sw = dshw_[q] + s.off;
+      const float* sh = dsh_[q] + s.off;
+      float u = 0, ud = 0;
+      for (int i = 0; i < n; ++i) {
+        u += sw[i] * x[i];
+        ud += sh[i] * v[i];
+      }
+      // (its push less the resting one; touching while pressed in and pushing)
+      const float dev = Kq * (u - k.hy) + Rq * (ud - k.hv);
+      const bool on = u - k.hy + d0 > 0 && dev > -Fq0;
+      touch = touch || on;
+      const float Fs = k.seated ? (on ? dev : -Fq0) : (on ? Fq0 + dev : 0.0f);
+      if (Fs != 0) {
+        const float* dk = dkp_[q] + s.off;
+        for (int i = 0; i < n; ++i) v[i] -= dk[i] * Fs;
+      }
+      head += on ? dev : -Fq0;
+    }
+  }
+  if (touch) k.seated = true;
+  // (dHold_: a drag on the head, its wire in the guide rail's cloth bushings; 0 by default)
+  k.hv += dt_ * (head - dHold_ * k.hv) / k.dM;
+  k.hy += dt_ * k.hv;
+  // (how much of the time the felt touches, over ~4 ms)
+  k.engage += (float(touch) - k.engage) * std::min(1.0f, dt_ / 0.004f);
 }
 
 // A damper's felt pushing its strings this sample, while it lands; its grip comes on with it.
@@ -765,20 +958,25 @@ void Piano::hammer(Key& k) {
         // is pressed nap g / (g + c) (c = napK nap) and the felt under it
         // (g / K)^(1/p). g + A g h(d(g)) ... = b, solved for g (Newton, from
         // below: the left side rises with g and is concave).
+        // (With napPack the nap gives out: as soft at first, nap g / c, but flat at napPack of
+        // its depth, n (1 - exp(-g / (n c / nap))): a hard blow goes through it to the felt.)
         const float c = k.napK * k.nap, ip = 1 / p, iK = 1 / K;
+        const float nD = k.nap * k.napPack, nF = c * k.napPack;
+        const auto napD = [&](float x) { return k.napPack > 0 ? nD * (1 - std::exp(-x / nF)) : k.nap * x / (x + c); };
+        const auto napS = [&](float x) { return k.napPack > 0 ? k.nap / c * std::exp(-x / nF) : k.nap * c / ((x + c) * (x + c)); };
         float g = 0;
         d = 0;
         for (int it = 0; it < 12; ++it) {
-          const float dn = k.nap * g / (g + c), dm = std::pow(g * iK, ip);
+          const float dn = napD(g), dm = std::pow(g * iK, ip);
           d = dn + dm;
-          const float dd = k.nap * c / ((g + c) * (g + c)) + (g > 1e-12f ? ip * dm / g : 1e6f);
+          const float dd = napS(g) + (g > 1e-12f ? ip * dm / g : 1e6f);
           const float h = std::max(0.0f, 1 + kHyst * (d - s.dPrev) / dt_);
           const float r = d + A * g * h - b;
           const float dr = dd + A * (h + g * kHyst / dt_ * dd);
           g = std::max(0.0f, g - r / dr);
           if (it == 0 && g <= 0) g = 1e-6f;
         }
-        d = std::min(b, k.nap * g / (g + c) + std::pow(g * iK, ip));
+        d = std::min(b, napD(g) + std::pow(g * iK, ip));
         f = g * std::max(0.0f, 1 + kHyst * (d - s.dPrev) / dt_);
       } else if (b > 0) {
         d = std::min(b, std::max(s.dPrev, 1e-7f));
@@ -840,19 +1038,20 @@ void Piano::hammer(Key& k) {
 
 // One sample of a string's modes, both directions of swing: the bridge's motion dy0 / dy1 into
 // them, the damper's grip e (0: free), and what they passed back to the bridge (sum0 / sum1).
-static inline void swing(int n, float e, float dy0, float dy1, const float* __restrict in,
+static inline void swing(int n, float e, float e1, float dy0, float dy1, const float* __restrict in,
                          const float* __restrict out, const float* __restrict dm, float* __restrict x0,
                          float* __restrict v0, float* __restrict x1, float* __restrict v1,
                          const float* __restrict c0, const float* __restrict s0, const float* __restrict c1,
                          const float* __restrict s1, float* sum0p, float* sum1p) {
   float sum0 = 0, sum1 = 0;
-  if (e > 0) {
+  if (e > 0 || e1 > 0) {
+    // (e: the damper's grip on the up-and-down swing, e1 on the sideways one)
     for (int i = 0; i < n; ++i) {
-      const float g = 1 - e * (1 - dm[i]);
+      const float g = 1 - e * (1 - dm[i]), g1 = 1 - e1 * (1 - dm[i]);
       const float xa = x0[i] + in[i] * dy0, xb = x1[i] + in[i] * dy1;
-      const float va = g * (v0[i] * c0[i] - xa * s0[i]), vb = g * (v1[i] * c1[i] - xb * s1[i]);
+      const float va = g * (v0[i] * c0[i] - xa * s0[i]), vb = g1 * (v1[i] * c1[i] - xb * s1[i]);
       x0[i] = g * (xa * c0[i] + v0[i] * s0[i]);
-      x1[i] = g * (xb * c1[i] + v1[i] * s1[i]);
+      x1[i] = g1 * (xb * c1[i] + v1[i] * s1[i]);
       sum0 += out[i] * (va - v0[i]);
       sum1 += out[i] * (vb - v1[i]);
       v0[i] = va;
@@ -924,14 +1123,19 @@ float Piano::sample(float testForce) {
       const int ki = activeKeys_[a0 + u];
       Key& k = key_[ki];
       k.acc = acc[u];
-      if (k.landWait > 0 || k.landLeft > 0) {
+      float e1 = -1;
+      if (dContact_ && k.hasDamper) {
+        if (k.damperDown) damperContact(k);
+        e1 = k.damperDown ? k.engage : 0.0f;  // (the felt's friction sideways, while it touches)
+      } else if (k.landWait > 0 || k.landLeft > 0) {
         // (Landing: no grip until the felt touches; then half of it within the push (the felt
         // closing on the swinging strings: the first contact is quick), the rest as it beds in.)
         const bool touching = k.landWait == 0;
         land(k);
         if (touching) k.engage = std::min(1.0f, k.engage + 0.5f / k.landN);
       } else if (k.damperDown && k.engage < 1) k.engage = std::min(1.0f, k.engage + dt_ / 0.05f);
-      const float e = k.engage;
+      const float e = e1 >= 0 ? 0.0f : k.engage;
+      if (e1 < 0) e1 = e;
       float F = 0, Fp = 0;
       for (int j = 0; j < k.ns; ++j) {
         const Str& s = str_[k.s0 + j];
@@ -939,7 +1143,7 @@ float Piano::sample(float testForce) {
         // Both directions of swing in one pass (the bridge's coupling and output weights shared).
         float sum0, sum1;
         const size_t o = s.off;
-        swing(s.live, e, k.acc, kSide * k.acc, in_ + o, out_ + o, damp_ + o, x_[0] + o, v_[0] + o, x_[1] + o,
+        swing(s.live, e, e1, k.acc, kSide * k.acc, in_ + o, out_ + o, damp_ + o, x_[0] + o, v_[0] + o, x_[1] + o,
               v_[1] + o, cs_ + o, sn_ + o, cs1_ + o, sn1_ + o, &sum0, &sum1);
         F -= sum0 + kSide * sum1;
         if (pickup_) Fp -= sum0 + pickSide_ * sum1;
@@ -958,11 +1162,18 @@ float Piano::sample(float testForce) {
     float f = 0;
     for (Knock& q : knock_) {
       if (q.left <= 0) continue;
-      f += q.amp * std::sin(float(M_PI) * (q.n - q.left + 0.5f) / q.n) * dt_;
+      const float fq = q.amp * std::sin(float(M_PI) * (q.n - q.left + 0.5f) / q.n) * dt_;
+      if (q.at >= 0) {  // (a key's: at its own bridge point)
+        const float* ph = phi_ + size_t(q.at) * kB;
+        for (int m = 0; m < kB; ++m) bf_[m] += ph[m] * fq;
+      } else {
+        f += fq;
+      }
       if (--q.left == 0) --knocks_;
     }
     const float* tp = trapPhi_.data();
-    for (int m = 0; m < kB; ++m) bf_[m] += tp[m] * f;
+    if (f != 0)
+      for (int m = 0; m < kB; ++m) bf_[m] += tp[m] * f;
   }
   if (testForce != 0 && kB) {  // (tests: a force at middle C's bridge point)
     const float* ph = phi_ + size_t(39) * kB;
@@ -1001,7 +1212,15 @@ float Piano::sample(float testForce) {
       const float cr = tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
       l += cl;
       r += cr;
-      if (keepRegions_) region_[regionOf_[p]] += 0.5f * (cl + cr);
+      if (keepRegions_)
+        {
+        if (regionSrc_) {
+          const int ih = (ringPos_ - srcI_[p]) & (kRing - 1);
+          region_[regionOf_[p]] += srcW_[p] * (ring[ih] + srcF_[p] * (ring[(ih - 1) & (kRing - 1)] - ring[ih]));
+        } else {
+          region_[regionOf_[p]] += 0.5f * (cl + cr);
+        }
+      }
     }
   }
   side_ = pickup_ ? 0 : 0.5f * (l - r);
@@ -1055,6 +1274,11 @@ float Piano::sample(float testForce) {
       asleep_ = true;
     }
   }
+  if (keepRegions_ && regionSrc_ && !pickup_) {  // (the whole: the regions' sum, nothing left at the centre)
+    float sum = 0;
+    for (int j = 0; j < kRegions; ++j) sum += region_[j];
+    return sum;
+  }
   return pickup_ ? pick_ : 0.5f * (l + r);
 }
 
@@ -1084,6 +1308,23 @@ void Piano::keepRegions(bool on) {
   for (int j = 0; j < kRegions; ++j) {
     regionX_[j] = n[j] ? sx[j] / n[j] : 0;
     regionY_[j] = n[j] ? sy[j] / n[j] : 0;
+  }
+  // (Toward the audience: off the bentside, past the raised lid, ~30 degrees over the board. The
+  // room places each region; within one, a patch nearer the listener speaks a little sooner, so
+  // that the highs of a broad board add by power at a seat, not all in phase.)
+  static const double kUp = knob("PJ_PIANO_HALLUP", 30) * M_PI / 180;
+  const double dy = std::cos(kUp);
+  for (int p = 0; p < kP; ++p) {
+    const int j = regionOf_[p];
+    const double lead = dy * (pos[2 * p + 1] - regionY_[j]);
+    const double d = std::clamp(srcD_ - lead / 345.0 * fs_, 1.0, double(kRing - 2));
+    srcI_[p] = int(d);
+    srcF_[p] = float(d - int(d));
+    // (The bass bands' sound adds up in the open as it did not between the crossed figure-of-eight
+    // pair, which turns much of it away: each band set back to the balance the keys were voiced at.)
+    static const double kTrim[4] = {knob("PJ_PIANO_HALLB0", -15), knob("PJ_PIANO_HALLB1", -13.5),
+                                    knob("PJ_PIANO_HALLB2", -0.5), knob("PJ_PIANO_HALLB3", -3.5)};
+    srcW_[p] = srcG_ * float(std::pow(10.0, kTrim[j / 2] / 20));
   }
 }
 

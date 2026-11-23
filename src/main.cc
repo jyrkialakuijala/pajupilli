@@ -27,6 +27,7 @@
 #include "brasssect.h"
 #include "calibrate.h"
 #include "midifile.h"
+#include "organ.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "flute.h"
@@ -388,6 +389,9 @@ const char kUsage[] =
     "                      and gives every part one reading: phrases, dynamics, accents,\n"
     "                      vibrato, a final ritardando, fermatas. auto (default): only\n"
     "                      for a file with no performance of its own; on; off\n"
+    "  -volume DB          with -play: the whole mix up or down (e.g. -volume -6)\n"
+    "  -organ NAME         which church organ: large (default), janakkala (40 stops, North German baroque),\n"
+    "                      or in a historical tuning: janakkala-meantone, -kirnberger3, -neidhardt, -lehman\n"
     "  -pianist            with -play: each piano part's sustain pedal planned from\n"
     "                      its notes (research/pedaling.md), the file's own set\n"
     "                      aside: changed with the harmony, sparing in a linear\n"
@@ -577,6 +581,18 @@ int main(int argc, char** argv) {
       if (!setReinstrument(next())) return 1;
     }
     else if (a == "-pianist") setPianist(true);
+    else if (a == "-volume") setPlayVolume(std::atof(next()));
+    else if (a == "-organ") {
+      const std::string w = next();
+      const OrganTemperament t = w == "janakkala-meantone" ? kMeantone : w == "janakkala-kirnberger3" ? kKirnberger3
+                                 : w == "janakkala-neidhardt" ? kNeidhardt : w == "janakkala-lehman" ? kLehman : kEqualTemperament;
+      if (w != "large" && w != "janakkala" && t == kEqualTemperament) {
+        std::fprintf(stderr, "-organ: large, janakkala, janakkala-meantone, janakkala-kirnberger3, janakkala-neidhardt or janakkala-lehman\n");
+        return 1;
+      }
+      setOrganDisposition(w != "large");
+      setOrganTemperament(t);
+    }
     else if (a == "-ensemble") {
       ensemble = "bass,alto,flute,flute,piccolo";
       if (i + 1 < argc && argv[i + 1][0] != '-') ensemble = argv[++i];
