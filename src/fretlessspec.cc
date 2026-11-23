@@ -1,4 +1,4 @@
-// The fretless bass's instrument (src/fretless.h): the Jazz Bass defretted. Only guitar.h, the Jazz
+// The fretless bass's instrument (src/fretless.h): the two-pickup bass defretted. Only guitar.h, the Jazz
 // Bass's spec and the knobs: the unit checks (tools/fretlessboard.cc) build it without the rest.
 #include <cmath>
 
@@ -8,13 +8,13 @@
 
 namespace pajupilli {
 
-// The Jazz Bass defretted (research/fretless_bass.md 1, 2, 8.2): the board (an epoxied or ebony
+// The two-pickup bass defretted (research/fretless_bass.md 1, 2, 8.2): the board (an epoxied or ebony
 // one: the double bass's contact), the action over the board's end 2.5 mm (PJ_FRETLESS_ACTION x),
 // no relief (PJ_FRETLESS_RELIEF, 1/m), the fingertip's loss half the double bass's
 // (PJ_FRETLESS_FINGER). PJ_FRETLESS_FLATS=1: flatwounds (1.4: the partials lose 2.5 times as much,
 // a little stiffer: less mwah, no squeak). The bridge pickup favoured.
 GuitarSpec fretlessBass() {
-  GuitarSpec g = jazzBass();
+  GuitarSpec g = twoPickupBass();
   g.name = "fretless-bass";
   g.board = knob("PJ_FRETLESS_BOARD", 1) > 0.5;
   g.boardK = knob("PJ_FRETLESS_BOARDK", 3e4);

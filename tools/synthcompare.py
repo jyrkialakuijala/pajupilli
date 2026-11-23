@@ -631,7 +631,7 @@ MEASURES = {
     'stem_icc': ('stem width (interchannel coherence)', '', 0.075, 0.4),
     'mod_slow': ('envelope modulation 0.5-2 Hz', 'dB', 1.5, 0.3),
     'mod_mid': ('envelope modulation 2-8 Hz (vibrato, tremolo, beats)', 'dB', 1.5, 0.4),
-    'mod_fast': ('envelope modulation 8-32 Hz (roughness, Leslie)', 'dB', 1.5, 0.4),
+    'mod_fast': ('envelope modulation 8-32 Hz (roughness, Rotary)', 'dB', 1.5, 0.4),
     'clicks_per_min': ('clicks per minute', '/min', 1.0, 0.8),
     'noise_db': ('noise floor in gaps re stem', 'dB', 6.0, 0.5),
     'stem_dissonance': ('Plomp-Levelt dissonance over the stem (log2)', 'oct', 0.3, 0.6),
@@ -706,7 +706,7 @@ def zmono(x, seconds=None):
 
 
 GM = ('Acoustic Grand Piano,Bright Acoustic Piano,Electric Grand Piano,Honky-tonk Piano,Electric Piano 1,Electric Piano 2,'
-      'Harpsichord,Clavinet,Celesta,Glockenspiel,Music Box,Vibraphone,Marimba,Xylophone,Tubular Bells,Dulcimer,Drawbar Organ,'
+      'Harpsichord,Clavi,Celesta,Glockenspiel,Music Box,Vibraphone,Marimba,Xylophone,Tubular Bells,Dulcimer,Drawbar Organ,'
       'Percussive Organ,Rock Organ,Church Organ,Reed Organ,Accordion,Harmonica,Tango Accordion,Nylon Guitar,Steel Guitar,'
       'Jazz Guitar,Clean Guitar,Muted Guitar,Overdriven Guitar,Distortion Guitar,Guitar Harmonics,Acoustic Bass,'
       'Finger Bass,Pick Bass,Fretless Bass,Slap Bass 1,Slap Bass 2,Synth Bass 1,Synth Bass 2,Violin,Viola,Cello,'

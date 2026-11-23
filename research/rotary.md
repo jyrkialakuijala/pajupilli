@@ -1,14 +1,14 @@
-# The Leslie rotating speaker (122 / 147) as a physical model
+# The rotary speaker rotating speaker (122 / 147) as a physical model
 
-Status: 2026-11-16. Research and plan; nothing is built. This is the speaker for the Hammond
-B-3 of `research/hammond_b3.md` (GM 17-19). That paper ends at the organ's console output, and
+Status: 2026-11-16. Research and plan; nothing is built. This is the speaker for the tonewheel organ
+tonewheel organ of `research/tonewheel_organ.md` (GM 17-19). That paper ends at the organ's console output, and
 this one starts there (§9). Nothing in `src/` models a rotating speaker yet. The room is
 `src/room.*`. Stereo goes out through `Tube::takeSide` (`src/tube.h`; see `src/accordion.cc`).
 
 Marks: **[paper]** a paper or primary document in §14; **[web]** a weaker web source in §14
 (makers' manuals, emulators, forums, restorers); **[calc]** worked out here (scripts in the session
-scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledge, to be checked;
-**[design]** a modelling choice; **[rec]** measured in the user's recordings (none has a Leslie:
+scratchpad, `tonewheel/calcs.py`, `rotary_calc.py`); **[memory]** general knowledge, to be checked;
+**[design]** a modelling choice; **[rec]** measured in the user's recordings (none has a rotary speaker:
 §11).
 
 ## 1. Short answer
@@ -21,7 +21,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
     live and one a dummy counterweight, with a diffuser cone at the mouth.
   - Each rotor has a fast and a slow AC motor, switched by a relay. A belt drives the rotor.
   - Everything sits in a louvred three-compartment cabinet 743 × 524 × 1057 mm **[paper,
-    Henricksen; web, Hammond specs]**.
+    Henricksen; web, tonewheel organ specs]**.
   - The 122 has a **balanced** input and is speed-switched by a DC voltage on the audio pair. The
     147 has an unbalanced input and a separate relay line **[web, Uneeda]**.
 - **Speeds** (one 147, measured): horn **400 rpm (6.67 Hz) fast, 48 rpm (0.80 Hz) slow**; drum
@@ -29,7 +29,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
   emulators give 396-423 rpm and 31-49 rpm (§4). The drum turns a little slower than the horn, so
   the two beat.
 - **Spin-up and spin-down: no primary measurement found.** Values in use:
-  - Hammond-Suzuki's own Leslie 2101mk2 (modelled on the 122): horn rise 1.8-4.2 s and fall
+  - the organ maker's own digital rotary speaker (modelled on the 122): horn rise 1.8-4.2 s and fall
     2.4-3.4 s; drum rise 12-13 s and fall 5.5-12 s **[web, L2101]**.
   - setBfree's first-order time constants: horn 0.16 s up and 0.32 s down; drum 4.1 s up and
     1.4 s down **[web, SBF]**.
@@ -44,7 +44,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
   800 Hz)". Below 200 Hz the scoop is too small to matter **[paper, Henricksen]**.
 - **Directivity.** Without its diffuser the horn is "beamy", with strong AM. With it the horn is
   "almost omnidirectional; note, however, the 'lobing'", and the diffuser keeps the apparent source
-  at the mouth (more FM) **[paper, Henricksen]**. Measured (Leslie 600 horn, 15° steps): below
+  at the mouth (more FM) **[paper, Henricksen]**. Measured (rotary speaker horn, 15° steps): below
   ~12 Bark (~1.7 kHz) the angle mainly lowers the level as the horn turns away, the treble falling
   faster; an angle-independent "base leakage" arrives first **[paper, SSAB02]**.
 - **A faithful model is:**
@@ -78,12 +78,12 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
     vented box for the low-frequency driver);
   - the bottom compartment the low-frequency rotor and amplifier.
   - Louvres located in the top and bottom compartments let out treble and bass sound respectively."
-- **Players modify them.** "Many Leslies played in clubs are faced backwards, with the top and
+- **Players modify them.** "Many rotary speakers played in clubs are faced backwards, with the top and
   bottom rear panels and deflectors removed, because the sound 'cuts' better" **[paper,
   Henricksen]**. That is an option for the model (§12.2).
-- **Never connect a Hammond to a 147.** "Only connect a Hammond Organ to a Model 122, 22, or 122RV;
-  never connect a Hammond via a 'Leslie Cord' to a Model 147 or 145 … It will basically blow up"
-  **[paper, Henricksen]**. The 122 is the B-3's speaker **[design: model the 122]**.
+- **Never connect a tonewheel organ to a 147.** "Only connect a tonewheel organ Organ to a Model 122, 22, or 122RV;
+  never connect a tonewheel organ via a 'rotary speaker Cord' to a Model 147 or 145 … It will basically blow up"
+  **[paper, Henricksen]**. The 122 is the tonewheel organ's speaker **[design: model the 122]**.
 
 ## 3. The rotors
 
@@ -93,7 +93,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
   horizontally, sits on this bearing/tube" over the driver. "Only one is operable as a horn. The
   other side, a 'dummy', acts as a counterweight or dynamic balancer, providing symmetric air drag
   at high speed" **[paper, Henricksen]**. "The Model 44W horn is identical to that of the Model
-  600, and evidently standard across all Leslie models" **[paper, SSAB02]**.
+  600, and evidently standard across all rotary speaker models" **[paper, SSAB02]**.
 - **The rotation radius** (axis to effective source) was **not found in a primary source**.
   setBfree uses 19.2 cm **[web, SBF]**. **[design]** r_h = 0.17 m ± 0.02 (the horn's total span is
   ~0.4-0.5 m tip to tip, from photos; to measure).
@@ -128,10 +128,10 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
 
 | Source | Horn fast | Horn slow | Drum fast | Drum slow | Type |
 |---|---|---|---|---|---|
-| Leslie 147, one owner (belt middle pulley, normal tension) | 400 rpm = 6.67 Hz | 48 rpm = 0.80 Hz | 342 rpm = 5.70 Hz | 40 rpm = 0.67 Hz | **[web, diyaudio citing HammondWiki]** measured |
+| larger rotary speaker, one owner (belt middle pulley, normal tension) | 400 rpm = 6.67 Hz | 48 rpm = 0.80 Hz | 342 rpm = 5.70 Hz | 40 rpm = 0.67 Hz | **[web, diyaudio citing HammondWiki]** measured |
 | Another owner | 409 rpm = 6.82 Hz | 48-49 rpm | 396 rpm = 6.60 Hz | 48-49 rpm | **[web]** measured |
 | Forum summary | 5.7-6.8 Hz | ~0.8 Hz | | | **[web, musicplayer]** |
-| Leslie 2101mk2 preset 1 (Hammond-Suzuki, "122") | 400 rpm | 46 rpm | 400 rpm | 46 rpm | **[web, L2101]** design |
+| digital rotary speaker preset 1 (the organ maker, "122") | 400 rpm | 46 rpm | 400 rpm | 46 rpm | **[web, L2101]** design |
 | 2101mk2 preset 2 | 400 rpm | 46 rpm | 376 rpm | 31 rpm | **[web, L2101]** design |
 | 2101mk2 ranges | 375-450 rpm | 24-318 rpm | 372-431 rpm | 24-48 rpm | **[web, L2101]** |
 | setBfree | 423.36 rpm = 7.06 Hz | 40.32 rpm = 0.67 Hz | 357.3 rpm = 5.96 Hz | 36.0 rpm = 0.60 Hz | **[web, SBF]** design |
@@ -139,7 +139,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
 
 - **[design] Defaults:** horn 6.7 / 0.80 Hz, drum 1.6 × slower, 4.2 / 0.50 Hz (2026-11-18, the
   user: "they have different motors, and the high frequency speaker can rotate perhaps 1.6 x as
-  fast"; the measured units above are ~1.17 ×: `PJ_LESLIE_RATIO=1.17`). The rotors turn opposite
+  fast"; the measured units above are ~1.17 ×: `PJ_ROTARY_RATIO=1.17`). The rotors turn opposite
   ways (the user), the drum's angle mirrored. The drum's fast speed varies most
   between units (342-396 rpm). The horn speed depends on the pulley step (three choices) and belt
   tension **[paper, Henricksen; web]**.
@@ -153,7 +153,7 @@ scratchpad, `hammond/calcs.py`, `leslie_calc.py`); **[memory]** general knowledg
 
 | Source | Horn up | Horn down | Drum up | Drum down | Meaning |
 |---|---|---|---|---|---|
-| Leslie 2101mk2 preset 1 | 4.2 s | 3.4 s | 12 s | 12 s (brake 12) | "transition time", seconds **[web, L2101]** |
+| digital rotary speaker preset 1 | 4.2 s | 3.4 s | 12 s | 12 s (brake 12) | "transition time", seconds **[web, L2101]** |
 | 2101mk2 preset 2 / Japanese edition | 1.8-3.0 s | 2.4-3.0 s | 12-13 s | 5.5-12 s | same **[web, L2101]** |
 | setBfree | τ = 0.161 s | τ = 0.321 s | τ = 4.127 s | τ = 1.371 s | first-order time constants **[web, SBF]**; 95 % at 3τ = 0.48 / 0.96 / 12.4 / 4.1 s **[calc]** |
 | x42-whirl | | | | | its constants are "the time to reach half the speed" **[web, zynthian]** |
@@ -235,7 +235,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
     relatively lower amplitude modulation … Take the deflectors out though, and the FM will be
     lost, but you obtain very strong AM, especially at higher frequencies".
 - **Smith, Serafin, Abel, Berners [paper, SSAB02]:**
-  - The Leslie 600 horn was measured in free field at −180° to 180° in 15° steps (Golay codes, 256
+  - The rotary speaker horn was measured in free field at −180° to 180° in 15° steps (Golay codes, 256
     taps used), modelled with 5 principal components.
   - "Below 12 Barks or so, the angle-dependence is primarily to decrease amplitude as the horn
     points away from the listener, with high frequencies decreasing somewhat faster with angle than
@@ -245,7 +245,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
     first.
   - The dB-vs-angle curves are in their figures only (not tabulated).
 - **Herrera, Hanson, Abel [paper, HHA09 via JAES]:**
-  - A Leslie 44W measured in its cabinet with a spaced pair of B&K 4006 at 0.9° horn steps and
+  - A rotary speaker 44W measured in its cabinet with a spaced pair of B&K 4006 at 0.9° horn steps and
     2.7° baffle steps.
   - A dense tail of reflections in each response.
   - About **20 fixed filters**, crossfaded by angle, were enough. Interpolating irregular
@@ -258,7 +258,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
   - **Without the diffuser:** high band cos^4(ψ/2)-like (beamy), and r_h falling with f.
   - **Base leakage:** a fixed, angle-independent path at −12 dB (a guess; Smith's figure shows a
     clear early component).
-  - Fit all of it to any measured Leslie response the user can supply.
+  - Fit all of it to any measured rotary speaker response the user can supply.
 
 ### 6.3 The drum's directivity [paper, Henricksen; design]
 
@@ -282,7 +282,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
   - The compartment's axial modes are near **231 Hz (width) and 327 Hz (depth)**, and the height
     mode (~0.3 m tall) is ~570 Hz. These are damped by the louvres and the open back.
 - **Smith et al.:** "the first few early reflections are simply handled as additional sources …
-  a 'Leslie cabinet' reverberator for handling later reflections more statistically" **[paper,
+  a 'rotary speaker cabinet' reverberator for handling later reflections more statistically" **[paper,
   SSAB02]**.
 - **Herrera et al.** measured the reflections directly, in the IRs **[paper, HHA09]**.
 - **The bass compartment:** a box with louvres. The middle compartment is the woofer's vented
@@ -304,12 +304,12 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 - **Power.** 40 W **[paper, Henricksen; web, Hammond]**; Uneeda says "about 60 W". Plate supply
   "over 400 VDC" **[paper, Henricksen]**.
 - **The 147's drive level.** "Any source capable of delivering over 6 V into a load of 2.5 kΩ … will
-  be able to drive the Leslie amp to full power" **[paper, Henricksen]**.
+  be able to drive the rotary speaker amp to full power" **[paper, Henricksen]**.
 - **The character.** "When you really lean on it, it sounds even lovelier, with a warm rich
   distortion like nothing you've heard. The show organist at Circus-Circus, Las Vegas … runs his
-  Hammond B3 on 10, and just keeps the hammer down" **[paper, Henricksen]**.
-- **The schematic.** The Leslie 122 amplifier schematic is on elektrotanya behind a download gate
-  ("leslie_122_142_amplifier_sch.pdf"; also 122R, 122XB) **[web, ELT]**. It was **not read**, so
+  tonewheel organ on 10, and just keeps the hammer down" **[paper, Henricksen]**.
+- **The schematic.** The rotary speaker amplifier schematic is on elektrotanya behind a download gate
+  ("rotary_122_142_amplifier_sch.pdf"; also 122R, 122XB) **[web, ELT]**. It was **not read**, so
   no component values are given here.
 - **[design] The model:**
   - Driver: a grid-current soft clip on the 12AU7 (asymmetric).
@@ -322,13 +322,13 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
     a 30 Hz pedal tone and it shakes a lot" **[paper, Henricksen]**).
   - **The crossover is passive**, after the amp: 12 dB/oct at 800 Hz, loaded by 16 Ω drivers.
     Distortion products of bass notes above 800 Hz therefore go to the **horn**. That is part of
-    why an overdriven Leslie "spins" its distortion.
+    why an overdriven rotary speaker "spins" its distortion.
 
 ## 8. Microphones and stereo
 
 - **Practice [paper, Henricksen; web, Strymon]:**
   - "An RCA 77DX ribbon at back of the top rotor cabinet, about 8 inches from the treble horn."
-  - Or "a pair of tube U67s, located about 5 feet away from the Leslie, aimed midway between top
+  - Or "a pair of tube U67s, located about 5 feet away from the rotary speaker, aimed midway between top
     and bottom rotors, and spaced 10 feet apart".
   - Typical modern rock/jazz miking: "a pair of mics at the top of the cabinet at the horn and a
     single mic at the bottom to pick up the drum" **[web, Strymon]**.
@@ -348,10 +348,10 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 ## 9. The interface to the organ
 
 - **Signal.** The organ's AO-28 output transformer T3 feeds the 122 a balanced line-level signal
-  (`hammond_b3.md` §10.1). The model passes the console signal (volts) into the Leslie amp's input
+  (`tonewheel_organ.md` §10.1). The model passes the console signal (volts) into the rotary speaker amp's input
   stage, where the 122's volume control sets the drive **[design]**.
 - **Speed switching** **[design; web, L2101]**:
-  - **Slow/fast:** a Hammond half-moon switch (or the older separate switch) puts or removes the DC
+  - **Slow/fast:** a tonewheel organ half-moon switch (or the older separate switch) puts or removes the DC
     on the audio pair. In MIDI: **CC1 ≥ 64 → fast, < 64 → slow**, and **CC64 → fast while
     pressed** (the 2101's default slow/fast control code is 64, latching). The last one received
     wins.
@@ -359,34 +359,34 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
     (common modification). Map it to CC1 = 0 held for 1 s (the 2101 stops the rotors on a foot
     switch held > 1 s).
   - **Speed-change curves** come from §5.2, never instant.
-- **One Leslie per organ instance**, shared by all notes. Per-note processing is not physical.
+- **One rotary speaker per organ instance**, shared by all notes. Per-note processing is not physical.
 
 ## 10. The literature
 
 | Work | What it gives | Used here |
 |---|---|---|
-| Henricksen, "Unearthing the mysteries of the Leslie cabinet", *Recording Engineer/Producer*, Apr. 1981 | construction, crossover, amp, horn polar effects, drum = AM 200-800 Hz, mic setups | throughout |
-| Smith, Serafin, Abel, Berners, "Doppler simulation and the Leslie", DAFx-02 | the moving-source/listener delay-line method; Leslie 600 horn measurements, PCA, base leakage | §6.1, §6.2, §12 |
-| Herrera, Hanson, Abel, "Discrete time emulation of the Leslie speaker", AES 127th Conv., paper 7925 (2009) | 44W IRs at 0.9°/2.7° steps with a spaced mic pair; ~20 fixed filters; measured spin-up/down; spatial aliasing above 6 Hz | §5, §6.2 (via the JAES review; full paper not read) |
-| Pekonen, Pihlajamäki, Välimäki, "Computationally efficient Hammond organ synthesis", DAFx-11 | the Leslie as time-varying spectral delay filters | an alternative to delay lines |
-| Werner, Dunkel, Germain, DAFx-16 | the organ's vibrato line (not the Leslie) | `hammond_b3.md` §9 |
-| Dobbins, "A new approach to simulating the Leslie speaker" (IoA) | a cardioid-type rotating beam from a fixed array | a directivity sanity check (abstract only) |
+| Henricksen, "Unearthing the mysteries of the rotary speaker cabinet", *Recording Engineer/Producer*, Apr. 1981 | construction, crossover, amp, horn polar effects, drum = AM 200-800 Hz, mic setups | throughout |
+| Smith, Serafin, Abel, Berners, "Doppler simulation and the rotary speaker", DAFx-02 | the moving-source/listener delay-line method; rotary speaker horn measurements, PCA, base leakage | §6.1, §6.2, §12 |
+| Herrera, Hanson, Abel, "Discrete time emulation of the rotary speaker", AES 127th Conv., paper 7925 (2009) | 44W IRs at 0.9°/2.7° steps with a spaced mic pair; ~20 fixed filters; measured spin-up/down; spatial aliasing above 6 Hz | §5, §6.2 (via the JAES review; full paper not read) |
+| Pekonen, Pihlajamäki, Välimäki, "Computationally efficient tonewheel organ synthesis", DAFx-11 | the rotary speaker as time-varying spectral delay filters | an alternative to delay lines |
+| Werner, Dunkel, Germain, DAFx-16 | the organ's vibrato line (not the rotary speaker) | `tonewheel_organ.md` §9 |
+| Dobbins, "A new approach to simulating the rotary speaker" (IoA) | a cardioid-type rotating beam from a fixed array | a directivity sanity check (abstract only) |
 | setBfree / x42-whirl (F. Kilander, R. Gareus) | an open, widely used model: speeds, time constants, radii, filters (drum 812 Hz, horn 4.5 kHz/300 Hz) | §4, §5 |
-| Leslie 2101mk2 manual (Hammond-Suzuki) | the maker's own digital Leslie: speeds, rise/fall/brake times, 0.7/0.8/1.0 kHz crossover, "122" cabinet character | §4, §5, §9 |
+| digital rotary speaker manual (the organ maker) | the maker's own digital rotary speaker: speeds, rise/fall/brake times, 0.7/0.8/1.0 kHz crossover, "122" cabinet character | §4, §5, §9 |
 
 - **Not found:** a free-field or in-cabinet directivity table in numbers, a published horn
   rotation radius, the drum's dimensions, and the 122 amp's component values (schematic gated).
-  "Werner" and "Holters" on the Leslie itself: no Leslie paper by them was found. Werner's Hammond
+  "Werner" and "Holters" on the rotary speaker itself: no rotary speaker paper by them was found. Werner's tonewheel organ
   work is the vibrato line.
 
 ## 11. The user's recordings [rec]
 
-- **No Leslie found.** 26 tracks of the user's music likeliest to hold a Hammond/Leslie were split
+- **No rotary speaker found.** 26 tracks of the user's music likeliest to hold a tonewheel organ/Rotary were split
   with Demucs `htdemucs_6s`. They were screened for envelope lines at 0.5-1.2 Hz and 4.5-8 Hz that
   are not tempo harmonics and that differ between below and above 800 Hz (drum ≠ horn).
 - **The one candidate failed.** St Germain's *Sure Thing* (5.60 Hz) is a rhythmic loop: 7 × the bar
   rate, identical in both bands, steady for six minutes.
-- **Details:** `hammond_b3.md` §12.2. Speeds, ramp times and AM/FM depths therefore come from §4-§6
+- **Details:** `tonewheel_organ.md` §12.2. Speeds, ramp times and AM/FM depths therefore come from §4-§6
   only.
 
 ## 12. Model plan [design]
@@ -449,9 +449,9 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 - **CC1:** ≥ 64 fast, < 64 slow. **CC64:** fast while held (latch option).
 - **Stop:** optional (CC1 = 0 held 1 s).
 - **CC11:** the organ's expression (which drives the amp). It belongs to the organ, not here.
-- **Defaults per program** (from `hammond_b3.md` §13.3): GM 17 slow, GM 18 slow, GM 19 fast with
+- **Defaults per program** (from `tonewheel_organ.md` §13.3): GM 17 slow, GM 18 slow, GM 19 fast with
   high drive.
-- **No per-note control:** the Leslie is one shared mechanism.
+- **No per-note control:** the rotary speaker is one shared mechanism.
 
 ### 12.4 Costs [calc]
 
@@ -475,7 +475,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 5. The drum.
 6. The amp and crossover.
 7. The mics and stereo.
-8. The interface to the B-3 (`hammond_b3.md` §13).
+8. The interface to the tonewheel organ (`tonewheel_organ.md` §13).
 
 ### 12.6 Tests
 
@@ -497,26 +497,26 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 
 ## 13. Open questions for the user
 
-1. **A Leslie recording:** any track or clip with a clearly audible Leslie (ideally a speed change
+1. **A rotary speaker recording:** any track or clip with a clearly audible rotary speaker (ideally a speed change
    from chorale to tremolo, with the organ alone) would let us fit the rates, ramp times, AM/FM
    depths and the drum/horn balance. None of your music has one (§11).
-2. **Horn ramp:** fast (setBfree, ~0.5 s) or slow (Hammond-Suzuki 2101, 2-4 s)? A "belt age" knob
+2. **Horn ramp:** fast (setBfree, ~0.5 s) or slow (the organ maker 2101, 2-4 s)? A "belt age" knob
    covers both. Which default?
 3. **Diffuser in or out by default?** In is the stock 122 (more FM, gentler AM). Out with the back
    removed is the rock-club sound.
 4. **Mic setup:** a close horn pair plus a drum mic (studio), or a room pair (the audience)?
 5. **Stop/brake:** wanted, and how to trigger it from MIDI (CC1 = 0 held, or a separate CC)?
 6. **Drive:** should GM 19 drive the 122's amp hard (the Jon Lord sound), or add a separate guitar
-   amp (Marshall) in front, as Lord did? That would be a separate model.
-7. **147 or 122 only?** For the B-3 only the 122 matters. A 147 would let other instruments (GM 21
-   reed organ, guitar) use the Leslie. Should it be a general effect?
+   amp (British stack) in front, as Lord did? That would be a separate model.
+7. **147 or 122 only?** For the tonewheel organ only the 122 matters. A 147 would let other instruments (GM 21
+   reed organ, guitar) use the rotary speaker. Should it be a general effect?
 
 ## 14. Sources
 
 - **[Henricksen]** C. A. Henricksen, "Unearthing the mysteries of the Leslie cabinet", *Recording
   Engineer/Producer*, April 1981 (read in full).
   https://dannychesnut.com/Music/Leslie/LeslieMystery.html (originally at
-  theatreorgans.com/hammond/faq/mystery/mystery.html)
+  theatreorgans.com/tonewheel/faq/mystery/mystery.html)
 - **[SSAB02]** J. O. Smith, S. Serafin, J. Abel, D. Berners, "Doppler simulation and the Leslie",
   DAFx-02, Hamburg (read in full). https://ccrma.stanford.edu/~jos/doppler/dafx02.pdf ; the CCRMA
   pages https://ccrma.stanford.edu/~jos/pasp05/Leslie_Free_Field_Horn_Measurements.html and
@@ -566,7 +566,7 @@ J·dω/dt = τ_motor(ω) − b·ω − d·ω·|ω| − τ_brake,  dφ/dt = ω
 
 ## 15. Built (2026-11-17)
 
-`src/leslie.h`, `src/leslie.cc`, owned by the Hammond (`hammond_b3.md` §16).
+`src/rotary.h`, `src/rotary.cc`, owned by the tonewheel organ (`tonewheel_organ.md` §16).
 
 **Simplified from §12 [design]:**
 - **The amp:** an asymmetric tanh, its drive eased by a 0.1 s sag.
@@ -599,7 +599,7 @@ belt noise.
 | Uneven rotation within a turn | off-centre pulley, unbalanced rotor | speed × (1 + e cos(φ + a)) | horn e ~3 %, drum ~1.2 % |
 | Belt wobble | belt seam and stretch | speed × (1 + b cos φ_belt), the belt turning 2.6 (horn) / 2.3 (drum) × the rotor | 1 % / 0.6 % |
 | Hunting | induction motors' slip under load and mains | Ornstein-Uhlenbeck on the target speed, τ 0.5 / 0.8 s | fast 1 %, slow 3 % |
-| The dummy bell | the twin horn's sealed bell leaks | a source at the rotor's other end, facing out, with its own Doppler | −16 dB (`PJ_LESLIE_DUMMY`) |
+| The dummy bell | the twin horn's sealed bell leaks | a source at the rotor's other end, facing out, with its own Doppler | −16 dB (`PJ_ROTARY_DUMMY`) |
 | The horn's wind | turbulence off the spinning horn | 1.5-5 kHz noise × (ω/ω_fast)², sent through the horn | +9 dB idle, fast vs slow |
 | A loose panel | a louvre or back panel touching | a resonance (150-220 Hz, Q 15-25) driven by the bass under 200 Hz; what passes its clearance, high-passed, radiated | ~33 dB under the chord's highs at a loud rock bass |
 | Machinery | motor hum and rumble, amp hum, the speed relay | 120 / 28.75 / 60 Hz tones; a 4 ms 2.3 kHz click on a switch | relay +35 dB over the idle floor |
@@ -609,7 +609,7 @@ belt noise.
 The rotor's within-turn wobble could not be read back from the audio: the horn's 18 dB beam swing
 breaks a pitch tracker's lock in the dips. It is simple enough to check by reading the code.
 
-**Into the room (2026-11-17, the user: "the Leslie is not connected to the room, like mic'ed in a
+**Into the room (2026-11-17, the user: "the rotary speaker is not connected to the room, like mic'ed in a
 dead room from close proximity") [design]:**
 - **Before,** the room got the close microphones' mid as an ordinary point source. Its late field
   pulsed with the mics' tremolo, and the mics' side signal was added dry.
@@ -623,15 +623,15 @@ dead room from close proximity") [design]:**
 
   The late field is fed the rays' mean.
 - **The level balance.** The ensemble's level trim is the listener's alone (the room is fed
-  without it), so a quiet model with a big trim sounds drier than the rest. The Hammond's output
+  without it), so a quiet model with a big trim sounds drier than the rest. The the tonewheel organ's output
   was raised 14 dB and its trims lowered 10.9 dB (the other 3 dB make up the 4 m distance).
 - **Measured** (a held chord, fast, in the hall), room vs close mics: tail −18 vs −21 dB,
   left-right correlation 0.60; the horn band's level swing ~21 dB (the direct sound's beam).
 
 **Inside the horn compartment (2026-11-17, the user's observations of a 122; the sources) [web,
 design]:**
-- **The sources.** Hammond's own description: the louvres "reflect the resonance of inside sounds,
-  while simultaneously spreading the sounds outside" [web, Hammond]. A Leslie "vents the sound from
+- **The sources.** the tonewheel organ's own description: the louvres "reflect the resonance of inside sounds,
+  while simultaneously spreading the sounds outside" [web, Hammond]. A rotary speaker "vents the sound from
   within the box after the sound has bounced around inside" [web]. Smith and Serafin: the cabinet
   is a "multiply-reflecting enclosure", its comb filtering by delayed reflections "critical to a
   realistic simulation" of the chorus and phasing [paper, SSAB02]. Herrera, Hanson and Abel
@@ -674,11 +674,11 @@ slow to high speed"):**
   - the horn stays within 0.71..6.72 Hz around 0.82 / 6.6.
 - These replace the first-order time constants (0.5 / 0.8 s, 3.5 / 2.5 s), close to the clones'
   and to setBfree's ranges (§5).
-- **The planned nudge** (the user: "on long sustained notes, slightly accelerate the slow Leslie
+- **The planned nudge** (the user: "on long sustained notes, slightly accelerate the slow rotary speaker
   rotation and then go back to slow, an impulse of faster rotation around half the long note"):
   - The slow speed's target is ×1.6-2.4 from 45 % to 70 % of a note held ≥ 1.6 s and ≥ 2 beats,
     with no onset in its middle 60 %.
-  - Only where the plan has the Leslie slow, 8 s apart at least.
+  - Only where the plan has the rotary speaker slow, 8 s apart at least.
   - Applied by the clock: a long note has no events in its middle.
   - **Measured** on a 4 s note: the horn 0.82 → 1.82 Hz and back, the drum 0.66 → 1.37.
 - **The planned flick** (the user: "on long held chords, flick the fast speed on for a bit and go

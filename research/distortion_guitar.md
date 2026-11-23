@@ -3,16 +3,16 @@
 Status: research 2026-11-19; built the same day (README, "Electric guitars"): `-inst
 distortion-guitar` with the `slo` preset (the stages as a list with shelves, dividers, the cold
 clipper and the follower; 2× oversampling with first-order ADAA instead of 8×; the gate, with an
-adaptive quick close the chugs needed; the noise floor; presence and resonance; the V30 cabinet,
-fitted to FluidR3 rather than to Celestion's plot alone), the TS block (off by default), the GM-31
+adaptive quick close the chugs needed; the noise floor; presence and resonance; the 60 W British cabinet,
+fitted to FluidR3 rather than to British speaker's plot alone), the TS block (off by default), the GM-31
 palm rule, power-chord octave and wide vibrato; all of section 11's checks pass in
 `tools/test.py`, check 5 only as "more lines" (75 against 90, not 39 against 254). Not built: the
-`rectifier`, `jcm800-boost` and pedal presets, drop tunings, pinch harmonics, the Greenback
+`rectifier`, `crunch-stack-boost` and pedal presets, drop tunings, pinch harmonics, the 25 W British speaker
 refit, the option to drop thirds. It continues `research/electric_guitars.md`
 (below "EG"), which covers the program list (EG §2.5), palm muting (EG §8), pinch harmonics (EG
 §9.3), the amp module in general (EG §11), styles and presets (EG §12–13) and a listener's list
 (EG §15). This document does not repeat those; it goes deeper where GM 31 needs more than GM 30's
-`jcm800` preset. What is built and what this builds on: `src/guitar.*` (the Les Paul spec with the
+`crunchStack` preset. What is built and what this builds on: `src/guitar.*` (the twin-humbucker solid-body spec with the
 hot 8 H bridge humbucker, the palm, the pick), `src/guitarinst.*` (the guitarist), `src/guitaramp.*`
 (two triode stages, a tone stack after stage 1 or 2, a bright cap on the gain pot, a master, a
 push-pull stage with sag, cabinet biquads, 4× oversampling with the elliptic filter of
@@ -30,18 +30,18 @@ References are short keys in brackets (section 13); EG's keys ([PY09], [YehThesi
 [Koren96]) are listed in EG §19 and used here unchanged.
 
 **Short answer.** GM 31 is the late-80s/90s high-gain rig: a hot bridge humbucker into a cascaded
-preamp (four or five 12AX7 stages, one of them a "cold clipper", e.g. the Soldano SLO and its
-descendants, the Mesa Dual Rectifier and the Peavey 5150) or a boosted Marshall, a master-volume
-power stage that stays mostly clean, a closed 4×12 of Celestions, a close SM57, and a noise gate.
-The Soldano's overdrive channel, read stage by stage: 36 dB, a gain pot (−20 dB at half), 32 dB, a
+preamp (four or five 12AX7 stages, one of them a "cold clipper", e.g. the high-gain amp SLO and its
+descendants, the high-gain amp and the high-gain amp) or a boosted British stack, a master-volume
+power stage that stays mostly clean, a closed 4×12 of British speakers, a close dynamic microphone, and a noise gate.
+The high-gain amp's overdrive channel, read stage by stage: 36 dB, a gain pot (−20 dB at half), 32 dB, a
 cold stage of only ~5 dB (39 kΩ unbypassed cathode, bias −4 V, 0.1 mA, a 1.6 kHz plate roll-off),
 then a 37.8 dB stage that clips first, into a DC-coupled cathode follower; at half gain 3.4 mV peak
 at the jack already overdrives the last stage, 0.34 mV at full gain **[T, Kuehnel/ampbooks]**, so a
 humbucker's 0.5 V peak is 40–60 dB over the edge. "Tight" comes from what is kept out of the
 clipping stages: small coupling capacitors (2.2 nF: 72 Hz into 1 MΩ, 154 Hz into 470 kΩ **[E]**),
 small or partial cathode bypasses (bass 3–5 dB under treble below 90–170 Hz **[T, Kuehnel]**), and a
-Tube Screamer in front at drive 0 / level high (its gain is 1 + R2/4.7 kΩ only above 720 Hz
-**[T, YehThesis]**). Speakers: Celestion's own plots of the Vintage 30 and Greenback both show a
+mid-hump overdrive in front at drive 0 / level high (its gain is 1 + R2/4.7 kΩ only above 720 Hz
+**[T, YehThesis]**). Speakers: British speaker's own plots of the 60 W British speaker and 25 W British speaker both show a
 double peak at 2.3 and 3.1–3.2 kHz (+5 dB over 1 kHz), a dip between (2.6–2.7 kHz), and a fall of
 ~15 dB from 4 to 6.5 kHz **[T, Celestion plots]**; FluidR3's distortion-guitar samples show the same
 fingerprint (a 3.2 kHz peak +6 dB over 1 kHz, −10 dB at 5 kHz, −26 dB at 8 kHz, −38 dB at 10 kHz)
@@ -51,21 +51,21 @@ simulation]**; listeners rated distorted power chords 6.06/10, major 5.61, minor
 Aliasing: a hard clipper at gain 10 needs 12× oversampling for the aliasing that first-order
 antiderivative antialiasing (ADAA) reaches at 4×, second order at 3× **[T, PZL16]**. Build: generalise
 the two stages into a list of up to five, add the cold-clipper and cathode-follower forms, a TS
-pedal, a noise gate keyed from the guitar, resonance and presence on the power stage, a V30 4×12 +
-SM57 cabinet, 8× (or 4× + ADAA); the guitarist gets a GM 31 palm-mute rule and drop tuning.
+pedal, a noise gate keyed from the guitar, resonance and presence on the power stage, a 60 W British 4×12 +
+dynamic microphone cabinet, 8× (or 4× + ADAA); the guitarist gets a GM 31 palm-mute rule and drop tuning.
 
 ---
 
 ## 1. What GM 31 stands for, and what the sound sets do
 
 - **The rig the name points to** **[L]**: by 1991 (GM's year) "distortion" meant the
-  preamp-distortion amps of the 80s: Soldano SLO-100 (1987), Mesa/Boogie Mark series and later the
-  Dual Rectifier (1989–91), modded Marshalls (an extra gain stage in a JCM800), the Marshall JCM900
-  (1990) with diode clipping, the Peavey 5150 (1992, after GM). Played through a closed 4×12 and
+  preamp-distortion amps of the 80s: high-gain amp (1987), high-gain amp maker Mark series and later the
+  high-gain amp (1989–91), modded British stacks (an extra gain stage in a British crunch stack), the later British stack
+  (1990) with diode clipping, the high-gain amp (1992, after GM). Played through a closed 4×12 and
   close-miked. A distortion pedal (DS-1, RAT) into a clean-ish amp is the cheap version of the same.
-  The Roland list (EG §2.5) has "Dist.Gt.", "Power Guitar" and "Feedback Gt."; the XG list has
+  The one maker list (EG §2.5) has "Dist.Gt.", "Power Guitar" and "Feedback Gt."; the XG list has
   feedback variations: feedback belongs to the program **[T, EG]**.
-- **The Roland and Yamaha sets:** their samples cannot be read here; the SC-88Pro's insertion
+- **The one maker and one maker sets:** their samples cannot be read here; the SC-88Pro's insertion
   effects include "Distortion" with four amp-simulator types (Small, BltIn, 2-Stk, 3-Stk) **[T,
   SC-88Pro manual, via EG]**: the vendor's own model of the rig is "a stack".
 - **FluidR3's preset "Distortion Guitar"** (bank 0, program 30 counting from 0) read from the file
@@ -131,7 +131,7 @@ SM57 cabinet, 8× (or 4× + ADAA); the guitarist gets a GM 31 palm-mute rule and
 
 ## 2. High-gain preamps: topologies and values
 
-### 2.1 The Soldano SLO-100 overdrive channel (read stage by stage)
+### 2.1 The high-gain amp overdrive channel (read stage by stage)
 
 All values **[T, Kuehnel/ampbooks]** unless marked.
 
@@ -147,7 +147,7 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 | Cathode follower | DC-coupled to V2b's plate | | | −0.1 dB, 615 Ω out | | |
 | Send | 100 k / 1 k divider | | | −40 dB | | |
 | V3 (return) | 220 k / 378 V | 2.2 k fully bypassed | −1.75 V | | stays clean (needs +4.2 dBV, has +1.9) | |
-| Tone stack | Bassman-type, after the return's cathode follower, before the phase inverter | | | | values not given | |
+| Tone stack | tweed 4x10 amp-type, after the return's cathode follower, before the phase inverter | | | | values not given | |
 
 - **Sensitivity:** with the gain at half, 3.4 mV peak (−52.5 dBV) at the jack overdrives V2b; at
   full gain 340 µV (−72.5 dBV) **[T]**. A hot humbucker's 0.5 V peak (EG; README: "a single note
@@ -155,7 +155,7 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 - So the distortion is made mostly in **one** stage (V2b) plus the cathode follower it drives, after
   three stages that amplify, shape and pre-clip. The cold clipper clips its lower half at a few
   volts; V2b clips both ways. The DC-coupled follower adds its own soft compression when its grid
-  is pulled above its cathode ("a pleasing compression effect", a large part of the Soldano sound
+  is pulled above its cathode ("a pleasing compression effect", a large part of the high-gain amp sound
   **[S/L, Blais via Robinette]**).
 - **Where it filters:** the bright caps and the 1.6 kHz plate capacitor of the cold stage cut the
   fizz *before* the last clipping stage; partial cathode bypasses give 3–5 dB less bass than treble
@@ -164,32 +164,32 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 
 ### 2.2 The others, less exactly
 
-- **Marshall JCM800 2203/2204** (EG §11, the built `jcm800`): four triode sections: V1a, the gain
+- **British crunch stack/2204** (EG §11, the built `crunchStack`): four triode sections: V1a, the gain
   pot with its 470 pF bright cap, V1b cold (10 k unbypassed), V2a, then the DC-coupled cathode
-  follower into the Marshall stack; coupling capacitors 0.022 µF, 470 k grid leaks (faster recovery
-  of the coupling capacitors) **[S, Robinette/Blais]**. A **modded / "hot-rodded" JCM800** adds a
-  gain stage in front (a booster: the Soldano's V1a), so the cold stage then gets 30–40 dB more;
-  Soldano's 39 k cold stage replaced Marshall's 10 k because 10 k was "a bit too much" once a stage
+  follower into the British stack; coupling capacitors 0.022 µF, 470 k grid leaks (faster recovery
+  of the coupling capacitors) **[S, Robinette/Blais]**. A **modded / "hot-rodded" British crunch stack** adds a
+  gain stage in front (a booster: the high-gain amp's V1a), so the cold stage then gets 30–40 dB more;
+  high-gain amp's 39 k cold stage replaced British stack's 10 k because 10 k was "a bit too much" once a stage
   was added **[S, Blais via Robinette]**. Builders' first-stage coupling cap for high gain: **2.2–4.7
-  nF** **[S, Blais via Robinette]**; JCM800 lead: 0.0022 µF on one coupling **[S]**.
-- **Mesa/Boogie Dual Rectifier:** widely described as the Soldano circuit with the 39 k cold stage,
+  nF** **[S, Blais via Robinette]**; British crunch stack lead: 0.0022 µF on one coupling **[S]**.
+- **high-gain amp maker high-gain amp:** widely described as the high-gain amp circuit with the 39 k cold stage,
   the effects loop moved after the tone stack, an AC-coupled cathode follower, **no global negative
   feedback** (the presence control replaced by a treble-cut) **[S, Robinette]**; channel modes
   "Vintage"/"Modern"; 6L6 power tubes, a switchable bias for EL34; a switch between valve and
   silicon rectifiers (the valve one sags more) **[S/L]**. One reported Rectifier-family stage: 200 k
   plate, 1.8 k cathode, 394 V **[S, forum]**. No verified stage table was found (section 12).
-- **Peavey 5150 / 6505 lead channel:** players count six cascaded triode sections before the
+- **high-gain amp / 6505 lead channel:** players count six cascaded triode sections before the
   tone stack and two more before the power tubes **[S, forum]**; a 39 k cold stage **[S]**; 220 k
   plates; coupling caps mostly 0.022 µF with some small ones (a "C17" of 2.2 nF ∥ 470 k in the 5150,
   470 pF in the 5150 II **[S]**); a **plate-driven** tone stack (no cathode follower in front: more
   loss, a different curve) after an extra booster stage **[S, Robinette]**; a "resonance" and a
   "presence" on the power stage (section 6). Known among players as the tight one, the Rectifier as
   the loose, thick one **[L]**.
-- **Marshall JCM900 (4100, 2100) and later DSL/TSL:** the JCM900's high-gain channel adds diode
+- **later British stack (4100, 2100) and later DSL/TSL:** the later British stack's high-gain channel adds diode
   clipping (a pair of silicon diodes) after tube stages, in some versions only switched in at high
-  gain **[S, forum]**; the JCM900 SL-X and later DSL/TSL turn to Soldano-style cascades **[S/L]**.
+  gain **[S, forum]**; the later British stack SL-X and later DSL/TSL turn to high-gain amp-style cascades **[S/L]**.
   No schematic read.
-- **Peavey VTM (the switches that show the levers)** **[T, Kuehnel/ampbooks]**: a cathode resistor
+- **amp maker VTM (the switches that show the levers)** **[T, Kuehnel/ampbooks]**: a cathode resistor
   of 6.8 k (cold) or 6.8 k ∥ 4.7 k = 2.8 k; a "gain 2" switch that bypasses part of it at high
   frequencies only (1 k with 0.68 µF: treble gain up, bias unchanged); the first stage's bypass
   0.68 / 1.68 / 11.68 µF across 2.7 k (more capacitance: the bass shelf moves down, more bass into
@@ -199,7 +199,7 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 
 ### 2.3 Tight and loose: what to keep out of the clipping stages
 
-| Lever | Tight (modern metal: 5150, boosted Rectifier, Soldano with a TS) | Loose (classic, saggy: Rectifier "vintage", JCM800 without a boost) | Values |
+| Lever | Tight (modern metal: 5150, boosted Rectifier, high-gain amp with a TS) | Loose (classic, saggy: Rectifier "vintage", British crunch stack without a boost) | Values |
 |---|---|---|---|
 | Coupling caps into clipping stages | small | large | 2.2 nF into 1 M → 72 Hz; into 470 k → 154 Hz; 1 nF into 1 M → 159 Hz; 22 nF into 1 M → 7.2 Hz **[E]** |
 | Cathode bypass of the gain stages | small or partial (bass 3–5 dB under treble below 90–170 Hz) | large (25 µF: full bass gain to ~4 Hz) | 1.8 k ∥ 1 µF → 88 Hz; 1.8 k ∥ 0.68 µF → 130 Hz; 2.7 k ∥ 0.68 µF → 87 Hz **[E]** |
@@ -223,9 +223,9 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 
 ---
 
-## 3. Pedals in front: the Tube Screamer as a boost, the DS-1 and RAT
+## 3. Pedals in front: the mid-hump overdrive as a boost, the DS-1 and RAT
 
-### 3.1 Tube Screamer (TS808/TS9) into a high-gain amp
+### 3.1 mid-hump overdrive (mid-hump overdrive/TS9) into a high-gain amp
 
 - The circuit and values are in EG §11.8 **[T, YehThesis]**: the clipping op amp's gain is 1 +
   (51 k + D·500 k)/4.7 k above **720 Hz** (the 4.7 k / 0.047 µF leg to ground: 1/(2π·4.7k·47n) =
@@ -247,10 +247,10 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 
 ### 3.2 Distortion pedals instead of a high-gain amp
 
-- **Boss DS-1:** values in EG §11.8 **[T, YehThesis]**. Its diodes go to ground after a 2.2 k /
+- **hard-clipping distortion pedal:** values in EG §11.8 **[T, YehThesis]**. Its diodes go to ground after a 2.2 k /
   0.01 µF RC (7.2 kHz) and its tone control blends a 320 Hz low-pass with a 1.16 kHz high-pass:
   a scooped curve.
-- **ProCo RAT** (electrosmash still unreachable: DNS failure on 2026-11-19): an LM308 op-amp
+- **hard-clipping distortion** (electrosmash still unreachable: DNS failure on 2026-11-19): an LM308 op-amp
   stage whose gain is set by a 100 k pot against two legs to ground, **560 Ω + 4.7 µF** and **47 Ω
   + 2.2 µF** **[S, forum, search]**: corners 1/(2π·560·4.7µ) = **60 Hz** and 1/(2π·47·2.2µ) =
   **1.54 kHz** **[E]** (matching the "high-pass filters at 60 Hz and 1.5 kHz" in electrosmash's
@@ -259,7 +259,7 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
   LM308's slew rate (~0.3 V/µs **[M]**) and gain–bandwidth: at high gain the op amp cannot follow
   the highs: a built-in, level-dependent low-pass **[S]**; 100 pF across the feedback **[S]**; then
   1N914 (Rat 2: 1N4148) to ground (hard), a "filter" low-pass, a JFET output buffer **[S]**.
-- **For GM 31:** a pedal into a clean-ish amp is a second voice (DS-1/RAT + JCM800 at low gain).
+- **For GM 31:** a pedal into a clean-ish amp is a second voice (DS-1/RAT + British crunch stack at low gain).
   The amp-made preset is the main one (section 10).
 
 ---
@@ -277,10 +277,10 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
   compresses it upwards. Without a gate, every rest is filled with hiss and hum, and every chug's
   tail rings into the next.
 - **The pedals:**
-  - **Boss NS-2:** threshold and decay knobs, a "reduction/mute" switch, an expander below the
+  - **noise-gate pedal:** threshold and decay knobs, a "reduction/mute" switch, an expander below the
     threshold; −20 dBu nominal input, 1 MΩ input, 1 kΩ output **[S, manual via search]**. Its
     "decay" sets how long the sound takes to fade after the input falls below the threshold **[S,
-    Boss]**. No ranges in milliseconds were found.
+    one pedal maker]**. No ranges in milliseconds were found.
   - **ISP Decimator / Decimator II "G-string":** the detector listens to the guitar directly (a
     separate input before any distortion), the gate acts on the amp's effects loop (after the
     preamp): it opens on the clean, fast pick attack and closes on the guitar's own level, not on
@@ -303,41 +303,41 @@ All values **[T, Kuehnel/ampbooks]** unless marked.
 
 ## 5. Speakers, cabinet and microphone
 
-### 5.1 The speakers: Celestion's measured curves
+### 5.1 The speakers: British speaker's measured curves
 
-Read by eye from Celestion's published response plots (on-axis SPL, 1 W, the maker's test baffle;
+Read by eye from British speaker's published response plots (on-axis SPL, 1 W, the maker's test baffle;
 ±1 dB reading error) **[T, Celestion plots]**:
 
 | Hz | 50 | 100 | 200 | 350 | 500 | 1000 | 1300 | 1600 | 2300 | 2650 | 3150 | 4000 | 5000 | 6000 | 6500 | 8000 | 10000 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Vintage 30 (dB SPL) | 87.5 | 94.5 | 98.5 | 98 | 100.5 | 101 | 98.5 | 101 | **106** | 102.5 | **105.5** | 101.5 | 95 | 86 | 83 | 78 | 80 |
-| G12M Greenback | 87 | 95.5 | 97.5 | 95.5 | 98.5 | 98.5 | 97 | **95.5** | **105.5** | 100.5 | **107** | 100.5 | 95 | 86 | 78.5 | 79 | 80 |
+| 60 W British speaker (dB SPL) | 87.5 | 94.5 | 98.5 | 98 | 100.5 | 101 | 98.5 | 101 | **106** | 102.5 | **105.5** | 101.5 | 95 | 86 | 83 | 78 | 80 |
+| G12M 25 W British speaker | 87 | 95.5 | 97.5 | 95.5 | 98.5 | 98.5 | 97 | **95.5** | **105.5** | 100.5 | **107** | 100.5 | 95 | 86 | 78.5 | 79 | 80 |
 
 - **Both:** a double presence peak at 2.3 and 3.1–3.2 kHz with a 3.5–5 dB dip at 2.6–2.7 kHz
   between, and a fall of 15–20 dB from 4 to 6.5 kHz (≈ −25 to −30 dB/octave), a floor of break-up
   peaks around 75–80 dB above 7 kHz. Below 100 Hz both fall ~12 dB/octave in the baffle.
-- **Where they differ:** the Greenback has a dip at **1.6 kHz** (−3 dB under 1 kHz, 10 dB under its
+- **Where they differ:** the 25 W British speaker has a dip at **1.6 kHz** (−3 dB under 1 kHz, 10 dB under its
   2.3 kHz peak) and a lower-mid dip at 350 Hz, its 3.2 kHz peak is 1.5 dB higher and its fall to 6.5
-  kHz steeper: more "honk" and bite with a hollow in the upper mids. The V30's 500 Hz–1.6 kHz is
+  kHz steeper: more "honk" and bite with a hollow in the upper mids. The 60 W British stack's 500 Hz–1.6 kHz is
   flatter and 2 dB higher relative to its low end: the forward "mid" that players hear in it **[T
-  plots; L the words]**. Specs: both resonate at **75 Hz**; V30 70 Hz–5 kHz, 100 dB; Greenback 75
+  plots; L the words]**. Specs: both resonate at **75 Hz**; 60 W British 70 Hz–5 kHz, 100 dB; 25 W British speaker 75
   Hz–5 kHz, 98 dB **[T, Celestion]**.
 - **FluidR3's samples** (1) have the 3.2 kHz peak and a dip at 1.6–2 kHz: either speaker would fit;
-  the 1.6–2 kHz dip (−2 to −4 dB re 1 kHz) is closer to the Greenback's.
+  the 1.6–2 kHz dip (−2 to −4 dB re 1 kHz) is closer to the 25 W British speaker's.
 
 ### 5.2 The closed 4×12
 
 - **Closed back:** the box's air stiffens the cone: the resonance rises from the driver's 75 Hz to
   about 90–120 Hz with a bump, and below it the response falls at 12 dB/octave (a sealed box); no
   back wave, so none of the open-back's bass cancellation **[M/E]**. Players: "a tighter low end and,
-  often, subjectively less treble" **[S, SOS]**. Thiele-Small parameters for the V30 beyond Fs (75 Hz)
+  often, subjectively less treble" **[S, SOS]**. Thiele-Small parameters for the 60 W British beyond Fs (75 Hz)
   and Re (7.3 Ω) were not found, so the box's Q and bump cannot be computed here (section 12).
 - **Four speakers:** in the near field one speaker dominates the close mic; the others add at a few
   ms of delay at lower level: a mild comb in the room mic, not in the close one **[M]**.
 - **Cone break-up** dominates the sound above ~500 Hz and starts at "a few microvolts" of drive:
   it is linear and part of the speaker's fixed response **[S, SOS]**: a filter is right.
 
-### 5.3 The SM57
+### 5.3 The dynamic microphone
 
 - Its published response: flat-ish 200 Hz–2 kHz, a presence rise of ~+4 to +6 dB at 4–6 kHz, a
   fall above ~10 kHz, a bass roll-off below ~200 Hz that the proximity effect fills in at 2–5 cm
@@ -346,29 +346,29 @@ Read by eye from Celestion's published response plots (on-axis SPL, 1 W, the mak
   different, darker high end **[S, Shure via search]**; brighter towards the centre, darker towards
   the edge **[S, Sweetwater, Thomann]**. No measured dB difference was found; EG §11.5 estimated
   5–10 dB above 2 kHz **[M]**. The usual metal placement: on-axis, just off the dust cap, close
-  **[L]**; Herbst's recordings: SM57 "slightly off-centre, on-axis, close", Marshall 1960 4×12 with
+  **[L]**; Herbst's recordings: dynamic microphone "slightly off-centre, on-axis, close", British stack 1960 4×12 with
   V30s **[T, Herbst]**.
 
-### 5.4 Biquads for a "V30 closed 4×12, SM57 off-cap" [E]
+### 5.4 Biquads for a "60 W British closed 4×12, dynamic microphone off-cap" [E]
 
-Fitted by hand to 5.1 plus 5.2–5.3 (target: the V30 table, the closed-box bump and the 57's rise
+Fitted by hand to 5.1 plus 5.2–5.3 (target: the 60 W British table, the closed-box bump and the 57's rise
 cancelling some of the speaker's fall, then checked against FluidR3's pooled envelope in 1):
 
 | # | Type | f (Hz) | Q | Gain (dB) | Why |
 |---|---|---|---|---|---|
 | 1 | high-pass | 85 | 0.9 | | closed box below its resonance (12 dB/oct) |
 | 2 | peak | 110 | 1.2 | +3 | the box's bump, with proximity |
-| 3 | peak | 350 | 1.5 | −1.5 | (V30: −0.5 dB; Greenback: −2.5) |
-| 4 | peak | 1300 | 3 | −2.5 | the V30's small dip (Greenback: 1600 Hz, −4.5, Q 2) |
+| 3 | peak | 350 | 1.5 | −1.5 | (60 W British: −0.5 dB; 25 W British speaker: −2.5) |
+| 4 | peak | 1300 | 3 | −2.5 | the 60 W British stack's small dip (25 W British speaker: 1600 Hz, −4.5, Q 2) |
 | 5 | peak | 2300 | 4 | +5 | presence peak 1 |
 | 6 | peak | 3150 | 3.5 | +5 | presence peak 2 (the dip between follows) |
 | 7 | low-pass | 4600 | 1.1 | | the fall: −10 dB at 5.5 kHz with #8 |
 | 8 | low-pass | 6000 | 0.7 | | the steep part (together ≈ −24 dB/oct, −30 at 8 kHz) |
 | 9 | peak | 9500 | 4 | +4 | a break-up floor (optional) |
 
-The built Greenback cabinet (`cab_` for `cabinet == 1`: 72 Hz HP, +2 dB at 120, +4 at 1.8 kHz, +3
+The built 25 W British speaker cabinet (`cab_` for `cabinet == 1`: 72 Hz HP, +2 dB at 120, +4 at 1.8 kHz, +3
 at 3.3 kHz, −7 at 4.2 kHz, low-passes at 4.8 and 6.2 kHz) has its presence at 1.8 kHz where
-Celestion's plot has a dip at 1.6 kHz and only one peak at 3.3 kHz: worth re-fitting to the
+British speaker's plot has a dip at 1.6 kHz and only one peak at 3.3 kHz: worth re-fitting to the
 table above while GM 31 is built (section 10.5).
 
 ---
@@ -379,21 +379,21 @@ table above while GM 31 is built (section 10.5).
   the master sets how hard the power stage is driven. At home and in the studio it sits low: the
   power stage nearly clean, its contribution sag and soft compression on chord attacks; on stage
   higher: power-stage distortion and the speaker's own compression join in **[L]**. GM 31's preset:
-  power stage at the edge, like `jcm800`'s 0.6 master, not saturated **[E]**.
-- **EL34 vs 6L6** **[L]**: EL34 (Marshall, Soldano option): earlier, softer break-up with a mid
-  bark; 6L6/5881 (Mesa Rectifier, 5150, Soldano standard): more headroom, bigger low end, "scooped"
+  power stage at the edge, like `crunchStack`'s 0.6 master, not saturated **[E]**.
+- **EL34 vs 6L6** **[L]**: EL34 (British stack, high-gain amp option): earlier, softer break-up with a mid
+  bark; 6L6/5881 (high-gain amp maker Rectifier, 5150, high-gain amp standard): more headroom, bigger low end, "scooped"
   and tighter bass. As a model: the 6L6 stage clips later and more symmetrically; the EL34 earlier
   with a little more 3rd harmonic in the upper mids **[E]**. Koren's 6L6CG pentode constants are in
-  EG §11.2 **[T, Koren96]**. JCM800 2204 numbers: EL34s at ~460 V plate, −40 V grid bias, 40 mA idle,
+  EG §11.2 **[T, Koren96]**. British crunch stack 2204 numbers: EL34s at ~460 V plate, −40 V grid bias, 40 mA idle,
   3.2 kΩ plate-to-plate, ~60 V sag at full power, 64 W RMS before transformer loss, feedback 100 k
   from the 4 Ω tap ("about a factor of three" less feedback than the 47 k of the 1987) **[T,
   Kuehnel/ampbooks]**.
 - **Negative feedback, presence, resonance:**
   - Global feedback from the speaker tap to the phase inverter flattens the power stage and lowers
-    its output impedance; the amount varies: JTM45 about three times the Bassman's **[S, Robinette]**;
-    the Peavey VTM's phase-inverter-to-tap gain 18.7 dB with presence at minimum **[T, Kuehnel]**;
-    the Dual Rectifier has none **[S]**. Typical guitar amps: 6–12 dB of feedback **[M]**.
-  - **Presence:** a capacitor (Marshall: 0.1 µF with a 5 k pot; Peavey: 0.1–0.3 µF) shunts the
+    its output impedance; the amount varies: JTM45 about three times the tweed 4x10 amp's **[S, Robinette]**;
+    the amp maker VTM's phase-inverter-to-tap gain 18.7 dB with presence at minimum **[T, Kuehnel]**;
+    the high-gain amp has none **[S]**. Typical guitar amps: 6–12 dB of feedback **[M]**.
+  - **Presence:** a capacitor (British stack: 0.1 µF with a 5 k pot; amp maker: 0.1–0.3 µF) shunts the
     feedback divider at high frequencies, so above its corner the feedback falls and the gain rises,
     by up to the feedback amount: a shelf of +3 to +10 dB from ~2–5 kHz **[T values Kuehnel; E
     arithmetic: 1/(2π·4.7k·0.1µ) = 340 Hz for the cap's own corner, the shelf's audible part higher
@@ -404,7 +404,7 @@ table above while GM 31 is built (section 10.5).
     closed 4×12) **[S, forum]**: a bump of +3 to +8 dB at ~100 Hz, more low-frequency distortion in
     the power stage, a looser bass when overdone **[S/E]**. The 5150, Rectifier-era Mesas and most
     modern high-gain heads have it **[L]**.
-  - **Without feedback** (Rectifier, Vox) the voltage follows the speaker's impedance everywhere:
+  - **Without feedback** (high-gain, Vox) the voltage follows the speaker's impedance everywhere:
     a bump at resonance and a rise above ~2 kHz (voice-coil inductance) **[M]**: as resonance and
     presence turned fully up.
 - **Model** **[E]**: as built (`chain`: master, sag, push-pull soft clip) plus two shelves after
@@ -487,8 +487,8 @@ table above while GM 31 is built (section 10.5).
 | E minor (E2 G2 B2 E3) | 39 | 313 |
 | E5 with a G#3 on top | 31 | 182 |
 
-- **Listeners** **[T, Herbst]**: 171 listeners rated chords (C3 root; Laney, Marshall JCM2000,
-  Mesa Triaxis, Orange, 5150 into a V30 4×12): clean, overdrive, distortion: power chord 7.40 /
+- **Listeners** **[T, Herbst]**: 171 listeners rated chords (C3 root; British amp, British stack JCM2000,
+  high-gain amp maker Triaxis, Orange, 5150 into a 60 W British 4×12): clean, overdrive, distortion: power chord 7.40 /
   6.76 / **6.06**, major 7.52 / 6.64 / **5.61**, minor 6.96 / 5.05 / **3.89**, altered dominant
   6.06 / 4.40 / 3.35 (1–10). Going from overdrive to distortion mostly separated power from major;
   minor and complex chords had already fallen at overdrive. The "muddy major third" is mild; the
@@ -613,7 +613,7 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 ### 10.1 Stages: a list instead of two
 
 - `Preset::Stage stages[5]; int nStages;` replacing `s1, s2`; `stackAfter` becomes "after stage k"
-  (0: before all, as a pedal's place; nStages: after all, the Soldano/Rectifier position);
+  (0: before all, as a pedal's place; nStages: after all, the high-gain amp/Rectifier position);
   `volume`/`bright` stay the pot after stage 1. Each stage gains:
   - `shelfHz, shelfDb`: a partial cathode bypass as a first-order low shelf (bass `shelfDb` under
     treble below `shelfHz`); e.g. −3.2 dB at 169 Hz, −4.7 dB at ~130 Hz **[T values, Kuehnel]**.
@@ -632,18 +632,18 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 
 | Preset | Stage list (gain, bias, hp Hz, lp Hz, shelf) | Stack | Knobs | Power | Cabinet |
 |---|---|---|---|---|---|
-| `slo` (main GM 31) | V1a 60, 0, 10, —, −3 dB @ 170 → pot (gain 0.5 of a log pot, 2000 pF treble bypass, 470 k/500 k) → V1b 40, 0, 15, —, −4.5 dB @ 130; ×0.68 → V2a cold 2.4, −2.2, 30, 1600 ; ×0.77 → V2b 75, 0, 72, 9000 → follower | after all; Marshall values (Bassman-type not given) | T 0.6 M 0.5 B 0.6 | master 0.4; 6L6 (clip a little later and softer than EL34); resonance +4 dB, presence +3 dB | V30 4×12 + SM57 (5.4) |
+| `slo` (main GM 31) | V1a 60, 0, 10, —, −3 dB @ 170 → pot (gain 0.5 of a log pot, 2000 pF treble bypass, 470 k/500 k) → V1b 40, 0, 15, —, −4.5 dB @ 130; ×0.68 → V2a cold 2.4, −2.2, 30, 1600 ; ×0.77 → V2b 75, 0, 72, 9000 → follower | after all; British stack values (tweed 4x10 amp-type not given) | T 0.6 M 0.5 B 0.6 | master 0.4; 6L6 (clip a little later and softer than EL34); resonance +4 dB, presence +3 dB | 60 W British 4×12 + dynamic microphone (5.4) |
 | `slo-ts` | as `slo`, with a TS in front: drive 0, level such that above 720 Hz the amp sees +15 dB, tone 0.55 | | gain 0.35 (the TS adds the rest) | | |
-| `rectifier` (variation) | as `slo` with larger coupling (20 Hz) and full cathode bypasses (no shelves), no feedback: resonance +7, presence +6, sag 0.25 s and deeper (valve rectifier) | | T 0.5 M 0.35 B 0.7 (scooped) | | V30 4×12 |
-| `jcm800-boost` (variation) | the built `jcm800` with V1a's booster in front (a third stage, 36 dB) and the gain at 0.5 | Marshall | as `jcm800` | EL34 | Greenback 4×12 |
-| `ds1` / `rat` (later) | a pedal clipper (EG §11.8; section 3.2) into `twin` or `jcm800` at low gain | | | | |
+| `rectifier` (variation) | as `slo` with larger coupling (20 Hz) and full cathode bypasses (no shelves), no feedback: resonance +7, presence +6, sag 0.25 s and deeper (valve rectifier) | | T 0.5 M 0.35 B 0.7 (scooped) | | 60 W British 4×12 |
+| `crunch-stack-boost` (variation) | the built `crunchStack` with V1a's booster in front (a third stage, 36 dB) and the gain at 0.5 | British stack | as `crunchStack` | EL34 | 25 W British speaker 4×12 |
+| `ds1` / `rat` (later) | a pedal clipper (EG §11.8; section 3.2) into `twin` or `crunchStack` at low gain | | | | |
 
 - Gain staging check **[E from T]**: with `slo` the humbucker's 0.5 V should put V2b ~40 dB over
   its knee on a single note (2.1), a soft (velocity 30) note ~25 dB over: still fully distorted,
   only the attack and the noise differ.
 - Compressor: none on GM 31 (the amp compresses); the TS takes its place.
 
-### 10.3 The Tube Screamer block
+### 10.3 The mid-hump overdrive block
 
 - Input HP 15.9 Hz; the clipping stage as a one-capacitor ODE or a static curve: the added path
   `v = clip( (R2/4.7k) · HP720(x) ) ` with `R2 = 51k + D·500k`, the 51 pF low-pass on it, two 1N914
@@ -668,8 +668,8 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 
 - Two shelves after the power stage: resonance (peak, 100 Hz, Q 1.5, 0…+8 dB), presence (high shelf,
   3 kHz, 0…+8 dB) (6). A 6L6 / EL34 flag that moves the clip and its knee.
-- Cabinet type 2: "V30 closed 4×12, SM57 off-cap": section 5.4's nine biquads. Refit type 1
-  (Greenback) to Celestion's curve (the 1.6 kHz dip and the 2.3/3.2 kHz pair) and recheck GM 30
+- Cabinet type 2: "60 W British closed 4×12, dynamic microphone off-cap": section 5.4's nine biquads. Refit type 1
+  (25 W British speaker) to British speaker's curve (the 1.6 kHz dip and the 2.3/3.2 kHz pair) and recheck GM 30
   by ear.
 
 ### 10.6 Oversampling
@@ -683,7 +683,7 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 ### 10.7 The guitar and the guitarist
 
 - A new instrument name `distortion-guitar` (midifile.cc's kGm entry for GM 31 off `lead-charang`).
-- Guitar: the GM 30 Les Paul spec; the bridge humbucker as built (8 H, 13.5 kΩ: "hot"); optional
+- Guitar: the GM 30 twin-humbucker solid-body spec; the bridge humbucker as built (8 H, 13.5 kΩ: "hot"); optional
   an active-pickup variant (EMG 81-type: a low-impedance source, no coil resonance, ~1 V peaks **[L]**:
   `Source{L = 0}` or a low R/L) later.
 - Guitarist (`guitarinst.cc`, a `distorted_` flag beside `driven_`): pick over the bridge pickup
@@ -695,8 +695,8 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 
 ### 10.8 Cost
 
-- 4–5 stages + TS + gate at 4× (or 8×): about 2–2.5× the `jcm800` chain's stage cost; the
-  `jcm800` instrument costs 2.4–3.7 % of a core in total with the guitar **[README]**, so GM 31
+- 4–5 stages + TS + gate at 4× (or 8×): about 2–2.5× the `crunchStack` chain's stage cost; the
+  `crunchStack` instrument costs 2.4–3.7 % of a core in total with the guitar **[README]**, so GM 31
   ≈ 3.5–5.5 % at 4× + ADAA, 5–8 % at 8× **[E]**. Against EG §14's target of ≤ 3 %, ADAA is the
   route that may meet it.
 
@@ -734,16 +734,16 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 
 ## 12. Not found, or uncertain
 
-- **Verified stage tables for the Mesa Dual Rectifier, the Peavey 5150 and the JCM900/DSL:** only
+- **Verified stage tables for the high-gain amp, the high-gain amp and the later British stack/DSL:** only
   forum reports (values marked [S]); a DIY Rectifier clone's schematic image could not be
-  downloaded. Only the Soldano was read stage by stage (Kuehnel's analysis), and even there the
+  downloaded. Only the high-gain amp was read stage by stage (Kuehnel's analysis), and even there the
   tone-stack values and the master were not given.
-- **Electrosmash** (TS808, RAT, DS-1, Fuzz Face analyses): still unreachable (DNS failure). Geofex's
-  "Technology of the Tube Screamer" reset the connection. The RAT numbers are search snippets and
+- **Electrosmash** (mid-hump overdrive, RAT, DS-1, germanium fuzz analyses): still unreachable (DNS failure). Geofex's
+  "Technology of the mid-hump overdrive" reset the connection. The RAT numbers are search snippets and
   arithmetic.
-- **Boss NS-2 and ISP Decimator time constants:** not published as numbers in what was found; the
+- **noise-gate pedal and ISP Decimator time constants:** not published as numbers in what was found; the
   gate settings are producers' practice.
-- **SM57 position effect in dB, measured 4×12 responses (closed box bump frequency and Q), V30
+- **dynamic microphone position effect in dB, measured 4×12 responses (closed box bump frequency and Q), 60 W British
   Thiele–Small parameters** beyond Fs and Re: not found.
 - **Presence and resonance curves** of real amps in dB: only component values; the dB figures are
   arithmetic and [M].
@@ -752,7 +752,7 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 - **Palm-mute practice on GM 31** (how often, how heavy, how players decide): no study; the rule in
   8.2 is an estimate. Guitar Pro's MIDI export of palm mutes: from memory.
 - **Vibrato widths and rates of rock/metal guitarists:** no measurement found.
-- **The Roland and Yamaha distortion-guitar samples:** not accessible; only names (EG).
+- **The one maker and one maker distortion-guitar samples:** not accessible; only names (EG).
 - **ADAA higher-order numbers** (Bilbao et al. 2017): the abstract only; PZL16's table read.
 - **The simulations in 7 and 8.1** are idealised (one tanh, synthetic tones): they rank options,
   they do not predict the amp's numbers.
@@ -805,7 +805,7 @@ Mapped onto `src/guitaramp.h/.cc`. All values **[E]** unless cited.
 - **[RAT]** cushychicken, "Simulating the ProCo RAT in LTSpice", https://cushychicken.github.io/ltspice-proco-rat (not read);
   electrosmash, https://electrosmash.com/proco-rat (unreachable); diystompboxes thread on the
   560 Ω/4.7 µF leg, https://diystompboxes.com/smfforum/index.php?msg=797495
-- **[Forums: Rectifier, 5150, JCM900, resonance]** (values marked [S]):
+- **[Forums: Rectifier, 5150, later British stack, resonance]** (values marked [S]):
   https://music-electronics-forum.com/forum/amplification/guitar-amps/maintenance-troubleshooting-repair/41574 ;
   https://www.rig-talk.com/forum/threads/some-questions-about-the-original-peavey-5150.89154/ ;
   https://www.audunmelbye.no/2012/10/10/peavey-5150-6505-series-mods/ ;

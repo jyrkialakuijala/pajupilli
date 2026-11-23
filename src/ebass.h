@@ -1,7 +1,7 @@
 // The electric bass (-inst electric-bass; General MIDI program 34, "Electric Bass (finger)";
-// research/bass_section.md): a Fender Jazz Bass played fingerstyle. The electric guitar's model
+// research/bass_section.md): a two-pickup bass played fingerstyle. The electric guitar's model
 // (guitar.h) with four strings and the bass's numbers:
-//   - 34 in. (864 mm), 20 frets, D'Addario EXL170 (45-65-80-100) roundwounds: tensions 155-216 N,
+//   - 34 in. (864 mm), 20 frets, standard EXL170 (45-65-80-100) roundwounds: tensions 155-216 N,
 //     B from 3.5e-5 (G, measured) to ~2e-4 (E) (2.1-2.2). Each partial's loss from the string's
 //     internal damping and the neck's support (Fleischer): the open E's fundamental rings ~20 s,
 //     the partials die about in proportion to their frequency, 0.4-1 s at 8 kHz (Kemp). Modes to
@@ -12,9 +12,9 @@
 //     spacing); both full up: two coils in parallel, the scooped "both up" sound (the notch
 //     near the open E's 8th harmonic). A coil 3.3 H, 7.4 kOhm, ~90 pF; 250 k pots (two volumes,
 //     one tone), the cable 700 pF, into a 1 MOhm input: a resonance near 4.4 kHz, Q ~1.7 (3.3).
-//   - What comes out (research/bass_amps.md 10.1, src/guitaramp.h's "b15-di"): the pickups on a
-//     splitter into an active DI and an Ampeg B-15N (0.9 MOhm between them), the B-15's 1x15
-//     miked with an RE20, the two blended half and half (lined up), then an LA-2A at 3:1.
+//   - What comes out (research/bass_amps.md 10.1, src/guitaramp.h's "fliptop-di"): the pickups on a
+//     splitter into an active DI and an fliptop bass amp (0.9 MOhm between them), the fliptop's 1x15
+//     miked with an broadcast dynamic microphone, the two blended half and half (lined up), then an optical compressor at 3:1.
 //     PJ_EBASS_DI=1: the DI alone, as it was (the coils into 1 MOhm, nothing after).
 // The bassist: each note to a string and fret (low on the neck, open strings welcome, near the
 // hand); the index and middle fingers in turn while notes come quickly, rest strokes between the
@@ -26,11 +26,11 @@
 // along). Pitch bend bends the last note's string.
 //
 // The pick bass (-inst pick-bass; GM 35, "Electric Bass (pick)"; research/pick_bass.md): the
-// same strings and neck on a Fender Precision (src/bassspec.cc precisionBass(): one split coil,
+// same strings and neck on a split-coil bass (src/bassspec.cc splitCoilBass(): one split coil,
 // the E/A half 149 mm from the saddle, the D/G half 124 mm, 6.4 H, 10.5 kOhm; one volume, one
 // tone; PJ_PBASS_FLATS=1 flatwounds), the same fretting hand (BassLinePlayer), a pick held by a
-// hand instead of the fingers (PickBassPlayer, Guitar::pickContact), into an Ampeg SVT and its
-// 8x10 with the DI, an 1176 (guitaramp.h's "svt").
+// hand instead of the fingers (PickBassPlayer, Guitar::pickContact), into an bass stack and its
+// 8x10 with the DI, a FET compressor (guitaramp.h's "bass-stack").
 #pragma once
 
 #include <memory>
@@ -46,8 +46,8 @@ namespace pajupilli {
 bool electricBassInstrument(const Instrument& inst);  // the finger bass, the pick bass, the slap basses
 bool pickBassInstrument(const Instrument& inst);
 int slapBassInstrument(const Instrument& inst);  // 1: GM 37, 2: GM 38, 0: neither
-GuitarSpec jazzBass();
-GuitarSpec precisionBass();
+GuitarSpec twoPickupBass();
+GuitarSpec splitCoilBass();
 
 class ElectricBassModel : public Tube {
  public:
@@ -157,7 +157,7 @@ class PickBassPlayer : public BassLinePlayer {
 };
 
 // GM 37 and 38, the slap basses (research/slap_bass_1.md 5.3-5.5, slap_bass_2.md 5.2, 6): the
-// same Jazz Bass with its frets as obstacles (Guitar's fretContact), slapped and popped. Each note:
+// same two-pickup bass with its frets as obstacles (Guitar's fretContact), slapped and popped. Each note:
 //   - a ghost (low velocity, short): the fretting hand lies on the string unpressed (a deep mute
 //     where it lies), and the right hand strikes all the same: a pitchless click off the frets;
 //   - a hammer-on or pull-off (a step of 1-3 semitones on the string still held, soon after,

@@ -17,8 +17,8 @@
 namespace pajupilli {
 
 bool guitarInstrument(const Instrument& inst);
-bool guitarHarmonics(const Instrument& inst);  // GM 32: the clean Strat played in harmonics
-bool jazzGuitarInstrument(const Instrument& inst);  // GM 27: the ES-175 (src/jazzguitar.h's player)
+bool guitarHarmonics(const Instrument& inst);  // GM 32: the clean three-pickup solid-body played in harmonics
+bool jazzGuitarInstrument(const Instrument& inst);  // GM 27: the laminated archtop (src/jazzguitar.h's player)
 
 class GuitarModel : public Tube {
  public:
@@ -230,7 +230,7 @@ class GuitarPlayer : public Performer {
   int velOf_[Guitar::kStrings] = {};
 };
 
-// GM 32, Guitar Harmonics (research/electric_guitars.md 2.6, 9): the clean Stratocaster on its
+// GM 32, Guitar Harmonics (research/electric_guitars.md 2.6, 9): the clean three-pickup solid-body on its
 // middle pickup (the neck pickup sits on the open strings' 4th-harmonic node), into the Twin.
 // Every note is a harmonic, at the pitch written:
 //   - Where: a natural harmonic if there is one (the open string touched at the 12th fret,

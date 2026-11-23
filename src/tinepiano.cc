@@ -1,4 +1,4 @@
-#include "rhodes.h"
+#include "tinepiano.h"
 #include "heard.h"
 
 #include <algorithm>
@@ -10,7 +10,7 @@
 
 namespace pajupilli {
 
-bool rhodes(const Instrument& inst) { return std::strcmp(inst.name, "electric-piano-1") == 0; }
+bool tinepiano(const Instrument& inst) { return std::strcmp(inst.name, "electric-piano-1") == 0; }
 
 namespace {
 
@@ -22,7 +22,7 @@ double through(const double (*pts)[2], int n, double key) {
   return pts[n - 1][1];
 }
 
-// The tine lengths (mm): the factory's cutting sheet for the 73's keys E1 .. E7 (research/rhodes.md
+// The tine lengths (mm): the factory's cutting sheet for the 73's keys E1 .. E7 (research/tinepiano.md
 // 3.2; its two misprints, keys 33 and 48-50, smoothed), the 88's A0 .. D#1 on E1's tine, F7 .. C8
 // from the manual's chart less its 1 mm offset.
 const double kLen73[73] = {156.4, 152.4, 148.4, 143.7, 140.5, 135.7, 131.4, 128.6, 125.8, 121.4, 117.9, 113.1,
@@ -115,14 +115,14 @@ constexpr double kRhoA = 7850 * M_PI * 0.762e-3 * 0.762e-3;  // the swaged tine'
 
 }  // namespace
 
-RhodesModel::RhodesModel(const Instrument& inst) : Tube(inst), dt_(1.0 / inst.fs) {
-  static const double kWear = knob("PJ_RHODES_WEAR", 1.0);     // the keys' scatter (0: all as the tables)
-  static const double kGap = knob("PJ_RHODES_GAP", 1.0);       // x every gap (smaller: more bark, louder)
-  static const double kDelta = knob("PJ_RHODES_VOICING", 1.0); // x the offset over the pole's edge (smaller: bell / overtones)
-  static const double kP = knob("PJ_RHODES_P", 1.25);          // the bell's exponent
-  static const double kBarQ = knob("PJ_RHODES_BAR_Q", 40);
-  static const double kSideDb = knob("PJ_RHODES_SIDE_DB", -20);  // the sideways polarisation's share
-  suitcase_ = knob("PJ_RHODES_SUITCASE", 1) > 0;
+TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / inst.fs) {
+  static const double kWear = knob("PJ_TINEPIANO_WEAR", 1.0);     // the keys' scatter (0: all as the tables)
+  static const double kGap = knob("PJ_TINEPIANO_GAP", 1.0);       // x every gap (smaller: more bark, louder)
+  static const double kDelta = knob("PJ_TINEPIANO_VOICING", 1.0); // x the offset over the pole's edge (smaller: bell / overtones)
+  static const double kP = knob("PJ_TINEPIANO_P", 1.25);          // the bell's exponent
+  static const double kBarQ = knob("PJ_TINEPIANO_BAR_Q", 40);
+  static const double kSideDb = knob("PJ_TINEPIANO_SIDE_DB", -20);  // the sideways polarisation's share
+  suitcase_ = knob("PJ_TINEPIANO_SUITCASE", 1) > 0;
   const double fs = inst.fs;
   keys_.resize(kKeys);
   for (int k = 0; k < kKeys; ++k) {
@@ -195,14 +195,14 @@ RhodesModel::RhodesModel(const Instrument& inst) : Tube(inst), dt_(1.0 / inst.fs
     K.alpha = 2.8;
     K.k = 1.5e11 * tipE(midi) / 5.5;
     K.mu = 0.6;
-    K.M = knob("PJ_RHODES_HAMMER_G", 11) * 1e-3;
+    K.M = knob("PJ_TINEPIANO_HAMMER_G", 11) * 1e-3;
   }
   // The action: each key's hammer speed scaled so that a blow at 1 m/s leaves its tine's tip
-  // moving at PJ_RHODES_TIP m/s (the Rhodes is built for an even touch: the same tip speed, so
-  // an amplitude ~ 1 / f, the bass barking first; research/rhodes.md 4.1): a test blow on each
+  // moving at PJ_TINEPIANO_TIP m/s (the TinePiano is built for an even touch: the same tip speed, so
+  // an amplitude ~ 1 / f, the bass barking first; research/tinepiano.md 4.1): a test blow on each
   // key at rest.
   {
-    static const double kTip = knob("PJ_RHODES_TIP", 3.0);
+    static const double kTip = knob("PJ_TINEPIANO_TIP", 3.0);
     for (Key& K : keys_) {
       Key T = K;
       T.awake = true;
@@ -224,7 +224,7 @@ RhodesModel::RhodesModel(const Instrument& inst) : Tube(inst), dt_(1.0 / inst.fs
       }
       const double tipV = T.m[0].w * std::hypot(T.m[0].re, T.m[0].im);
       // (below C3 the tip's speed falls with the pitch: the bass's swing stays ~3 mm at mezzo-forte,
-      // its A / w ~1 there, 2 .. 3 at fortissimo: research/rhodes.md 12.1)
+      // its A / w ~1 there, 2 .. 3 at fortissimo: research/tinepiano.md 12.1)
       const double f0 = K.m[0].w / (2 * M_PI);
       const double target = kTip * std::min(1.0, f0 / 131.0);
       K.action = tipV > 0 ? std::clamp(target / tipV, 0.05, 5.0) : 1.0;
@@ -257,7 +257,7 @@ RhodesModel::RhodesModel(const Instrument& inst) : Tube(inst), dt_(1.0 / inst.fs
   for (double& e : humEps_) e = 0.05 * urand(h);
 }
 
-void RhodesModel::resetAir() {
+void TinePianoModel::resetAir() {
   Tube::resetAir();
   for (Key& K : keys_) {
     for (Mode& m : K.m) m.re = m.im = 0;
@@ -269,7 +269,7 @@ void RhodesModel::resetAir() {
   side_.clear();
 }
 
-const float* RhodesModel::takeSide(int n) {
+const float* TinePianoModel::takeSide(int n) {
   sideOut_.assign(n, 0.0f);
   const int have = int(side_.size()), m = std::min(n, have);
   std::copy(side_.end() - m, side_.end(), sideOut_.end() - m);
@@ -277,7 +277,7 @@ const float* RhodesModel::takeSide(int n) {
   return sideOut_.data();
 }
 
-void RhodesModel::strike(int key, double speed) {
+void TinePianoModel::strike(int key, double speed) {
   if (key < 0 || key >= kKeys) return;
   Key& K = keys_[key];
   // The hammer leaves its rest under the tine's swing: it meets the tine where the tine is.
@@ -296,22 +296,22 @@ void RhodesModel::strike(int key, double speed) {
   K.quiet = 0;
 }
 
-void RhodesModel::damp(int key, bool on) {
+void TinePianoModel::damp(int key, bool on) {
   if (key < 0 || key >= kKeys) return;
   keys_[key].dampTarget = on ? 1 : 0;
 }
 
-inline void RhodesModel::rotate(Mode& m, bool sub) {
+inline void TinePianoModel::rotate(Mode& m, bool sub) {
   const double c = sub ? m.cs : m.c, s = sub ? m.ss : m.s, d = sub ? m.ds : m.d;
   const double re = m.re, im = m.im;
   m.re = d * (c * re - s * im);
   m.im = d * (s * re + c * im);
 }
 
-float RhodesModel::sample() {
-  static const double kRetreat = knob("PJ_RHODES_RETREAT", 1.0);  // the hammer's fall after a blow (m/s)
-  static const double kEmf = knob("PJ_RHODES_GAIN", 2.0e-4);
-  static const double kHum = knob("PJ_RHODES_HUM", 1.0), kMains = knob("PJ_MAINS_HZ", 50);
+float TinePianoModel::sample() {
+  static const double kRetreat = knob("PJ_TINEPIANO_RETREAT", 1.0);  // the hammer's fall after a blow (m/s)
+  static const double kEmf = knob("PJ_TINEPIANO_GAIN", 2.0e-4);
+  static const double kHum = knob("PJ_TINEPIANO_HUM", 1.0), kMains = knob("PJ_MAINS_HZ", 50);
   const double dts = dt_ / kSub;
   double emf = 0;
   for (Key& K : keys_) {
@@ -344,11 +344,11 @@ float RhodesModel::sample() {
       }
       if (++K.hammerT > int(0.1 / dt_) || (K.vh < 0 && K.xh < -6e-3)) {
         K.hammer = false;
-        static const bool kDebug = knob("PJ_RHODES_DEBUG", 0) > 0;
+        static const bool kDebug = knob("PJ_TINEPIANO_DEBUG", 0) > 0;
         if (kDebug) {
           double a = 0;
           for (int n = 0; n < K.nm; ++n) a += std::hypot(K.m[n].re, K.m[n].im);
-          say(stderr, "rhodes key %d: contact %.2f ms, tip %.2f mm (A/w %.2f)\n", int(&K - &keys_[0]) + kLowest,
+          say(stderr, "tinepiano key %d: contact %.2f ms, tip %.2f mm (A/w %.2f)\n", int(&K - &keys_[0]) + kLowest,
                        K.contact * 1e3, a * 1e3, a / K.w);
         }
       }
@@ -453,33 +453,33 @@ float RhodesModel::sample() {
 
 // --- The player.
 
-RhodesPlayer::RhodesPlayer(RhodesModel& m) : Performer(m), m_(m) {}
+TinePianoPlayer::TinePianoPlayer(TinePianoModel& m) : Performer(m), m_(m) {}
 
-void RhodesPlayer::noteOn(int midi, int velocity) {
-  if (midi < RhodesModel::kLowest || midi >= RhodesModel::kLowest + RhodesModel::kKeys) return;
+void TinePianoPlayer::noteOn(int midi, int velocity) {
+  if (midi < TinePianoModel::kLowest || midi >= TinePianoModel::kLowest + TinePianoModel::kKeys) return;
   articulate(midi, velocity, false);
   keyDown_[midi] = true;
   note_ = midi;
   blowing_ = true;
   // The hammer's speed: 0.1 .. 1.6 m/s (the mezzo-forte C3's tine swinging ~3 mm at its tip).
-  static const double kVmax = knob("PJ_RHODES_VMAX", 1.6);
+  static const double kVmax = knob("PJ_TINEPIANO_VMAX", 1.6);
   const double v = kVmax * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3) * hardness_;
-  m_.strike(midi - RhodesModel::kLowest, std::max(0.03, v));
+  m_.strike(midi - TinePianoModel::kLowest, std::max(0.03, v));
 }
 
-void RhodesPlayer::noteOff(int midi) {
+void TinePianoPlayer::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
   keyDown_[midi] = false;
-  if (!hold_) m_.damp(midi - RhodesModel::kLowest, true);
+  if (!hold_) m_.damp(midi - TinePianoModel::kLowest, true);
 }
 
-void RhodesPlayer::setHold(bool h) {
+void TinePianoPlayer::setHold(bool h) {
   hold_ = h;
-  for (int k = RhodesModel::kLowest; k < RhodesModel::kLowest + RhodesModel::kKeys; ++k)
-    if (!keyDown_[k]) m_.damp(k - RhodesModel::kLowest, !h);
+  for (int k = TinePianoModel::kLowest; k < TinePianoModel::kLowest + TinePianoModel::kKeys; ++k)
+    if (!keyDown_[k]) m_.damp(k - TinePianoModel::kLowest, !h);
 }
 
-bool RhodesPlayer::setKnob(int k, double x) {
+bool TinePianoPlayer::setKnob(int k, double x) {
   if (k == 2) {  // K3: the vibrato's speed (2.0 .. 6.6 Hz, the Peterson's range)
     rate_ = 2.0 * std::pow(3.3, x);
     return true;
@@ -491,8 +491,8 @@ bool RhodesPlayer::setKnob(int k, double x) {
   return false;
 }
 
-void RhodesPlayer::render(float* out, int n) {
-  static const double kRate = knob("PJ_RHODES_VIB_HZ", 4.5), kDepth = knob("PJ_RHODES_VIB", 0.5);
+void TinePianoPlayer::render(float* out, int n) {
+  static const double kRate = knob("PJ_TINEPIANO_VIB_HZ", 4.5), kDepth = knob("PJ_TINEPIANO_VIB", 0.5);
   constexpr int kBlock = 32;
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);

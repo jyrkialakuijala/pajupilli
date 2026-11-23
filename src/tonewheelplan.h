@@ -1,4 +1,4 @@
-// A Hammond part's plan from a MIDI file (-play), made by rules from its notes: which notes the
+// A Tonewheel part's plan from a MIDI file (-play), made by rules from its notes: which notes the
 // pedals take, which the lower manual, which the upper, and the drawbars for the piece.
 //
 //   - Lines: the part's tracks. A low, mostly one-note-at-a-time line (under ~D3 on average) is the
@@ -14,7 +14,7 @@
 //     rock organ 888800000 driven; the lower manual a comping 838 (808 under a soft upper), the
 //     pedals 8 / 3 (8 / 5 when there is no pedal line to carry, the bass then on the lower).
 //   - Three lines (an organist's three staves): the lowest the pedals, the other two the manuals.
-//   - The Leslie: the file's own controls if it has them; else planned from the notes (seeded by
+//   - The Rotary: the file's own controls if it has them; else planned from the notes (seeded by
 //     them: the same file, the same plan): most pieces slow throughout, about one in four fast in
 //     its strongest phrase (or two).
 //   - The harmonic percussion where the tune is single, detached and moving (the jazz line), not
@@ -26,10 +26,10 @@
 //   - The vibrato tabs: the chorus on both manuals, off for counterpoint (the lines straight), off
 //     on the lower manual when it carries the bass.
 //   - Preset keys: a re-registration at a short pause at once (the B key), not pulled.
-//   - The ending: on a long final chord the Leslie up and winding down (or down, if fast), the
+//   - The ending: on a long final chord the Rotary up and winding down (or down, if fast), the
 //     expression closing on a ballad or swelling otherwise, two more drawbars out (not a ballad);
 //     the rock organ's sometimes ending with the run switch off: the pitch sinking.
-//   - A glissando up the white keys into the first note of a climax (where the Leslie goes fast).
+//   - A glissando up the white keys into the first note of a climax (where the Rotary goes fast).
 #pragma once
 
 #include <array>
@@ -39,26 +39,26 @@
 #include <string>
 #include <vector>
 
-#include "hammond.h"
+#include "tonewheel.h"
 
 namespace pajupilli {
 
-struct HammondNote {
+struct TonewheelNote {
   int line;          // channel * 1000 + track
   long on, off;      // ticks
   int pitch, vel, ch;
   int expr = 127;    // its channel's expression (CC11) when it began
-  int forced = -1;   // a division its instrument routes it to (hammond-upper-manual ...), or -1
+  int forced = -1;   // a division its instrument routes it to (tonewheel-upper-manual ...), or -1
 };
 
-struct HammondPlan {
-  // (channel * 128 + pitch, on-tick) -> HammondModel::Division
+struct TonewheelPlan {
+  // (channel * 128 + pitch, on-tick) -> TonewheelModel::Division
   std::map<std::pair<int, long>, int> division;
-  HammondRegistration reg;
-  // The Leslie's planned speed changes (tick, fast); empty when the file sets it itself.
-  std::vector<std::pair<long, bool>> leslie;
-  // Nudges of the slow Leslie on long held notes (tick, the slow speed x this; 1 back to slow).
-  std::vector<std::pair<long, double>> leslieBoost;
+  TonewheelRegistration reg;
+  // The Rotary's planned speed changes (tick, fast); empty when the file sets it itself.
+  std::vector<std::pair<long, bool>> rotary;
+  // Nudges of the slow Rotary on long held notes (tick, the slow speed x this; 1 back to slow).
+  std::vector<std::pair<long, double>> rotaryBoost;
   // The harmonic percussion's planned switches (tick, on): at most two, mostly none (the piece's
   // choice is in reg).
   std::vector<std::pair<long, bool>> percussion;
@@ -69,15 +69,15 @@ struct HammondPlan {
   // (per change: by the preset key, at once, where the pause is too short to pull a drawbar)
   std::vector<bool> upperInstant;
   double lowerExtra = 0;
-  // The lower manual on a shape of its own (hammondLowerShaped): 1 008880080, the percussion on, the
+  // The lower manual on a shape of its own (tonewheelLowerShaped): 1 008880080, the percussion on, the
   // left hand comping above the pedals' bass, an extra octave of percussion-like sound; 2 the hollow
   // 8', a soft line set apart from the tune by colour, not left a whisper. 0: derived.
   int lowerShape = 0;
   // The lower manual's vibrato tab switched (tick, on): off through the planned fast phrases and
-  // back after (C3 under a fast Leslie muddies the low accompaniment; the upper keeps it).
+  // back after (C3 under a fast Rotary muddies the low accompaniment; the upper keeps it).
   std::vector<std::pair<long, bool>> lowerVib;
   // (the lower manual's and pedals' clarity, 0..1: less 16' (and 5 1/3') under a moving pedal line
-  // or rich harmony; see hammondLowerFor, hammondPedalFor)
+  // or rich harmony; see tonewheelLowerFor, tonewheelPedalFor)
   double clarity = 0;
   // The channels whose expression (CC11) is the organ's pedal: the tune's (mostly upper notes).
   std::set<int> exprChannels;
@@ -103,10 +103,10 @@ struct HammondPlan {
   std::string summary;
 };
 
-// fileLeslie: the file sends its own Leslie controls (CC1, CC64, CC82 on the part's channels);
+// fileRotary: the file sends its own Rotary controls (CC1, CC64, CC82 on the part's channels);
 // fileExpr: its own expression pedal (CC11). secondsAt: a tick's time by the file's tempo map (the
 // ending's length, a ritardando's included); empty: by bpm.
-HammondPlan planHammond(const std::vector<HammondNote>& notes, int tpq, double bpm, const std::string& instrument,
-                        bool fileLeslie, bool fileExpr = false, std::function<double(long)> secondsAt = nullptr);
+TonewheelPlan planTonewheel(const std::vector<TonewheelNote>& notes, int tpq, double bpm, const std::string& instrument,
+                        bool fileRotary, bool fileExpr = false, std::function<double(long)> secondsAt = nullptr);
 
 }  // namespace pajupilli

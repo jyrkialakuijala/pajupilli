@@ -7,7 +7,7 @@ dampers and a pedal, and two microphones, all physical, no samples.
 
 The instruments: the modern **Schiedmayer** celesta (Wendlingen, Germany): 4, 5 and 5½ octaves,
 the 5½-octave "Compact" and "Studio" models. Its ancestor is the **Mustel** celesta (Paris,
-patented 1886, the instrument Tchaikovsky bought in 1891). Yamaha and Jenco instruments appear
+patented 1886, the instrument Tchaikovsky bought in 1891). One maker and Jenco instruments appear
 where they add a number.
 
 Where each number comes from: **[web]** from a source in section 11; **[calc]** computed here
@@ -20,9 +20,9 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
 
 - **No acoustics paper measures a celesta.** Searches found no measured modes, decays or
   spectra of celesta plates, and no physical model of one in the literature. One commercial
-  physical model exists (Pianoteq's "Celeste" pack, after a five-octave German instrument); its
+  physical model exists (a commercial piano model's "Celeste" pack, after a five-octave German instrument); its
   workings are not published. The construction below comes from makers' descriptions (Schiedmayer,
-  Yamaha's guide and patents), restorers and museum records. The vibration numbers are computed
+  one maker's guide and patents), restorers and museum records. The vibration numbers are computed
   from that construction **[calc]**.
 - **A plate:** flat high-carbon steel, about 2–2.5 mm thick and 25 mm wide, 50 mm (C8) to about
   280 mm (C3) long. It rests on felt at its two mode-1 nodes, 22.4 % of the length from each end,
@@ -42,9 +42,9 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
   **[calc]**. The box draws energy from the plate's fundamental only. A coupling of κ ≈ 0.003–0.007
   (a fraction of a percent; the box tuned to the plate) shortens a plate that would ring 30–40 s
   by itself to the heard 3–8 s, and radiates 70–80 % of the fundamental's energy **[calc, est]**.
-- **Hammer:** felt on a birch (Yamaha) or pear-wood (Schiedmayer) head. The shank is thin
+- **Hammer:** felt on a birch (one maker) or pear-wood (Schiedmayer) head. The shank is thin
   vertically and wide sideways, springy like a mallet **[web]**. Mustel and Schiedmayer strike from
-  above; Yamaha and Kolberg strike from below with a grand action **[web]**. No hammer masses are
+  above; one maker and Kolberg strike from below with a grand action **[web]**. No hammer masses are
   published. With piano-treble felt (K ≈ 10⁹, p ≈ 2.5) and 3–8 g heads, contact lasts 1–2.5 ms
   in the middle **[calc]**. That is too long for the top octave: C8 needs under about 0.25 ms (felt
   ten times harder) or its fundamental falls by 20 dB or more **[calc]**.
@@ -69,18 +69,18 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
 | Schiedmayer 5 octaves | c–c5 = C3–C8 | 61 **[calc]** | 1.23 × 1.08 × 0.59 m, 121 kg (dealer) **[web]** | Rental instruments from 1959 and 1967 tuned to 443 Hz **[web, Preissler]** |
 | Schiedmayer 5½ octaves, Compact and Studio | c–f5 = C3–F8 | 66 **[calc]** | Studio 1.37 × 1.01 × 0.82 m, 93 / 121 kg (a dealer's gross/net, contradictory) **[web]** | The Studio is the loudest, "for large concert halls" **[web, bonedo]**; the brochure says its plates sit "side by side in one larger resonator" **[web, Schiedmayer site]** |
 | Schiedmayer, built into a pipe organ | c–c5 = C3–C8 | 61 | 1.17 × 1.00 × 0.35 m, 70 kg | Plates on 3 levels, oak frame, mechanical or 24 V magnet action **[web]** |
-| Yamaha CEL-53 / CEL-56P (from 1992) | 53 / 56 keys | — | 1.01 / 1.05 × 1.08 × 0.65 m, 70 / 72 kg **[web]** | Struck from below with grand-piano action parts, boxes above the plates; 56P has a soft pedal **[web]** |
+| one maker CEL-53 / CEL-56P (from 1992) | 53 / 56 keys | — | 1.01 / 1.05 × 1.08 × 0.65 m, 70 / 72 kg **[web]** | Struck from below with grand-piano action parts, boxes above the plates; 56P has a soft pedal **[web]** |
 | Jenco (USA) | — | 3 racks | — | Plates hung on cord (like vibraphone bars), metal tube resonators, felt hammers from above **[web, Schiedmayer; PTG]** |
 
 - Standard pitch 442 Hz, 442–446 depending on the orchestra **[web, VSL]**. Cases weigh 50–130 kg
   and measure about 1.10 × 1.00 × 0.60 m **[web, VSL]**.
 - One Schiedmayer build takes about three months. The plates (60 of them in the instrument
   described) are tuned over about a week by heating, cooling and measuring **[web, Deutsche
-  Handwerks Zeitung]**. Its "steel and brass alloy" for the plates is a journalist's phrase; Yamaha
+  Handwerks Zeitung]**. Its "steel and brass alloy" for the plates is a journalist's phrase; one maker
   says high-carbon spring steel **[web]**. The same article says the plates are struck "from
   below", against Schiedmayer's own brochure ("from above"); the brochure is trusted here.
 - History: Victor Mustel's tuning-fork *typophone* came first (1860, 1865 or 1866 by source).
-  Schiedmayer's brochure names Victor Mustel (1815–1890) as the inventor; Britannica, Yamaha and
+  Schiedmayer's brochure names Victor Mustel (1815–1890) as the inventor; Britannica, one maker and
   VSL name his son Auguste. Tchaikovsky ordered one in Paris in 1891, for about 1 200 francs
   **[web, Yamaha]**. Mustel stopped making them in about 1975 **[web, Schiedmayer]**. Schiedmayer has
   made them since 1890, full-size piano keys since 1996, and moved the pedal to right of centre
@@ -95,7 +95,7 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
 - **Steel:** "high-carbon steel, a very hard metal also used in automobile suspensions"
   **[web, Yamaha]**. Taken here as E = 206 GPa, ρ = 7850 kg/m³, ν = 0.29, bending wave speed
   √(E/ρ) = 5120 m/s **[memory]**.
-- **Thickness:** "around 2 mm" low and "around 2.5 mm" high in a Yamaha; a metallophone's bars are
+- **Thickness:** "around 2 mm" low and "around 2.5 mm" high in a one maker; a metallophone's bars are
   7.8–9 mm **[web, Yamaha]**. Thicker plates sound "more metallic" **[web, Yamaha]**. A student wiki
   says the opposite way round (2 mm high, 2.5 mm low) **[web, UBC, unreliable]**.
 - **One measured instrument** (Grinnell College, 49 plates): lengths from 8 in to 2 in (203 →
@@ -104,7 +104,7 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
   octaves is exactly what a uniform plate needs (f ∝ t / L²). But a 3.3 mm plate 203 mm long
   sounds G♯4, not C4; with 2 mm, the same lengths give C4–C8 **[calc]**. Either that thickness is
   misreported, or the bass plates are weighted.
-- Width 20–30 mm **[web, UBC]**; Yamaha's patent uses three plate widths, widest in the bass
+- Width 20–30 mm **[web, UBC]**; one maker's patent uses three plate widths, widest in the bass
   **[web, US 7 541 530]**.
 
 **Length for a uniform free-free plate, f1 = 1.0279 · t · √(E/ρ) / L² [calc]:**
@@ -143,7 +143,7 @@ sounding pitch (C4 = 261.6 Hz). The celesta is written an octave below where it 
 ### 3.3 Bass end weights
 
 "Weights are attached to both ends of bass register sound bars … a clever way to shorten the
-sound bars without changing their pitches" **[web, Yamaha]**. Yamaha's patent does the same with
+sound bars without changing their pitches" **[web, Yamaha]**. One maker's patent does the same with
 "mass-concentrating" thicker ends **[web, US 7 541 530]**. A beam with point masses at both ends,
 tuned to C3 (t = 2 mm, w = 31.75 mm) **[calc, FE beam]**:
 
@@ -183,7 +183,7 @@ A antisymmetric) **[calc]**:
   the actual outline with the holes and end weights.
 - **No overtone tuning:** marimba and xylophone bars are undercut to tune 1 : 4 or 1 : 3. Celesta
   plates are flat strips tuned by length and thickness for the fundamental. No source mentions
-  tuning their overtones. Yamaha's patent cites a prior art aiming at 1 : 4 : 8 for keyboard tone
+  tuning their overtones. One maker's patent cites a prior art aiming at 1 : 4 : 8 for keyboard tone
   plates **[web]**, but that is not the classic celesta.
 
 ## 4. The resonators
@@ -193,8 +193,8 @@ A antisymmetric) **[calc]**:
 - **Bottles.** "Although resonator boxes may look like simple square boxes, they actually have
   necks and mouths on the bottom … They look quite like a bottle of liquor, just turned upside
   down … the volume of the box and the cross-sectional area of its mouth are adjusted" **[web,
-  Yamaha]**. A Helmholtz resonator, its mouth facing the plate.
-- **By register (Yamaha's patent):** the low range is Helmholtz, one chamber per plate; the middle
+  one maker]**. A Helmholtz resonator, its mouth facing the plate.
+- **By register (one maker's patent):** the low range is Helmholtz, one chamber per plate; the middle
   range is closed tubes, one per plate, in blocks of four to six; the high range is one chamber
   shared by several plates. Each chamber is at least twice the plate's width. Tuning is by the
   opening's area and depth, chamfering, or partly covering the hole **[web, US 7 750 221]**.
@@ -255,7 +255,7 @@ pipe's 0.7–0.9 % **[web]**.
   (VSL, Schiedmayer) in physical terms: not suppression, but amplification of the fundamental
   alone.
 - Mustel's shared boxes: one cavity under several plates cannot be tuned to each, so each plate
-  sees a smaller and detuned κ: quieter, a longer and more uneven ring **[est]**. Yamaha's guide:
+  sees a smaller and detuned κ: quieter, a longer and more uneven ring **[est]**. One maker's guide:
   "Celestas from Schiedmayer … are louder than those from Mustel Company, and feature a larger
   bass range" **[web]**.
 
@@ -264,15 +264,15 @@ pipe's 0.7–0.9 % **[web]**.
 - **Direction:** Mustel's patent claims the hammer striking the plate from above, distinct from
   the upright's sideways and the grand's upward blow **[web, Schiedmayer]**. Schiedmayer keeps this.
   A c. 1988 Schiedmayer transmits the key's motion by "trackers and rollers (normally seen in
-  pipe-organs)" **[web, Yamaha]**. Yamaha (1992) and Kolberg use grand-piano actions striking
+  pipe-organs)" **[web, Yamaha]**. One maker (1992) and Kolberg use grand-piano actions striking
   from below, the boxes above the plates; Schiedmayer calls these "keyboard glockenspiels"
   **[web]**.
-- **Dynamics:** of the older action Yamaha says that celestas "would not make any noise unless
+- **Dynamics:** of the older action one maker says that celestas "would not make any noise unless
   the keys were pressed strongly, and it was impossible to vary the intensity"; glissandi hurt the
   fingers **[web, Yamaha]** (a competitor's claim). Schiedmayer since 1996: full-length keys, a
   light touch, "a very nuanced tone" **[web]**. Model consequence: a narrow range of hammer
   speeds for the Mustel (est. 0.8–2 m/s), wider for the modern instrument (0.4–3 m/s) **[est]**.
-- **The hammer:** a wooden head (birch at Yamaha; pear wood and felt in Schiedmayer's
+- **The hammer:** a wooden head (birch at one maker; pear wood and felt in Schiedmayer's
   workshop) with a felt tip **[web]**. The shank is "thin vertically but thick horizontally, and
   supple", like a soft mallet's, unlike a piano's stiff shank **[web, Yamaha]**. Bass hammers are
   larger with thicker felt **[web, VSL]**. The felt hardens with use and the sound flattens; it is
@@ -323,18 +323,18 @@ pipe's 0.7–0.9 % **[web]**.
   0.1–0.3 s **[est]**, like the piano's slowed dampers (0.15 s for a middle note, piano.md §11). The
   coupled box keeps a little air ringing, then follows.
 - **Pedal:** one, lifting all dampers like a piano's sustain **[web]**. Old instruments had it in the
-  centre, Schiedmayer right of centre **[web]**. Yamaha's CEL-56P adds a soft pedal **[web]**.
+  centre, Schiedmayer right of centre **[web]**. One maker's CEL-56P adds a soft pedal **[web]**.
   Three-octave table models have no dampers **[web, Wikipedia]**. No source mentions undamped top
   plates, as the piano's top 18 keys are. Model all keys damped **[est]**.
 - With the pedal down, the plates hardly ring in sympathy: no bridge joins them. The only paths
-  are the frame and a shared box (Mustel; Yamaha's top range; the Studio's "one larger
+  are the frame and a shared box (Mustel; one maker's top range; the Studio's "one larger
   resonator"). Ignore at first; a shared-box option for the Mustel voice is cheap (section 9).
 
 ## 7. The sound
 
 - **Character [web]:** "the attack and a very long resonance"; decay "similar to a piano's in the
   same register, though a little shorter", the low notes ringing longer; quiet, of limited
-  dynamic range; fewer overtones than a glockenspiel, warmer (VSL). Yamaha: soft but "able to
+  dynamic range; fewer overtones than a glockenspiel, warmer (VSL). One maker: soft but "able to
   carry over quite a distance"; heard better at the back of a hall than in the front row. The
   Mustel restorer's instrument has screens (grilles) front and back; the sound leaves through
   them and the open back.
@@ -367,7 +367,7 @@ pipe's 0.7–0.9 % **[web]**.
 ## 8. Published work
 
 - **Celesta-specific:** none found in JASA, Acta Acustica, DAFx or ICMC searches. Wolfram has a
-  "celesta struck-bar estimate" notebook with placeholder inputs ("reference_only"). Pianoteq's
+  "celesta struck-bar estimate" notebook with placeholder inputs ("reference_only"). a commercial piano model's
   "Celeste" pack has a celesta physically modelled after a five-octave German instrument
   (unnamed; probably a Schiedmayer) **[web]**.
 - **Bars and resonators in general:** Soares, Debut & Antunes 2022/2023 (the coupled bar–pipe modal
@@ -461,7 +461,7 @@ oversampling during contact.
 ## 10. Open questions
 
 - **Actual plate dimensions** of a Schiedmayer, with thickness and end weights per register:
-  none published. Grinnell's 3.3 mm conflicts with Yamaha's 2–2.5 mm. A technician's measurement
+  none published. Grinnell's 3.3 mm conflicts with one maker's 2–2.5 mm. A technician's measurement
   of one instrument would settle §3 at once.
 - **Hammer masses and felt hardness:** none published. The top octave's contact time decides
   whether C7–F8 can sound at all.

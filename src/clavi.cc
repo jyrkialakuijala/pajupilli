@@ -1,4 +1,4 @@
-#include "clavinet.h"
+#include "clavi.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +10,7 @@
 
 namespace pajupilli {
 
-bool clavinet(const Instrument& inst) { return std::strncmp(inst.name, "clavinet", 8) == 0; }
+bool clavi(const Instrument& inst) { return std::strncmp(inst.name, "clavi", 5) == 0; }
 
 namespace {
 
@@ -25,7 +25,7 @@ double through(const double (*pts)[2], int n, double key) {
   return pts[n - 1][1];
 }
 
-// The scale (research/clavinet.md 4.2): lengths estimated (only E3's, 0.678 m,
+// The scale (research/clavi.md 4.2): lengths estimated (only E3's, 0.678 m,
 // is published). Stiffness: in the bass and at the top as measured by
 // Gabrielli et al. (2013); from E2 to D#4 as measured on a recorded D6 (21
 // notes, tools/pianofit.py: 3.5 .. 8e-5, half Gabrielli's there, and what
@@ -53,11 +53,11 @@ const double kKnockW[] = {1, 0.7, 0.5, 0.35, 0.25};
 
 }  // namespace
 
-ClavinetModel::ClavinetModel(const Instrument& inst)
+ClaviModel::ClaviModel(const Instrument& inst)
     : Tube(inst),
-      model_(std::strcmp(inst.name, "clavinet-e7") == 0  ? Model::kE7
-             : std::strcmp(inst.name, "clavinet-c") == 0 ? Model::kC
-                                                          : Model::kD6),
+      model_(std::strcmp(inst.name, "clavi-late") == 0  ? Model::kLate
+             : std::strcmp(inst.name, "clavi-early") == 0 ? Model::kEarly
+                                                          : Model::kMiddle),
       dt_(1.0 / inst.fs) {
   static const double kYarn = knob("PJ_CLAV_YARN", 1.0);  // x the yarn's damping (worn yarn: less)
   static const double kSide = knob("PJ_CLAV_SIDE", 0.6);  // the share of keys below E4 that beat
@@ -151,7 +151,7 @@ ClavinetModel::ClavinetModel(const Instrument& inst)
 }
 
 // A bank's per-sample turns from its decays, its tuning x ratio.
-void ClavinetModel::turns(Bank& b, double ratio) {
+void ClaviModel::turns(Bank& b, double ratio) {
   for (int i = 0; i < b.n; ++i) {
     const double r = std::exp(-b.sig[i] * dt_), ph = b.w[i] * ratio * dt_;
     b.pr[i] = float(r * std::cos(ph));
@@ -159,7 +159,7 @@ void ClavinetModel::turns(Bank& b, double ratio) {
   }
 }
 
-void ClavinetModel::sideTurns(Str& s, double ratio) {
+void ClaviModel::sideTurns(Str& s, double ratio) {
   if (s.side.re.empty()) return;
   for (int i = 0; i < s.s.n; ++i) {
     const double r = std::exp(-s.s.sig[i] * dt_), ph = s.s.w[i] * ratio * (1 + s.detune) * dt_;
@@ -168,7 +168,7 @@ void ClavinetModel::sideTurns(Str& s, double ratio) {
   }
 }
 
-void ClavinetModel::setTone(int bits) {
+void ClaviModel::setTone(int bits) {
   bits &= 15;
   if (bits == tone_) return;
   // A rocker's change: the old setting fades out over 5 ms under the new.
@@ -179,7 +179,7 @@ void ClavinetModel::setTone(int bits) {
   std::memset(sos_[0], 0, sizeof sos_[0]);
 }
 
-void ClavinetModel::setPressure(double cents) {
+void ClaviModel::setPressure(double cents) {
   if (std::fabs(cents - press_) < 0.05) return;
   press_ = cents;
   const double ratio = std::exp2(cents / 1200);
@@ -191,7 +191,7 @@ void ClavinetModel::setPressure(double cents) {
     }
 }
 
-void ClavinetModel::strike(int key, double speed) {
+void ClaviModel::strike(int key, double speed) {
   if (key < 0 || key >= kKeys) return;
   Str& s = str_[key];
   if (s.down) return;
@@ -247,7 +247,7 @@ void ClavinetModel::strike(int key, double speed) {
   s.quiet = 0;
 }
 
-void ClavinetModel::release(int key) {
+void ClaviModel::release(int key) {
   if (key < 0 || key >= kKeys) return;
   Str& s = str_[key];
   if (!s.down) return;
@@ -275,13 +275,13 @@ void ClavinetModel::release(int key) {
   s.quiet = 0;
 }
 
-bool ClavinetModel::asleep() const {
+bool ClaviModel::asleep() const {
   for (const Str& s : str_)
     if (s.s.on || s.j.on) return false;
   return true;
 }
 
-void ClavinetModel::resetAir() {
+void ClaviModel::resetAir() {
   Tube::resetAir();
   for (Str& s : str_) {
     for (Bank* b : {&s.s, &s.j}) {
@@ -303,7 +303,7 @@ void ClavinetModel::resetAir() {
   std::memset(sos_, 0, sizeof sos_);
 }
 
-float ClavinetModel::sample() {
+float ClaviModel::sample() {
   static const double kDrive = knob("PJ_CLAV_DRIVE", 1.5);    // pickup EMF (per m/s) at stage 2's input (V)
   static const double kNl = knob("PJ_CLAV_NL", 0.15);         // the magnet's field over the string's swing
   static const double kGc = knob("PJ_CLAV_GC", 1.0), kGb = knob("PJ_CLAV_GB", 1.0);
@@ -425,7 +425,7 @@ float ClavinetModel::sample() {
   x = x * kDrive + testDp_;
   testDp_ = 0;
   double y;
-  if (model_ == Model::kC) {
+  if (model_ == Model::kEarly) {
     // The C: no transformer, no tone switches. Two germanium stages: a
     // coupling high-pass, an uneven soft clip (the negative swing sooner),
     // a roll-off near 14 kHz (3 nF).
@@ -448,7 +448,7 @@ float ClavinetModel::sample() {
     lp1_ += (1 - std::exp(-2 * M_PI * 15000 * dt_)) * (hp - lp1_);
     lp2_ += (1 - std::exp(-2 * M_PI * 5000 * dt_)) * (lp1_ - lp2_);
     // The tone switches (and the old setting fading out after a change).
-    const auto& sos = model_ == Model::kE7 ? clavtone::kSosE7 : clavtone::kSos;
+    const auto& sos = model_ == Model::kLate ? clavtone::kSosLate : clavtone::kSos;
     auto run = [&](int bits, double (*st)[2], double in) {
       if (bits == 0) return 0.0;
       double v = in;
@@ -471,7 +471,7 @@ float ClavinetModel::sample() {
     // at 400 mV in, c tanh(x / c) with c = 1.14 V; the E7's stage 2 has less
     // gain (x4.5): it is driven less hard (an assumption: their levels at
     // the tone node are not known together).
-    if (model_ == Model::kE7) y *= 0.6;
+    if (model_ == Model::kLate) y *= 0.6;
     const double c = 1.14;
     y = c * std::tanh(y / c);
   }
@@ -509,11 +509,11 @@ float ClavinetModel::sample() {
   return finish(last_);
 }
 
-ClavinetPlayer::ClavinetPlayer(ClavinetModel& m) : Performer(m), m_(m) {}
+ClaviPlayer::ClaviPlayer(ClaviModel& m) : Performer(m), m_(m) {}
 
-void ClavinetPlayer::noteOn(int midi, int velocity) {
-  const int key = midi - ClavinetModel::kLowest;
-  if (key < 0 || key >= ClavinetModel::kKeys) return;
+void ClaviPlayer::noteOn(int midi, int velocity) {
+  const int key = midi - ClaviModel::kLowest;
+  if (key < 0 || key >= ClaviModel::kKeys) return;
   articulate(midi, velocity, false);
   keyDown_[key] = true;
   note_ = midi;
@@ -523,21 +523,21 @@ void ClavinetPlayer::noteOn(int midi, int velocity) {
   m_.strike(key, v);
 }
 
-void ClavinetPlayer::noteOff(int midi) {
-  const int key = midi - ClavinetModel::kLowest;
-  if (key < 0 || key >= ClavinetModel::kKeys) return;
+void ClaviPlayer::noteOff(int midi) {
+  const int key = midi - ClaviModel::kLowest;
+  if (key < 0 || key >= ClaviModel::kKeys) return;
   keyDown_[key] = false;
   if (!hold_) m_.release(key);
 }
 
-void ClavinetPlayer::setHold(bool h) {
+void ClaviPlayer::setHold(bool h) {
   hold_ = h;
   if (!h)
-    for (int k = 0; k < ClavinetModel::kKeys; ++k)
+    for (int k = 0; k < ClaviModel::kKeys; ++k)
       if (!keyDown_[k]) m_.release(k);
 }
 
-void ClavinetPlayer::render(float* out, int n) {
+void ClaviPlayer::render(float* out, int n) {
   constexpr int kBlock = 16;
   // (Tests: PJ_CLAV_TONE the switches' bits, PJ_CLAV_PICKUP the selector, PJ_CLAV_MUTE the bar,
   // PJ_CLAV_WAH the pedal's place, PJ_CLAV_ENV the envelope filter, PJ_CLAV_PRESS cents.)

@@ -3,7 +3,7 @@
 
 The grand's board tool (tools/pianoboard.py: the plate, its ribs and bridges on a 2.5 cm grid,
 the lowest 256 resonances and 96 broad ones above, the patches that radiate) run on the board of
-a 121 cm upright (Yamaha U1 class):
+a 121 cm upright (121 cm upright class):
 
   - a rectangle 1.42 m wide (y, from the bass end) and 0.95 m high (x, from its top edge down):
     1.35 m^2 (the U1's 1.38), 8.5 mm thinning to 6 mm at the rim;

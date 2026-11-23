@@ -260,7 +260,7 @@ and few diphthongs **[memory]**. Acoustically:
 - **Symphonic chorus:** 60–150, 15–40 a part **[memory]**. Titze & Maxfield model sections of 16
   and 128 singers. The Mormon Tabernacle Choir (360) is ~9 dB louder than a 45-voice choir
   **[web, TM17]**.
-- **Mellotron "8 Choir":** 4 men + 4 women, recorded in two adjacent studios **[web, Wiki-Mtron]**
+- **tape-replay keyboard "8 Choir":** 4 men + 4 women, recorded in two adjacent studios **[web, Wiki-Mtron]**
   (section 6.3).
 - **Level:** +3 dB per doubling of singers (incoherent sum) **[web, TM17]**.
 
@@ -357,7 +357,7 @@ range" is for trained soloists.)
 - **The voice parts overlap by about an octave** **[web, UQ-SATB (snip)]**.
 - **Unauditioned choirs** should avoid the top two notes of each part's high tessitura,
   particularly sopranos and tenors **[web, Hutchings (snip)]**.
-- **Mellotron:** its keyboard is G2–F5 (35 keys). The men dropped the highest notes an octave
+- **tape-replay keyboard:** its keyboard is G2–F5 (35 keys). The men dropped the highest notes an octave
   because they were out of range **[web, Wiki-Mtron]**.
 
 ### 4.2 How GM keys should be shared (a proposal, following stringsect.cc)
@@ -427,7 +427,7 @@ lowest, middle) **[code]**. The choir follows the same pattern:
   For "Choir Aahs" a moderate attack (the ensemble reaches full level in 150–300 ms); for "Voice
   Oohs" a softer one (250–400 ms) **[calc]**. (Built so, τ 0.19 s, it measured an attack of 774 ms
   against the SoundFonts' 40–80 (research/gm_compare.md, 54 Voice Oohs) and dragged in rhythmic
-  parts; it is now τ ≈ 75 ms at mf, a soft onset's 50–150 ms, full in ~0.2 s.) Roland's Voice Oohs is described as a "dooh" set
+  parts; it is now τ ≈ 75 ms at mf, a soft onset's 50–150 ms, full in ~0.2 s.) one maker's Voice Oohs is described as a "dooh" set
   **[web, SynthMania]**, so a short soft /d/-like start can be imitated by a constriction release
   (Singer has `setConstriction`) **[code]**.
 
@@ -508,9 +508,9 @@ lowest, middle) **[code]**. The choir follows the same pattern:
 
 ### 6.3 What sampled choirs contain (what a GM file expects)
 
-- **Roland Sound Canvas (the GM reference):**
+- **one maker Sound Canvas (the GM reference):**
   - 53 "Choir Aahs" is a "classic early-'90s sampled choir"; 54 "Voice Oohs" is "the ubiquitous
-    Roland 'dooh' sample set" **[web, SynthMania]**;
+    one maker 'dooh' sample set" **[web, SynthMania]**;
   - GS also has "Choir Aahs 2" (variation 32 or 41) **[web, SynthMania (snip)]**;
   - GM2 adds "Humming" as a variation of 54 **[memory]**.
 - **Typical content [memory]:**
@@ -523,16 +523,16 @@ lowest, middle) **[code]**. The choir follows the same pattern:
 
   GM files use Choir Aahs as a **pad**: long chords, often held for bars, mixed under strings,
   sometimes doubled with String Ensemble or Synth Voice.
-- **Mellotron choirs:**
+- **tape-replay keyboard choirs:**
   - the "8 Choir" tapes: 4 men + 4 women recorded together in two adjacent studios. The men from
     the Ted Taylor Choir dropped their highest notes an octave **[web, Wiki-Mtron]**;
-  - all Mellotron tapes play ≤ 8 s **[web, Hollowsun]**, with tape wow and flutter making each
+  - all tape-replay keyboard tapes play ≤ 8 s **[web, Hollowsun]**, with tape wow and flutter making each
     note differ **[web, Wiki-Mtron]**;
   - its character **[memory]**: a breathy, sustained "aah" with a slight constant pitch wander, a
     strong mid-range and little bass. It is heard on 1970s progressive rock and on Orchestral
     Manoeuvres in the Dark's *Architecture & Morality* (1981).
 
-  A "mellotron-choir" variant (8 singers, 4+4, the men an octave down on their top notes, an
+  A "tape-choir" variant (8 singers, 4+4, the men an octave down on their top notes, an
   8-s tape envelope, ±0.2 % wow at 0.5–1 Hz) is cheap once the choir exists **[calc]**.
 - **Meeting the GM expectation:**
   - the choir must sound immediately as a pad: no consonant, no "words";
@@ -608,7 +608,7 @@ lowest, middle) **[code]**. The choir follows the same pattern:
 
 | choir | singers | cost (cores) | [calc] |
 |---|---|---|---|
-| Mellotron 4 + 4 | 8 | 0.054 | |
+| tape-replay keyboard 4 + 4 | 8 | 0.054 | |
 | chamber, 4 a part | 16 | 0.11 | |
 | chamber, 6 a part (proposed) | 24 | 0.16 | |
 | large, 12 a part | 48 | 0.32 | |
@@ -813,7 +813,7 @@ would give a choir.
     It allows per-singer as well as summed comparisons.
 - **References for the GM expectation:** a Sound Canvas (or its emulation) rendering of 53 and 54
   as a timbre and attack reference; band energies in 10 ms frames as in puhuja's method
-  **[code, LEARNINGS.md]**. A Mellotron "8 Choir" recording for the variant.
+  **[code, LEARNINGS.md]**. A tape-replay keyboard "8 Choir" recording for the variant.
 
 ### 10.3 Listening tests (the project's way)
 
@@ -836,7 +836,7 @@ the attack GM-like, is the release natural in the church?
 | `choir` | 53 Choir Aahs | SATB, 6 per part, "aah" [ɑ], moderate attack, church |
 | `voice-oohs` | 54 Voice Oohs | the same choir on [u]/[ʊ], softer and slower, a short soft "d"-like release of a constriction at onsets (velocity-dependent), women lead (men only below C4) |
 | `choir-hum` (GM2 54 var.) | Humming | closed lips, nasal branch |
-| `mellotron-choir` (later) | — | 4+4, 8-s tape envelope, wow |
+| `tape-choir` (later) | — | 4+4, 8-s tape envelope, wow |
 | `pad-choir` | 92 | unchanged (or 3 singers of the new choir) |
 
 ### 11.2 Structure (after src/stringsect.cc)
@@ -927,7 +927,7 @@ the attack GM-like, is the release natural in the church?
 5. Hum (nasal branch).
 6. Folds option.
 7. Lane-parallel Singers.
-8. The Mellotron variant.
+8. The tape-replay keyboard variant.
 
 ---
 

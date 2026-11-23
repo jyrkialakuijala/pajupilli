@@ -63,7 +63,7 @@
 //   - parts: a mask of the parts that sing (1 << ChoirPart index); menBelow: the men sing only keys
 //     below this (128: everywhere; an "oohs" led by the women: 60);
 //   - consonant 0 .. 1: a soft "d" at each fresh onset (the tongue's closure released, harder keys
-//     more), as Roland's "dooh"; hum 0 .. 1: the lips closed into a hum (src/hum.h);
+//     more), as one maker's "dooh"; hum 0 .. 1: the lips closed into a hum (src/hum.h);
 //   - gainDb: its level against the aahs (the levels table trims each instrument after).
 // The knobs (SingerPlayer::setKnob; live's K2 and K3, -seq's "knob 2 X", "knob 3 X") are the same
 // for every variant: K2 the vowel's colour from dark to bright (u ʊ ɔ ɑ e i), K3 the openness

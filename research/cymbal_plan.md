@@ -84,7 +84,7 @@ Each step ends in something to hear (`listen/cymbal_*.wav`) and a check that can
 - **The stick:** a mass (12 g at the tip **[jd §3.4]**) on a Hertz spring against the plate's own
   give at that point, solved each sample as the piano hammer is. Tip (hickory or nylon) or
   shoulder; MIDI velocity is its speed, 0.3–8 m/s.
-- **Played live** from the MPK to judge it by ear: keys across the plate from edge to bell,
+- **Played live** from the controller to judge it by ear: keys across the plate from edge to bell,
   velocity the stroke; two pads for shoulder and choke. In a MIDI file: 51 bow, 53 bell, 59 the
   second ride.
 - **Sound:** the two overhead microphones of step 1, into the room as every instrument.

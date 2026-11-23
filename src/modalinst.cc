@@ -124,7 +124,7 @@ extern const Instrument kModals[] = {
     {"woodblock", 0, 48, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "block"},
     {"taiko", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "taiko"},
     {"reverse-cymbal", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "cymbal"},
-    // GM 12: the vibraphone (a Musser M55, F3-F6).
+    // GM 12: the vibraphone (a one mallet maker M55, F3-F6).
     {"vibraphone", 0, 53, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "vibraphone"},
     // (The same vibraphone played with Mike Balter's 25R "jazz" mallets (rattan): very hard.)
     {"vibraphone-25r", 0, 53, 89, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kModal, &kModalDesign, "vibraphone"},
@@ -615,7 +615,7 @@ void ModalModel::build1() {
       break;
     }
     case kVibraphone: {
-      // research/vibraphone.md: a Musser M55, 37 bars F3-F6 of 2024
+      // research/vibraphone.md: a one mallet maker M55, 37 bars F3-F6 of 2024
       // aluminium, 12.7 mm thick, 381 -> 175 mm long, arched underneath to
       // tune the overtones; a closed tube under each, tuned to the bar.
       // Each bar one vibrator (y only: the mallet strikes down), its modes:

@@ -58,7 +58,7 @@ for the research, not a decision.
 | GM | Required character | Candidate circuit to study |
 |---|---|---|
 | 81 Square | Hollow, odd harmonics. Variable pulse width is welcome. Clean attack. | A sawtooth or triangle core into a comparator with a PWM threshold. Or an astable multivibrator (two transistors, cross-coupled RC) whose duty cycle follows the timing-capacitor ratio. |
-| 82 Sawtooth | Bright, all harmonics, the classic lead. A resonant low-pass sweep on attack. | A sawtooth core: an expo converter charges a capacitor, and a comparator triggers a fast discharge (reset). Into a 4-pole transistor-ladder low-pass with resonance (Moog 1969 ladder; Stilson & Smith 1996; Huovilainen 2004). |
+| 82 Sawtooth | Bright, all harmonics, the classic lead. A resonant low-pass sweep on attack. | A sawtooth core: an expo converter charges a capacitor, and a comparator triggers a fast discharge (reset). Into a 4-pole transistor-ladder low-pass with resonance (the 1969 transistor ladder ladder; Stilson & Smith 1996; Huovilainen 2004). |
 | 83 Calliope | A breathy, flute-like whistle: near-sine with noise, slight pitch instability. | A sine-shaped core: a triangle through a differential-pair shaper, or a Wien-bridge or phase-shift oscillator whose amplitude a diode or lamp limiter sets. Noise from a reverse-biased junction, gated by the envelope. |
 | 84 Chiff | A pipe-organ-like attack transient ("chiff") on a mellow tone. | A narrow band-pass noise burst at onset (filtered avalanche noise and a fast envelope) into a mellow pulse or triangle tone. The burst should come from the circuit's start-up where possible: a resonant filter pinged by the gate. |
 | 85 Charang | An overdriven, guitar-like lead with compressed sustain. | A sawtooth or pulse core into an op-amp or diode-clipper overdrive (Yeh, Abel & Smith 2007), then a tone stack or low-pass. Two slightly detuned cores beat, unless locked. |
@@ -198,7 +198,7 @@ Each source used is cited in `research/synth_leads.md` with what was taken from 
   - the ear's role is taken by the per-note calibration.
 - Instruments are added to the instrument table with `Kind::kCircuit` and a family name ("lead"),
   so `-inst lead-saw`, `-ensemble` and live work unchanged.
-- **MPK knobs:** a per-family knob map (the winds keep theirs). The leads use cutoff, resonance,
+- **controller knobs:** a per-family knob map (the winds keep theirs). The leads use cutoff, resonance,
   envelope amount, attack, release, glide time, detune or lock strength, and volume.
 - **Real time:** each voice runs under 1.5 µs per sample at 48 kHz including oversampling on this
   machine's core (the winds use 0.3–0.8 µs). Eight voices fit in a 64-frame period without xruns.

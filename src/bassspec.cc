@@ -1,5 +1,5 @@
 // The electric basses' instruments (src/ebass.h): the strings and the neck they share, the Jazz
-// Bass's two pickups (GM 34), the Precision's split coil (GM 35). Only guitar.h and the knobs: the
+// Bass's two pickups (GM 34), the split-coil bass's split coil (GM 35). Only guitar.h and the knobs: the
 // unit checks (tools/pickcontact.cc) build them without the rest.
 #include <algorithm>
 #include <cmath>
@@ -59,8 +59,8 @@ void bassStrings(GuitarSpec& g, bool flats) {
 
 }  // namespace
 
-// The Jazz Bass (research/bass_section.md 2, 3, 5): numbers marked there.
-GuitarSpec jazzBass() {
+// The two-pickup bass (research/bass_section.md 2, 3, 5): numbers marked there.
+GuitarSpec twoPickupBass() {
   GuitarSpec g;
   g.name = "electric-bass";
   bassStrings(g, false);
@@ -79,13 +79,13 @@ GuitarSpec jazzBass() {
   return g;
 }
 
-// The Precision Bass (research/pick_bass.md 2.1, 9.2a; bass_section.md 3): the Jazz's strings
+// The split-coil bass (research/pick_bass.md 2.1, 9.2a; bass_section.md 3): the two-pickup bass's strings
 // and neck (roundwounds; PJ_PBASS_FLATS=1 flatwounds), one split coil: the E/A half 149 mm from
 // the saddle, the D/G half 124 mm, each string under one half; 6.4 H, 10.5 kOhm, 30 pF, its
 // field as wide as the J's. Wound hotter than a J coil (twice the inductance: ~1.4 times the
 // turns, the EMF with them [E]). One 250 k volume, one 250 k tone with 0.047 uF (the model's
 // ElectricBassModel: PJ_PBASS_TONE).
-GuitarSpec precisionBass() {
+GuitarSpec splitCoilBass() {
   GuitarSpec g;
   g.name = "pick-bass";
   bassStrings(g, knob("PJ_PBASS_FLATS", 0) > 0.5);

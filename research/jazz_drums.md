@@ -142,12 +142,12 @@ On a physical hi-hat the choke follows from the pedal (§4.5). It needs no rule.
 ### 2.2 The Jazz and Brush kits, key by key
 
 GM2 drum sets (Bank Select MSB 120, LSB 0, then a program change; 1-based numbers): 1 Standard, 9 Room,
-17 Power, 25 Electronic, 26 TR-808, **33 Jazz**, **41 Brush**, 49 Orchestra, 57 SFX. GM2 percussion
+17 Power, 25 Electronic, 26 classic drum machine, **33 Jazz**, **41 Brush**, 49 Orchestra, 57 SFX. GM2 percussion
 adds keys 27–34 and 82–87 to GM1's 35–81 (27 High Q, 28 Slap, 29/30 Scratch Push/Pull, 31 Sticks,
 32 Square Click, 33/34 Metronome Click/Bell; 82 Shaker, 83 Jingle Bell, 84 Belltree, 85 Castanets,
 86/87 Mute/Open Surdo) **[web, Wikipedia GM2]**.
 
-The Roland GS / GM2 key map, compared with the Standard kit **[web, voidaudio; PG Music]**:
+The GS / GM2 key map, compared with the Standard kit **[web, voidaudio; PG Music]**:
 
 | Key | Standard (1) | Jazz (33) | Brush (41) |
 |---|---|---|---|
@@ -165,12 +165,12 @@ The Roland GS / GM2 key map, compared with the Standard kit **[web, voidaudio; P
     economy, not what a drummer does. With brushes in hand, the ride, the hi-hat strokes and the
     toms are played with the brush. The pedal hi-hat (44) and the kick are feet and do not change.
 - **The Jazz kit is "nearly identical to Standard"**, with softer kick and snare sounds **[web, PG
-  Music; Kurzweil]**. In the GS key map only the kicks differ **[web, voidaudio]**. So "jazz snare"
+  Music; one maker]**. In the GS key map only the kicks differ **[web, voidaudio]**. So "jazz snare"
   is a voicing (tuning, heads), not a different key.
 - **Program numbering:** the bytes on the wire are 0-based, so Jazz = 32 and Brush = 40 **[web,
-  Kurzweil manual via search]**.
-- Later Roland modules (SC-88 and later) add variants next to each set (e.g. a "Jazz 2"), so programs
-  33–40 belong to the Jazz family and 41–48 to the Brush family **[memory]**. Yamaha XG and Korg maps
+  one maker manual via search]**.
+- Later one maker modules (later GS module and later) add variants next to each set (e.g. a "Jazz 2"), so programs
+  33–40 belong to the Jazz family and 41–48 to the Brush family **[memory]**. XG and one maker maps
   differ **[web, search snippets]**: this plan follows GS/GM2.
 
 ### 2.3 How the player should handle the kit switch
@@ -199,7 +199,7 @@ The Roland GS / GM2 key map, compared with the Standard kit **[web, voidaudio; P
 ### 2.4 The brush swirl (key 40 in the Brush kit) as a sustained note
 
 - **What modules do.** GS modules mostly ignore note-off on drum keys: each drum instrument has an
-  `Rx.NoteOff` switch, off by default. The swirl is a fixed-length sample **[web, Roland manual
+  `Rx.NoteOff` switch, off by default. The swirl is a fixed-length sample **[web, one maker manual
   snippet; memory]**. GM1's clarifications single out Long Whistle and Long Guiro as answering note-off
   **[web, GM1 clarification index]**. No GM2 text on the swirl's note-off was found.
 - **Proposal for this project (physical, playable):**
@@ -244,7 +244,7 @@ The Roland GS / GM2 key map, compared with the Standard kit **[web, voidaudio; P
    the swirl uses them.
 5. **Keep the tempo map** (now converted to seconds while reading) available to the kit, for the swirl's
    circle rate. A per-event "seconds per beat" field is enough.
-6. **Live (MPK pads, channel 10):** the same routing. The pads' pressure gives the swirl's pressure.
+6. **Live (controller pads, channel 10):** the same routing. The pads' pressure gives the swirl's pressure.
 
 ## 3. Cymbals
 
@@ -254,11 +254,11 @@ The Roland GS / GM2 key map, compared with the Standard kit **[web, voidaudio; P
 |---|---|---|
 | Alloys | B20 (CuSn20 bronze) for most professional and jazz cymbals; B8 for bright, cheaper lines; brass for the cheapest | [memory] |
 | Bronze, as modelled in a hi-hat simulation | ρ = 8860 kg/m³, E = 110 GPa, ν = 0.33 | [paper, SS23] |
-| Edge thickness h_e, crashes | 0.9–0.5 mm; mean 0.65–0.7 mm; thinnest: Paiste Fast Crash 14", Sabian AA Thin crash, Paiste 602 "paperthin" (used as hi-hats) | [paper, Bao19] |
+| Edge thickness h_e, crashes | 0.9–0.5 mm; mean 0.65–0.7 mm; thinnest: one cymbal maker Fast Crash 14", one cymbal maker AA Thin crash, one cymbal maker 602 "paperthin" (used as hi-hats) | [paper, Bao19] |
 | Centre thickness h_c | 0.9–1.4 mm (crashes); up to 1.5 mm (rides) | [paper, Bao19] |
 | Rides, edge | 1.4–0.8 mm | [paper, Bao19] |
-| Splashes, edge | 0.55–0.65 mm; minimum 0.4 mm (Sabian AAX 8") | [paper, Bao19] |
-| Dome height of a 16" crash (Zildjian A Custom Rock-type), from the surface profile | H_c = 3.4 cm (bell + bow profile) | [paper, Bao19] |
+| Splashes, edge | 0.55–0.65 mm; minimum 0.4 mm (one cymbal maker AAX 8") | [paper, Bao19] |
+| Dome height of a 16" crash (one cymbal maker A Custom Rock-type), from the surface profile | H_c = 3.4 cm (bell + bow profile) | [paper, Bao19] |
 | Curvature radius (one-curvature spherical model of a 14" hi-hat) | R_s = 0.8 m | [paper, SS23] |
 
 Typical masses and mean thicknesses. The masses are typical catalogue weights **[memory]**. The mean
@@ -278,7 +278,7 @@ thickness is h̄ = m / (ρ π R²) with ρ = 8600 kg/m³, ignoring the dome **[c
 
 These agree with the calliper ranges above (h̄ lies between h_e and h_c).
 
-The **dark, dry jazz ride** (K Constantinople, Bosphorus, Istanbul, Paiste Dark Energy-type)
+The **dark, dry jazz ride** (K Constantinople, Bosphorus, Istanbul, one cymbal maker Dark Energy-type)
 **[memory]**:
 - It is thinner and more hammered than a rock ride, and often unlathed or partly lathed.
 - Hammering leaves local stresses and thickness variations. They split the degenerate mode pairs and
@@ -287,8 +287,8 @@ The **dark, dry jazz ride** (K Constantinople, Bosphorus, Istanbul, Paiste Dark 
   (more wash).
 - A drier cymbal is heavily hammered and has a small bell: the highs decay faster and the wash
   builds less.
-- Paiste's own glossary: "ping" is the initial sound right after the stick tip strikes, *including the
-  stick's wood sound*. A dry ride is "focused, controllable"; a wetter one builds a wash **[web, Paiste
+- one cymbal maker's own glossary: "ping" is the initial sound right after the stick tip strikes, *including the
+  stick's wood sound*. A dry ride is "focused, controllable"; a wetter one builds a wash **[web, one cymbal maker
   glossary]**.
 
 ### 3.2 Modal density
@@ -394,7 +394,7 @@ stick of 40–50 g) **[calc; masses memory]**:
     **[paper, Bao19]**.
   - **A large plate struck for 4 ms:** "a slow migration of energy to the high frequency range over
     the first several hundred milliseconds" **[paper, BWWD23]**.
-  - **A recorded 16" Sabian HHX Evolution crash:** new high frequencies emerge 100–300 ms after the
+  - **A recorded 16" one cymbal maker HHX Evolution crash:** new high frequencies emerge 100–300 ms after the
     hit **[paper, SA19]**.
   - **Crash level and spectrum (Rossing & Shepherd, via bells_blocks.md):** peak level 0.15–0.2 s
     after the strike; energy reaches 3–5 kHz within ~100 ms.
@@ -673,7 +673,7 @@ All values **[calc]**.
 
 - A 14" × 5–6.5" snare; for jazz, often a wooden shell with a coated batter tuned high, and a thin
   snare-side head (~3 mil) **[memory]**.
-- **Measured batter-head modes:** a 36 cm steel snare drum with a Remo coated Powerstroke 3, from
+- **Measured batter-head modes:** a 36 cm steel snare drum with a one head maker coated Powerstroke 3, from
   352-point modal analysis **[paper, Skrodzka06]**. Rossing et al.'s values for another drum are given
   for comparison:
 
@@ -1180,7 +1180,7 @@ All values **[calc]**.
 - **Brush texture parameters:** grain spacing, tip stiffness, the number of active wires. None
   published, so fit to recordings.
 - **GM2 brush swirl note-off:** no GM2 statement found. Device behaviour varies (§2.4).
-- **Later Roland Brush sets** may add brush keys (e.g. rolls) at 25–34 **[memory, unverified]**.
+- **Later one maker Brush sets** may add brush keys (e.g. rolls) at 25–34 **[memory, unverified]**.
 - **Cymbal masses and the ride T60s** in §3.1 and §3.3 are from memory or a lab plate. Measure or find
   maker data.
 

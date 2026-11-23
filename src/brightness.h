@@ -114,7 +114,7 @@ class SingingArcModel : public Tube {
 };
 
 // Velocity is the arc's length and current; the sustain pedal holds the keys; the pitch bend is
-// +-2 semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"): K1 the arc's length (the
+// +-2 semitones. Knobs (the controller's K1-K4, -seq's "knob K X"): K1 the arc's length (the
 // brightness), K2 the chorus (the two arcs' spread), K3 the hiss (the arc's flicker), K4 the
 // release (the current's run-down).
 class SingingArcPlayer : public Performer {

@@ -13,7 +13,7 @@ constexpr GmLevel kGmLevels[] = {
     {"electric-piano-1", 5.7f},  // GM 5 Electric Piano 1
     {"electric-piano-2", -5.5f},  // GM 6 Electric Piano 2
     {"harpsichord", -0.0f},  // GM 7 Harpsichord
-    {"clavinet", -1.4f},  // GM 8 Clavinet
+    {"clavi", -1.4f},  // GM 8 Clavi
     {"celesta", -4.5f},  // GM 9 Celesta
     {"glockenspiel", -4.8f},  // GM 10 Glockenspiel
     {"music-box", -4.6f},  // GM 11 Music Box

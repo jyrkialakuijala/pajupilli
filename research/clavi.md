@@ -1,10 +1,10 @@
-# The Hohner Clavinet (D6; also C, E7, Duo): research and model plan
+# The clavi (D6; also C, E7, Duo): research and model plan
 
 Status: 2026-11-15. Research only; nothing is built. GM program 8 ("Clavi"). SI units. Pitches
 by MIDI-style names (C4 = middle C, A4 = 440 Hz). Keys are numbered 1..60 from F1 (MIDI 29) to
 E6 (MIDI 88).
 
-This file builds on `research/harpsichord_clavinet.md` §1, §3, §5 (which already summarises
+This file builds on `research/harpsichord_clavi.md` §1, §3, §5 (which already summarises
 Gabrielli 2013 and Remaggi 2012: the moving-end excitation, the 23 wound strings, Gabrielli's B
 table, the T60 ripple and beating, the pickup polynomial, the release drop of three semitones,
 the waveguide model's cost). That material is not repeated here except where it is corrected or
@@ -20,7 +20,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 ## 1. Short answer
 
 - **Compass:** 60 keys F1–E6, one steel string each, the 23 lowest wound (F1–D#3) **[paper,
-  Gabrielli 2013; web, Hohner 1973 catalogue "F1–e³"; Wikipedia]**. Verified.
+  Gabrielli 2013; web, one maker 1973 catalogue "F1–e³"; Wikipedia]**. Verified.
 - **Strike:** the key's rubber tip (the tangent) pushes the string onto a metal anvil and holds it
   there. The string's end at the anvil is thereby moved by the string-to-anvil gap h (about
   1 mm **[calc]**) in τ = h/v, a fraction of a millisecond to ~2 ms **[calc]**. Each mode gets
@@ -36,7 +36,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
   - The **bridge pickup is the upper one** (above the strings, 4 cm from the tailpiece end,
     tilted 30°): bright, thin bass.
   - The **centre ("rhythm") pickup is the lower one**: 18.5 cm (bass) to 6.5 cm (treble) from
-    the end, warm. Gabrielli 2013 and the clavinet.com FAQ agree; Remaggi 2012 has it the other
+    the end, warm. Gabrielli 2013 and the clavi.com FAQ agree; Remaggi 2012 has it the other
     way round.
   - Switches: C/D sets one pickup or both; A/B then picks centre/bridge, or in/out of phase.
 - **Electronics (D6, from the schematic):**
@@ -56,7 +56,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
   near the end, which makes partials 2–3 louder than 1; the comb; the 1.6 kHz Treble peak; long
   sustain cut by a fast, pitch-dropping release; the key's knock. Then, almost always, a wah or
   envelope filter and an amp.
-- **Model** (§10): a new `Clavinet` on the piano's modal-string machinery.
+- **Model** (§10): a new `clavi` on the piano's modal-string machinery.
   - Per key two mode banks: speaking (held) and joined (released), with a fixed projection
     between them.
   - A moving-end exciter instead of the hammer; the yarn as a damper band on the joined bank.
@@ -69,20 +69,20 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 
 | Model | Years | Differences that matter to a model | Source |
 |---|---|---|---|
-| Clavinet I | 1964 | Built-in battery amp and speaker; two tablet switches for pickups; aimed at Baroque music | [web, Wikipedia] |
-| Clavinet II | after I | Preamp instead of the speaker; first with rocker tone switches | [web, Wikipedia] |
-| Clavinet C | 1968 | **Two magnets per pickup** ("unique tone"); **no transformer, no tone network**; 2× AC151 germanium PNP; a 3 nF shunt on the output (corner ≈ 14 kHz from 3.9 kΩ **[calc]**); 9 V. Used on "Superstition" (several overdubs) | [web, clavinet.com ident; schematic; Wikipedia; FAQ] |
-| Clavinet L | 1968 | Home model, trapezoid case, built-in amp, reversed key colours | [web] |
-| **Clavinet D6** | 1971–1982 | Four tone switches, AB/CD pickup switches, **mute slider**; unshielded; two preamp board layouts (on the switches, or on the floor) | [web, Wikipedia; FAQ §12] |
-| Clavinet E7 | 1977/1979 (sources differ) | D6 controls plus slide volume, power switch; better shielding and a noise filter; 8.2 V zener regulator (BC238); different stage values (§7.4): "drier" | [web, clavinet.com; Wikipedia; groupdiy] |
-| Clavinet/Pianet Duo | 1978 | E7 Clavinet + Pianet T (reeds plucked by sticky pads) in one case; foot switch Clavinet/Pianet/mix, keyboard split, stereo out. Its pickups have a centre tap so each half can be switched off | [web, Wikipedia; FAQ §11.1] |
+| clavi I | 1964 | Built-in battery amp and speaker; two tablet switches for pickups; aimed at Baroque music | [web, Wikipedia] |
+| clavi II | after I | Preamp instead of the speaker; first with rocker tone switches | [web, Wikipedia] |
+| early clavi | 1968 | **Two magnets per pickup** ("unique tone"); **no transformer, no tone network**; 2× AC151 germanium PNP; a 3 nF shunt on the output (corner ≈ 14 kHz from 3.9 kΩ **[calc]**); 9 V. Used on "Superstition" (several overdubs) | [web, clavinet.com ident; schematic; Wikipedia; FAQ] |
+| clavi L | 1968 | Home model, trapezoid case, built-in amp, reversed key colours | [web] |
+| **clavi** | 1971–1982 | Four tone switches, AB/CD pickup switches, **mute slider**; unshielded; two preamp board layouts (on the switches, or on the floor) | [web, Wikipedia; FAQ §12] |
+| late clavi | 1977/1979 (sources differ) | D6 controls plus slide volume, power switch; better shielding and a noise filter; 8.2 V zener regulator (BC238); different stage values (§7.4): "drier" | [web, clavinet.com; Wikipedia; groupdiy] |
+| clavi and reed piano Duo | 1978 | E7 clavi + reed electric piano T (reeds plucked by sticky pads) in one case; foot switch clavi and reed piano/mix, keyboard split, stereo out. Its pickups have a centre tap so each half can be switched off | [web, Wikipedia; FAQ §11.1] |
 | D6-N | — | D6 in the E7-style case | [web, Wikipedia] |
 
 - About 38 000 made in all **[web, Wikipedia]**. D6 size about 119 × 38 × 15 cm, 31 kg with
   legs **[web, Hohner 1973 catalogue via hohner-pianet blog]**.
-- Hohner's own claim: "tone production is individually determinable through the touch"
+- one maker's own claim: "tone production is individually determinable through the touch"
   **[web, 1973 catalogue]**.
-- **The Pianet T** (in the Duo) is a separate instrument (plucked reeds, passive pickups). It is
+- **The reed electric piano T** (in the Duo) is a separate instrument (plucked reeds, passive pickups). It is
   out of scope here and would fit the project's tine/reed families (`src/modal.cc`), not this
   string model.
 
@@ -120,7 +120,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 - The corner is f_c ≈ 1/(πτ). For h = 1 mm and v_t = 0.5–2 m/s, τ = 0.5–2 ms and f_c ≈
   160–640 Hz.
   - Above f_c the spectrum gains 6 dB per doubling of key speed; below it nothing changes.
-  - So a Clavinet's dynamics are mostly a change of brightness and of the 1–4 kHz energy the
+  - So a clavi's dynamics are mostly a change of brightness and of the 1–4 kHz energy the
     ear reads as loudness.
   - The bass fundamentals barely change with velocity. To check on recordings (§10.6).
 - The rubber rounds both corners of the ramp. Contact on the string starts softly (the tip
@@ -151,11 +151,11 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 ### 3.4 Key pressure: a pitch bend?
 
 - **Claims:**
-  - Up to a quarter-tone (Stiller, *Handbook of Instrumentation*, 1985, quoted on the modartt
+  - Up to a quarter-tone (Stiller, *Handbook of Instrumentation*, 1985, quoted on a piano-modelling
     forum), "ineffective in chords".
   - A D6 owner on the same forum says pressure does nothing.
   - Wikipedia: "aftertouch from the string being stretched further".
-  - Logic's model has a "Pitch Pressure" control; a Sonic Couture script offers aftertouch bend
+  - Logic's model has a "Pitch Pressure" control; a a sample library script offers aftertouch bend
     in cents and its author finds small values more natural **[web, all]**.
 - **Physics [calc]:**
   - Holding the string down onto the anvil stretches it by ΔL ≈ (h²/2)(1/a + 1/L_s), with a =
@@ -291,13 +291,13 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 | Sound | bright, brash; thin bass | warm; more bass, smoother attack |
 
 - **Sources:** Gabrielli 2013 says the bridge pickup is above and the centre below. The
-  clavinet.com FAQ says the "upper" pickup is "bright brash" and the "lower" one "warm" **[web]**.
+  clavi.com FAQ says the "upper" pickup is "bright brash" and the "lower" one "warm" **[web]**.
   Chicago Electric Piano says B = bridge **[web, schematic notes]**. Remaggi 2012 has the reverse
   and is the odd one out.
 - Each pickup is six coils in series (the schematic draws six per pickup), each coil over ten
   strings **[schematic; paper, Remaggi]**. Gabrielli 2013 says "10 bars × 6 strings", which
   contradicts the drawing; take six × ten.
-- **Clavinet C:** each pickup has two magnets **[web]**. The schematic draws two cores per pickup.
+- **early clavi:** each pickup has two magnets **[web]**. The schematic draws two cores per pickup.
 
 ### 6.2 Switch matrix
 
@@ -337,7 +337,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
   - The bridge pickup has the fundamental 10–16 dB down in the bass: the "brash" sound.
   - Out of phase loses 4–15 dB of the lowest partials, more in the treble, and keeps the highs:
     the thin, nasal, quacky setting.
-  - The centre pickup's comb (nulls every 3–5 partials) is the Clavinet's formant pattern.
+  - The centre pickup's comb (nulls every 3–5 partials) is the clavi's formant pattern.
   - The pickups' heights (set by screws, not published) change their relative gains by several
     dB. Make the gains parameters.
 - **Velocity sensing:** the coil reads the string's velocity (ω × displacement). With the 1/n
@@ -355,10 +355,10 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 ### 7.1 D6 signal chain [schematic, Chicago Electric Piano 2015 redraw of Hohner's]
 
 1. **Pickups** (two × six coils), the switch matrix, then the primary of a **Beyer TR 145
-   (BV 35 569) transformer, 1:15**. The FAQ calls it "the heart of the Clavinet sound", a
+   (BV 35 569) transformer, 1:15**. The FAQ calls it "the heart of the clavi sound", a
    studio microphone transformer **[web, FAQ §12.2]**. A 1:15 step-up is ×15 in voltage
    (+23.5 dB) and ×225 in impedance **[calc]**.
-2. **Stage 1:** 10 nF → base of **BC550C** (BC413C on some boards **[web, clavinet.com
+2. **Stage 1:** 10 nF → base of **BC550C** (BC413C on some boards **[web, clavi.com
    upgrade]**). The emitter is grounded; collector 51 kΩ to +9 V; 3.9 MΩ ∥ 8.2 pF from
    collector to base; 100 kΩ from base to ground.
    - It is a shunt-feedback (transimpedance) stage with high gain.
@@ -425,7 +425,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 | All four | −31 | −29 | −21 | −15.7 | −26 | −25 | −17 | the fullest; same peak and dip |
 
 - **Treble's 1.6 kHz resonance** is in every setting that includes it, and is the "twang". With
-  Brilliant added, the top comes back above a notch near 3 kHz: the nasal, quacky Clavinet.
+  Brilliant added, the top comes back above a notch near 3 kHz: the nasal, quacky clavi.
 - **Levels** span ~20 dB between settings (Soft alone is the quietest). The real instrument
   needs the volume reset when switching. A model should keep that (it is part of the
   instrument) but offer a trim.
@@ -451,7 +451,7 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
     ground, and 100 kΩ volume.
   - The germanium stages are blamed for the C's "gritty" sound **[web, Chicago Electric Piano]**.
   - For a model: a flat, slightly soft-clipping two-stage amp with a ~14 kHz roll-off.
-  - The "Superstition" Clavinet **[web, FAQ; Wikipedia]**.
+  - The "Superstition" clavi **[web, FAQ; Wikipedia]**.
 
 ### 7.5 Noise
 
@@ -474,16 +474,16 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
     fall on release, tension modulation, pitch pressure, damping, excite shape (rubber hardness)
     and brilliance, key-off click with velocity/release-velocity, and pickup positions
     **[web, Apple]**.
-  - Arturia Clavinet V (modelled mute and yarn damping) **[web]**.
-  - Modartt Pianoteq CL1 **[paper ref. 25]**.
-  - Samples: Nord, Scarbee/NI, Sonic Couture. GSi Ticky Clav **[web, Wikipedia]**.
+  - a software maker clavi V (modelled mute and yarn damping) **[web]**.
+  - the piano-modelling forum a commercial piano model CL1 **[paper ref. 25]**.
+  - Samples: stage keyboard, sample libraries, a sample library. GSi Ticky Clav **[web, Wikipedia]**.
   - These name the features a player expects: pickup and tone switches, mute, release thunk and
     pitch fall, key-off click, a wah.
 - **Related physics:** the clavichord's tangent (Jiolat et al., "Toward a physical model of the
   clavichord", JASA 2021: intermittent contact plus a Kirchhoff–Carrier string) **[web, search
   result only]**. It is the nearest published treatment of a tangent held on a string.
 
-## 9. What makes it sound like a Clavinet, and how it is played
+## 9. What makes it sound like a clavi, and how it is played
 
 - **Physics (in order of weight) [calc, from §3–7]:**
   1. A sawtooth-like source at the very end of the string, sensed as velocity near the end:
@@ -502,24 +502,24 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
   - **Wah:** an inductor band-pass swept by the pedal. Cry Baby GCB-95 peak ≈ 450 Hz–1.6 kHz
     (750 Hz at mid travel; a dealer's chart says 350 Hz–2.2 kHz); inductor ≈ 0.5 H
     **[web, ElectroSmash and Sweetwater via search snippets]**. Q ≈ 2–6 **[memory]**.
-    "Up on Cripple Creek" (1969) is the first wah'd Clavinet **[web, FAQ]**.
+    "Up on Cripple Creek" (1969) is the first wah'd clavi **[web, FAQ]**.
   - **Envelope filter:** Mu-Tron III, used on "Higher Ground" **[web, Wikipedia]**: a resonant
     filter (LP/BP/HP modes, Peak = Q, Range switch, up/down sweep) driven by the input's
     envelope **[web, effectsdatabase; filter type: memory]**.
   - Also phaser, chorus, compression **[web, FAQ; Wikipedia]**.
-  - Amp: a tube amp, the Fender Twin Reverb most cited **[web, FAQ]**.
+  - Amp: a tube amp, the clean 2x12 combo most cited **[web, FAQ]**.
 - **Typical settings (not documented by players; [memory] unless tagged):**
   - Funk rhythm: Treble (+ Brilliant), with the bridge pickup alone (C/B) or both out of phase
-    (D/B) for the thinnest. Kurzweil's classic Clav samples use "treble" and the release thump
+    (D/B) for the thinnest. One maker's classic Clav samples use "treble" and the release thump
     **[web, Kurzweil manual via search]**.
   - Lead or warm comping: Medium (+ Treble), centre pickup or both in phase.
   - Soft alone: a muffled, bass-guitar-like tone, often with the mute.
 
-## 10. Model plan (`-inst clavinet`)
+## 10. Model plan (`-inst clavi`)
 
 ### 10.1 What is reused from the piano (`src/piano.h`)
 
-| Piano part | Clavinet use |
+| Piano part | clavi use |
 |---|---|
 | `PianoKey` len, tension, mu, B, f1, loss/b2/b3 | as is, per key, one string (`strings = 1`) |
 | Modal banks x/v with decay folded into the rotation, SIMD loops | as is: the speaking bank |
@@ -530,10 +530,10 @@ peer-reviewed paper; **[schematic]** read off the schematic images; **[calc]** w
 | `tuneByPartials` | not needed (single strings, equal temperament on f1) |
 | the plectrum exciter (being added in another session) | shares the "exciter drives modes through a row of weights" interface; the tangent is a third kind |
 
-The `Piano` class is built around a bridge exchange and a board. The Clavinet needs none of
-that and does need two banks per key. So it is cleaner as a sibling class (`src/clavinet.h/.cc`)
+The `Piano` class is built around a bridge exchange and a board. The clavi needs none of
+that and does need two banks per key. So it is cleaner as a sibling class (`src/clavi.h/.cc`)
 that reuses the mode-bank helpers, not a `PianoDesign` variant. If the piano's bank code is not
-factored out, factor it out first; the CP-80 plan wants the same thing.
+factored out, factor it out first; the electric grand plan wants the same thing.
 
 ### 10.2 What is new
 
@@ -645,14 +645,14 @@ factored out, factor it out first; the CP-80 plan wants the same thing.
    the thunk's level relative to the sustain at release time.
 6. **Tone switches:** the 15 settings' long-term spectra on a chord against the §7.3 table
    (differences only).
-7. **Recordings** (only ones the user owns, measured for parameters): exposed Clavinet in
+7. **Recordings** (only ones the user owns, measured for parameters): exposed clavi in
    "Superstition" (C, overdubs), "Higher Ground" (Mu-Tron), Herbie Hancock *Head Hunters*,
    Led Zeppelin "Trampled Under Foot", Bob Marley "Could You Be Loved" **[web, Wikipedia]**.
    Most are processed (wah, filter), so they serve for listening and attack and release timing
    more than for spectra. Isolated DI notes (an owner, or a sample library the user owns) are
    what the fit needs.
 8. **A/B listening:** stage by stage (string and pickup; plus tone; plus amp; plus wah), as for
-   the CP-80.
+   the electric grand.
 
 ## 11. Open questions
 
@@ -665,7 +665,7 @@ factored out, factor it out first; the CP-80 plan wants the same thing.
 - Stage 1's real output impedance (the D6 bias puzzle in §7.1) and the transformer's secondary
   impedance and bandwidth. A SPICE run of the schematic would pin §7.3's absolute levels; the
   shapes are robust.
-- The Clavinet C's two-magnet pickups: their effect on the comb and the nonlinearity.
+- The early clavi's two-magnet pickups: their effect on the comb and the nonlinearity.
 
 ## 12. Sources
 
@@ -708,17 +708,17 @@ factored out, factor it out first; the CP-80 plan wants the same thing.
 - Arturia Clavinet V. https://www.arturia.com/products/software-instruments/clavinet-v/overview
 - Jiolat et al., "Toward a physical model of the clavichord", JASA 2021 (via search; not read).
   https://hal.univ-lorraine.fr/IJLRDA-LAM/hal-03369924v1
-- This repository: `research/harpsichord_clavinet.md` §1, §3, §5; `research/cp80.md`;
+- This repository: `research/harpsichord_clavi.md` §1, §3, §5; `research/electricgrand.md`;
   `src/piano.h`.
 
 ## 13. Fitted to recordings (2026-11-15)
 
-Four recordings of a D6 (`~/Music/clavinet*.wav`, mostly mono, riffs), measured with
+Four recordings of a D6 (`~/Music/clavi*.wav`, mostly mono, riffs), measured with
 `tools/pianofit.py`: 21 notes found clean enough, most between E2 and D#4.
 
 - **Stiffness:** 3.5–8e-5 from E2 to D#4 (D#3, six takes: median 4.7e-5; E2–G2 6.5–7.9e-5;
   A#3 5.4e-5). That is half of Gabrielli's table there, and what §4.2's plain-wire calculation
-  gave for E3 (5.3e-5). The model now uses these values (`src/clavinet.cc` kStiff); bass and top
+  gave for E3 (5.3e-5). The model now uses these values (`src/clavi.cc` kStiff); bass and top
   keep Gabrielli's (no recorded notes there).
 - **Setting:** against the six D#3 takes (partials 1–16), the model's default (both pickups in
   phase, Medium+Treble) is the nearest of 32 pickup/tone settings, 8.6 dB rms. Partials 1–4 agree

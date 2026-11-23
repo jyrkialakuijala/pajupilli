@@ -222,7 +222,7 @@ const Design kMutedTrumpetDesign = {kMutedTrumpetBore, int(sizeof kMutedTrumpetB
                                     nullptr, 0, kTrumpetNotes, 0.0, 1537.0, false, nullptr, 0, {}, {},
                                     &kTrumpetLips, kTrumpetAlt};
 
-// Tenor trombone with an F attachment: the Conn 8H that Bilbao & Chick 2013
+// Tenor trombone with an F attachment: the large-bore tenor trombone that Bilbao & Chick 2013
 // measured (their Fig. 7, read from the preprint's vector paths; its transfer
 // matrices meet their measured peaks 1-16 within ~1 %; research/trombone.md),
 // a Denis Wick 5AL mouthpiece (cup 9.6 cm^3, lumped 9.0: the lips take some;
@@ -364,7 +364,7 @@ const Design kTromboneDesign = {kTromboneBore, int(sizeof kTromboneBore / sizeof
 
 // CC tuba, 4 valves (research/tuba.md): no published bore was found, so the
 // shape is fitted (tools/brass.py's transfer matrices) to the resonances
-// measured on a Besson BE994 (Mattéoli et al. 2022), transposed to C, within
+// measured on a one brass maker BE994 (Mattéoli et al. 2022), transposed to C, within
 // 4.3 cents rms on peaks 2..12: an 8.3 mm throat, a cone to the 19.5 mm valve
 // cylinder, a long two-part cone and a Bessel bell to 470 mm; 5.05 m open.
 // The cup (9 cm^3) lumped.

@@ -1,4 +1,4 @@
-# The player's airway, and the MPK mini mk3 MIDI map
+# The player's airway, and the 25-key MIDI controller MIDI map
 
 Research for REQUIREMENTS.md R10–R12 (how much of the player to model) and R17 (the controller).
 Date: 2026-11-11. Every claim has a source tag like [F75]; the list is at the end of each part.
@@ -272,20 +272,20 @@ All of these are below the −40 dB coupling level in normal playing [A16, C73].
 
 ---
 
-## PART B — Akai MPK mini mk3: default MIDI behaviour
+## PART B — 25-key MIDI controller: default MIDI behaviour
 
-Akai publishes **no MIDI implementation chart** for this device [IN22], so some defaults below
-come from third-party sources. **Verify on the unit** with `aseqdump -p "MPK mini 3"` when it is
+the controller publishes **no MIDI implementation chart** for this device [IN22], so some defaults below
+come from third-party sources. **Verify on the unit** with `aseqdump -p "25-key MIDI controller 3"` when it is
 plugged in. It was not connected to this machine when I checked `aconnect -l`.
 
 ### B1. Linux / ALSA
 
-- **USB class-compliant.** The ALSA sequencer client is named **"MPK mini 3"**, with port
-  **"MPK mini 3 MIDI 1"**.
-  - tsmetana/mpk3-settings finds the device by the name prefix "MPK mini 3" [TS].
-  - An Ardour user selects "MPK mini 3 MIDI 1 (In)" [ARD].
-  - `aseqdump -p "MPK mini 3"` is used in [YD].
-- Auto-connect by matching the client-name prefix "MPK mini 3".
+- **USB class-compliant.** The ALSA sequencer client is named **"25-key MIDI controller 3"**, with port
+  **"25-key MIDI controller 3 MIDI 1"**.
+  - tsmetana/mpk3-settings finds the device by the name prefix "25-key MIDI controller 3" [TS].
+  - An Ardour user selects "25-key MIDI controller 3 MIDI 1 (In)" [ARD].
+  - `aseqdump -p "25-key MIDI controller 3"` is used in [YD].
+- Auto-connect by matching the client-name prefix "25-key MIDI controller 3".
 
 ### B2. Controls (default program: Program 1, aligned to MPC Beats [FAQ])
 
@@ -303,7 +303,7 @@ plugged in. It was not connected to this machine when I checked `aconnect -l`.
 **MIDI channel.**
 
 - Keys and knobs ("Keybed & Controls") and pads have **separate channels** in each program [TS].
-- The usual setup is keys on channel 1 and pads on channel 10. Akai's support article tells users
+- The usual setup is keys on channel 1 and pads on channel 10. the controller's support article tells users
   to set exactly that, keys 1 and pads 10 [AK-ch]. [YD] shows the same.
 - That this is the factory default for Program 1 is **(likely, verify)**.
 - Listen on all channels and route by event type.
@@ -357,7 +357,7 @@ plugged in. It was not connected to this machine when I checked `aconnect -l`.
 
   | Mode | Bank A | Bank B | Source |
   |---|---|---|---|
-  | Note | 36–43 (C1–G1, Akai labels "C2") | 44–51 | Akai support says pad 1 of bank A = note 36 [AK-pad]; mk1 factory preset uses 36–43 [GLJ] |
+  | Note | 36–43 (C1–G1, the controller labels "C2") | 44–51 | the controller support says pad 1 of bank A = note 36 [AK-pad]; mk1 factory preset uses 36–43 [GLJ] |
   | CC | 16–23 | 24–31 | [YD] |
   | Program Change | 0–7 | 8–15 | (guess) |
 

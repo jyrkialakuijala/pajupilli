@@ -51,8 +51,8 @@ Drum drumFor(int k, Kit kit, bool gs) {
   static const bool kHatBrush = knob("PJ_HAT_KITBRUSH", 0) > 0;
   if (k == 42 || k == 44 || k == 46) return {"hi-hat", brush && kHatBrush && k != 44 ? k + 1 : k};  // closed, the foot, open
   // Below 35 General MIDI 1 defines nothing. Files that play there are
-  // Yamaha XG's (its brush strokes and extra snares live there) unless they
-  // say they are Roland GS or General MIDI 2 (clicks, scratches, sticks).
+  // XG's (its brush strokes and extra snares live there) unless they
+  // say they are GS or General MIDI 2 (clicks, scratches, sticks).
   if (k < 35) {
     if (gs) {
       if (k == 25) return {"brush-snare", 38};                 // snare roll (until one is built: a tap)

@@ -10,7 +10,7 @@ Short answer:
 - **Model a 4-valve CC tuba** (5th valve optional). It covers GM "Tuba" E1..F4 with standard fingerings: E1 is 2-3-4 on
   partial 2, and F4 is valve 1 on partial 12 (§1, §4).
 - **No full tuba bore profile is published online.** I fitted the bore below with the repo's transfer-matrix code. It
-  reproduces the measured resonance pattern of a real contrabass tuba (Besson BE994 B♭B♭, Mattéoli et al. 2022 [MGT22])
+  reproduces the measured resonance pattern of a real contrabass tuba (one brass maker BE994 B♭B♭, Mattéoli et al. 2022 [MGT22])
   transposed to C: rms 4 cents on peaks 2–12. It is anchored at the published end points: throat, shank, valve bore and
   bell (§2).
 - **The tuba's first resonance is not far below the nominal fundamental**, unlike the trombone's. It sits ~2 semitones
@@ -48,12 +48,12 @@ Short answer:
 
 | Quantity | Value | Source |
 |---|---|---|
-| Mouthpiece cup Ø (rim inner) | 32–34 mm [W]; Perantucci PT-50 33 mm, PT-83 32–32.5 mm; Schilke 69C4 32.76 mm; Denis Wick 1–5: 30.0–32.5 mm | retailers [MPX, DW] **[U]** |
-| Mouthpiece throat ("bore") | Schilke 69C4 / 62 / 66 / 67: .3281" = **8.33 mm**; Schilke Helleberg: .295–.323" (7.5–8.2 mm); Denis Wick 7.6–8.8 mm; Perantucci PT-83 8.6 mm; Jacobs Heritage 8.5 mm | [MPX, DW] **[U]** |
+| Mouthpiece cup Ø (rim inner) | 32–34 mm [W]; Perantucci PT-50 33 mm, PT-83 32–32.5 mm; one brass maker 69C4 32.76 mm; Denis Wick 1–5: 30.0–32.5 mm | retailers [MPX, DW] **[U]** |
+| Mouthpiece throat ("bore") | one brass maker 69C4 / 62 / 66 / 67: .3281" = **8.33 mm**; one brass maker Helleberg: .295–.323" (7.5–8.2 mm); Denis Wick 7.6–8.8 mm; Perantucci PT-83 8.6 mm; Jacobs Heritage 8.5 mm | [MPX, DW] **[U]** |
 | Shank tip (American standard) | OD .520–.530" (13.2–13.5 mm); Jarno-like taper 1:20 on diameter | tubaforum [TF1] **[U]** |
 | Mouthpipe (leadpipe) start | "under .550"" (14 mm) bore on "fake euro" receivers | [TF1] **[U]** |
-| Valve-section bore, CC | Yamaha YCB-822: **19.5 mm (.768")**, bell **500 mm**; Miraphone 1291 CC: conical through the valves **19.6 → 21.2 mm**, bell **470 mm**, 4 piston + 1 rotary valve | Yamaha spec page [Y822]; retailers [MIR] **[U]** |
-| Valve bore, B♭B♭ | Adams: 19–20.5 mm, bell 450 mm; Miraphone 495: 19.6 mm; Yamaha YBB-201: .728" (18.5 mm), bell 443 mm | retailer/maker pages [ADM, Y201] **[U]** |
+| Valve-section bore, CC | one maker YCB-822: **19.5 mm (.768")**, bell **500 mm**; Miraphone 1291 CC: conical through the valves **19.6 → 21.2 mm**, bell **470 mm**, 4 piston + 1 rotary valve | one maker spec page [Y822]; retailers [MIR] **[U]** |
+| Valve bore, B♭B♭ | Adams: 19–20.5 mm, bell 450 mm; Miraphone 495: 19.6 mm; one maker YBB-201: .728" (18.5 mm), bell 443 mm | retailer/maker pages [ADM, Y201] **[U]** |
 | Shape | "almost entirely conical" over > 5 m [PL10] citing [FR98] | [PL10] |
 | Cup volume | not published for tuba mouthpieces that I found. Bowl of Ø 32.5 mm, depth ~22 mm, about paraboloidal: π·r²·d/2 ≈ **9 cm³** [D]. Myers' thesis ranks 435 measured mouthpieces by cup volume [My98], but the scan's OCR did not give the tuba values | [D] |
 
@@ -69,7 +69,7 @@ to 650 mm and then conical, and a bass trombone, 12.0 → 13.0 mm to 1800 mm and
 Method: the profile is parametrised as throat, backbore, conical leadpipe, cylindrical valve section, a two-segment
 cone and a Bessel bell, with Hermite blends (±120 mm) at the three kinks, as in `kHornBore`. I fitted 7 parameters
 (Nelder–Mead on `tools/brass.py`'s transfer matrices, cup 9 cm³ lumped) so that impedance peaks 1–12 match the cents
-pattern **measured on a Besson BE994 B♭B♭** [MGT22, Fig. 3a; my digitisation, §3.1], transposed to C1 = 32.703 Hz. The
+pattern **measured on a one brass maker BE994 B♭B♭** [MGT22, Fig. 3a; my digitisation, §3.1], transposed to C1 = 32.703 Hz. The
 result has an rms error of **4.3 cents** on peaks 2–12. The end points (8.3 mm throat, 13 mm at the shank, 19.5 mm valves,
 470 mm bell) were fixed.
 
@@ -148,7 +148,7 @@ const ValveDef kTubaValves[] = {{900.0, 638.6, 19.5, 2}, {800.0, 300.8, 19.5, 1}
 
 ## 3. Input impedance, the pedal and the ghost note
 
-### 3.1 Measured: a B♭B♭ contrabass tuba (Besson BE994, mouthpiece Perantucci PT-50)
+### 3.1 Measured: a B♭B♭ contrabass tuba (one brass maker BE994, mouthpiece Perantucci PT-50)
 
 Mattéoli et al. 2022 [MGT22] measured it with the Macaluso–Dalmont impedance head on the mouthpiece and fitted 13 modes.
 I digitised the peaks of their Fig. 3a (the vector plot rendered at 800 dpi; the frequency axis was read from the grid
@@ -414,7 +414,7 @@ Path length with all four loops: 5.05 + 0.30 + 0.64 + 1.00 + 1.80 = **8.79 m**. 
    on n = 2–12. Validate the **cut-off fall** (peaks 11–14 at ~0.3–0.4 of peak 10's |Z|) against §3.1.
 3. **Ghost note:** with the [MGT22] lip set (Q 7, μ 9.1, w 12 mm), the B♭B♭-scaled bore should give a ghost note ≈ 7–8 semitones
    under partial 2 at ~half its threshold pressure. A good qualitative test of the low-register lip–bore coupling.
-4. **Unverified:** all mouthpiece numbers (retailer specs), the CC valve bore and bell (Yamaha/retailers), Bouhuys' tuba
+4. **Unverified:** all mouthpiece numbers (retailer specs), the CC valve bore and bell (one maker/retailers), Bouhuys' tuba
    pressures, the tuba-family B range, and every [G] in §5 and §7.
 
 ---

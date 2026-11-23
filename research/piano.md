@@ -3,7 +3,7 @@
 Status: a first version is built (2026-11-14, `-inst grand-piano`); section 10 says what it has
 and what is still open. Sections 1-9 are the research as written before building.
 
-The instrument: a concert grand (the Steinway D is the one the literature measures), GM
+The instrument: a concert grand (the 274 cm concert grand is the one the literature measures), GM
 program 1, MIDI 21–108. A physical model like the rest of the project: hammers, strings, bridge,
 soundboard, no samples.
 
@@ -40,7 +40,7 @@ is one register; the bass strings need 8–12 registers each.
 
 ## 2. What the instrument is
 
-- **Strings [memory]:** 88 keys, 243 strings on a Steinway D: keys 1–8 one wound string, 9–13
+- **Strings [memory]:** 88 keys, 243 strings on a 274 cm concert grand: keys 1–8 one wound string, 9–13
   two wound, 14–20 three wound, 21–88 three plain steel. Speaking lengths about 2.0 m (A0) to
   5 cm (C8). Tension 600–1300 N per string, about 20 tonnes in all.
 - **One measured string [web, Chabassier RR-8181]:** D#1: L = 1.945 m, steel area 1.31 mm²,
@@ -50,7 +50,7 @@ is one register; the bass strings need 8–12 registers each.
   1 kHz (near a rib 1000–2000, between ribs 600–700), falling to 200–300 kg/s by 2.5–10 kHz.
   A hundred times the string's: the string gives its energy slowly, hence the long sustain.
 - **Inharmonicity [web, range only]:** partial n at n·f0·√(1 + B n²), B from about 10⁻⁴ in the
-  low-middle to 10⁻² at the top. A Steinway D's tuning stretch: about −22 c at A0 to +46 c at C8
+  low-middle to 10⁻² at the top. A 274 cm concert grand's tuning stretch: about −22 c at A0 to +46 c at C8
   **[web, a users' forum, unverified]**.
 - **Hammers [web, KTH lectures]:** 11–12 g in the bass to 3.5–6 g in the treble. Felt as a
   spring that hardens: F = K·δ^p, p = 2.2–3.5 for played hammers, 1.5–2.8 for new ones (Hall &
@@ -264,7 +264,7 @@ Time for one 64-sample period (budget 1.33 ms), median:
    spectrum against velocity, the double decay, the beating.
 2. The soundboard's 256 modes from an offline plate model (ribs, bridges, rim), and the tail;
    check the bridge impedance against the measured 1000 kg/s and its fall.
-3. All 88 keys always running; dampers and pedals; `-inst grand-piano` on the MPK.
+3. All 88 keys always running; dampers and pedals; `-inst grand-piano` on the controller.
 4. Fit string damping, hammer hardness per key and unison mistuning to the solo piano recordings
    in `~/Music` (Beethoven, Schubert, Debussy tracks): parameters only, as for the bass.
 5. Lengthwise motion, duplex lengths, action noise, lid.
@@ -370,7 +370,7 @@ set against hammer speeds 0.6 / 1.5 / 3.5 m/s.
 
 - **Stiffness** follows one law from the lowest plain string up (doubling every 8.2 keys:
   7.5e-5 at key 24); the plain strings' lengths now follow from it and the wire: 1.90 m at
-  key 21 (a model D's is about 1.87 m **[memory]**), 0.695 m at C4, 53 mm at C8. The wound
+  key 21 (a 274 cm concert grand's is about 1.87 m **[memory]**), 0.695 m at C4, 53 mm at C8. The wound
   bass has the least near key 13 (4.5e-5); below key 7 the recordings give too few partials
   to say, and 8e-5 at A0 is a guess.
 - **Tuning:** an equal-tempered octave D#4-D5, 2:1 octaves going up, 6:3 going down (was 4:2,
@@ -519,7 +519,7 @@ speed; the evenness is as before (0.9–1.0 and 1.5 dB, largest step 4.8 dB); th
 lever, left alone, is a softer felt in the middle: it takes the third and higher down by more.
 
 **Later the same day, two more remarks of the user's.**
-- "My Fazioli F183 rings quite a bit longer ... could it be that it damps energy too quickly?"
+- "My 183 cm grand rings quite a bit longer ... could it be that it damps energy too quickly?"
   Yes. Held notes at 2 m/s fell 40 dB in 5.2 s at C4 (60 dB in 9 s), 4.3 s at C5, 8.5 s at C3:
   after the first seconds the fall was about 6 dB/s where a grand's aftersound falls 2–3. The
   fit had only the first 0.55 s of the recordings' notes, which the bridge sets; the wire's own

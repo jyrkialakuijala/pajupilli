@@ -1,4 +1,4 @@
-// The Leslie 122 (research/leslie.md §12): the organ's console signal into the cabinet's tube amp,
+// The rotary speaker (research/rotary.md §12): the organ's console signal into the cabinet's tube amp,
 // an 800 Hz crossover, the treble horn and the bass drum's scoop each turned by its own motor and
 // belt, heard by two microphones (stereo).
 //
@@ -22,12 +22,12 @@
 
 namespace pajupilli {
 
-class Leslie {
+class Rotary {
  public:
   // spread: this cabinet's parts off their nominal values by up to this share each (0: as built;
   // two cabinets side by side: ~0.07), drawn from the seed.
   // speed: all its speeds x this; ratioSlow, ratioFast: the horn's speed over the drum's on chorale
-  // and on tremolo (0: PJ_LESLIE_RATIO, 1.6).
+  // and on tremolo (0: PJ_ROTARY_RATIO, 1.6).
   void setup(double fs, uint32_t seed, double spread = 0, bool log = true, double speed = 1, double ratioSlow = 0,
              double ratioFast = 0);
   void setFast(bool fast) { fast_ = fast; brake_ = false; }
@@ -86,7 +86,7 @@ class Leslie {
   float drumFixed_[2048] = {};
   int dfw_ = 0;
   // The cabinet's tail.
-  // The cabinet's own flaws (seeded by its serial; PJ_LESLIE_AGE scales them, PJ_LESLIE_NOISE the
+  // The cabinet's own flaws (seeded by its serial; PJ_ROTARY_AGE scales them, PJ_ROTARY_NOISE the
   // machinery's noises).
   double age_ = 1, noise_ = 1;
   double hornEcc_ = 0, hornEccPh_ = 0, drumEcc_ = 0, drumEccPh_ = 0;  // a rotor's speed within a turn

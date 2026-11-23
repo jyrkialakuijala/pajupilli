@@ -58,7 +58,7 @@ int main() {
     const double loads[3] = {10e6, 1e6, 140e3};
     std::vector<double> rp[3];
     for (int i = 0; i < 3; ++i) {
-      GuitarAmp::Preset p = GuitarAmp::b15Di();
+      GuitarAmp::Preset p = GuitarAmp::fliptopDi();
       p.inputR = loads[i];
       GuitarAmp a(kFs, p);
       a.connect(P, 700e-12);
@@ -78,20 +78,20 @@ int main() {
   }
   // 2. The low end of the amp's path, cabinet off, the stack at noon: E1's 41 Hz against 200 Hz.
   {
-    GuitarAmp::Preset p = GuitarAmp::b15Di();
+    GuitarAmp::Preset p = GuitarAmp::fliptopDi();
     p.treble = p.bass = 0.5;
     p.cabinet = -1;
     GuitarAmp a(kFs, p);
-    // (The B-15's stack itself is 2.9 dB down at 40 Hz at noon (3.1's table: the 270 k from the
+    // (The fliptop's stack itself is 2.9 dB down at 40 Hz at noon (3.1's table: the 270 k from the
     // bass wiper): what is asked of the rest, the couplings, is to keep the E1.)
     const double e1 = rel(a, 3, 41.2) - rel(a, 1, 41.2), c30 = rel(a, 3, 30) - rel(a, 1, 30), st = rel(a, 1, 41.2);
-    GuitarAmp::Preset q = GuitarAmp::svt();
+    GuitarAmp::Preset q = GuitarAmp::bassStack();
     q.treble = q.bass = 0.5;
     q.cabinet = -1;
     q.voices = 0;
     GuitarAmp b(kFs, q);
     const double s1 = rel(b, 3, 41.2) - rel(b, 1, 41.2);
-    std::snprintf(d, sizeof d, "b15-di's couplings %+.2f dB at 41 Hz (%+.2f at 30), svt's %+.2f, against 200 Hz (the B-15's stack at noon itself %+.1f)", e1, c30, s1, st);
+    std::snprintf(d, sizeof d, "fliptop-di's couplings %+.2f dB at 41 Hz (%+.2f at 30), bassStack's %+.2f, against 200 Hz (the fliptop's stack at noon itself %+.1f)", e1, c30, s1, st);
     check(e1 > -1 && s1 > -1, "the amp keeps E1's fundamental", d);
   }
   // 3. The James stacks (3.1, 3.2), against noon at the same frequency.
@@ -101,25 +101,25 @@ int main() {
       p.treble = treble;
       return GuitarAmp(kFs, p);
     };
-    const GuitarAmp sn = stack(GuitarAmp::svt(), 0.5, 0.5), sb = stack(GuitarAmp::svt(), 1, 0.5), st = stack(GuitarAmp::svt(), 0.5, 1);
+    const GuitarAmp sn = stack(GuitarAmp::bassStack(), 0.5, 0.5), sb = stack(GuitarAmp::bassStack(), 1, 0.5), st = stack(GuitarAmp::bassStack(), 0.5, 1);
     double lo = 1e9, hi = -1e9;
     for (double f = 30; f <= 12000; f *= 1.05) { lo = std::min(lo, db(sn.response(1, f))); hi = std::max(hi, db(sn.response(1, f))); }
     const auto up = [](const GuitarAmp& a, const GuitarAmp& n, double f) { return db(a.response(1, f)) - db(n.response(1, f)); };
     std::snprintf(d, sizeof d, "noon %.1f .. %.1f dB from 30 Hz to 12 kHz (research -22.6 .. -21.5)", lo, hi);
-    check(hi - lo < 2 && lo > -23.5 && hi < -20.5, "SVT stack at noon", d);
+    check(hi - lo < 2 && lo > -23.5 && hi < -20.5, "bass stack stack at noon", d);
     const double b30 = up(sb, sn, 30), b100 = up(sb, sn, 100), t8 = up(st, sn, 8000), t12 = up(st, sn, 12000);
     std::snprintf(d, sizeof d, "bass full %+.1f dB at 30 Hz, %+.1f at 100 (+18, +14.8); treble full %+.1f at 8 kHz, %+.1f at 12 (+9.5, +12.5)", b30, b100, t8, t12);
-    check(std::fabs(b30 - 18) < 1 && std::fabs(b100 - 14.8) < 1 && std::fabs(t8 - 9.5) < 1 && std::fabs(t12 - 12.5) < 1.5, "SVT stack's range", d);
-    const GuitarAmp bn = stack(GuitarAmp::b15Di(), 0.5, 0.5), bb = stack(GuitarAmp::b15Di(), 1, 0.5), bt = stack(GuitarAmp::b15Di(), 0.5, 1),
-                    bz = stack(GuitarAmp::b15Di(), 0.5, 0);
+    check(std::fabs(b30 - 18) < 1 && std::fabs(b100 - 14.8) < 1 && std::fabs(t8 - 9.5) < 1 && std::fabs(t12 - 12.5) < 1.5, "bass stack stack's range", d);
+    const GuitarAmp bn = stack(GuitarAmp::fliptopDi(), 0.5, 0.5), bb = stack(GuitarAmp::fliptopDi(), 1, 0.5), bt = stack(GuitarAmp::fliptopDi(), 0.5, 1),
+                    bz = stack(GuitarAmp::fliptopDi(), 0.5, 0);
     const double c40 = up(bb, bn, 40), c5 = up(bt, bn, 5000), z5 = up(bz, bn, 5000), ins = db(bn.response(1, 1000));
     std::snprintf(d, sizeof d, "insertion %.1f dB at 1 kHz (-23.1); bass full %+.1f at 40 Hz (+14.9); treble full %+.1f at 5 kHz (+18.8), zero %+.1f (-17.4)", ins, c40, c5, z5);
-    check(std::fabs(ins + 23.1) < 1 && std::fabs(c40 - 14.9) < 1 && std::fabs(c5 - 18.8) < 1 && std::fabs(z5 + 17.4) < 1, "B-15 stack", d);
+    check(std::fabs(ins + 23.1) < 1 && std::fabs(c40 - 14.9) < 1 && std::fabs(c5 - 18.8) < 1 && std::fabs(z5 + 17.4) < 1, "fliptop stack", d);
   }
   // 4. The cabinets (4.3), against 200 Hz.
   {
     const auto cab = [](int c) {
-      GuitarAmp::Preset p = GuitarAmp::b15Di();
+      GuitarAmp::Preset p = GuitarAmp::fliptopDi();
       p.cabinet = c;
       return GuitarAmp(kFs, p);
     };
@@ -130,10 +130,10 @@ int main() {
               std::fabs(h + 1.6) < 1,
           "the cabinets", d);
   }
-  // 6. The blend: the DI and the mic (b15-di; svt) no weaker than the louder alone at 40-200 Hz,
+  // 6. The blend: the DI and the mic (fliptop-di; bassStack) no weaker than the louder alone at 40-200 Hz,
   // no notch deeper than 3 dB under 2 kHz.
   {
-    for (GuitarAmp::Preset p : {GuitarAmp::b15Di(), GuitarAmp::svt()}) {
+    for (GuitarAmp::Preset p : {GuitarAmp::fliptopDi(), GuitarAmp::bassStack()}) {
       GuitarAmp a(kFs, p);
       double low = 1e9, all = 1e9, lowF = 0, allF = 0;
       for (double f = 30; f <= 2000; f *= 1.02) {
@@ -158,7 +158,7 @@ int main() {
     const int n = int(2.0 * kFs);
     std::vector<double> y[2];
     for (int k = 0; k < 2; ++k) {
-      GuitarAmp::Preset p = GuitarAmp::b15Di();
+      GuitarAmp::Preset p = GuitarAmp::fliptopDi();
       p.blend = 1;
       p.dis = 0;
       p.studio = k ? 1 : 0;
@@ -171,18 +171,18 @@ int main() {
       for (int i = int(t0 * kFs); i < int(t1 * kFs); ++i) s += v[i] * v[i];
       return 10 * std::log10(s / (int(t1 * kFs) - int(t0 * kFs)) + 1e-30);
     };
-    const GuitarAmp::Preset p = GuitarAmp::b15Di();
+    const GuitarAmp::Preset p = GuitarAmp::fliptopDi();
     const double grEnd = p.stMakeup - (lvl(y[1], 1.5, 2.0) - lvl(y[0], 1.5, 2.0)), gr3 = p.stMakeup - (lvl(y[1], 0.3, 0.4) - lvl(y[0], 0.3, 0.4));
     const size_t per = size_t(std::lround(kFs / f * 41));  // (41 periods: 0.995 s)
     const double t0 = thd(y[0], size_t(kFs), per, f), t1 = thd(y[1], size_t(kFs), per, f);
     std::snprintf(d, sizeof d, "a 0.25 V E1: %.1f dB of gain reduction at 1.5-2 s, %.1f at 0.3-0.4 s", grEnd, gr3);
-    check(std::fabs(gr3 - grEnd) < 1 && grEnd > 1, "the LA-2A settles", d);
+    check(std::fabs(gr3 - grEnd) < 1 && grEnd > 1, "the optical compressor settles", d);
     std::snprintf(d, sizeof d, "THD %.3f %% with it, %.3f %% without", t1, t0);
-    check(t1 - t0 < 0.5, "the LA-2A leaves a held E1 clean", d);
+    check(t1 - t0 < 0.5, "the optical compressor leaves a held E1 clean", d);
   }
   // Every preset runs (a plucked-like burst, then silence): finite; the cost of each.
   {
-    for (GuitarAmp::Preset p : {GuitarAmp::b15Di(), GuitarAmp::svt(), GuitarAmp::slapDi(), GuitarAmp::slapSquash()}) {
+    for (GuitarAmp::Preset p : {GuitarAmp::fliptopDi(), GuitarAmp::bassStack(), GuitarAmp::slapDi(), GuitarAmp::slapSquash()}) {
       GuitarAmp a(kFs, p);
       a.connect(J, 700e-12);
       const int n = int(4 * kFs);

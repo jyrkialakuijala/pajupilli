@@ -8,7 +8,7 @@ their own experiments on a scratch copy of the code. Their reports are in `revie
 | `numerics.md` | The waveguide: stability, accuracy, losses, horn, grid |
 | `jet.md` | Jet, excitation, timbre, dynamics, noise, attacks |
 | `geometry.md` | Bore, tone holes, fingerings, intonation, cross-check with Dickens' code of the same flute |
-| `player.md` | Articulation, slurs, expressivity, MPK mapping, live loop |
+| `player.md` | Articulation, slurs, expressivity, controller mapping, live loop |
 | `code.md` | Vectorisation, performance, real-time safety, robustness, tests |
 
 ## Where we stand
@@ -57,7 +57,7 @@ their own experiments on a scratch copy of the code. Their reports are in `revie
    - G5 and C6 attacks squeal 15–18 dB above the steady tone.
    - Accents are inaudible: their 40 ms push is over before the tone builds.
    - "tu" and "du" are nearly identical.
-   - The MPK's velocity range (mostly < 64, max about 100) barely reaches the accent (> 90) and
+   - The controller's velocity range (mostly < 64, max about 100) barely reaches the accent (> 90) and
      pedal re-tongue (≥ 100) thresholds, and under the pedal a hard hit gives a soft "du".
    (player F4–F5, jet)
 7. **Live robustness.** (code, player)
@@ -65,7 +65,7 @@ their own experiments on a scratch copy of the code. Their reports are in `revie
      nothing resets the model.
    - If the ALSA device goes away, the real-time thread spins at 100 %.
    - The buffer isn't refilled after an underrun.
-   - The MPK doesn't reconnect after an unplug.
+   - The controller doesn't reconnect after an unplug.
    - Port rescans and `fprintf` run in the audio thread.
    - Startup calibration takes 1.7 s.
    - The first touch of a knob jumps, and volume changes aren't ramped.
@@ -100,7 +100,7 @@ Each step lands as knobs, off by default, then becomes the default after a liste
   - stop on an unrecoverable PCM error instead of spinning;
   - refill the buffer after an underrun;
   - move MIDI port scans and verbose printing to a helper thread with a lock-free queue;
-  - hot-replug the MPK by watching ALSA announce events.
+  - hot-replug the controller by watching ALSA announce events.
 - Set FTZ/DAZ explicitly. Bounds-check the CLI (`-imp`, `-dump`, `-o`).
 - Startup: run the per-note calibration in parallel threads (1.7 → 0.3 s) and cache it in a file
   keyed by a hash of the knobs.
@@ -273,7 +273,7 @@ embouchure the written one.
 ### Step 4 — Player and articulation (1–2 days) — player F1–F8
 - **Register kick.** When a slur or attack goes up a register, briefly add about +30 % pressure and
   −20 % jet length (tested: median settle about 170 → 50 ms). After step 3 it may need less.
-- **MPK velocity curve.** Thresholds relative to the keyboard's real range, and the pedal re-tongue
+- **controller velocity curve.** Thresholds relative to the keyboard's real range, and the pedal re-tongue
   logic fixed.
 - **Attacks.** Time the accent push to the tone build-up (60–70 ms), and give "tu" and "du"
   different seals and release times. Vibrato keeps its phase across tongued notes.

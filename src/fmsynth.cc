@@ -1,4 +1,4 @@
-#include "dx7.h"
+#include "fmsynth.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 
 namespace pajupilli {
 
-bool dx7Piano(const Instrument& inst) { return std::strcmp(inst.name, "electric-piano-2") == 0; }
+bool fmPiano(const Instrument& inst) { return std::strcmp(inst.name, "electric-piano-2") == 0; }
 
 namespace {
 
@@ -60,7 +60,7 @@ const Voice& voice() {
   return v;
 }
 
-// --- The DX7's tables and scalings (MSFA: env.cc, dx7note.cc).
+// --- The FM synth's tables and scalings (MSFA: env.cc, fmsynthnote.cc).
 
 int scaleOutLevel(int l) {
   static const int kLut[20] = {0, 5, 9, 13, 17, 20, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 42, 43, 45, 46};
@@ -98,7 +98,7 @@ int scaleLevel(int midi, int bp, int ld, int rd, int lc, int rc) {
 // log2 of a frequency, 2^24 an octave.
 int32_t logOf(double hz) { return int32_t(std::lround(std::log2(hz) * (1 << 24))); }
 
-// The operator's frequency (mode 0: a ratio). The detune as Dexed measured it on a DX7.
+// The operator's frequency (mode 0: a ratio). The detune as Dexed measured it on an FM synth.
 int32_t oscFreq(double noteHz, const OpParams& p) {
   int32_t lf = logOf(noteHz);
   if (p.mode == 0) {
@@ -137,7 +137,7 @@ constexpr int kLevelThresh = 1120;  // (MSFA: an operator below this gain, both 
 
 // --- The envelope (MSFA's Env, its steps at 44.1 kHz rescaled to our rate).
 
-void Dx7Model::Env::init(const int r[4], const int l[4], int ol, int rs, double scale) {
+void FmSynthModel::Env::init(const int r[4], const int l[4], int ol, int rs, double scale) {
   for (int i = 0; i < 4; ++i) rates[i] = r[i], levels[i] = l[i];
   outlevel = ol;
   rateScaling = rs;
@@ -147,7 +147,7 @@ void Dx7Model::Env::init(const int r[4], const int l[4], int ol, int rs, double 
   advance(0);
 }
 
-void Dx7Model::Env::advance(int i) {
+void FmSynthModel::Env::advance(int i) {
   ix = i;
   if (ix < 4) {
     int actual = scaleOutLevel(levels[ix]) >> 1;
@@ -162,7 +162,7 @@ void Dx7Model::Env::advance(int i) {
   }
 }
 
-int32_t Dx7Model::Env::step() {
+int32_t FmSynthModel::Env::step() {
   if (ix < 3 || (ix < 4 && !down)) {
     if (rising) {
       constexpr int32_t kJump = 1716;
@@ -183,7 +183,7 @@ int32_t Dx7Model::Env::step() {
   return level;
 }
 
-void Dx7Model::Env::keyDown(bool d) {
+void FmSynthModel::Env::keyDown(bool d) {
   if (down != d) {
     down = d;
     advance(d ? 0 : 3);
@@ -192,30 +192,30 @@ void Dx7Model::Env::keyDown(bool d) {
 
 // --- The model.
 
-Dx7Model::Dx7Model(const Instrument& inst) : Tube(inst) { (void)kSinInit; }
+FmSynthModel::FmSynthModel(const Instrument& inst) : Tube(inst) { (void)kSinInit; }
 
-void Dx7Model::resetAir() {
+void FmSynthModel::resetAir() {
   notes_.clear();
   pos_ = 64;
 }
 
-void Dx7Model::retune(Note& n) {
+void FmSynthModel::retune(Note& n) {
   const double k = std::exp2(bend_ / 12.0);
   for (Gen& g : n.gens)
     for (Op& o : g.op) o.freq = int32_t(std::lround(std::exp2(double(o.logfreq) / (1 << 24)) * k / instrument().fs * (1 << 24)));
 }
 
-void Dx7Model::keyOn(int midi, int velocity) {
+void FmSynthModel::keyOn(int midi, int velocity) {
   // How many generators (the unison of a piano's strings): one in the bass, two low, three from
   // the middle up (PJ_DX_ONE, PJ_DX_TWO: the lowest key with two, with three); 1/7 Hz apart
   // (PJ_DX_SPREAD x); their output levels (+-half a step: 0.4 dB) and envelope speeds (+-3 %)
-  // their own (PJ_DX_VARY x; the bass's one generator is the DX7's own).
+  // their own (PJ_DX_VARY x; the bass's one generator is the FM synth's own).
   static const int kTwo = int(knob("PJ_DX_ONE", 36)), kThree = int(knob("PJ_DX_TWO", 48));
   static const double kSpread = knob("PJ_DX_SPREAD", 1.0), kVary = knob("PJ_DX_VARY", 1.0);
-  static const int kMax = int(knob("PJ_DX_POLY", 32));  // notes at once (the DX7's 16 voices; here more)
+  static const int kMax = int(knob("PJ_DX_POLY", 32));  // notes at once (the FM synth's 16 voices; here more)
   const Voice& v = voice();
   const int ng = midi < kTwo ? 1 : midi < kThree ? 2 : 3;
-  // A key struck again: its sounding note goes on in its release, a new one starts (as on a DX7).
+  // A key struck again: its sounding note goes on in its release, a new one starts (as on an FM synth).
   for (Note& n : notes_)
     if (n.midi == midi && n.down) {
       n.down = false;
@@ -264,7 +264,7 @@ void Dx7Model::keyOn(int midi, int velocity) {
   notes_.push_back(std::move(n));
 }
 
-void Dx7Model::keyOff(int midi) {
+void FmSynthModel::keyOff(int midi) {
   for (Note& n : notes_)
     if (n.midi == midi && n.down) {
       n.down = false;
@@ -273,14 +273,14 @@ void Dx7Model::keyOff(int midi) {
     }
 }
 
-void Dx7Model::setBend(double semitones) {
+void FmSynthModel::setBend(double semitones) {
   if (semitones == bend_) return;
   bend_ = semitones;
   for (Note& n : notes_) retune(n);
 }
 
-// One block of 64 samples (the envelopes step once a block, as the DX7's do in MSFA's engine).
-void Dx7Model::block() {
+// One block of 64 samples (the envelopes step once a block, as the FM synth's do in MSFA's engine).
+void FmSynthModel::block() {
   constexpr int N = 64;
   std::fill(buf_, buf_ + N, 0.0f);
   const Voice& v = voice();
@@ -335,7 +335,7 @@ void Dx7Model::block() {
   notes_.erase(std::remove_if(notes_.begin(), notes_.end(), [](const Note& n) { return n.quiet > 4; }), notes_.end());
 }
 
-float Dx7Model::sample() {
+float FmSynthModel::sample() {
   if (pos_ >= 64) {
     block();
     pos_ = 0;
@@ -347,9 +347,9 @@ float Dx7Model::sample() {
 
 // --- The player.
 
-Dx7Player::Dx7Player(Dx7Model& m) : Performer(m), m_(m) {}
+FmSynthPlayer::FmSynthPlayer(FmSynthModel& m) : Performer(m), m_(m) {}
 
-void Dx7Player::noteOn(int midi, int velocity) {
+void FmSynthPlayer::noteOn(int midi, int velocity) {
   if (midi < 0 || midi > 127) return;
   articulate(midi, velocity, false);
   keyDown_[midi] = sounding_[midi] = true;
@@ -359,7 +359,7 @@ void Dx7Player::noteOn(int midi, int velocity) {
   m_.keyOn(midi, std::clamp(int(std::lround(velocity * hardness_)), 1, 127));
 }
 
-void Dx7Player::noteOff(int midi) {
+void FmSynthPlayer::noteOff(int midi) {
   if (midi < 0 || midi > 127) return;
   keyDown_[midi] = false;
   if (!hold_) {
@@ -368,7 +368,7 @@ void Dx7Player::noteOff(int midi) {
   }
 }
 
-void Dx7Player::setHold(bool h) {
+void FmSynthPlayer::setHold(bool h) {
   hold_ = h;
   if (!h)
     for (int k = 0; k < 128; ++k)
@@ -378,7 +378,7 @@ void Dx7Player::setHold(bool h) {
       }
 }
 
-void Dx7Player::render(float* out, int n) {
+void FmSynthPlayer::render(float* out, int n) {
   constexpr int kBlock = 64;
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);

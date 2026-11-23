@@ -20,7 +20,7 @@ bool electricBassInstrument(const Instrument& inst) {
 
 namespace {
 
-// The Jazz Bass slapped (research/slap_bass_1.md 5.1-5.2, slap_bass_2.md 5.2): the frets as
+// The two-pickup bass slapped (research/slap_bass_1.md 5.1-5.2, slap_bass_2.md 5.2): the frets as
 // obstacles, the modes to 10 kHz (the slap's 2-8 kHz; 128 reach 10.9 kHz on the open E). The
 // action at the 17th fret (PJ_SLAP_ACTION, mm on the E; the others a little lower as set up),
 // the relief (PJ_SLAP_RELIEF, mm); PJ_SLAP_FRETS=0: no frets (to hear what they make). GM 38: new
@@ -28,8 +28,8 @@ namespace {
 // research's 0.65 came out brighter than every reference set).
 // GM 34 (the finger bass) gets the frets only with PJ_EBASS_FRETS=1.
 GuitarSpec bassFor(const Instrument& inst) {
-  if (pickBassInstrument(inst)) return precisionBass();
-  GuitarSpec g = jazzBass();
+  if (pickBassInstrument(inst)) return splitCoilBass();
+  GuitarSpec g = twoPickupBass();
   const int slap = slapBassInstrument(inst);
   if (!slap) {
     if (knob("PJ_EBASS_FRETS", 0) > 0.5) g.fretContact = true;
@@ -117,9 +117,9 @@ ElectricBassModel::ElectricBassModel(const Instrument& inst)
   a2_ = (A * c * c - Bq * c + D) / a0;
   out_ = knob("PJ_EBASS_OUT", 1.0);
   // The amp and the studio after it (unless PJ_EBASS_DI): told the same coils, pots and cable.
-  // GM 34 the B-15 and the DI, an LA-2A; GM 35 the SVT and its 8x10 with the DI, an 1176.
+  // GM 34 the fliptop and the DI, an optical compressor; GM 35 the bass stack and its 8x10 with the DI, a FET compressor.
   if (knob("PJ_EBASS_DI", 0) > 0) return;
-  amp_.reset(new GuitarAmp(inst.fs, pick ? GuitarAmp::svt() : slap == 1 ? GuitarAmp::slapDi() : slap == 2 ? GuitarAmp::slapSquash() : GuitarAmp::b15Di()));
+  amp_.reset(new GuitarAmp(inst.fs, pick ? GuitarAmp::bassStack() : slap == 1 ? GuitarAmp::slapDi() : slap == 2 ? GuitarAmp::slapSquash() : GuitarAmp::fliptopDi()));
   amp_->connect({L, R, coilC, pots}, cable);
 }
 

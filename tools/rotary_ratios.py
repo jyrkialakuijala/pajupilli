@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Leslie cabinets' speeds chosen away from small whole-number ratios.
+"""The Rotary cabinets' speeds chosen away from small whole-number ratios.
 
 Several rotors turning at speeds in a simple ratio (3:2, 6:5, 8:5 ...) fall into step: their
 swirls line up again and again, a pattern that repeats. Speeds far from every simple ratio drift
@@ -13,14 +13,14 @@ wider the berth it wants (3 % from 4/5 as bad as 1 % from 15/17; nothing over 17
 set's score is its single worst cross ratio's d (the closest miss decides, no sum). Larger is
 better.
 
-The rotors (src/hammond.cc, src/leslie.cc): cabinet c's speed factor f_c (1, 1/step, 1/step^2,
+The rotors (src/tonewheel.cc, src/rotary.cc): cabinet c's speed factor f_c (1, 1/step, 1/step^2,
 step: the user's "17 % less, 17 % less again, 17 % more"); its horn at slow 0.80 f_c, fast 6.67 f_c;
 its drum at the horn's speed over its ratio: the first cabinet's own (h, slow and fast), the others
 the published 122's (1.20 slow, 1.17 fast). Slow and fast are scored apart (all the rotors run on
 one switch).
 
-  python3 tools/leslie_ratios.py [--q 10] [--free-pub] [--n 400000]
-  python3 tools/leslie_ratios.py --four [--rotors]   (1.0 and three free factors, every cross ratio)
+  python3 tools/rotary_ratios.py [--q 10] [--free-pub] [--n 400000]
+  python3 tools/rotary_ratios.py --four [--rotors]   (1.0 and three free factors, every cross ratio)
 
 (Several cabinets turn at exactly their factors in the model: a lone cabinet's +-3 % pulley
 spread would move every ratio by more than these optima differ.)

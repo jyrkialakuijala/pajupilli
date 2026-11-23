@@ -7,8 +7,8 @@
 //   ./pajupilli -inst piccolo ...         piccolo, alto or bass flute, flute-c (default: flute, B foot);
 //                                     notes are sounding MIDI pitches
 //   ./pajupilli -h                        all options
-//   ./pajupilli -live                     play it from the MPK mini mk3
-//       [-dev hw:0] [-midi MPK] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
+//   ./pajupilli -live                     play it from the 25-key MIDI controller
+//       [-dev hw:0] [-midi controller] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
 #include <cmath>
 #include <memory>
 #include <random>
@@ -360,10 +360,10 @@ const char kUsage[] =
     "                      -inst flute-c\n"
     "\n"
     "Modes:\n"
-    "  -live               play from a MIDI keyboard (Akai MPK mini mk3)\n"
+    "  -live               play from a MIDI keyboard\n"
     "  -selftest           -live without a keyboard: plays an arpeggio\n"
     "  -inst drums         (live) the drum kit on the keys and the pads, as General\n"
-    "                      MIDI's drum keys: the MPK's lowest C the bass drum (36)\n"
+    "                      MIDI's drum keys: the keyboard's lowest C the bass drum (36)\n"
     "  -pads drums         (live) the pads play the drum kit beside any instrument\n"
     "                      (bank A 36..43, bank B 44..51) instead of breath and flutter\n"
     "  -note M             play one note, print its pitch\n"
@@ -405,7 +405,7 @@ const char kUsage[] =
     "  -reinstrument R     with -play: FROM=TO[,FROM=TO]: a channel's instrument\n"
     "                      (a name, a family, or * for all but the drums) on\n"
     "                      another (organ: the church organ by its plan), e.g.\n"
-    "                      -reinstrument grand-piano=organ,piano=hammond\n"
+    "                      -reinstrument grand-piano=organ,piano=tonewheel\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
@@ -418,7 +418,7 @@ const char kUsage[] =
     "\n"
     "Live options:\n"
     "  -dev PCM            ALSA device (default: default, via PipeWire)\n"
-    "  -midi NAME          MIDI client name to connect to (default: MPK)\n"
+    "  -midi NAME          MIDI client name to connect to\n"
     "  -period N           frames per period (default 64)\n"
     "  -periods N          periods in the buffer (default 3)\n"
     "  -transpose N        keys to sounding pitch (default: the lowest C plays\n"

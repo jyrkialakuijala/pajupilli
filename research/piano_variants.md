@@ -7,7 +7,7 @@ not repeat what those cover.
 
 Targets: GM 2 Bright Acoustic Piano, GM 4 Honky-tonk Piano (and the plain upright behind it),
 tack and prepared piano (brief), toy piano, GM 9 Celesta and GM 11 Music Box. GM 3 Electric Grand
-(the Yamaha CP-70/80) comes up under GM 2 because studios use the two together.
+(the smaller electric grand/80) comes up under GM 2 because studios use the two together.
 
 Tags, as in piano.md: **[web]** from a source in section 9; **[calc]** computed here (the script
 is plain beam and contact formulas, E = 200 GPa and ρ = 7850 kg/m³ for steel unless stated);
@@ -18,7 +18,7 @@ on it. Values in the "plan" lines are starting choices for the model, not claims
 
 - **Bright Acoustic Piano is the same grand, voiced and miked differently.** Use harder felt
   (K × 2–4 from the middle up, or a steeper hardening exponent), the lid open and microphones
-  close over the hammers. A Yamaha C7 (2.27 m) is the studio favourite and has been "among the
+  close over the hammers. A 227 cm grand (2.27 m) is the studio favourite and has been "among the
   brightest sounding" since the 1970s **[web]**. The grand model has all the knobs already:
   `setVoicing`, `PJ_PIANO_COLOUR`, `PJ_PIANO_MICX/MICZ/MICBASS/MICTREBLE`. This needs no new
   physics, only a second voicing table and a mic preset. Cost is the grand's: 8 % of a core for
@@ -32,7 +32,7 @@ on it. Values in the "plan" lines are starting choices for the model, not claims
   bridge is already modelled: beyond about 0.3 Hz the strings beat instead of locking **[web,
   Weinreich]**, so the double decay goes away by itself.
 - **A real upright needs a second scale and a second board, not a second model.** Shorter bass:
-  the lowest string is 1.19 m on a Yamaha U1 and 1.21 m on a U3 **[web]**, against about 2.0 m on
+  the lowest string is 1.19 m on a 121 cm upright and 1.21 m on a U3 **[web]**, against about 2.0 m on
   a concert grand. That gives about 3–10 times the inharmonicity in the bass and low tenor. B
   reaches 10⁻³ in an upright's bass, against about 10⁻⁴ on a large grand **[web, Dalmont 2021]**.
   The board is 1.38–1.53 m² (U1, U3 **[web]**) against the model grand's 1.98 m². It stands
@@ -65,7 +65,7 @@ on it. Values in the "plan" lines are starting choices for the model, not claims
   f2/f1 is about 6.27 unweighted and up to about 7 with tip mass (the kalimba FE table). It is
   `ModalSet` with `pluck`, as the kalimba, with a fast slip, long decays and a small box. Under 1 %.
 
-## 2. GM 2 Bright Acoustic Piano (and the CP-70)
+## 2. GM 2 Bright Acoustic Piano (and the smaller electric grand)
 
 **What it means physically.** GM names a timbre, not an instrument. In hardware GM sets it is a
 brighter recording of the grand. Studios get that sound from:
@@ -78,8 +78,8 @@ brighter recording of the grand. Studios get that sound from:
 - **Mics close over the hammers, lid open or off.** This is common pop practice at about 15–30 cm
   over the hammer line **[memory]**. The direct sound of the strings near the strike point and the
   hammer's knock dominate the board's radiation.
-- **The instrument.** Yamaha C7 (7'6" = 2.29 m **[web]**) is "heavily recorded on pop records"
-  **[web]**. In 1977 Yamaha was "considered to be among the brightest sounding" for studio use
+- **The instrument.** 227 cm grand (7'6" = 2.29 m **[web]**) is "heavily recorded on pop records"
+  **[web]**. In 1977 one maker was "considered to be among the brightest sounding" for studio use
   **[web, RE/P]**.
 
 **How far.** Three recorded concert grands already spread by 10–20 dB in the 2–4 kHz share of a
@@ -100,7 +100,7 @@ model at −25 to −35 (piano.md, 11). A "bright" preset should sit above the b
   register and loudness third. The decays must stay the grand's, since only the felt and the mic
   change.
 
-**Yamaha CP-70/80 (for GM 3, and the "bright" pop piano of the 1970s–80s).**
+**smaller electric grand/80 (for GM 3, and the "bright" pop piano of the 1970s–80s).**
 - It is a real piano action and real strings, with a piezo pickup per string under the bridge and
   no soundboard to speak of **[web]**.
 - The bass strings are about 67.9 cm long (26¾"). The lowest 15 keys have one string each and the
@@ -122,7 +122,7 @@ model at −25 to −35 (piano.md, 11). A "bright" preset should sit above the b
 | Lowest plain string | 1.90 m (model fit) | about 0.9–1.1 m; the bass bridge carries keys 1 to about 28 | [memory] |
 | Middle C and up | 0.62–0.70 m at C4; the treble scale is nearly the same on all pianos | same within about 10 % from C5 up | [memory] |
 | B, lowest strings | about 1e-4 (8e-5 model A0) | up to 1e-3 | [web, Dalmont 2021] |
-| B, bass of a Yamaha C109 upright | | 4.5e-4 falling to 3.2e-4 across the bass | [web, secondary summary of Dalmont; unverified] |
+| B, bass of a one maker C109 upright | | 4.5e-4 falling to 3.2e-4 across the bass | [web, secondary summary of Dalmont; unverified] |
 | B, lowest plain string | 7.5e-5 (key 24, fitted) | about 8 × that if 1.0 m and 1.05 mm wire: about 6e-4 | [calc, B ∝ d² / (L⁴ f²)] |
 | B, wound A0 at 1.19 m | 8e-5 | 2.3e-4 (same core and tension, B ∝ L⁻²) | [calc] |
 | Soundboard | 1.98 m² (model), 2 m² (literature) | 1.38 m² (U1), 1.53 m² (U3); the measured board was 1.39 × 0.91 m, 9 kg | [web] |
@@ -157,7 +157,7 @@ model at −25 to −35 (piano.md, 11). A "bright" preset should sit above the b
   felt "almost completely robs the piano sound of its brilliance" **[web]**. Players have to hit
   harder **[web]**. In the high treble, or with the pedal down, the felt can make neighbouring
   undamped strings sound **[web, PTG]**.
-- No measured spectra were found. Pianoteq makes the pedal continuous with an adjustable felt
+- No measured spectra were found. a commercial piano model makes the pedal continuous with an adjustable felt
   thickness **[web]**, i.e. a modelled series spring.
 - **Plan:** a second, soft spring in series with the hammer felt. Strip thickness is about 2–5 mm
   **[memory]**; stiffness about 1/10–1/30 of the middle hammer's K at the same compression, p about
@@ -346,7 +346,7 @@ Beat rates **[calc]** (between centre and outer string; partial n beats n times 
 **The instrument.**
 - Mustel, Paris, 1886: 49 bars, four octaves at first; now 4, 5 or 5½ octaves (C4–C8, C3–C8,
   C3–F8 sounding). It is written an octave below sounding and tuned at 442–446 Hz **[web, VSL,
-  UBC]**. Makers today: Schiedmayer, Yamaha **[web]**.
+  UBC]**. Makers today: Schiedmayer, one maker **[web]**.
 - Bars: steel alloy, 20–30 mm wide, about 2 mm thick in the treble and 2.5 mm in the bass. They
   are supported at the nodes, 22.4 % of the length from each end. The low bars carry end weights
   **[web, UBC from Yamaha]**.
@@ -465,7 +465,7 @@ nodes of mode 1 are at 0.224 L, which matches the 22.4 %. Uniform bars, 25 mm wi
 | Instrument | Engine | New code | Main parameters | Cost (one core) |
 |---|---|---|---|---|
 | Bright piano (GM 2) | `Piano` (grand design) | voicing table, close-mic bridge pickup | K × 2–4 from key 30 up; mics 0.25 m over the hammers | 8 % one note, 29 % pedal |
-| CP-70 (GM 3) | `Piano` | rigid-bridge "board", piezo output | CP scale (bass 0.68 m, 1–2 strings), B about 7e-4 at A0 | about 5–20 % |
+| smaller electric grand (GM 3) | `Piano` | rigid-bridge "board", piezo output | CP scale (bass 0.68 m, 1–2 strings), B about 7e-4 at A0 | about 5–20 % |
 | Upright | `Piano` with a `PianoDesign` | design struct; upright board from `pianoboard.py` | lengths 1.19 m down; B 2–6e-4 in the bass; 1.38 m² board; wall reflection | about as the grand |
 | Honky-tonk (GM 4) | upright design | mistuning pattern, worn felt, false beats | ±4–8 c outer strings, random screamers; K × 2–3; loss × 1.5–2 | as the upright |
 | Moderator | `Piano::hammer` | series felt spring | strip K about 1/10–1/30, hamW 20–30 mm | none |

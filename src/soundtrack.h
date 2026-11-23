@@ -1,7 +1,7 @@
 // General MIDI 98, "FX 2 (soundtrack)" (-inst fx-soundtrack): a keyed aeolian harp
 // (research/fx_sounds.md).
 //
-// The classic patch (Roland's D-50 "Soundtrack", kept by every General MIDI set) is a dark,
+// The classic patch (a classic digital synth's "Soundtrack", kept by every General MIDI set) is a dark,
 // chorused pad of the note and its fifth. Here it is strings sung by the wind. Each key has a
 // course of four nylon strings: three on the note (a few cents apart, by their tensions: they
 // beat, a chorus) and one on its fifth (3:2). A blower keeps a steady wind (shared by every key,
@@ -113,7 +113,7 @@ class AeolianModel : public Tube {
 };
 
 // Velocity is the shutter's width and speed; the sustain pedal holds the keys; the pitch bend is
-// +-2 semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"): K1 the wind's gusts (turned up,
+// +-2 semitones. Knobs (the controller's K1-K4, -seq's "knob K X"): K1 the wind's gusts (turned up,
 // the level and the brightness breathe; a note struck in a strong gust may not catch), K2 the
 // swell's time, K3 the fifth, K4 the strings' ring.
 class AeolianPlayer : public Performer {

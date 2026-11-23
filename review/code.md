@@ -116,7 +116,7 @@ While keys move, `controlStep` (which runs `updateHoles` and the full `Bore::upd
 
 **3. Live loop: MIDI hot-replug is missing, and the rescan runs in the audio thread (RT, UX).
 Effort M, risk low.**
-- `midi.connected` never goes back to false. If the MPK is unplugged and replugged, nothing
+- `midi.connected` never goes back to false. If the controller is unplugged and replugged, nothing
   reconnects it.
 - The once-a-second rescan (`connectSources`, seq ioctls, and fprintf with `verbose=true`
   hard-coded) runs between `render` and `writei`.

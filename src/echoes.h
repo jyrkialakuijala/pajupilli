@@ -1,13 +1,13 @@
 // General MIDI 103, "FX 7 (echoes)" (-inst fx-echoes): a tuning-fork keyboard played into a
 // tape echo (research/fx_sounds.md).
 //
-// The classic patch (Roland's "Echo Drops", Yamaha's "Echoes") is not a delay effect: in the
+// The classic patch (one maker's "Echo Drops", one maker's "Echoes") is not a delay effect: in the
 // three SoundFonts it is a choir "aah" and a near-sine synth voice whose looped samples swell and
 // dip every 0.5 .. 1 s (the loops' own period, following the key), panned apart in FluidR3, with a
-// 5 s release in FluidR3; Roland's is described as two chorus-like sweeping tones that burst into
+// 5 s release in FluidR3; one maker's is described as two chorus-like sweeping tones that burst into
 // "drops" at the key-up. Here the echoes are real, and made by the machine that made echoes in
 // the 1970s: a tape loop running past an erase head, a record head and two playback heads
-// (Roland's RE-201 Space Echo and the Echoplex are this machine).
+// (the tape echo and the tape echo are this machine).
 //
 // The source is a dulcitone (Machell, 1880s): a tuning fork a key, struck by a felt hammer, its
 // stem on a resonance box tuned to it, picked up by a microphone. A fork is the nearest a struck
@@ -117,7 +117,7 @@ class EchoesModel : public Tube {
 };
 
 // Velocity is the hammer's speed; the sustain pedal holds the dampers off; the pitch bend is
-// +-2 semitones (the forks; the tape's echoes keep what was recorded). Knobs (the MPK's K1-K4,
+// +-2 semitones (the forks; the tape's echoes keep what was recorded). Knobs (the controller's K1-K4,
 // -seq's "knob K X"): K1 the tape's speed (the echo interval), K2 the intensity (the repeats), K3
 // the echo's volume, K4 the tape's wear.
 class EchoesPlayer : public Performer {

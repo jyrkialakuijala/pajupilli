@@ -8,7 +8,7 @@ by more than half a JND. Medians are over the instruments.
      2.5 dB against 0.55–1.2 dB for the fonts. pajupilli is outside, and less even, in 97 of 128.
    - Brightness scatter is more uneven in 62 (none more even).
    - The legato scale is less even in 40 (more even in 1).
-   - Part of it is deliberate: Rhodes voicing, the guitarist's choice of string, choir sections
+   - Part of it is deliberate: tine piano voicing, the guitarist's choice of string, choir sections
      covering parts of the range. Part of it is the room: near-sines and their reflections add or
      cancel key by key, 3.9 dB in the hall against 0.5 dB dry in the fx-echoes note.
    - Part is the probe: keys outside an instrument's compass are folded by octaves.

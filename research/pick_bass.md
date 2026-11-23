@@ -3,12 +3,12 @@
 Status: research 2026-11-20; **built the same day** (`-inst pick-bass`; see §12, "As built", for
 what was built and where it departs from §9). Before the build GM 35 "Electric Bass (pick)" fell
 back to `double-bass` (`src/midifile.cc` kGm: `{"pick-bass", "double-bass"}`, which now finds the
-pick bass first), and the "svt" amp preset was unused.
+pick bass first), and the "bass-stack" amp preset was unused.
 
 This document adds to three earlier ones and does not repeat them:
 - `research/bass_section.md`: strings, inharmonicity, losses, neck dead spots, P and J pickup
   positions and coils (§2–5), and the first short notes on the pick (§6.2).
-- `research/bass_amps.md`: the B-15, SVT, DI, cabinets and compression, and the "svt" preset for
+- `research/bass_amps.md`: the fliptop, bass stack, DI, cabinets and compression, and the "bass-stack" preset for
   GM 35 (§10.2) with its checks (§10.6).
 - `research/electric_guitars.md` §7–8 and `research/steel_guitar.md` §4.1: the pick and the palm
   on the guitar.
@@ -42,12 +42,12 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
 
 ## Short answer
 
-1. **Which bass.** The GM "pick bass" is a Fender **Precision** with **roundwounds**, picked over
+1. **Which bass.** The GM "pick bass" is an American amp **Precision** with **roundwounds**, picked over
    or near the pickup, into an amp: a bright, mid-forward note with a defined attack **[E, from
    §5 and §6]**. FluidR3's GM 35 is a real bass sampled string by string and fret by fret. Its
    open E has a dip at the 6th harmonic, which is where the P's E/A half-coil has its comb notch
    **[T]**. Variants are the 1960s session sound (P, flatwounds, a felt mute, a hard pick:
-   Carol Kaye) and the Rickenbacker growl (Squire, Lemmy). These belong behind knobs, not in the
+   Carol Kaye) and the through-neck bass growl (Squire, Lemmy). These belong behind knobs, not in the
    default.
 2. **Pick against finger, measured in the project's string model [T].**
    - At the same depth and angle, the existing `Guitar::pick` gives **+25 dB more energy above
@@ -90,7 +90,7 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
    No new mute code is needed; the work is in the numbers and the player.
 6. **The build** (§9): a `precisionBass()` spec, a `PickBassPlayer` (down/up strokes, place,
    pick, mute), a new `Guitar::pickContact` (displacement-controlled push, then a slip), and the
-   "svt" amp preset as it is. The tests are in §9.6.
+   "bass-stack" amp preset as it is. The tests are in §9.6.
 
 ---
 
@@ -104,18 +104,18 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
 | Palm | `Guitar::mute(s, depth, at)`: each mode loses `depth`·(its shape² under a 12 mm hand)/(the fundamental's), saturating at `palmSat` = 30× | reuse; the numbers are in §4.5 |
 | Player | `ElectricBassPlayer`: the fingering solver, one-voice lines, note-off damping, bends | copy its solver; replace the fingers with a pick |
 | DI | `ElectricBassModel`'s biquad (coil + pots + cable into 1 MΩ) | reuse with P values |
-| Amp | `GuitarAmp::svt()` (`src/guitaramp.cc` 204–245): SVT preamp and James stack, mid +3 dB at 800 Hz, 6550 power with sag, 8×10 + D112, DI 35 %, 1176 4:1 0.8 ms/150 ms; knobs `PJ_BAMP_*` | reuse; built for exactly this |
+| Amp | `GuitarAmp::bassStack()` (`src/guitaramp.cc` 204–245): bass stack preamp and James stack, mid +3 dB at 800 Hz, 6550 power with sag, 8×10 + kick-drum microphone, DI 35 %, FET compressor 4:1 0.8 ms/150 ms; knobs `PJ_BAMP_*` | reuse; built for exactly this |
 
 ---
 
 ## 2. The instruments
 
-### 2.1 Fender Precision Bass (the default)
+### 2.1 split-coil bass (the default)
 
 - **What sets its sound** is the split coil. The E/A half sits about 148–152 mm from the saddle
   (0.172 L) and the D/G half about 121–125 mm (0.142 L). Each coil is 6.4–7 H and 10.5–12 kΩ;
   one volume and one tone (250 k, 0.047 µF) **[bass_section.md §3, web: pickup-position-db,
-  Fender]**.
+  American amp]**.
 - **Combs** (from bass_section.md §3.1's table): the E/A half has its notch at the open string's
   6th harmonic (−19 dB), the D/G half at the 7th (−37 dB) and the 14th.
 - **The loaded resonance** is near 2.0–2.4 kHz with 700 pF. That is less top than a J (4.4 kHz
@@ -130,7 +130,7 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
   −7 / −2 / 0 / −2 / −8 / −16 / −21 / −22 dB. A dip at 6–7 fits a P's E/A coil better than a
   J **[T]**. The evidence is moderate: the 7th is also low, and an amp and a mic sit between.
 
-### 2.2 Rickenbacker 4001 / 4003
+### 2.2 through-neck bass 4001 / 4003
 
 - **Build** **[memory]**:
   - neck-through maple body, 33¼ in. (845 mm) scale, 20 frets;
@@ -144,10 +144,10 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
 - **Its sound** **[memory]**: the bridge pickup very near the saddle gives a thin, nasal, "clank"
   register, with a fundamental 15–20 dB under the 5th–10th harmonics, like the J bridge '70s
   column of bass_section.md §3.1. Roundwounds, a pick and amp grind give the growl.
-- **For the model:** a `rickenbacker()` spec (845 mm, neck tap ~180 mm and bridge tap ~40 mm from
+- **For the model:** a `throughNeckBass()` spec (845 mm, neck tap ~180 mm and bridge tap ~40 mm from
   the saddle **[E, unmeasured]**). It is a variant, not GM 35's default.
 
-### 2.3 Music Man StingRay
+### 2.3 active single-humbucker bass
 
 - **Pickup and preamp:**
   - one large humbucker (two coils, wired in parallel) set "well back toward the bridge", closer
@@ -195,13 +195,13 @@ energy above 2 kHz in the first 100 ms against all of it. "Centroid" is the firs
 
 | Player / style | Bass, strings | Pick technique | Chain | For the model |
 |---|---|---|---|---|
-| **Carol Kaye** (LA sessions 1963–70s; Beach Boys, Motown's LA sessions, film) | Fender P; flatwounds (Thomastik JF344 heavy is reported) **[web, Reverb; GuitarWorld]** | a **hard teardrop pick**; "pick at the end of the neck, not anywhere near the bridge"; a doubled piece of felt taped over the strings where they leave the bridge "cuts the overtones and the undertones" **[web, Reverb, GuitarWorld, Premier Guitar]**; "98 % of the things cut in Hollywood in the '60s were done with a pick on flatwound strings" **[web, GuitarWorld]** | DI and/or a small amp (B-15) **[memory]** | pick at **22–27 cm** from the saddle (the neck's end on a 20-fret P: 0.864·2^(−20/12) = 27 cm **[E]**); a **light, permanent mute** near the saddle (`mute` depth ~1.5–2.5 at 8–20 mm, §4.5); flats; stiff pick, so a fast release |
-| **Paul McCartney** | Höfner 500/1 (short scale, flats) to 1965; then Rickenbacker 4001S with roundwounds (Rotosound) from about *Rubber Soul* / *Paperback Writer* **[memory]** | pick, melodic, often with the pick near the neck pickup **[memory]** | Vox, Fender Bassman, DI at Abbey Road **[memory]** | the Rick spec; neck pickup; a moderate amp |
-| **Chris Squire** (Yes) | Rickenbacker 4001, Rotosound Swing Bass roundwounds, standard gauge **[web, GuitarWorld]** | heavy pick, hard attack, "between the pickups" (forum) **[web, Harmony Central]** | stereo: neck clean for the low end, bridge to fuzz/a Marshall guitar amp **[web, GuitarWorld]** | the Rick spec, two outputs: a clean low path plus a driven bridge path, blended; bright rounds |
-| **Lemmy** (Hawkwind, Motörhead) | Rickenbacker 4001/4004LK, rounds **[memory]** | heavy pick, near the bridge, chords and drones (open A/E under fretted D/G notes) **[web, GuitarWorld; guides]** | Marshall Super Bass 100 W: "bass off, treble off, middle full on, presence at about three o'clock, volume at two o'clock, no effects" **[web, GuitarWorld interview]** | double stops and drones (the player must let strings ring together); a guitar-type Marshall preset with mids full and heavy power-amp drive; 4×12 or 4×15 cabinet |
-| **Punk** (Dee Dee Ramone, Paul Simonon, J.J. Burnel) | P basses, rounds **[memory]** | **downstrokes only** on fast eighths (Ramones), palm on or off **[memory]** | SVT or Hiwatt/Marshall with grind **[memory]** | down-only at IOI ≥ 0.15 s; the same stroke every time (the variance from §4.4 only); grind on |
-| **1970s rock pick, mid-forward** (John Deacon, Roger Glover, Geddy Lee early) | P/Rick, rounds **[memory]** | pick over the pickup, alternate | SVT, miked 8×10 + DI **[bass_amps.md §2.2]** | the default: P, rounds, alternate strokes, ~10–12 cm, "svt" |
-| **Modern rock** (Mike Dirnt, Duff McKagan, Chris Wolstenholme, Justin Chancellor) | P / PJ / StingRay / Wal, rounds **[memory]** | pick near the bridge, hard, palm-muted eighths in verses, open in choruses **[memory]** | DI + SansAmp-type drive + amp, heavy compression, a high-pass on the drive path **[memory; bass_amps.md §5.3]** | mute on low velocities or by a CC; a parallel drive (exists in guitaramp as the "SansAmp-like drive") |
+| **Carol Kaye** (LA sessions 1963–70s; Beach Boys, Motown's LA sessions, film) | American amp P; flatwounds (Thomastik JF344 heavy is reported) **[web, Reverb; GuitarWorld]** | a **hard teardrop pick**; "pick at the end of the neck, not anywhere near the bridge"; a doubled piece of felt taped over the strings where they leave the bridge "cuts the overtones and the undertones" **[web, Reverb, GuitarWorld, Premier Guitar]**; "98 % of the things cut in Hollywood in the '60s were done with a pick on flatwound strings" **[web, GuitarWorld]** | DI and/or a small amp (fliptop) **[memory]** | pick at **22–27 cm** from the saddle (the neck's end on a 20-fret P: 0.864·2^(−20/12) = 27 cm **[E]**); a **light, permanent mute** near the saddle (`mute` depth ~1.5–2.5 at 8–20 mm, §4.5); flats; stiff pick, so a fast release |
+| **Paul McCartney** | short-scale violin bass (short scale, flats) to 1965; then through-neck bass 4001S with roundwounds (Rotosound) from about *Rubber Soul* / *Paperback Writer* **[memory]** | pick, melodic, often with the pick near the neck pickup **[memory]** | Vox, American amp tweed 4x10 amp, DI at Abbey Road **[memory]** | the Rick spec; neck pickup; a moderate amp |
+| **Chris Squire** (Yes) | through-neck bass 4001, Rotosound Swing Bass roundwounds, standard gauge **[web, GuitarWorld]** | heavy pick, hard attack, "between the pickups" (forum) **[web, Harmony Central]** | stereo: neck clean for the low end, bridge to fuzz/a British stack guitar amp **[web, GuitarWorld]** | the Rick spec, two outputs: a clean low path plus a driven bridge path, blended; bright rounds |
+| **Lemmy** (Hawkwind, Motörhead) | through-neck bass 4001/4004LK, rounds **[memory]** | heavy pick, near the bridge, chords and drones (open A/E under fretted D/G notes) **[web, GuitarWorld; guides]** | British stack Super Bass 100 W: "bass off, treble off, middle full on, presence at about three o'clock, volume at two o'clock, no effects" **[web, GuitarWorld interview]** | double stops and drones (the player must let strings ring together); a guitar-type British stack preset with mids full and heavy power-amp drive; 4×12 or 4×15 cabinet |
+| **Punk** (Dee Dee Ramone, Paul Simonon, J.J. Burnel) | P basses, rounds **[memory]** | **downstrokes only** on fast eighths (Ramones), palm on or off **[memory]** | bass stack or British amp with grind **[memory]** | down-only at IOI ≥ 0.15 s; the same stroke every time (the variance from §4.4 only); grind on |
+| **1970s rock pick, mid-forward** (John Deacon, Roger Glover, Geddy Lee early) | P/Rick, rounds **[memory]** | pick over the pickup, alternate | bass stack, miked 8×10 + DI **[bass_amps.md §2.2]** | the default: P, rounds, alternate strokes, ~10–12 cm, "bass-stack" |
+| **Modern rock** (Mike Dirnt, Duff McKagan, Chris Wolstenholme, Justin Chancellor) | P / PJ / active single-humbucker bass / Wal, rounds **[memory]** | pick near the bridge, hard, palm-muted eighths in verses, open in choruses **[memory]** | DI + tube-emulation DI-type drive + amp, heavy compression, a high-pass on the drive path **[memory; bass_amps.md §5.3]** | mute on low velocities or by a CC; a parallel drive (exists in guitaramp as the "tube-emulation drive") |
 
 Common ground: a stiff pick (≥ 0.88 mm), roundwounds except for the 1960s session sound, the
 pick between the neck's end and the bridge depending on style, alternate picking except punk,
@@ -445,18 +445,18 @@ velocity layers, reverb send 2 %.
 - Release 0.40 s, attenuation 8.2 dB, reverb send 7 %.
 - A preset-level mod LFO with no destination (does nothing). No filter, no velocity layers.
 
-### 5.2 Roland SC-55/88 and Yamaha XG (documentation)
+### 5.2 one maker early GS module/88 and XG (documentation)
 
-- **GS:** program 35 "Picked Bs." on the SC-55 **[memory]**; variations come by bank select
-  (CC0 before the program change) **[web, Terratec GS doc]**. Whether the SC-88 has a "Mute
+- **GS:** program 35 "Picked Bs." on the early GS module **[memory]**; variations come by bank select
+  (CC0 before the program change) **[web, Terratec GS doc]**. Whether the later GS module has a "Mute
   PickBs." variation was **not confirmed** **[web search, §10]**.
 - **XG:** "PickBass" at bank 0 and "MutePkBa" / "MutePickBass" at **bank (LSB) 28**, both
   program 35, **one element each** **[web, Yamaha QY100, QY700 and CLP-585 data lists]**.
-  - Yamaha's own GM 35 has a muted twin. The palm/felt mute is a recognised second voice of the
+  - one maker's own GM 35 has a muted twin. The palm/felt mute is a recognised second voice of the
     same program.
   - The project could offer it on bank 28 (§9.5).
 - **Measurements:** none (no hardware or ROM here). bass_amps.md §7.2 has the Soundhouse
-  snippet on Roland velocity driving a filter for slap. Nothing similar was found for picked.
+  snippet on one maker velocity driving a filter for slap. Nothing similar was found for picked.
 
 ### 5.3 Rendered and measured [T]
 
@@ -554,11 +554,11 @@ velocity layers, reverb send 2 %.
 
 ## 7. Amp chains for pick bass
 
-- **The preset exists:** "svt" (§1) is bass_amps.md §10.2 built.
-  - SVT preamp; the James stack with bass 0.6 and treble 0.55; mid +3 dB at 800 Hz (the
+- **The preset exists:** "bass-stack" (§1) is bass_amps.md §10.2 built.
+  - bass stack preamp; the James stack with bass 0.6 and treble 0.55; mid +3 dB at 800 Hz (the
     "mid-forward" voicing);
-  - 6550 power with sag; 8×10 cabinet with a D112;
-  - 35 % DI, aligned; an 1176 at 4:1, 0.8 ms attack, 150 ms release.
+  - 6550 power with sag; 8×10 cabinet with a kick-drum microphone;
+  - 35 % DI, aligned; a FET compressor at 4:1, 0.8 ms attack, 150 ms release.
   - Its checks (bass_amps.md §10.6 items 5, 8, 9 and 10): the hardest pick attacks at 3–5 % THD
     for 30–100 ms; mf notes under 1 %; v40→v120 at 10–12 dB after the compressor; 2–4 kHz
     within 25–35 dB of the strongest band on E1 v120.
@@ -572,20 +572,20 @@ velocity layers, reverb send 2 %.
 - **DI + amp blend:**
   - The DI carries the pick's top (to 5–8 kHz) and the clean fundamental; the amp the grind and
     the mids.
-  - 35/65 is the rock blend; 60/40 for the Kaye/session variant ("svt-flat", bass_amps.md
+  - 35/65 is the rock blend; 60/40 for the Kaye/session variant ("bass-stack-flat", bass_amps.md
     §10.2).
   - The DI must be lined up with the mic (exists: `diAlign`).
-- **Compression:** the 1176 at 4:1 with a 0.8 ms attack **[bass_amps.md §6]** catches the pick's
+- **Compression:** the FET compressor at 4:1 with a 0.8 ms attack **[bass_amps.md §6]** catches the pick's
   peak, so the note is more even than a finger line. Keep it.
 - **Variants:**
-  - **Lemmy:** a Marshall Super Bass with mids full, bass and treble off, presence 3 o'clock,
-    volume 2 o'clock, no effects **[web, GuitarWorld]**: a guitar-type Marshall preset (Marshall
+  - **Lemmy:** a British stack Super Bass with mids full, bass and treble off, presence 3 o'clock,
+    volume 2 o'clock, no effects **[web, GuitarWorld]**: a guitar-type British stack preset (British stack
     tone stack, EL34 power, strong drive) into a 4×12 or 4×15. A `guitaramp` preset "superbass"
-    beside "jcm800" **[E]**.
+    beside "crunchStack" **[E]**.
   - **Squire:** two outputs; the neck pickup into the bass amp clean, the bridge into a driven
     guitar amp, blended **[web, GuitarWorld]**. That needs `Guitar` to output two pickups
     separately (it sums two selected pickups today) **[E]**.
-  - **Modern:** the DI with the SansAmp-like drive (exists) in parallel, a high-pass at
+  - **Modern:** the DI with the tube-emulation drive (exists) in parallel, a high-pass at
     ~150–250 Hz on the drive path, heavier compression **[memory; bass_amps.md §5.3]**.
 
 ---
@@ -624,7 +624,7 @@ velocity layers, reverb send 2 %.
   - the fingering solver from `ElectricBassPlayer::play` (string choice, hand position, one-voice
     lines, double stops, note-off damping, the bend). Factor it out (`BassFingering`) rather than
     copy it.
-- `GuitarAmp::svt()` as it is, with `connect()` told the P coil.
+- `GuitarAmp::bassStack()` as it is, with `connect()` told the P coil.
 
 ### 9.2 What to add
 
@@ -715,7 +715,7 @@ plays once the instrument exists.
 | felt (Kaye) | depth 2 at 10 mm | 1.5–2.5 | [T, §4.5] |
 | strings | EXL170 rounds; flats `loss1` × 2.5 | | [T, E] |
 | pickup | P split, 149/124 mm, 6.4 H, 10.5 kΩ | | [web, bass_section.md] |
-| amp | "svt" (DI 35 %, 1176 4:1) | "svt-flat" for felt+flats | [bass_amps.md] |
+| amp | "bass-stack" (DI 35 %, FET compressor 4:1) | "bass-stack-flat" for felt+flats | [bass_amps.md] |
 
 ### 9.4 Order
 
@@ -723,15 +723,15 @@ plays once the instrument exists.
    should sound P-like at once).
 2. `Guitar::pickContact` (or the hold-phase fallback), with its unit tests (§9.6 items 1–3)
    before any player work.
-3. `PickBassPlayer` with strokes, place, variance, mute, felt; `-inst pick-bass`; hook to "svt".
+3. `PickBassPlayer` with strokes, place, variance, mute, felt; `-inst pick-bass`; hook to "bass-stack".
 4. Run bass_amps.md §10.6 items 5, 8, 9, 10 against it; adjust depth and push to land them.
-5. Variants by knob: flats, felt, downstrokes, chords; later a Rickenbacker spec and the
-   Marshall "superbass" preset; the StingRay last.
+5. Variants by knob: flats, felt, downstrokes, chords; later a through-neck bass spec and the
+   British stack "superbass" preset; the active single-humbucker bass last.
 
 ### 9.5 Optional: XG bank 28
 
 If `src/midifile.cc` passes bank select to instruments, GM 35 on LSB 28 can set `PJ_PICK_MUTE`
-≈ 0.8: Yamaha's MutePkBa **[web, Yamaha data lists]**.
+≈ 0.8: one maker's MutePkBa **[web, Yamaha data lists]**.
 
 ### 9.6 Tests (for `tools/test.py`, as `electric_bass()`)
 
@@ -758,7 +758,7 @@ If `src/midifile.cc` passes bank select to instruments, GM 35 on LSB 28 can set 
 8. **Felt:** `PJ_PICK_FELT=1`: decay 0.3–1.5 s of −15…−25 dB/s on the open E.
 9. **Velocity:** v40 → v120 at the DI: 16–20 dB, and the attack centroid rising ≥ 20 % (the
    physical pick should, unlike every SoundFont §5.3).
-10. **Against FluidR3 (through "svt"):** E1 v120 first 100 ms, 2–4 kHz band within 25–35 dB
+10. **Against FluidR3 (through "bass-stack"):** E1 v120 first 100 ms, 2–4 kHz band within 25–35 dB
     under the strongest (bass_amps.md §10.6 item 10; FluidR3 −28 dB); A2 centroid 300–600 Hz
     (FluidR3 373 Hz); decay 0.3–1.5 s of 1.5–6 dB/s on E1–A3 (FluidR3 1.9–5.4).
 11. **Amp:** the hardest pick attack (v127, E1) at 3–5 % THD for ≤ 100 ms in the amp path,
@@ -777,9 +777,9 @@ If `src/midifile.cc` passes bank select to instruments, GM 35 on LSB 28 can set 
   **[paper, Jasiński FA2026]**. That says the release point is sensitive, not where it is.
 - **A controlled flat-against-round measurement** (spectra, partial decays): none found. The
   flats' `loss1` × 2.5 is a guess.
-- **Pickup positions** on the Rickenbacker 4001/4003 and the StingRay, and the Rick's inductance:
+- **Pickup positions** on the through-neck bass 4001/4003 and the active single-humbucker bass, and the Rick's inductance:
   not found. Forum DC resistances only.
-- **SC-55/88 GM 35 details** (layers, velocity filter, any "Mute PickBs." variation): not
+- **early GS module/88 GM 35 details** (layers, velocity filter, any "Mute PickBs." variation): not
   confirmed. The XG MutePkBa on bank 28 is confirmed by three data lists.
 - **The IDMT-SMT-BASS picked (PK) notes** (3 basses, 3 pickup settings, E1–G3) would give real
   pick-against-finger numbers on the same instruments. The download (~1 GB) was not attempted
@@ -853,7 +853,7 @@ If `src/midifile.cc` passes bank select to instruments, GM 35 on LSB 28 can set 
 `precisionBass()`), `src/ebass.h/.cc` (`BassLinePlayer`: the fretting hand and the line's rules
 factored out of the finger bass; `ElectricBassPlayer` on it, byte-identical to before;
 `PickBassPlayer`), `Guitar::pickContact` in `src/guitar.h/.cc` (the guitars byte-identical),
-the "svt" preset's 1176 threshold in `src/guitaramp.cc`, `tools/pickcontact.cc` and
+the "bass-stack" preset's FET compressor threshold in `src/guitaramp.cc`, `tools/pickcontact.cc` and
 `tools/test.py` `pick_bass()` (§9.6's items), the trims in `src/levels_data.h` (+10.8 dB) and
 `src/velgain_data.h`.
 
@@ -875,14 +875,14 @@ angle and push. The contact needed no fallback: 1000 random picks are stable.
 - **The P's field width** is 5 mm (the J keeps 7): 4.8 mm poles 3.4 mm under the string give ~12 mm
   at half height **[E]**; the top 4-8 kHz comes up 5-10 dB. Modes above 5 kHz add nothing
   (tried 8 and 11 kHz): the coil's 2.3 kHz resonance into 700 pF and the 8x10 set the top.
-- **The 1176's threshold** in "svt" is 0.04 V, not 0.06: with the P's EMF the compressor did
+- **The FET compressor's threshold** in "bass-stack" is 0.04 V, not 0.06: with the P's EMF the compressor did
   nothing at 0.06 (0 dB on a mf line, 0.7 on ff). Now a ff line ~2.5 dB, and E1 v40 → v120 is
   11 dB after it (bass_amps.md §10.6 item 9: 10-12).
 - **What §4.2 predicted about brightness was wrong in one point.** The held pick is as loud as a
   slow finger pull at the same depth (+0.3 dB), but its spectrum below ~2 kHz is the static
   triangle's, not the old force pulse's: the old pick's "brightness" was its missing fundamental.
   The DI centroid of the open E is ~140 Hz (not 350-400). The pick's brightness is above 2 kHz
-  (+19 dB over GM 34's finger) and through the SVT's 1-4 kHz.
+  (+19 dB over GM 34's finger) and through the bass stack's 1-4 kHz.
 - **Brightness with velocity** is modest: the release is the same triangle at every depth.
   E1 brightens 24 % (its push at ff is shorter than a quarter period); A2 6 %; A3 not at all (the
   fast push's own transient reshapes its 2nd-7th harmonics). Real hard picking also has fret clank,
@@ -900,7 +900,7 @@ angle and push. The contact needed no fallback: 1000 random picks are stable.
   1.9 % after (the preamp triodes' curvature follows the level; the power stage adds nothing); a
   mf note (v80) 1.0 % then 0.7 %.
 - **Item 10's decays** are tested as 1-6 dB/s, not 1.5-6: the open A1 falls 1.3 dB/s through the
-  1176 (which slows a held note's fall over its threshold) and 1.2-1.6 at the bare DI: the shared
+  FET compressor (which slows a held note's fall over its threshold) and 1.2-1.6 at the bare DI: the shared
   strings' own (FluidR3's A1 2.0).
 - **XG bank 28** (§9.5) is not done: `-play` does not pass bank select to instruments.
 
@@ -914,10 +914,10 @@ harmonic in 0.11 s; 8. the felt 20 dB/s (open 4.5, flats alone 6.0); 9. 16.2 dB,
 126 → 156 Hz; 10. E1 v120 2-4 kHz −30 dB, A2's centroid 344 Hz, decays 1.3-4.1 dB/s on E1-A3 (the open A1 the
 longest, also 1.2-1.6 at the bare DI: tested as 1-6, not 1.5-6);
 11. as above; 12. the strings and DI 157-268 ns a sample, under the finger bass's (the contact costs
-only during the push); 2.4-3.8 % of a core with the SVT at 4x; 13. desire.mid's intro: 0.15 s after
+only during the push); 2.4-3.8 % of a core with the bass stack at 4x; 13. desire.mid's intro: 0.15 s after
 each release −38 / −58 / −49 dB.
 
-**Against FluidR3 (through "svt"):** E1 v120 octave bands 20-60 Hz … 4-8 kHz: ours −19 −2 0 −10 −19
+**Against FluidR3 (through "bass-stack"):** E1 v120 octave bands 20-60 Hz … 4-8 kHz: ours −19 −2 0 −10 −19
 −21 −30 −66, FluidR3 −9 −4 0 −14 −12 −21 −29 −42. Alike from 120 Hz to 4 kHz; above 4 kHz ours is
 darker by 20+ dB, and FluidR3 has more 20-60 Hz (its pre-attack and room). FluidR3's DI-like
 waveform (a flat line between two sharp kinks a period) is what our DI gives; FluidR3's notes
@@ -926,5 +926,5 @@ sweep follows FluidR3's level curve within a few dB; ours brightens with velocit
 A2 307 → 409 Hz), FluidR3's does not move.
 
 **Next:** fret clank on hard strokes (the string against the frets near the pick's push), a
-"svt-flat" session chain for felt and flats, the Rickenbacker and the Marshall "superbass", a
-StingRay; IDMT-SMT-BASS's picked notes (§10) to fit the slip and the push against real ones.
+"bass-stack-flat" session chain for felt and flats, the through-neck bass and the British stack "superbass", a
+active single-humbucker bass; IDMT-SMT-BASS's picked notes (§10) to fit the slip and the push against real ones.

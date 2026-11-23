@@ -87,7 +87,7 @@ instruments.
 | 8–33 | E6–A2 | gut (standard, light, "English" or heavy gauge); nylon optional | **[T]** [CamacChart] |
 | 34–45 | G2–C1 | steel core, copper (or silver-plated copper) wound | **[T]** [CamacChart]; [Galli] **[S]** |
 
-- Lyon & Healy's standard stringing for the Chicago 47: Bow Brand pedal nylon at the top, Bow
+- one harp maker's standard stringing for the Chicago 47: Bow Brand pedal nylon at the top, Bow
   Brand pedal gut in the middle, Bow Brand pedal wire (optional silver/copper) in the bass
   **[T]** [HCchart]. Some retailers list nylon in the 0 and 1 octaves and optional nylon in
   octave 2 **[S]**.
@@ -169,7 +169,7 @@ are mine **[E]**:
     core (E = 200 GPa), B ≈ 2 × 10⁻⁵ (G2) to 5 × 10⁻⁵ … 1 × 10⁻⁴ (C1). That is lower than the gut
     strings: "the steel keeps the inharmonicity low for the lowest strings" **[T]** [Waltham05].
 - "Maximum stress (and tension) occurs in the steel strings"; "the highest steel and nylon
-  strings feel the tightest to the player" **[T]** [Waltham05, figure captions; Salvi Aurora data,
+  strings feel the tightest to the player" **[T]** [Waltham05, figure captions; one harp maker Aurora data,
   numbers not legible].
 
 ### 2.4 String damping (the string alone)
@@ -306,7 +306,7 @@ board between the A♭2 and B♭2 attachments. Measured **[T]** [LeCarrou07 Tabl
 - **Radiation:** strongest at 140–230 Hz for the same force; the first two pressure peaks are
   T1 and A0 **[T]** [LeCarrou07]. Above 200 Hz modes overlap and cannot be told apart.
 - Earlier studies **[T]** (quoted in [LeCarrou07]): a strung Spanish baroque harp had A0/T1-like
-  pair at 112 and 146 Hz. An unstrung Salvi Orchestra showed the pair by holography, and one of
+  pair at 112 and 146 Hz. An unstrung one harp maker Orchestra showed the pair by holography, and one of
   the two "weakens when the soundboard is stressed by the strings" (Bell 1987).
 - **What the box cannot radiate:** "a dozen or so" of the lowest strings have fundamentals below
   what the soundbox radiates; they are heard by their overtones (missing fundamental) **[T]**
@@ -318,7 +318,7 @@ board between the A♭2 and B♭2 attachments. Measured **[T]** [LeCarrou07 Tabl
   mode's region of greatest motion lies further up toward the treble **[T]** [AT24, Waltham08
   Fig. 3]. The figure's legend lists modes at about 213, 285 and 571 Hz (partly illegible in
   the copy).
-- **Driving-point admittance along the string bar,** measured (Salvi Aurora, 0.2 g accelerometer,
+- **Driving-point admittance along the string bar,** measured (one harp maker Aurora, 0.2 g accelerometer,
   impact hammer) **[T]** [Waltham08]. Plotted against position and frequency, the high-admittance
   regions move steadily up the board as frequency rises. The string "trajectory" (each string's
   f0 at its attachment) runs just to the right of the primary antinodes (above them in
@@ -826,7 +826,7 @@ Ten harpists (six professional, four amateur), Camac Atlantide Prestige. A high-
 - **Per-string lengths and core diameters of the wire strings** (G2–C1) for any concert harp,
   and so their inharmonicity. Only overall gauges (Camac) and tensions (Galli, a retailer page)
   were found.
-- **A complete string table of a Lyon & Healy or Salvi 47** (lengths, gauges, tensions); the
+- **A complete string table of a one harp maker or one harp maker 47** (lengths, gauges, tensions); the
   Harp Connection PDF has no numbers, only the stringing types.
 - **Calibrated soundboard admittance** of a concert harp in m/s/N. The figures of [LeCarrou07],
   [Waltham08] and [Wood22] give shapes, not readable values. The damping of the six low modes is

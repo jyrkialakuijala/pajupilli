@@ -1,12 +1,12 @@
-# Electric pianos (Rhodes, Wurlitzer, Pianet, the FM piano): research and model plan
+# Electric pianos (tine piano, reed electric piano, reed electric piano, the FM piano): research and model plan
 
 Status: 2026-11-15, research only; nothing here is built. SI units.
 
-The targets: GM program 5 "Electric Piano 1" (a Fender Rhodes Mark I/II: tine + tonebar, a
-neoprene-tipped hammer, an electromagnetic pickup), the Wurlitzer 200/200A (a steel reed struck by
-a felt hammer, an electrostatic pickup), short notes on the Hohner Pianet, and GM program 6
-"Electric Piano 2" (in practice the DX7-style FM piano). The Clavinet is left to the harpsichord and
-clavinet notes.
+The targets: GM program 5 "Electric Piano 1" (a tine electric piano Mark I/II: tine + tonebar, a
+neoprene-tipped hammer, an electromagnetic pickup), the reed electric piano 200/200A (a steel reed struck by
+a felt hammer, an electrostatic pickup), short notes on the one maker reed electric piano, and GM program 6
+"Electric Piano 2" (in practice the FM-synth style FM piano). The clavi is left to the harpsichord and
+clavi notes.
 
 Where each number comes from is marked: **[web]** from the sources in section 9 (with the key),
 **[calc]** computed here (the scripts were one-off Python; the inputs are given), **[memory]**
@@ -23,7 +23,7 @@ says so.
   pickup. A model that gets the pickup's transfer curve wrong cannot be rescued by the resonator.
   The one published real-time model with a filter + tanh pickup (Sønderbo 2024) sounded harsh
   and wrong for exactly this reason **[web, So24]**.
-- **Rhodes pickup = a static nonlinear function of the tine tip's position, then d/dt.**
+- **tine piano pickup = a static nonlinear function of the tine tip's position, then d/dt.**
   The flux through the coil is a bell-shaped function of the tip's offset from the pole axis.
   Voicing (the tip's rest height relative to the pole, "slightly above dead centre" at the factory
   **[web, RSM ch. 4]**) chooses where on the bell the tine swings: centred gives the second
@@ -42,7 +42,7 @@ says so.
   the long sustain: Q ≈ 700–2200, T60 ≈ 27 s at E♭2, 10 s at E♭4, 3 s at E♭6 **[web Q, Sh11;
   calc T60]**. Its own higher modes are the inharmonic partials of the attack, more audible in the
   upper register **[web, PM17]**.
-- **Wurlitzer: one or two reed modes, a capacitive pickup, then a transistor amplifier.** The
+- **reed electric piano: one or two reed modes, a capacitive pickup, then a transistor amplifier.** The
   reed's higher modes are "comparably small or non-existent even under extreme playing
   conditions" **[web, Pf17]**. The capacitance is largest near the reed's rest position and falls
   at both extremes, unequally (the reed is not symmetric about the plate) **[web, PM17]**: again a
@@ -50,13 +50,13 @@ says so.
   The bark at high velocity is that nonlinearity plus the overdriven preamp and power amp;
   published sources do not separate the two shares (section 4.4).
 - **Plan:** a small dedicated `EPiano` class: per key 4 + 4 tine modes (two polarisations) and 2–3
-  tonebar modes coupled at the block (Rhodes), or 2 reed modes (Wurlitzer), the mallet solve from
+  tonebar modes coupled at the block (tine piano), or 2 reed modes (reed electric piano), the mallet solve from
   `ModalSet::strike` extended with Hunt–Crossley damping, an analytic pickup function evaluated at
   2× rate in the top two octaves, then the electronics (harp network, preamp, tremolo/pan,
   cabinet). Cost about 1 % of a core for 20 sounding notes **[calc]**: ~100 times cheaper than the
   grand.
-- **GM 6 (FM piano)** is the DX7 "E.PIANO 1" voice: three 2-operator stacks (section 6). The same
-  physical model covers it as a Rhodes voiced for "bell": tine set far off the pole axis (nearly
+- **GM 6 (FM piano)** is the FM synth "E.PIANO 1" voice: three 2-operator stacks (section 6). The same
+  physical model covers it as a tine piano voiced for "bell": tine set far off the pole axis (nearly
   linear pickup), hard tips (a loud, fast-dying high partial), two slightly detuned generators
   per key or a chorus, no tremolo. FM's velocity → modulation index is the waveshaper's
   amplitude → harmonics.
@@ -69,22 +69,22 @@ says so.
   `cantileverShape`/`cantileverRatio`. Everything the tine needs except:
   (1) tip-mass mode ratios and shapes (the cantilever helpers are for a uniform beam),
   (2) the hammer's velocity-dependent damping (Hunt–Crossley), (3) a per-vibrator body: in
-  `ModalSet` all vibrators share one bridge, while each Rhodes tine has its own tonebar,
+  `ModalSet` all vibrators share one bridge, while each tine piano tine has its own tonebar,
   (4) a nonlinear readout of the tip position (ModalSet's output is a linear sum of `rad`).
   Recommendation: a new class that copies the step and the mallet solve (as `Piano` copied the
   string bank), one key = one small fixed block of modes, all keys in a row for vectorisation.
 - **`Piano` (src/piano.h):** the felt hammer (power law with hysteresis, solved implicitly), the
   dampers' engagement ramp (`engage` 0..1 over tens of ms), key bookkeeping and sleeping of quiet
-  keys. The Wurlitzer's felt hammer is this hammer at a smaller scale.
+  keys. The reed electric piano's felt hammer is this hammer at a smaller scale.
 - **`lead.h` shapers:** the asymmetric diode overdrive and the OTA tanh are the right parts for
-  the Wurlitzer's transistor preamp and power-amp clipping. The project's room/reverb for the end.
+  the reed electric piano's transistor preamp and power-amp clipping. The project's room/reverb for the end.
 - **Not needed:** quadratic coupling (pan), tension glide: a clamped-free beam has no stretching,
   so the string's tension nonlinearity does not apply; tip amplitude / length is ~1–2 % **[calc]**,
   so the geometric nonlinearity of the tine is negligible next to the pickup's. (Pfeifle includes
   a Kirchhoff-like term **[web, Pf17]**; for a cantilever with a free end it has no physical basis
   in axial stretching, so this note drops it.)
 
-## 3. Rhodes (GM 5)
+## 3. tine piano (GM 5)
 
 ### 3.1 Construction and ranges
 
@@ -225,7 +225,7 @@ numerical differentiation. Harmonic levels of V for a pure sine tip motion, dB r
   velocity series of Pfeifle's model and the instrument show **[web, Pf17 fig. 10]**.
 - The settings in metres: gap 1/16–1/8 in (1.6–3.2 mm), after March 1972 down to 0.020 in
   (0.5 mm) in the middle and treble; a smaller gap is louder and more dynamic **[web, RSM ch. 4]**;
-  another Rhodes page gives 1/32 in (0.8 mm) for the middle, 1/16 in for bass and wood-tip treble,
+  another tine piano page gives 1/32 in (0.8 mm) for the middle, 1/16 in for bass and wood-tip treble,
   and warns the tine hits the pickup if set too close **[web, RTS via search]**. Tip amplitudes
   of a few mm at forte in the bass **[memory]**: A/w reaches 1 and beyond, so the bass barks first.
 - The horizontal polarisation modulates the width w: an amplitude modulation at the beat of the
@@ -266,7 +266,7 @@ numerical differentiation. Harmonic levels of V for a pure sine tip motion, dB r
 
 - Passive harp: 73/88 coils in the series–parallel network (3.1) into a cable and an amplifier
   input. Each coil is an inductance with resistance; with the cable capacitance it is a resonant
-  low-pass in the low kHz **[memory: Rhodes pickups ~180–190 Ω each, a few hundred mH; not
+  low-pass in the low kHz **[memory: tine piano pickups ~180–190 Ω each, a few hundred mH; not
   checked]**. Falaize & Hélie model the pickup load as RLC: 500 Hz cutoff, C = 330 nF,
   L = 307 mH, r = 1 kΩ (illustrative) **[web, FH15]**.
 - Suitcase amps: Jordan 50 W (1966–69, mono tremolo), Peterson 80 W (stereo "vibrato":
@@ -278,9 +278,9 @@ numerical differentiation. Harmonic levels of V for a pure sine tip motion, dB r
 - Model: L = s·(1 + d·m(t))/2, R = s·(1 − d·m(t))/2, m a rounded triangle, each side's gain through
   an LDR-like asymmetric slew (fast on, slow off) **[memory: LDRs ~10 ms / ~50–100 ms]**; then the
   preamp's bass/treble shelves and a cabinet filter. For the Stage: a guitar-amp-style input with
-  soft clipping (players' practice: Fender Twin **[memory]**).
+  soft clipping (players' practice: clean 2x12 combo **[memory]**).
 
-## 4. Wurlitzer 200 / 200A
+## 4. reed electric piano 200 / 200A
 
 ### 4.1 Construction
 
@@ -338,7 +338,7 @@ w the slot's effective half-width, a an asymmetry):
 
     C(x) = Cs + Cr · [1 + ((x − x0)/w)² + a·(x − x0)/w]^(−1)     (bell, peak near rest)
 
-The same family as the Rhodes flux (3.4), so the same harmonic table applies with x0/w for δ/w: a
+The same family as the tine piano flux (3.4), so the same harmonic table applies with x0/w for δ/w: a
 reed resting near the centre plane gives a strong 2nd harmonic, an offset one a fundamental with
 harmonics growing with amplitude. w, x0, a are to be computed once from a 2-D electrostatic
 solution of the slot (as `tools/pianoboard.py` computes the board) or fitted to the published
@@ -357,7 +357,7 @@ above it v ≈ V0 ΔC/C_b (charge-like). A tilt of 21–28 dB is thus built in f
 
 ### 4.4 The bark: what is known
 
-- The tone is "closer to a sawtooth" than the Rhodes; soft playing "sweet, vibraphone-like",
+- The tone is "closer to a sawtooth" than the tine piano; soft playing "sweet, vibraphone-like",
   hard playing "a slightly overdriven tone described as a bark" **[web, WP-W]**.
 - Two mechanisms, both in the plan: (1) the pickup curve (4.3: amplitude-dependent harmonics,
   even and odd, with the asymmetry a); (2) the transistor preamp and power amp driven hard: the
@@ -377,30 +377,30 @@ asymmetric) → tremolo: the LDR shunts the preamp signal, g(t) = 1 − d·L(t),
 with mild crossover and hard clip near the rails → two small speakers (a 2-pole band-pass ~100 Hz
 to ~6 kHz with a breakup peak) **[memory]**. Line out for the "direct" Wurli: skip the speaker.
 
-## 5. Hohner Pianet (and the Clavinet difference)
+## 5. One maker reed electric piano (and the clavi difference)
 
 - 61 keys F1–F6 (43.6–1397 Hz), later 60 **[web, WP-P]**. A tuned spring-steel reed per key; a pad
   on the key's rear end rests on the reed, lifts it when the key goes down and lets it go: the
   reed is plucked by adhesion, not struck **[web, WP-P]**. Early pads leather-faced over urethane
-  foam (they decay with age), from 1977 moulded silicone; the Pianet T's described as "suction
+  foam (they decay with age), from 1977 moulded silicone; the reed electric piano T's described as "suction
   pads" **[web, WP-P]**.
-- Pickups: early models (Pianet, C/CH, L/LB, N, N II, Combo) variable-capacitance like the
-  Wurlitzer; the T, M and Duo electromagnetic, passive; T reeds damp at once on release
+- Pickups: early models (reed electric piano, C/CH, L/LB, N, N II, Combo) variable-capacitance like the
+  reed electric piano; the T, M and Duo electromagnetic, passive; T reeds damp at once on release
   **[web, WP-P]**. Sound: "a complex mix of harmonics" at the strike settling into a cleaner tone;
   later models mellower **[web, WP-P]**.
-- Model: the reed as the Wurlitzer's (2 modes) with a different excitation: the pad pulls the tip
+- Model: the reed as the reed electric piano's (2 modes) with a different excitation: the pad pulls the tip
   up with the key and releases when the reed's elastic force k·x exceeds the adhesion force, so
   the initial displacement is nearly fixed by the pad, not by key speed: little dynamic range
   **[memory]**. `ModalSet::pluck` (rise, hold, slip) is this excitation, with the slip time from
-  the peel. Pickup: the Wurlitzer's capacitive curve (early) or the Rhodes-type magnetic one (T).
-- The Clavinet (another note covers it) is a string, struck against an anvil by a rubber tip that
+  the peel. Pickup: the reed electric piano's capacitive curve (early) or the tine-piano magnetic one (T).
+- The clavi (another note covers it) is a string, struck against an anvil by a rubber tip that
   stays on it while the key is held, with magnetic string pickups: a string with a stopping
   contact, not a free reed or tine.
 
 ## 6. GM 6 "Electric Piano 2": the FM piano
 
-- In GM/GS sound sets program 6 is usually an FM-style electric piano after the DX7's "E.PIANO 1"
-  **[memory]**. The DX7 factory ROM1A voice 11 "E.PIANO 1", read from the bank **[web, DX7 file;
+- In GM/GS sound sets program 6 is usually an FM-style electric piano after the FM synth's "E.PIANO 1"
+  **[memory]**. The FM synth factory ROM1A voice 11 "E.PIANO 1", read from the bank **[web, FM synth file;
   parsed here]**: algorithm 5 (three carrier ← modulator stacks: 1←2, 3←4, 5←6, feedback on 6),
   feedback 6:
 
@@ -416,22 +416,22 @@ to ~6 kHz with a breakup peak) **[memory]**. Line out for the "direct" Wurli: sk
 - Reading: stack 1←2 is the "tine clank": a ratio-14 modulator with full velocity sensitivity and
   a fast decay gives a burst of sidebands around 13, 14, 15 f0 at the attack; stacks 3←4 and 5←6
   are 1:1 (harmonic series whose richness follows velocity: the "bark"), 5/6 detuned against each
-  other (±7 of the DX7's detune steps, a few cents **[memory]**) for the chorus-like shimmer.
+  other (±7 of the FM synth's detune steps, a few cents **[memory]**) for the chorus-like shimmer.
 - Physical coverage: the tine model already has (a) an inharmonic partial excited by a hard strike
   near the base and dying fast (the tine's 2nd/3rd modes and the tonebar's: 6–20 f0, with μ and the
   strike point as the knobs; FM's 14 is an exaggerated clank), (b) a waveshaper on a near-sine whose
   harmonic count grows with velocity: what a 1:1 FM pair with velocity → index produces. So
-  "Electric Piano 2" = the Rhodes model with: the tip far off the pole axis (δ/w ≈ 1, nearly
+  "Electric Piano 2" = the tine piano model with: the tip far off the pole axis (δ/w ≈ 1, nearly
   clean), harder tips and a strike nearer the base (louder high partial), shorter tonebar
   sustain, two generators per key 2–4 cents apart (or a stereo chorus), no tremolo. It will sound
-  like a "very clean, glassy Rhodes"; the exact DX timbre (its sidebands are harmonic at 13/15 f0
+  like a "very clean, glassy tine piano"; the exact DX timbre (its sidebands are harmonic at 13/15 f0
   where the tine's are not) is not a physical goal.
 
 ## 7. Model plan and cost
 
 Per key (one block, all keys in a row; a key sleeps below −100 dB as in `Piano`):
 
-| | Rhodes | Wurlitzer | Pianet |
+| | tine piano | reed electric piano | reed electric piano |
 |---|---|---|---|
 | Vibrator modes | tine 4 (bass) .. 1 (top), × 2 polarisations | reed 2, one direction | reed 2 |
 | Second resonator | tonebar 2–3 modes, coupled at the block | none | none |
@@ -451,7 +451,7 @@ Per key (one block, all keys in a row; a key sleeps below −100 dB as in `Piano
   grade → k; strike line → shape at the strike point; Q table → losses; voicing (δ, gap) per key
   as one global "voicing" knob plus key-to-key scatter (real instruments are uneven).
 - **Controls worth exposing:** voicing (δ/w: bell ↔ bark), pickup gap (volume and dynamics), tip
-  hardness, tremolo/pan rate and depth, drive (Wurlitzer amp). MPE-style per-key bend is cheap with
+  hardness, tremolo/pan rate and depth, drive (reed electric piano amp). MPE-style per-key bend is cheap with
   modes (retune).
 
 ### Validation
@@ -463,10 +463,10 @@ Per key (one block, all keys in a row; a key sleeps below −100 dB as in `Piano
 3. **Pickup curve:** reproduce Shear's G3 (196 Hz) waveforms and harmonic levels vs. tine-to-axis
    separation (his figs. 2.4–2.5, digitise) and Falaize & Hélie's audio examples (gap 0.5/1.5/3 mm,
    offset 0/0.5/1.5 mm); then fix w0, p per register.
-4. **Velocity series:** record (or obtain) a direct-out Rhodes and a Wurlitzer at 5 velocities per
+4. **Velocity series:** record (or obtain) a direct-out tine piano and a reed electric piano at 5 velocities per
    key on a few keys; compare H1..H6 vs time and the attack partials; Pfeifle's figs. 3, 5, 10
-   (tip motion vs voltage, 12 ms Wurlitzer traces) as shape checks.
-5. **Electronics separately:** Wurlitzer reed-bar signal vs line out vs speaker, to place the bark
+   (tip motion vs voltage, 12 ms reed electric piano traces) as shape checks.
+5. **Electronics separately:** reed electric piano reed-bar signal vs line out vs speaker, to place the bark
    between pickup and amplifier (4.4); tremolo rate/shape from a recording's envelope.
 6. **Listening:** A/B against the project's existing recordings workflow (as for the grand),
    single notes then chords, both clean and through the amp/pan.
@@ -475,11 +475,11 @@ Per key (one block, all keys in a row; a key sleeps below −100 dB as in `Piano
 
 - Tonebar modes and the tine–bar coupling strength per register (Gabrielli et al. 2020 has them;
   not obtained).
-- Real Rhodes pole-tip geometry → w0 and p of the flux bell; the 2-D field around the wedge.
-- Wurlitzer reed lengths, solder masses, hammer masses; the slot geometry for C(x); the 200A
+- Real tine piano pole-tip geometry → w0 and p of the flux bell; the 2-D field around the wedge.
+- reed electric piano reed lengths, solder masses, hammer masses; the slot geometry for C(x); the 200A
   preamp/power-amp schematic values (the service manual [WSM] has them).
-- Rhodes coil inductance and resistance, harp network output impedance.
-- Suitcase pan rate range and LFO shape; Wurlitzer tremolo rate (measure from recordings).
+- tine piano coil inductance and resistance, harp network output impedance.
+- Suitcase pan rate range and LFO shape; reed electric piano tremolo rate (measure from recordings).
 
 ## 9. Sources
 

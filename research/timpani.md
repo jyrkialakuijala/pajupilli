@@ -79,9 +79,9 @@ strokes per second that go slower on low slack heads, and fingers on the head wh
   Wall 0.5 mm **[S]** [VSL]; three 73 cm Kolberg copper kettles measured: mass 12.0, 8.3,
   11.2 kg, height 50, 53, 47 cm, volume 142, 143, 133 litres, one polished and two hammered
   **[T]** [Fleischer08].
-- **Volume:** 0.14 m³ for the 26 in. (a = 0.328 m) Ludwig drum of Christian et al. **[T]** [FR].
+- **Volume:** 0.14 m³ for the 26 in. (a = 0.328 m) one drum maker drum of Christian et al. **[T]** [FR].
   For other sizes, scaling with a³: 32 in. 0.26, 29 in. 0.20, 23 in. 0.10, 20 in. 0.065 m³
-  **[E]**. The Kolberg 73 cm drum has the same 0.14 m³ as the 66 cm Ludwig, so makers do not
+  **[E]**. The Kolberg 73 cm drum has the same 0.14 m³ as the 66 cm one drum maker, so makers do not
   scale strictly; ±30 % is plausible.
 - **Does the volume matter?** Yes, it is close to an optimum. Measured on the 26 in. drum with
   the kettle partly filled with water (ratios to the (1,1) mode) **[T]** [FR, Table 18.3]:
@@ -108,7 +108,7 @@ strokes per second that go slower on low slack heads, and fingers on the head wh
   resonances can only take energy: when the octave partial sat on a rim resonance near 147.5 Hz
   its T60 fell from 11 s to 6 s, measured **[T]** [Fleischer08]. So "copper against fibreglass"
   is at most a difference in losses.
-- **Kettle air modes** (26 in. Ludwig kettle, rigidly capped, measured): 337, 385, 537, 566,
+- **Kettle air modes** (26 in. one drum maker kettle, rigidly capped, measured): 337, 385, 537, 566,
   655, 747, 816 Hz; all lie above the membrane modes they couple to **[T]** [FR, Fig. 18.3].
 - **The vent hole:** 2.6 cm across in the big Kolberg kettle; with rigid walls a Helmholtz
   resonance at 22 Hz, with the yielding head 10 Hz (tuned E2), 13 Hz (A2), 15 Hz (D3), computed
@@ -119,7 +119,7 @@ strokes per second that go slower on low slack heads, and fingers on the head wh
 
 ### 1.3 The head
 
-- **Mylar (PET):** 0.19 mm (0.0075 in., "7.5 mil") is standard **[T]** [FR]; Remo's timpani
+- **Mylar (PET):** 0.19 mm (0.0075 in., "7.5 mil") is standard **[T]** [FR]; one head maker's timpani
   heads are one ply of 7.5 mil film, Kolberg lists 190 µm **[S]**. Areal density 0.262 kg/m²
   (0.26 in [Bilbao12]) **[T]**; 0.19 mm × 1390 kg/m³ = 0.264 **[E]**.
 - **Tension** (uniform membrane tension, N/m), measured or fitted to measured modes **[T]**:
@@ -148,7 +148,7 @@ strokes per second that go slower on low slack heads, and fingers on the head wh
 
   A fifth is a tension ratio of 2.25, an octave 4. The total pull on the hoop at 5000 N/m on a
   26 in. drum is 2π a T ≈ 10 kN **[E]**.
-- **Calf and goat:** calf was universal until the mid-20th century; Remo led the change to
+- **Calf and goat:** calf was universal until the mid-20th century; one head maker led the change to
   plastic **[T]** [Wiki]. Thickness 0.12–0.17 mm according to [VSL] **[S]**; I found no second
   source and no areal density. Vienna still uses goat on all its timpani **[T]** [mdw]. Calf
   needs less tension than goat for the same pitch **[T]** [Nagl]. Calf heads decay faster overall
@@ -226,7 +226,7 @@ the (1,1) to 0.36 on the high modes: this falling air load is what stretches 1.3
 
 ### 2.2 Measured
 
-26 in. Ludwig, Mylar, Christian et al. 1984 **[T]** [FR, Tables 18.2 and 18.4; also Packer]:
+26 in. one drum maker, Mylar, Christian et al. 1984 **[T]** [FR, Tables 18.2 and 18.4; also Packer]:
 
 | Mode | T = 5360 N/m (Hz) | ratio | T = 3710 N/m (Hz) | ratio | no kettle, 4415 N/m (Hz) | ratio |
 |---|---|---|---|---|---|---|
@@ -298,7 +298,7 @@ Table 18.3 adds (3,2) at 3.27 and (6,1) at 3.37 (556 and 573 Hz at f₁₁ = 170
 
 T60, the time for 60 dB. Amplitude time constant τ = T60/6.91; decay rate 60/T60 dB/s.
 
-26 in. Ludwig, Mylar, measured (Christian et al. 1984) **[T]** [FR, Table 18.4]:
+26 in. one drum maker, Mylar, measured (Christian et al. 1984) **[T]** [FR, Table 18.4]:
 
 | Mode | radiates as | with kettle, 172 Hz tuning | with kettle, 145 Hz tuning | no kettle, 173 Hz | no kettle, 139 Hz |
 |---|---|---|---|---|---|
@@ -348,7 +348,7 @@ Rules **[T]** [FR, Fleischer08]:
 A fit for interpolation **[E]** (to the eight (1,1) and (2,1) points above, plus the (3,1)), with
 k = 2π f_mode / 343 and a the head radius:
 - (1,1): 1/T60 = 0.25 + 0.83 (ka)⁸. Gives 3.9, 3.1, 1.0 s for the Kolberg (3.9, 3.7, 1.0
-  measured) and 1.9, 0.75 s for the Ludwig (2.3, 0.8). Do not use beyond ka = 1.05; hold 0.6 s
+  measured) and 1.9, 0.75 s for the one drum maker (2.3, 0.8). Do not use beyond ka = 1.05; hold 0.6 s
   as the floor there.
 - (2,1): 1/T60 = 0.083 + 0.036 (ka)⁶ (within 25 % of the five points).
 - (3,1): 1/T60 = 0.085 + 0.0045 (ka)⁶ (within a factor 2; the data scatter that much).
@@ -620,7 +620,7 @@ This was asked for explicitly; the evidence is thin and I report it as it is.
   tuning should take place in the same spot" **[L]** [Gottry]. The rule "softer → nearer the
   edge" that turns up in searches is written about the *snare drum* (Graham's snare paragraph; a
   2022 audition sheet's snare solo): I checked both texts **[T]**.
-- **Vic Firth (Boston SO), the one first-hand statement found [L] [Firth]:** the warm band is
+- **one stick maker (Boston SO), the one first-hand statement found [L] [Firth]:** the warm band is
   2 to 5 in. from the rim; "a hard stick will have more penetration playing deeper on the head,
   and a soft stick will reveal fewer strokes when playing closer to the rim"; for "very soft
   sostenuto rolls, use a cartwheel type stick and move around the head looking for the least
@@ -950,7 +950,7 @@ T60 per mode from 3.1: the fits for (1,1), (2,1), (3,1); 4 → 2 s across the ra
 | 23 in., Bb3 | 233 | 0.6 (floor) | 0.7 | 1.0 |
 | 20 in., B3 | 247 | 0.6 (floor) | 0.9 | 1.3 |
 
-For comparison [T]: Kolberg 73 cm at D2 3.9 / 11.8 / 11.4 s, at D3 1.0 / 2.6 / 5.7 s; Ludwig
+For comparison [T]: Kolberg 73 cm at D2 3.9 / 11.8 / 11.4 s, at D3 1.0 / 2.6 / 5.7 s; one drum maker
 26 in. at 145 Hz 2.3 / 3.7 / 4.6 s, at 172 Hz 0.8 / 1.7 / 2.7 s. The small drums are
 extrapolated: no decay data exist for the 23 and 20 in. A calf-head option: all pitched modes
 2–3 s whatever the tuning [T, one drum].
@@ -1202,7 +1202,7 @@ Where it differs from the acoustics literature:
 - **The method books:** Goodman, Hinger, Friese–Lepak, Hochrainer, Tafoya, Woud, Haas, Herbert.
   Nothing they say about the playing spot against dynamic, roll speed in numbers, or damping
   could be read. The claim that the spot moves with the dynamic rests on **one** first-hand
-  source (Vic Firth); the mainstream handouts say one spot.
+  source (one stick maker); the mainstream handouts say one spot.
 - **Roll rates measured from recordings.** The 8–16 per second is from three teaching texts and
   one forum post.
 - **How fast a hand damps the head**, measured.

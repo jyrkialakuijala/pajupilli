@@ -1,4 +1,4 @@
-#include "cp80.h"
+#include "electricgrand.h"
 
 #include <algorithm>
 #include <cmath>
@@ -16,14 +16,14 @@ double lerp(double a, double b, double t) { return a + (b - a) * std::clamp(t, 0
 
 bool electricGrand(const Instrument& inst) { return std::strcmp(inst.name, "electric-grand") == 0; }
 
-// research/cp80.md 2.3, 3.1, 4.3, 7.2. What is known: 88 keys, single wound
+// research/electricgrand.md 2.3, 3.1, 4.3, 7.2. What is known: 88 keys, single wound
 // strings A0..F#2 (keys 1..22), two strings a key from G2 up, no
-// soundboard; the CP-70's bass string 0.679 m (no other length, and no
+// soundboard; the smaller electric grand's bass string 0.679 m (no other length, and no
 // gauge, is published). The rest is the grand's, fitted to what is known:
 //   - lengths: the grand's from the middle up; below, about 0.68 m held
 //     nearly flat down to A0 (0.73 m): the case is a third of a grand's;
 //   - the bass wound (keys 1..30) at 700 N, its stiffness B from 2.0e-3 at
-//     A0 (the open cp80-model's fit, 2.07e-3) to the plain wire's at key 31;
+//     A0 (the open electricgrand-model's fit, 2.07e-3) to the plain wire's at key 31;
 //     plain wire the grand's gauge on the shorter length (B ~ 1 / L^4: the
 //     tenor's partials sharp, the "clank");
 //   - the hammers: urethane and leather (the manual), or felt: the grand's
@@ -34,7 +34,7 @@ bool electricGrand(const Instrument& inst) { return std::strcmp(inst.name, "elec
 //   - no dampers on the top 8 keys (GSi's model);
 //   - the bridge on urethane and a heavy plate: a lossy, near-rigid support
 //     (supportR: to be fitted to recordings), read by a piezo per key.
-PianoDesign cp80Design() {
+PianoDesign electricGrandDesign() {
   PianoDesign d = grandDesign();
   d.name = "electric-grand";
   static const double kE = 2.02e11, kRho = 7850;
@@ -72,7 +72,7 @@ PianoDesign cp80Design() {
     PianoKey& s = d.key[key - 1];
     s.strings = key <= 22 ? 1 : 2;
     s.K *= kHard;
-    // The lowest octave and a half far darker than a grand's: CP-80
+    // The lowest octave and a half far darker than a grand's: electric grand
     // recordings (four, ~100 notes measured by tools/pianofit.py) have
     // the energy of A0..D2 nearly all below 1 kHz (1..2 kHz -16 .. -22 dB
     // of it, 2..4 kHz -27 dB and less); the grand's felt here gave -8, -15.
@@ -110,7 +110,7 @@ PianoDesign cp80Design() {
   d.unisonCents[1] = 0.4;
   d.bridge = PianoDesign::Bridge::kRigid;
   d.output = PianoDesign::Output::kPickup;
-  // The bridge on urethane strips over a duralumin plate (Yamaha's 1977
+  // The bridge on urethane strips over a duralumin plate (one maker's 1977
   // patent: "a kind of spring and dash pot", to make the decay piano-like):
   // a string's end on a spring and a dashpot loses (T / L) / R a second
   // above the corner (k / R), less below as (f / fc)^2: the fundamentals
@@ -123,7 +123,7 @@ PianoDesign cp80Design() {
   return d;
 }
 
-Cp80Circuit::Cp80Circuit(double fs) : fs_(fs) {
+ElectricGrandCircuit::ElectricGrandCircuit(double fs) : fs_(fs) {
   hpA_ = std::exp(-2 * M_PI * 3.4 / fs);
   setBass(0);
   setMiddle(0);
@@ -132,7 +132,7 @@ Cp80Circuit::Cp80Circuit(double fs) : fs_(fs) {
 }
 
 // The tone section. The diagram's parts are legible, their wiring through the
-// brilliance switch is not (research/cp80.md 3.3), so the controls are built
+// brilliance switch is not (research/electricgrand.md 3.3), so the controls are built
 // as the manual describes them (flat at the centre detent, each "affects the
 // entire keyboard"), first order as a passive network is, at the corners its
 // parts give:
@@ -150,7 +150,7 @@ Cp80Circuit::Cp80Circuit(double fs) : fs_(fs) {
 //     (the cut sizes assumed: the divider's 47 k : 4.7 k only bounds them).
 // (The gains are assumed: the network's response cannot be computed
 // without its wiring.)
-void Cp80Circuit::shelf(Biquad* q, double fc, double db, bool high) {
+void ElectricGrandCircuit::shelf(Biquad* q, double fc, double db, bool high) {
   // A first-order shelf, bilinear with the corner prewarped: unity at the
   // far end, 10^(db/20) at the shelf.
   const double g = std::pow(10.0, db / 20), k = std::tan(M_PI * std::min(fc, 0.45 * fs_) / fs_);
@@ -167,14 +167,14 @@ void Cp80Circuit::shelf(Biquad* q, double fc, double db, bool high) {
   q->a2 = 0;
 }
 
-void Cp80Circuit::setBass(double b) {
+void ElectricGrandCircuit::setBass(double b) {
   b = std::clamp(b, -1.0, 1.0);
   if (b == bassSet_) return;
   bassSet_ = b;
   shelf(&bass_, 100, 12 * b, false);
 }
 
-void Cp80Circuit::setMiddle(double m) {
+void ElectricGrandCircuit::setMiddle(double m) {
   m = std::clamp(m, -1.0, 1.0);
   if (m == middleSet_) return;
   middleSet_ = m;
@@ -189,14 +189,14 @@ void Cp80Circuit::setMiddle(double m) {
   middle_.a2 = (1 - alpha / A) / a0;
 }
 
-void Cp80Circuit::setTreble(double t) {
+void ElectricGrandCircuit::setTreble(double t) {
   t = std::clamp(t, -1.0, 1.0);
   if (t == trebleSet_) return;
   trebleSet_ = t;
   shelf(&treble_, 8700, 12 * t, true);
 }
 
-void Cp80Circuit::setBrilliance(int b) {
+void ElectricGrandCircuit::setBrilliance(int b) {
   b = std::clamp(b, 0, 2);
   if (b == brillSet_) return;
   brillSet_ = b;
@@ -204,13 +204,13 @@ void Cp80Circuit::setBrilliance(int b) {
   shelf(&brill_, 1500, kCut[b], true);
 }
 
-void Cp80Circuit::reset() {
+void ElectricGrandCircuit::reset() {
   hpX_ = hpY_ = 0;
   for (Biquad* q : {&bass_, &middle_, &treble_, &brill_}) q->x1 = q->x2 = q->y1 = q->y2 = 0;
   ldrG_[0] = ldrG_[1] = 0;
 }
 
-void Cp80Circuit::process(float in, float* left, float* right) {
+void ElectricGrandCircuit::process(float in, float* left, float* right) {
   // The input's high-pass (C101 into R102).
   const double hp = hpA_ * (hpY_ + in - hpX_);
   hpX_ = in;
@@ -230,7 +230,7 @@ void Cp80Circuit::process(float in, float* left, float* right) {
   const double s = std::tanh(1.5 * std::sin(ph_)) / std::tanh(1.5);
   // The LDR at full light ~11.8 k (each channel dips 8 dB with the depth
   // pot at 0), dark ~2 M; the depth pot in series (0 .. 67 k). Fitted to a
-  // CP-80's tremolo at 0.92 Hz (two recordings, the L/R balance folded over
+  // electric grand's tremolo at 0.92 Hz (two recordings, the L/R balance folded over
   // the cycle: a near-square swing of +-8 dB, 1 dB rms from this model).
   static const double kGLit = 1 / 11.8e3, kGDark = 1 / 2e6;
   const double rDepth = 67.5e3 * (1 - std::clamp(depth_, 0.0, 1.0));
@@ -252,15 +252,15 @@ void Cp80Circuit::process(float in, float* left, float* right) {
   *right = float(y * g[1]);
 }
 
-Cp80Model::Cp80Model(const Instrument& inst) : Tube(inst), piano_(inst.fs, cp80Design()), circuit_(inst.fs) {}
+ElectricGrandModel::ElectricGrandModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, electricGrandDesign()), circuit_(inst.fs) {}
 
-void Cp80Model::resetAir() {
+void ElectricGrandModel::resetAir() {
   Tube::resetAir();
   piano_.reset();
   circuit_.reset();
 }
 
-const float* Cp80Model::takeSide(int n) {
+const float* ElectricGrandModel::takeSide(int n) {
   sideOut_.assign(n, 0.0f);
   const int have = int(side_.size()), m = std::min(n, have);
   std::copy(side_.end() - m, side_.end(), sideOut_.end() - m);
@@ -268,7 +268,7 @@ const float* Cp80Model::takeSide(int n) {
   return sideOut_.data();
 }
 
-float Cp80Model::sample() {
+float ElectricGrandModel::sample() {
   // The bus: the strings' force on the bridge (N) through the piezos (a
   // mezzo-forte middle C at the program's common level: PJ_CP_GAIN).
   static const float kGain = float(knob("PJ_CP_GAIN", 0.023));
@@ -282,12 +282,12 @@ float Cp80Model::sample() {
   return finish(last_);
 }
 
-Cp80Player::Cp80Player(Cp80Model& m) : Performer(m), m_(m) {
+ElectricGrandPlayer::ElectricGrandPlayer(ElectricGrandModel& m) : Performer(m), m_(m) {
   // (PJ_PIANO_PEDAL: the sustain pedal held from the start, as the grand's.)
   if (knob("PJ_PIANO_PEDAL", 0) > 0) setHold(true);
 }
 
-void Cp80Player::noteOn(int midi, int velocity) {
+void ElectricGrandPlayer::noteOn(int midi, int velocity) {
   const int key = midi - kLowest;
   if (key < 0 || key >= m_.piano().keys()) return;
   articulate(midi, velocity, false);
@@ -298,21 +298,21 @@ void Cp80Player::noteOn(int midi, int velocity) {
   m_.piano().strike(key, PianoPlayer::hammerSpeed(velocity, dyn_));
 }
 
-void Cp80Player::noteOff(int midi) {
+void ElectricGrandPlayer::noteOff(int midi) {
   const int key = midi - kLowest;
   if (key < 0 || key >= m_.piano().keys()) return;
   down_[key] = false;
   if (!hold_) m_.piano().damper(key, true);
 }
 
-void Cp80Player::setHold(bool h) {
+void ElectricGrandPlayer::setHold(bool h) {
   hold_ = h;
   for (int k = 0; k < m_.piano().keys(); ++k)
     if (h) m_.piano().damper(k, false);
     else if (!down_[k]) m_.piano().damper(k, true);
 }
 
-void Cp80Player::render(float* out, int n) {
+void ElectricGrandPlayer::render(float* out, int n) {
   constexpr int kBlock = 16;
   // (Tests: PJ_CP_TREM the tremolo's depth, PJ_CP_SPEED its speed, in place of the knobs.)
   static const double kTrem = knob("PJ_CP_TREM", -1), kSpeed = knob("PJ_CP_SPEED", -1);

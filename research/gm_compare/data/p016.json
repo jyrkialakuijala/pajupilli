@@ -1599,7 +1599,7 @@
 },
 "pj_log": [
 "  channel  1: drawbar-organ (1 at once, one voice)",
-"    channel 1 track 0: split by hand; notes: 64 upper, 0 lower, 0 pedals; percussion off; Leslie planned: slow throughout, nudged on 32 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
+"    channel 1 track 0: split by hand; notes: 64 upper, 0 lower, 0 pedals; percussion off; Rotary planned: slow throughout, nudged on 32 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
 ],
 "build_md5": "a8b790266195d96f500cdf8fc1ba4cfb"
 }

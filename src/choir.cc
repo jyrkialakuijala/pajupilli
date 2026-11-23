@@ -33,7 +33,7 @@ const ChoirVariant kChoirVariants[] = {
     {"choir", {3, 3, 3, 3, 3, 3}, -1, 0.07, 0.12, 0, 1, 1, 1, 0x3f, 128, 0, 0, 0},
     // 54 Voice Oohs: the women lead (the men only below C4) on a rounded [u] (sopranos, mezzos) ..
     // [ʊ] (basses), the women's top opening toward [ɔ] (D5 .. G5); softer (lower pressures),
-    // breathier, less vibrato, a soft "d" on firmer keys (Roland's "dooh"). The lungs rise with
+    // breathier, less vibrato, a soft "d" on firmer keys (one maker's "dooh"). The lungs rise with
     // tau ~75 ms at mf (0.055 x 0.92 x the softness's 1.5): a soft, coordinated onset builds its
     // pressure in 50-150 ms (research/choir.md 5.1); with the entries' scatter and the room the
     // section is at half level in ~0.1 s, within 2-3 dB of full in ~0.2 s. (At 0.14, tau 0.19 s,

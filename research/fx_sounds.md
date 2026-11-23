@@ -19,19 +19,19 @@ How each fact is marked:
 
 ## Survey: what the classic sets do for 97–104
 
-Roland's GS names (SC-55, SC-88) and Yamaha's XG names are [memory] except where marked; the
+one maker's GS names (early GS module, later GS module) and one maker's XG names are [memory] except where marked; the
 three SoundFonts' preset names and samples are [T] (read from the files' `phdr`/`inst`/`shdr`).
 
-| GM | GM name | Roland GS (SC-55/88) | Yamaha XG | FluidR3_GM: preset, layers | TimGM6mb | Jnsgm2 | pajupilli |
+| GM | GM name | GS (early GS module/88) | XG | FluidR3_GM: preset, layers | TimGM6mb | Jnsgm2 | pajupilli |
 |---|---|---|---|---|---|---|---|
 | 97 | FX 1 (rain) | Ice Rain [web, soundhouse] | Rain | Ice Rain: decaying filtered saw + Halo Pad + "Iceloop" (a 31 ms looped glass ping) | IceRain: one 1.7 s looped sample of a tinkling figure on C4, C5, G5 | Ice Rain: synth strings + a 30 ms looped xylophone ping | `fx-rain`: rain on tuned glass bowls (this file) |
-| 98 | FX 2 (soundtrack) | Soundtrack (from the D-50's "Soundtrack") [web, synthmania; wikipedia] | Sound Track | Soundtrack: "Alien Strings" twice, on the note and a fifth up | synth strings twice, the second a fifth up | synth strings twice, the first a fifth up | `fx-soundtrack`: a keyed aeolian harp (this file) |
+| 98 | FX 2 (soundtrack) | Soundtrack (from the classic digital synth's "Soundtrack") [web, synthmania; wikipedia] | Sound Track | Soundtrack: "Alien Strings" twice, on the note and a fifth up | synth strings twice, the second a fifth up | synth strings twice, the first a fifth up | `fx-soundtrack`: a keyed aeolian harp (this file) |
 | 99 | FX 3 (crystal) | Crystal | Crystal | Crystal: celesta + square wave | celesta + "Spectrum" | celesta variants + "Spectrum" | `fx-crystal`: bowed/struck glass plate (`src/lead.cc`) |
-| 100 | FX 4 (atmosphere) | Atmosphere (from the D-50's "Nylon Atmosphere") [web, wikipedia; synthmania] | Atmosphere (variations "Nylon Harp", "Warm Atmos", ...) [web, Yamaha lists] | Atmosphere: nylon guitar + Alien Strings, both decaying | nylon/steel guitar (a filtered short onset) + synth strings | nylon guitar + synth strings | `fx-atmosphere`: a keyed psaltery with magnetic resonators (this file) |
-| 101 | FX 5 (brightness) | Brightness ("a Fairlight type of sound") [web, synthmania SC-50] | Brightness | Brightness: "Bright" (a chorused C6 cluster, looped) + synth strings | solo vox + synth strings | solo vox + synth strings an octave up | `fx-brightness`: a keyboard of singing arcs (this file) |
+| 100 | FX 4 (atmosphere) | Atmosphere (from the classic digital synth's "Nylon Atmosphere") [web, wikipedia; synthmania] | Atmosphere (variations "Nylon Harp", "Warm Atmos", ...) [web, Yamaha lists] | Atmosphere: nylon guitar + Alien Strings, both decaying | nylon/steel guitar (a filtered short onset) + synth strings | nylon guitar + synth strings | `fx-atmosphere`: a keyed psaltery with magnetic resonators (this file) |
+| 101 | FX 5 (brightness) | Brightness ("an early sampler type of sound") [web, synthmania SC-50] | Brightness | Brightness: "Bright" (a chorused C6 cluster, looped) + synth strings | solo vox + synth strings | solo vox + synth strings an octave up | `fx-brightness`: a keyboard of singing arcs (this file) |
 | 102 | FX 6 (goblins) | Goblin | Goblins | Goblin: synth vox + vox + wind | syn vox (aahs at the top) + sitar | the same | `fx-goblins`: a pyrophone, singing flames in glass pipes (this file) |
 | 103 | FX 7 (echoes) | Echo Drops (one voice; "sweeping tones, drops at the release") [web, soundhouse] | Echoes | Echo Drops: "Ahh Choir" + "SynthVz" (a pair panned ±50 %), a 5 s release | aahs + syn vox + synth strings | syn vox + synth strings | `fx-echoes`: a dulcitone (tuning forks) into a tape echo (this file) |
-| 104 | FX 8 (sci-fi) | Star Theme | Sci-Fi | Star Theme: clean electric guitar + "Sweeper" | clavinet + Strat + synth strings | electric guitar + synth strings | `fx-sci-fi` (`src/scifi.cc`) |
+| 104 | FX 8 (sci-fi) | Star Theme | Sci-Fi | Star Theme: clean electric guitar + "Sweeper" | clavi + three-pickup solid-body + synth strings | electric guitar + synth strings | `fx-sci-fi` (`src/scifi.cc`) |
 
 A pattern [T]: every FX program in the SoundFonts is a layer of a pad (synth strings, a halo
 pad, a choir) with something struck or plucked (celesta, xylophone, guitar, sitar). GM itself
@@ -41,14 +41,14 @@ only names the programs; the sounds are each maker's.
 
 ### What it is in the classic sets
 
-- **Roland (SC-55 onward), "Ice Rain".** GM2 names program 97 "Rain"; Roland has called it "Ice
+- **one maker (early GS module onward), "Ice Rain".** GM2 names program 97 "Rain"; one maker has called it "Ice
   Rain" since 1991, evoking hailstones [web, soundhouse]. A Japanese column describes it as a
   synth-brass/strings-like pad with a hard percussive attack from a looped xylophone-like sound,
-  glassy, celesta-like, and traces it to the Roland D-50 (1987) [web, soundhouse; not checked
-  against a D-50 preset list]. Later Roland libraries add an "Ice Rain Dly" variation [web,
-  roland]. That the SC-55's droplets are a short tuned ping retriggered by a looped sample, not
+  glassy, celesta-like, and traces it to the classic digital synth (1987) [web, soundhouse; not checked
+  against a classic digital synth preset list]. Later one maker libraries add an "Ice Rain Dly" variation [web,
+  roland]. That the early GS module's droplets are a short tuned ping retriggered by a looped sample, not
   random notes, is [memory] and matches the SoundFonts below.
-- **Yamaha XG, "Rain"** (variations "Harmo Rain", "African Wind", "Carib" on banks > 0) [memory]:
+- **XG, "Rain"** (variations "Harmo Rain", "African Wind", "Carib" on banks > 0) [memory]:
   a pad with a glittering high layer; not inspected.
 - **FluidR3_GM, "Ice Rain"** [T], three layers:
   1. looped single-cycle sawtooths (`saw-fb-110` .. `-880`, one per octave), low-passed
@@ -211,8 +211,8 @@ a little louder per drop brought it to −0.7 dB.
 
 ### What it is in the classic sets
 
-- **Roland's origin: the D-50's "Soundtrack" (1987).** Wikipedia's D-50 article lists
-  "Soundtrack" with "Fantasia" and "Atmosphere" among the D-50 presets that live on in every
+- **one maker's origin: the classic digital synth's "Soundtrack" (1987).** Wikipedia's classic digital synth article lists
+  "Soundtrack" with "Fantasia" and "Atmosphere" among the classic digital synth presets that live on in every
   General MIDI device [web, wikipedia]. Synthmania analyses it as factory preset 37
   [web, synthmania]:
   - Dual key mode (split C4) in stereo through the reverb.
@@ -221,10 +221,10 @@ a little louder per drop brought it to −0.7 dB.
   - It has chorus, slight pitch modulation and per-tone detuning.
   - Its partial-1 envelopes "change dramatically by velocity [and] release".
   - The author calls it "the perfect pad".
-- **Roland GS (SC-55, SC-88), "Soundtrack":** the GS/GM2 name for program 98 [web, polyphone /
-  GM2 list]. That the SC-55's version is a dark, slow fifth pad in the D-50's line is [memory]:
+- **GS (early GS module, later GS module), "Soundtrack":** the GS/GM2 name for program 98 [web, polyphone /
+  GM2 list]. That the early GS module's version is a dark, slow fifth pad in the classic digital synth's line is [memory]:
   not heard or inspected here.
-- **Yamaha XG, "Sound Track":** [memory], not inspected.
+- **XG, "Sound Track":** [memory], not inspected.
 - **FluidR3_GM, "Soundtrack"** [T]: two layers of one instrument (both "Alien Strings", a stereo
   pair panned ±50 %).
   - **The sample:** "Alien Strings" (1.16 s at 44.1 kHz, looped from 0.83 s) is a **detuned
@@ -258,7 +258,7 @@ a little louder per drop brought it to −0.7 dB.
   It renders like TimGM6mb.
 
 So the common core [T, web]: **a sustained string-like pad of the note with a second voice a
-fifth above** (4–10 dB under the note), detuned for a chorus, darker than a sawtooth. The D-50
+fifth above** (4–10 dB under the note), detuned for a chorus, darker than a sawtooth. The classic digital synth
 also made it dynamic: velocity and release reshape it. A slow swell and a dark-to-bright filter
 are not in the SoundFonts: they start within 0.1–0.25 s, and TimGM6mb's filter closes rather
 than opens.
@@ -298,7 +298,7 @@ What the patch must do: play chords in tune, a dark chorused pad of the note and
 swells and opens (the prompt's brief) and holds. Three physical candidates were weighed:
 
 1. **An analog circuit pad** (oscillators into a component-level OTA or ladder filter opened by
-   an RC envelope). This is the most literal reading of the patch: the D-50's TVF and the
+   an RC envelope). This is the most literal reading of the patch: the classic digital synth's TVF and the
    SoundFonts' filter envelopes. Rejected because it is what `src/lead.cc`'s pads already are,
    and `pad-warm` is the fallback this replaces. A second one would add a parameter set, not a
    sound.
@@ -312,7 +312,7 @@ swells and opens (the prompt's brief) and holds. Three physical candidates were 
      street is), the same nearly pure tone as "Alien Strings".
    - **A slow bloom:** it grows over its own Q (~1/(ζω), 0.3–1 s), not a programmed envelope.
    - **Chorus:** several strings a few cents apart beat, the patch's chorus.
-   - **The fifth:** a string on the fifth is the fifth layer (the D-50's "BriteFifth").
+   - **The fifth:** a string on the fifth is the fifth layer (the classic digital synth's "BriteFifth").
    - **Brightness from the wind:** wind across a wire is how real harmonics appear (the harp
      locking higher modes), so brightness can come from where the wind blows, not from a filter.
    - **Keys:** a "keyed" harp, a shutter per course, makes it playable: chords, any key.
@@ -443,17 +443,17 @@ Built: `src/lead.cc` (`fx-crystal`), a bowed and struck glass plate; README "Syn
 
 ### What it is in the classic sets
 
-- **Roland's origin: the D-50's "Nylon Atmosphere" (1987).** Wikipedia's D-50 article lists
-  "Atmosphere" and "Nylon Atmosphere" among the D-50 presets that "live on in every machine that
+- **one maker's origin: the classic digital synth's "Nylon Atmosphere" (1987).** Wikipedia's classic digital synth article lists
+  "Atmosphere" and "Nylon Atmosphere" among the classic digital synth presets that "live on in every machine that
   conforms to the General MIDI specification" [web, wikipedia]. Synthmania lists "Nylon
   Atmosphere" as factory preset 27: "Typical L.A. synthesis sound. A beautiful and classic 1980s
   pad patch" [web, synthmania]. That it layers a sampled (PCM) nylon-guitar attack with
   synthesized pad partials, as L.A. synthesis does, is [memory]: its partials were not found
   on the web.
-- **Roland GS (SC-55, SC-88), "Atmosphere":** the GS name for program 100 [web, polyphone / GM2
-  list]. That the SC-55's tone is a nylon-like pluck over a soft pad in the D-50's line is
+- **GS (early GS module, later GS module), "Atmosphere":** the GS name for program 100 [web, polyphone / GM2
+  list]. That the early GS module's tone is a nylon-like pluck over a soft pad in the classic digital synth's line is
   [memory]: not heard or inspected here.
-- **Yamaha XG, "Atmosphere"** (MSB 0, LSB 0). Its variations [web, Yamaha QY100 and P-515 data
+- **XG, "Atmosphere"** (MSB 0, LSB 0). Its variations [web, one maker QY100 and P-515 data
   lists]: Warm Atmos (LSB 18), Hollow Release (19), Nylon EP (40), Nylon Harp (64), Harp Vox
   (65), Atmos Pad (66), Planet (67). The names say what the voice is built from: a plucked
   nylon or harp attack with a pad. The voice itself was not inspected.
@@ -512,7 +512,7 @@ arpeggios under a melody (new-age, film and game beds), at moderate velocities, 
   a grand piano, driven from a pickup through a filter tuned to the note (or to a chosen
   harmonic). It gives swelling, held, pad-like tones, played from the keyboard, the touch
   setting the intensity. Berdahl, Backer and Smith's electromagnetically prepared piano
-  (2005) is the same idea [paper]. The Moog Guitar (2008) sustains or damps each string this
+  (2005) is the same idea [paper]. The classic ladder Guitar (2008) sustains or damps each string this
   way [memory].
 - **The loop as a negative damping** [memory, textbook]: a force in phase with a mode's
   velocity, F = G v, changes its decay rate from σ to σ − G φ_p φ_d / 2 (φ_p and φ_d are the
@@ -690,16 +690,16 @@ What is alike: a prompt onset, the level after 2 s, the release, the velocity cu
 
 ### What it is in the classic sets
 
-- **Roland GS (SC-55 onward), "Brightness"** (program 101, bank 0) [web, polyphone / GM2 list;
-  dtm wiki SC-55 map]. Synthmania's SC-50 page calls it "Fairlight type of sound" [web,
+- **GS (early GS module onward), "Brightness"** (program 101, bank 0) [web, polyphone / GM2 list;
+  dtm wiki early GS module map]. Synthmania's SC-50 page calls it "early sampler type of sound" [web,
   synthmania SC-50]. A Japanese column lists "101 000 Brightness (2 voices), range C2–C7", glosses
   the name as radiance or clarity, and hears "a metallic, string-like quality" [web, soundhouse
-  GM SFX column; read through a search summary, the page itself timed out]. **D-50 heritage: not
+  GM SFX column; read through a search summary, the page itself timed out]. **classic digital synth heritage: not
   found.** The pages that trace "Fantasia", "Soundtrack", "Atmosphere" and "Ice Rain" to the
-  D-50 do not mention "Brightness", and no D-50 preset of that name turned up; that it is a D-50
+  classic digital synth do not mention "Brightness", and no classic digital synth preset of that name turned up; that it is a classic digital synth
   patch is not supported. The sound itself was not heard or inspected.
-- **Yamaha XG, "Brightness"** (MSB 0, LSB 0) [memory]. The XG voice lists (MU80, QY100) could not
-  be fetched (Yamaha's PDFs returned 404/403), so its elements and variations are not known here.
+- **XG, "Brightness"** (MSB 0, LSB 0) [memory]. The XG voice lists (MU80, QY100) could not
+  be fetched (one maker's PDFs returned 404/403), so its elements and variations are not known here.
 - **FluidR3_GM, "Brightness"** [T]. The preset: attenuation 5 dB, chorus 20 %, reverb 20 %. One
   instrument, a global release of 2786 tc (5 s), two layers, no volume decay (it **holds**):
   - **"Synth Strings 1" (L/R)**, panned ±50 %: 2.15 s samples looped over their last 0.59 s,
@@ -953,15 +953,15 @@ velocity curve, the noisiness, the stereo width (between FluidR3's and the other
 SF2 times below are converted from timecents (2^(tc/1200) s) and frequencies from absolute
 cents (8.176 · 2^(c/1200) Hz).
 
-- **Roland GS (SC-55 onward), "Goblin"** (program 102, bank 0).
+- **GS (early GS module onward), "Goblin"** (program 102, bank 0).
   - A Japanese column lists it with two voices and a C2–C7 range, and describes it as heavily
     sweeping synth voices; the name is the fantasy creature [web, soundhouse GM SFX column; read
     through a search summary, the page itself timed out].
-  - **D-50 heritage: not found.** The pages that trace "Fantasia", "Soundtrack" and "Atmosphere"
-    to the D-50 do not mention a goblin, and Sound House ties another FX program ("Crystal") to
-    the D-50 but not this one. Nothing supports a D-50 origin. The sound itself was not heard or
+  - **classic digital synth heritage: not found.** The pages that trace "Fantasia", "Soundtrack" and "Atmosphere"
+    to the classic digital synth do not mention a goblin, and Sound House ties another FX program ("Crystal") to
+    the classic digital synth but not this one. Nothing supports a classic digital synth origin. The sound itself was not heard or
     inspected.
-- **Yamaha XG, "Goblins"** (MSB 0, LSB 0, program 102; two elements) [web, Yamaha lists; QY100
+- **XG, "Goblins"** (MSB 0, LSB 0, program 102; two elements) [web, one maker lists; QY100
   and QY700 data lists, read through a search summary]. The same summary lists bank variations
   near it ("GobSynth", "Creeper", "Ritual", "Night"); their placement was not checked against the
   PDF. The elements' make-up is not known here.
@@ -1267,16 +1267,16 @@ and Jnsgm2's), the release, the pitch wobble (14–16 c against 21–40 c), the 
 SF2 times below are converted from timecents (2^(tc/1200) s), frequencies from absolute cents
 (8.176 · 2^(c/1200) Hz) and levels from centibels.
 
-- **Roland GS (SC-55 onward), "Echo Drops"** (program 103, bank 0), with bank variations "Echo
+- **GS (early GS module onward), "Echo Drops"** (program 103, bank 0), with bank variations "Echo
   Bell" and "Echo Pan" [web, dtm wiki SC-55 map; read through a search summary].
   - Sound House's GM column lists it with **one voice** and a C2–C7 range. It says that despite
     the name it does not behave like a delay effect: it is two chorus-like tones that sweep, and a
     bursting sound comes at the key-up, which suggests water drops (hence "Drops") [web,
     soundhouse; read through a search summary, the page itself timed out].
-  - **D-50 heritage: not found.** The pages that trace "Fantasia", "Soundtrack" and "Atmosphere"
-    to the D-50 do not mention it, and no D-50 preset list searched has an "Echo Drops". The
+  - **classic digital synth heritage: not found.** The pages that trace "Fantasia", "Soundtrack" and "Atmosphere"
+    to the classic digital synth do not mention it, and no classic digital synth preset list searched has an "Echo Drops". The
     sound itself was not heard.
-- **Yamaha XG, "Echoes"** (MSB 0, LSB 0, program 103) [web, Yamaha lists]. The variations are
+- **XG, "Echoes"** (MSB 0, LSB 0, program 103) [web, Yamaha lists]. The variations are
   "Echoes 2" (LSB 8), "Echo Pan" (14), "EchoBell(s)" (64), "Big Pan" (65) and "SynPiano" (66),
   with "Creation", "StarDust" and "Reso&Pan" in some lists (QY100, CLP-785 and P-515 data lists,
   read through a search summary; the PDFs answered 403 to a direct read). The element count and
@@ -1318,7 +1318,7 @@ SF2 times below are converted from timecents (2^(tc/1200) s), frequencies from a
       5 s release with the loops' swells in it (bumps at ~0.8, 1.0 and 1.2 s).
   - So the "echoes" are a pad's level pulsing at 0.5–1.2 s, an interval set by the sample and
     the key, not a tempo; nothing decays repeat by repeat or darkens, and only FluidR3 is
-    stereo. Roland's description (sweeping, chorus-like tones; drops at the release) fits
+    stereo. One maker's description (sweeping, chorus-like tones; drops at the release) fits
     FluidR3's long release over a sweeping pair.
 
 So the common core [T]:
@@ -1348,7 +1348,7 @@ suggest [memory]: struck notes and chords that come back, slow lines, moderate v
   Wallace 1951]. A slower tape (a shorter wavelength for the same frequency) or a worn one
   (larger d) is darker. Gap loss (the sinc of the gap over the wavelength) and thickness
   loss come on top; at these speeds the gap's first null lies far above the audio band.
-- **The tape echo** (Echoplex, 1961; Roland RE-201 Space Echo, 1974) [memory]: a loop of tape
+- **The tape echo** (tape echo, 1961; tape echo, 1974) [memory]: a loop of tape
   runs past an erase head, a record head and one or more playback heads. A head at distance D
   hears what was recorded D / v ago; its output fed back to the record head ("intensity") makes
   the repeats. Each pass is quieter by the feedback, darker by the head losses and, when loud,
@@ -1399,12 +1399,12 @@ The candidates:
    - **its own dynamics:** the feedback loop (decaying repeats, runaway past unity), the tape's
      saturation (loud chords and piled-up repeats compress), the spacing loss (each pass darker,
      a slower or worn tape darker still), wow and flutter (the repeats' pitch wanders; a held
-     note beating against its own echo sweeps like a chorus: Roland's "sweeping tones"), the
+     note beating against its own echo sweeps like a chorus: one maker's "sweeping tones"), the
      motor's inertia (turning the rate glides the echoes);
    - **stereo from the machine:** the two heads to the two sides make the repeats alternate;
    - **not a duplicate:** `pad-halo` has an abstract bucket-brigade echo (a 340 ms line, a fixed
      low-pass and a tanh); nothing here records on tape. The source is new too: no instrument
-     here is a tuning fork (the Rhodes' tine and tone bar form an asymmetric fork, but it is
+     here is a tuning fork (the tine piano' tine and tone bar form an asymmetric fork, but it is
      heard through a magnetic pickup, and the kalimba's tines are free).
    - **The fork as the source:** the nearest a struck thing comes to the classic's near-sine
      voice; its clang under a hard blow is the "drop"; its long ring holds like a pad; and a
@@ -1555,10 +1555,10 @@ SoundFonts have none); their interval, decay and darkening are in the measuremen
 
 - **The tape is idealised:** an anhysteretic Langevin curve without hysteresis or the bias's own
   level; spacing loss only (no gap or thickness loss, no head bump, no pre-emphasis); no tape
-  hiss or modulation noise (a real Space Echo hisses audibly). The head spacing, the wow and
+  hiss or modulation noise (a real tape echo hisses audibly). The head spacing, the wow and
   flutter depths and the capstan's size are chosen, not measured on a machine.
-- **Two playback heads**, the second fed back; the RE-201 has three and a mode switch. The
-  repeats alternate sides because the heads are panned, which a mono Space Echo does not do.
+- **Two playback heads**, the second fed back; the tape echo has three and a mode switch. The
+  repeats alternate sides because the heads are panned, which a mono tape echo does not do.
 - **The fork is three modes and a box,** the box a band-pass without back-reaction on the fork
   (no beating between fork and box); the octave is a quadratic term, not the stem's geometry.
 - **It decays,** where the classic patch holds as a pad (3 dB/s at C4). Re-struck, a key's fork

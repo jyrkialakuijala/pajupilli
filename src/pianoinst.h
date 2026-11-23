@@ -15,7 +15,7 @@
 namespace pajupilli {
 
 // The grand's tuning (-tuning grand-piano;NAME): grand-piano-stretch (default, Precision Strobe's table),
-// stretch-variable, railsback-4-2 (a Modartt forum study's curves), octaves-by-register, partials
+// stretch-variable, railsback-4-2 (a piano-modelling forum study's curves), octaves-by-register, partials
 // (the model's earlier 2:1 / 6:3), tet12 (no stretch), or meantone, kirnberger3, neidhardt, lehman
 // (over the partials' stretch). False: no such tuning.
 bool setPianoTuning(const std::string& name);
@@ -118,6 +118,9 @@ class PianoPlayer : public Performer {
   // (-play) The next release's speed at the dampers (m/s), as the player chose it for the music
   // (an on/off pedal: how hard the foot lets go there); taken by that release.
   void planRelease(double speed) { plannedUp_ = speed; }
+  // (-play) The next release is the song's last, or goes into a silence: the foot comes up as gently
+  // as it can, the dampers laid on over PJ_PIANO_LASTPEDAL seconds (1.5; 0: as any other).
+  void planGentleRelease() { lastUp_ = true; }
   void seed(unsigned) override {}
   static double hammerSpeed(int velocity, double dynamics);  // m/s
 
@@ -130,7 +133,7 @@ class PianoPlayer : public Performer {
   // gave, whether it is down, the draws for each release's own speed)
   int pedalCC_ = 0;
   double pedalT_ = -1, now_ = 0, nextSpeed_ = -1, plannedUp_ = -1;
-  bool pedalDown_ = false;
+  bool pedalDown_ = false, lastUp_ = false;
   uint32_t pedalRng_ = 9157;
   int lo_ = 0, hi_ = 127;
   bool held_ = false;  // the sustain pedal, as last told (printed when it changes)

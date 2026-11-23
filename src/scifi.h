@@ -77,7 +77,7 @@ class SciFiModel : public Tube {
 };
 
 // Velocity is the fold's drive and the ping's strength (and its FM index); the sustain pedal
-// holds the keys; the pitch bend is +-2 semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"):
+// holds the keys; the pitch bend is +-2 semitones. Knobs (the controller's K1-K4, -seq's "knob K X"):
 // K1 the fold, K2 the modulator's ratio, K3 the balance, K4 the ping's ring.
 class SciFiPlayer : public Performer {
  public:

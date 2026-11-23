@@ -4029,7 +4029,7 @@
 ]
 },
 "log": [],
-"inst": "clavinet"
+"inst": "clavi"
 },
 "Jnsgm2": {
 "anchor": [
@@ -4140,7 +4140,7 @@
 ]
 },
 "log": [],
-"inst": "clavinet"
+"inst": "clavi"
 },
 "TimGM6mb": {
 "anchor": [
@@ -4251,7 +4251,7 @@
 ]
 },
 "log": [],
-"inst": "clavinet"
+"inst": "clavi"
 },
 "SGM": {
 "anchor": [
@@ -4362,7 +4362,7 @@
 ]
 },
 "log": [],
-"inst": "clavinet"
+"inst": "clavi"
 },
 "pajupilli": {
 "anchor": [
@@ -4474,9 +4474,9 @@
 },
 "log": [
 "  channel  1: grand-piano (1 at once, one voice)",
-"  channel  2: clavinet (1 at once, one voice)"
+"  channel  2: clavi (1 at once, one voice)"
 ],
-"inst": "clavinet"
+"inst": "clavi"
 }
 },
 "6": {
@@ -10075,7 +10075,7 @@
 "log": [
 "  channel  1: grand-piano (1 at once, one voice)",
 "  channel  2: drawbar-organ (1 at once, one voice)",
-"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion off; Leslie planned: slow throughout, nudged on 7 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
+"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion off; Rotary planned: slow throughout, nudged on 7 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
 ],
 "inst": "drawbar-organ"
 }
@@ -10636,7 +10636,7 @@
 "log": [
 "  channel  1: grand-piano (1 at once, one voice)",
 "  channel  2: percussive-organ (1 at once, one voice)",
-"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion on (3rd, fast); Leslie planned: slow throughout, nudged on 7 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
+"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion on (3rd, fast); Rotary planned: slow throughout, nudged on 7 long notes; harmony 0.00; re-registered at 4 pauses, to 888888006"
 ],
 "inst": "percussive-organ"
 }
@@ -11197,7 +11197,7 @@
 "log": [
 "  channel  1: grand-piano (1 at once, one voice)",
 "  channel  2: rock-organ (1 at once, one voice)",
-"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion off; Leslie planned: fast in 2 phrases (the lower's vibrato off in it), nudged on 6 long notes; re-registered at 4 pauses, to 688888006; two glissandos up the white keys"
+"    channel 2 track 0: split by hand; notes: 20 upper, 0 lower, 0 pedals; percussion off; Rotary planned: fast in 2 phrases (the lower's vibrato off in it), nudged on 6 long notes; re-registered at 4 pauses, to 688888006; two glissandos up the white keys"
 ],
 "inst": "rock-organ"
 }

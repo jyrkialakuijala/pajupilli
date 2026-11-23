@@ -37,9 +37,9 @@ plan; **[meas]** measured here on the user's recordings (numbers only; audio sta
   a brute-force tutti is 45–100 µs/sample, 2–5 cores. The plan (§8) keeps the physics where it is
   heard (each pipe's attack and its pitch/level under the wind) and uses a cheaper steady-state form
   per rank once a pipe has spoken.
-- **The user's MIDI files barely use organ programs**: only GM 17 (drawbar, i.e. a Hammond) in one
+- **The user's MIDI files barely use organ programs**: only GM 17 (drawbar, i.e. a tonewheel organ) in one
   file (`goodbaitGM.mid`, 2646 notes, keys 41–81, mostly 2-note chords); **no GM 19, 20 or 21**
-  **[meas]**. So the church organ is mainly a **live** instrument (MPK mini) and a `-play` voice for
+  **[meas]**. So the church organ is mainly a **live** instrument (25-key MIDI controller) and a `-play` voice for
   other files.
 
 ## 2. Flue pipes
@@ -123,7 +123,7 @@ plan; **[meas]** measured here on the user's recordings (numbers only; audio sta
 | Posaune 16′, Contra Posaune 32′ | conical, often half-length in the bass | weak fundamental | 16′ C2: ≥ 75 harmonics to 5 kHz; fundamental 20 dB under the 2nd, inaudible if removed |
 | Oboe 8′ | narrow conical, capped bell | keen, nasal | F#3: ~9 harmonics in 3 kHz |
 | Cromorne 8′, Dulcian 16′, Fagott 16′, Klarine 4′ | cylindrical, ~half length | even harmonics suppressed | Krummhorn C3: odd strong |
-| Vox humana 8′ | very short cylindrical (~1/8 of a clarinet's) | a formant: dominant harmonic ~1.85 kHz, fixed over 4 octaves (±18 %) | Wurlitzer F#3 |
+| Vox humana 8′ | very short cylindrical (~1/8 of a clarinet's) | a formant: dominant harmonic ~1.85 kHz, fixed over 4 octaves (±18 %) | reed electric piano F#3 |
 | Trompette en chamade 8′ | conical, horizontal, high pressure | very bright, direct | — |
 
 - **The reed dominates the pitch**, the resonator the timbre; a half-length resonator has no
@@ -407,7 +407,7 @@ The selection covers about 20 distinct pipe families (§8 stage 3).
   drones are routed by range); very long notes and pp → the soft accompaniment.
 - **GM 21 (Reed Organ)** is a harmonium (free reeds) — not this instrument (see `free_reeds.md`).
 - **GM 17–19** (drawbar, percussive, rock organ) are tonewheel organs — a different instrument
-  (Hammond: tonewheels, drawbars, Leslie), out of scope here; the user's one organ file uses GM 17.
+  (tonewheel organ: tonewheels, drawbars, rotary speaker), out of scope here; the user's one organ file uses GM 17.
 
 ## 7. Cost
 
@@ -1054,7 +1054,7 @@ climate and maintenance). How the design stands against it, and what it adds **[
    et al. 2006 / Sawicki et al. 2018: wider when closer; anti-phase or silence when equal and very
    close); the céleste's beat rate varies by key; a chromatic run alternates sides; the cost of a
    500-pipe tutti under 1 core for the room.
-6. **The console:** 35 stops, couplers, presets (§6.1), the MPK mini mapping (§10), and `-play`
+6. **The console:** 35 stops, couplers, presets (§6.1), the 25-key MIDI controller mapping (§10), and `-play`
    (GM 20) with a registration and the swell on CC11.
 6b. **The church (§7b.2), on its own core:** the nave spec (~20 000 m³, T60 per octave fitted to
    the recordings), a 32-line FDN with 3-band decay, early reflections per pipe in the nave with the
@@ -1193,7 +1193,7 @@ Analysed in the scratchpad (`ffmpeg`, numpy), numbers only:
 - Next (step 0): find single held notes and chord releases in these files (onset detection; the
   final chords) for attack and spectral targets.
 
-## 10. Live (MPK mini mk3)
+## 10. Live (25-key MIDI controller)
 
 - 25 keys + octave shift: a manual; the pads: 8 registration presets (§6.1) and a bank switch for
   coupler/division; K1–K8 knobs: the swell shoe (K1), tremulant on/off & depth (K2), wind
@@ -1213,7 +1213,7 @@ Analysed in the scratchpad (`ffmpeg`, numpy), numbers only:
 3. **Wind (§4a):** answered (2026-11-16): **modern**, steady regulators, and the blower
    **struggles clearly** at the full organ: ~8 % sag, ~4 c droop (§4a.5: Qmax ≈ 21-26 m³/min).
 4. **Room:** the existing `church` (RT60 4 s) or a bigger one fitted to the recordings (6–7 s)?
-5. **GM programs:** GM 20 to this organ; should GM 17–19 (tonewheel) get a Hammond later, and GM 21
+5. **GM programs:** GM 20 to this organ; should GM 17–19 (tonewheel) get a tonewheel organ later, and GM 21
    go to the harmonium from the free-reed work?
 6. **Live control:** registration presets on the pads as in §10, or another layout?
 7. Is the "Gloria 355 CC" a specific instrument the user plays (its sound as the reference)? I

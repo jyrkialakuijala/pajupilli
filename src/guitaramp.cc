@@ -14,13 +14,13 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 }
 
-// A Fender Twin Reverb (AB763), clean: research/electric_guitars.md 11.3 (the blackface stack:
+// A clean 2x12 combo (AB763), clean: research/electric_guitars.md 11.3 (the blackface stack:
 // 250 pF, 100 nF, 47 nF; treble 250 k, bass 250 k, mid 10 k, slope 100 k [YS06]) after the first
 // stage. Its knobs as a jazz or clean player leaves them; the volume at about 3 of 10 (a log
 // pot: 0.2 of the signal): clean for a single coil, a hard strum just touching the power stage.
-GuitarAmp::Preset GuitarAmp::twin() {
+GuitarAmp::Preset GuitarAmp::cleanCombo() {
   Preset p{};
-  p.name = "twin";
+  p.name = "clean-combo";
   p.stage[0] = {40, 0, 18, 0};
   p.stage[1] = {40, 0, 22, 0};
   p.stages = 2;
@@ -40,25 +40,25 @@ GuitarAmp::Preset GuitarAmp::twin() {
 
 // The same with a compressor pedal in front (GM 29: research/electric_guitars.md 13): ratio 4
 // above 50 mV, its make-up putting a 0.2 V peak where it was.
-GuitarAmp::Preset GuitarAmp::twinComp() {
-  Preset p = twin();
-  p.name = "twin-comp";
+GuitarAmp::Preset GuitarAmp::cleanComboComp() {
+  Preset p = cleanCombo();
+  p.name = "clean-combo-comp";
   p.compRatio = knob("PJ_AMP_COMP", 4.0);
   p.compAt = knob("PJ_AMP_COMPAT", 0.05);
   return p;
 }
 
-// A Marshall JCM800 2203 at crunch (GM 30; 11.2-11.5 [E] from the circuit): V1A (gain ~50, its
+// A British crunch stack at crunch (GM 30; 11.2-11.5 [E] from the circuit): V1A (gain ~50, its
 // cathode capacitor small: the lowest bass not amplified), the preamp volume with its 470 pF
 // bright capacitor, V1B biased cold (10 k unbypassed: less gain, clipping its lower half first;
-// the Miller roll-off from 7 kHz), the cathode follower into the Marshall stack (470 pF, 22 nF,
+// the Miller roll-off from 7 kHz), the cathode follower into the British stack (470 pF, 22 nF,
 // 22 nF; 220 k, 1 M, 22 k, 33 k), the master, the EL34s. The knobs as a rock player sets them for
 // crunch: the gain low (0.08 of the pot: about 3 of 10, a log pot) so that soft picking comes
 // through nearly clean, a hard stroke drives the cold stage well past its knee; the master at
 // 0.6: the power stage at the edge on chords. PJ_AMP_OS=1: without oversampling (to compare).
-GuitarAmp::Preset GuitarAmp::jcm800() {
+GuitarAmp::Preset GuitarAmp::crunchStack() {
   Preset p{};
-  p.name = "jcm800";
+  p.name = "crunch-stack";
   p.stage[0] = {50, 0, 35, 0};
   p.stage[1] = {30, -1.2, 15, 7000};
   p.stages = 2;
@@ -84,16 +84,16 @@ GuitarAmp::Preset GuitarAmp::jcm800() {
   return p;
 }
 
-// A Soldano SLO-100's overdrive channel (GM 31: research/distortion_guitar.md 2.1, 10.2; Kuehnel's
+// A high-gain amp's overdrive channel (GM 31: research/distortion_guitar.md 2.1, 10.2; Kuehnel's
 // reading of the circuit): V1a (36 dB; its cathode partly bypassed: the bass 3 dB under the
 // treble below ~170 Hz), the gain pot (470 k with 2000 pF across it, then the 500 k pot: the bass
 // 5.6 dB down, the treble whole; the pot at about 4 of 10), V1b (32 dB, its bass 4.5 dB under),
 // a 0.68 divider, V2a the cold clipper (39 k unbypassed, bias near cut-off: ~2.4x, its plate
 // rolled off from 1.6 kHz), 0.77, V2b (38 dB: where it distorts most; its coupling capacitor
-// small, 72 Hz: the bass kept out), the DC-coupled cathode follower, then the stack (Marshall
-// values: the Soldano's are not given) after all of it, the master low (the 6L6s nearly clean:
-// sag and a soft knee on chord attacks), resonance and presence, a closed 4x12 of Vintage 30s
-// and an SM57. A humbucker's 0.5 V is some 35 dB over V2b's knee; a soft note still 20. The
+// small, 72 Hz: the bass kept out), the DC-coupled cathode follower, then the stack (British stack
+// values: the high-gain amp's are not given) after all of it, the master low (the 6L6s nearly clean:
+// sag and a soft knee on chord attacks), resonance and presence, a closed 4x12 of 60 W British speakers
+// and a dynamic microphone. A humbucker's 0.5 V is some 35 dB over V2b's knee; a soft note still 20. The
 // noise of the pickup and the hum, and a gate on the guitar's own signal (2 mV) to close on them.
 // The stages at 2x with their curves antialiased (PJ_AMP_OS, PJ_AMP_ADAA). PJ_AMP_TS: a Tube
 // Screamer in front (its level; 0: none), drive PJ_AMP_TSDRIVE.
@@ -101,7 +101,7 @@ GuitarAmp::Preset GuitarAmp::slo() {
   Preset p{};
   p.name = "slo";
   // (Its grid stoppers, 68 k and 220 k, and its high plate resistors: grid current charges the
-  // coupling capacitors some five times slower than in the Marshall. Faster, a hard attack
+  // coupling capacitors some five times slower than in the British stack. Faster, a hard attack
   // would push each stage cold for tens of milliseconds: thin pulses, a dark, blocked attack.)
   const double grid = knob("PJ_AMP_GRID", 0.2);
   p.stage[0] = {60, 0, 10, 0, 170, -3, 0, 0, 1, 0, grid};
@@ -141,19 +141,19 @@ GuitarAmp::Preset GuitarAmp::slo() {
   return p;
 }
 
-// GM 34: a Jazz Bass on a splitter into an active DI (10 MOhm) and an Ampeg B-15N's 1966 channel
-// (1 MOhm: the pickup sees 0.9 MOhm), the two blended half and half, then an LA-2A (research/
-// bass_amps.md 10.1; the B-15N drawn by Piazza, 3.1). The amp: V1a and V1b (6SL7s, 470 k and 220
+// GM 34: a two-pickup bass on a splitter into an active DI (10 MOhm) and an fliptop bass amp's 1966 channel
+// (1 MOhm: the pickup sees 0.9 MOhm), the two blended half and half, then an optical compressor (research/
+// bass_amps.md 10.1; the fliptop bass amp drawn by Piazza, 3.1). The amp: V1a and V1b (6SL7s, 470 k and 220
 // k plates, their cathodes unbypassed: ~30x each and a swing four times a 12AX7's), the volume
 // between them, the James stack after V1b (bass 1 M with 220 k / 22 k and 1 nF / 10 nF, treble 1 M
 // with 470 pF / 4.7 nF, 120 k to the output, the 270 k from the bass wiper; fed from V1b's ~37 k,
 // into ~500 k), the phase splitter (V3, ~10x), two 6L6s (a soft knee) on a 5AR4 rectifier (the
-// supply sags more), a 1x15 with an RE20 at ~15 cm. The coupling corners of a few Hz, the output
-// at 8 Hz. The DI's top rolled off a little (the engineers' "roll off the top"). The LA-2A at 3:1:
+// supply sags more), a 1x15 with an broadcast dynamic microphone at ~15 cm. The coupling corners of a few Hz, the output
+// at 8 Hz. The DI's top rolled off a little (the engineers' "roll off the top"). The optical compressor at 3:1:
 // a mf line 3 dB under, a ff one 6. Knobs PJ_BAMP_*.
-GuitarAmp::Preset GuitarAmp::b15Di() {
+GuitarAmp::Preset GuitarAmp::fliptopDi() {
   Preset p{};
-  p.name = "b15-di";
+  p.name = "fliptop-di";
   const double sw = knob("PJ_BAMP_SWING", 4.0);
   p.stage[0] = {30, 0, 3, 0};
   p.stage[1] = {30, 0, 16, 0};
@@ -195,21 +195,21 @@ GuitarAmp::Preset GuitarAmp::b15Di() {
   return p;
 }
 
-// GM 35 (the Precision with its pick, src/ebass.cc PickBassPlayer): an Ampeg SVT's Normal input
+// GM 35 (the split-coil bass with its pick, src/ebass.cc PickBassPlayer): an bass stack's Normal input
 // (research/bass_amps.md 10.2; Piazza's 1972 drawing, 3.2): V1 a 12AU7-like stage (~13x, a swing
 // three times a 12AX7's), the volume, V3a (~18x), the James stack (treble 47 pF / 470 pF: a higher
 // shelf), the mid at 800 Hz +3 dB, the driver; the master half up, six 6550s on silicon (little
-// sag, a harder knee), at 4x (the growl on hard attacks); an 8x10 with a D112 close. The DI 35 %;
-// an 1176 at 4:1, its slowest attack, a fast release, its threshold set on the P played (0.04 V:
+// sag, a harder knee), at 4x (the growl on hard attacks); an 8x10 with a kick-drum microphone close. The DI 35 %;
+// a FET compressor at 4:1, its slowest attack, a fast release, its threshold set on the P played (0.04 V:
 // a mf line hardly touched, a ff one ~2.5 dB down, E1 v40 -> v120 11 dB after it: research/
 // bass_amps.md 10.6 item 9). PJ_BAMP_MID (Hz), PJ_BAMP_MIDDB, Ultra Lo
 // and Hi (PJ_BAMP_ULTRALO, PJ_BAMP_ULTRAHI: 1 on).
 // GM 36 (the fretless, src/fretless.cc; research/fretless_bass.md 6, bass_amps.md 10.3): the
-// records' fretless, DI-heavy. The B-15's path as GM 34's, blended 30 % for warmth; the DI 70 %,
+// records' fretless, DI-heavy. The fliptop's path as GM 34's, blended 30 % for warmth; the DI 70 %,
 // both with the Acoustic 360's Variamp pushing the mids (+3 dB at 800 Hz, Q 0.8: PJ_FRETLESS_MIDDB);
-// the LA-2A at 3:1. (Its chorus is the model's own: PJ_FRETLESS_CHORUS.)
+// the optical compressor at 3:1. (Its chorus is the model's own: PJ_FRETLESS_CHORUS.)
 GuitarAmp::Preset GuitarAmp::fretlessDi() {
-  Preset p = b15Di();
+  Preset p = fliptopDi();
   p.name = "fretless-di";
   const double mid = knob("PJ_FRETLESS_MIDDB", 3);
   p.blend = knob("PJ_FRETLESS_BLEND", 0.7);
@@ -218,9 +218,9 @@ GuitarAmp::Preset GuitarAmp::fretlessDi() {
   return p;
 }
 
-GuitarAmp::Preset GuitarAmp::svt() {
+GuitarAmp::Preset GuitarAmp::bassStack() {
   Preset p{};
-  p.name = "svt";
+  p.name = "bass-stack";
   p.stage[0] = {13, 0, 2, 0};
   p.stage[0].swing = 3;
   p.stage[1] = {18, 0, 16, 0};
@@ -261,9 +261,9 @@ GuitarAmp::Preset GuitarAmp::svt() {
   return p;
 }
 
-// GM 37 (src/ebass.cc SlapBassPlayer): the DI first (75 %; the Markbass-like VPF at noon:
+// GM 37 (src/ebass.cc SlapBassPlayer): the DI first (75 %; the bass amp-like VPF at noon:
 // +4 dB at 35 Hz, -6 at 380, +4 at 10 kHz), a clean solid-state head (GK-like: op-amp stages
-// straight, its EQ with the Mid Contour in) into a 4x10 with a horn; an 1176 at 4:1 (research/
+// straight, its EQ with the Mid Contour in) into a 4x10 with a horn; a FET compressor at 4:1 (research/
 // bass_amps.md 10.4).
 GuitarAmp::Preset GuitarAmp::slapDi() {
   Preset p{};
@@ -305,9 +305,9 @@ GuitarAmp::Preset GuitarAmp::slapDi() {
 // GM 38 (research/slap_bass_2.md 4, 5.3, revising bass_amps.md 10.5): every SoundFont's 38 is
 // brighter than its 37 and rings longer, but no more squashed (its crest factor as high or
 // higher): the brightness is the active bass's (src/ebass.cc), not the chain's. So 37's chain,
-// the DI a little more of the blend (80 %), the 1176 at 4:1 with a slower attack (1.5 ms: the
+// the DI a little more of the blend (80 %), the FET compressor at 4:1 with a slower attack (1.5 ms: the
 // pop's snap kept) and a quicker release (120 ms). The stomp compressor (PJ_BAMP_STOMP: its
-// ratio, 0 off) and the SansAmp-like drive on the DI (PJ_BAMP_DRIVEMIX: its share, 0 off) as
+// ratio, 0 off) and the tube-emulation drive on the DI (PJ_BAMP_DRIVEMIX: its share, 0 off) as
 // bass_amps.md 10.5 had them, off unless asked.
 GuitarAmp::Preset GuitarAmp::slapSquash() {
   Preset p = slapDi();
@@ -325,7 +325,7 @@ GuitarAmp::Preset GuitarAmp::slapSquash() {
 }
 
 // GM 27 (research/jazz_guitar.md 5, 9.2, 12.3): a Polytone Mini-Brute-like solid-state amp.
-// Its preamp an op amp (one stage, straight: a swing far beyond what a humbucker gives); no Fender
+// Its preamp an op amp (one stage, straight: a swing far beyond what a humbucker gives); no American amp
 // stack and its 400 Hz scoop but an active EQ (a design: the circuit was not found): +3 dB under
 // 150 Hz, +2 dB at 500 Hz, -2 dB above 2.5 kHz (PJ_JAZZ_BASS, _MID, _TREBLE in dB; the research's
 // -4 made a soft note dull once the tone pot and the 15" had taken theirs); a solid-state
@@ -537,7 +537,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
     cab_[5] = rbj(0, fs, 6800 / std::max(0.2, cab), 0.6);
     nCab_ = 6;
   } else if (p.cabinet == 1) {
-    // A closed 4x12 of Celestion Greenbacks (75 Hz, usable to 5 kHz): the closed box's thump
+    // A closed 4x12 of 25 W British speakers (75 Hz, usable to 5 kHz): the closed box's thump
     // (a sharper resonance, a little low bump), the forward upper mids, breakup, a steeper fall.
     cab_[0] = rbj(1, fs, 72, 1.4);
     cab_[1] = rbj(2, fs, 120, 1.0, 2.0 * cab);
@@ -549,12 +549,12 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
     nCab_ = 7;
   }
   if (p.cabinet == 2) {
-    // A closed 4x12 of Celestion Vintage 30s, an SM57 close, just off the dust cap
+    // A closed 4x12 of British speaker 60 W British speakers, a dynamic microphone close, just off the dust cap
     // (distortion_guitar.md 5.4's table as the start, then fitted, the amp before it as built,
     // to FluidR3's distortion-guitar samples: their pooled harmonic envelope within 4 dB from
     // 200 Hz to 8 kHz, 800 Hz 5 dB under). The closed box below its resonance (12 dB an octave)
     // and its broad bump; the low mids of the close microphone's proximity, strong (+9 dB at
-    // 350 Hz, where Celestion's plot of the bare speaker is flat: the recording's, not the
+    // 350 Hz, where British speaker's plot of the bare speaker is flat: the recording's, not the
     // speaker's); a wide hollow at 900 Hz; the presence pair at 2.6 and 3.25 kHz; the fall
     // above 6 kHz, steep; the cone's break-up floor near 9 kHz.
     cab_[0] = rbj(1, fs, 80, 0.6);
@@ -575,11 +575,11 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   // at 8-12 kHz, -35 dB and under, is left out. The research's numbers are the analog filters':
   // here the 8x10's and the 1x15's low-passes 5-6 % higher, the bilinear's squeeze made good.)
   if (p.cabinet == 3) {
-    // An Ampeg SVT-810E (8x10, sealed), a D112 ~5 cm off the centre of one cone.
+    // An 8x10 bass cabinet (8x10, sealed), a kick-drum microphone ~5 cm off the centre of one cone.
     const Eq e[8] = {{1, 60, 0.8, 0}, {1, 40, 0.6, 0}, {2, 95, 1.0, 3}, {2, 470, 1.4, -3}, {2, 2000, 2.5, 5}, {0, 2440, 1.0, 0}, {0, 3070, 0.7, 0}, {2, 4000, 2.0, 3}};
     for (const Eq& q : e) cab_[nCab_++] = eq(q, fs);
   } else if (p.cabinet == 4) {
-    // The B-15's 1x15 (ported), an RE20 at ~15 cm (no proximity: its Variable-D).
+    // The fliptop's 1x15 (ported), an broadcast dynamic microphone at ~15 cm (no proximity: its Variable-D).
     const Eq e[6] = {{1, 44, 1.0, 0}, {1, 38, 0.7, 0}, {2, 600, 1.5, -2}, {2, 1900, 3.0, 7}, {0, 2310, 1.1, 0}, {0, 2940, 0.7, 0}};
     for (const Eq& q : e) cab_[nCab_++] = eq(q, fs);
   } else if (p.cabinet == 5) {
@@ -642,7 +642,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   gatePeakFall_ = std::exp(-1 / (0.3 * fs));
   gateReopenFall_ = std::exp(-1 / (0.05 * fs));
   gateDropTo_ = p.gateDrop > 0 ? std::pow(10.0, -p.gateDrop / 20) : 0;
-  // The Tube Screamer (EG 11.8 [YehThesis]): 15.9 Hz in; its gain's leg 4.7 k + 0.047 uF
+  // The mid-hump overdrive (EG 11.8 [YehThesis]): 15.9 Hz in; its gain's leg 4.7 k + 0.047 uF
   // (720 Hz); R2 = 51 k + drive 500 k with 51 pF across; the tone's low-pass 723 Hz .. 10 kHz.
   if (p.tsLevel > 0) {
     const double r2 = 51e3 + std::clamp(p.tsDrive, 0.0, 1.0) * 500e3;
@@ -1147,7 +1147,7 @@ double GuitarAmp::stack(double x) {
   return y;
 }
 
-// The Tube Screamer: the clean signal, and added to it its part above 720 Hz, amplified and
+// The mid-hump overdrive: the clean signal, and added to it its part above 720 Hz, amplified and
 // clipped by the two diodes in the op amp's feedback (a firm knee at ~0.6 V); its tone; its level.
 double GuitarAmp::screamer(double x) {
   x = tsIn_.run(x);

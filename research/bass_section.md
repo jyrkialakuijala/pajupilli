@@ -1,6 +1,6 @@
-# The missing basses: Fender Jazz and Precision (finger, pick, slap), the Minimoog bass, the DX7 "E.BASS 1": research
+# The missing basses: American amp Jazz and Precision (finger, pick, slap), the classic monosynth bass, the FM synth "E.BASS 1": research
 
-Status: research 2026-11-19. Built: GM 34 (electric-bass, `src/ebass.cc`: the Jazz Bass fingerstyle, its DI blended with an Ampeg B-15N and an LA-2A after: `research/bass_amps.md` 10.1, the amp module's "b15-di"; README "Electric bass"); the rest is not. In `src/midifile.cc` (the kGm
+Status: research 2026-11-19. Built: GM 34 (electric-bass, `src/ebass.cc`: the two-pickup bass fingerstyle, its DI blended with an fliptop bass amp and an optical compressor after: `research/bass_amps.md` 10.1, the amp module's "fliptop-di"; README "Electric bass"); the rest is not. In `src/midifile.cc` (the kGm
 table, line 191) GM programs 34 Electric Bass (finger), 35 (pick), 36 Fretless, 37 Slap Bass 1 and
 38 Slap Bass 2 (counting from 1) all fall back to `double-bass`. GM 39 and 40 exist: `synth-bass-1`
 and `synth-bass-2` are patches of the analog lead circuit in `src/lead.cc` (lines 176–182), the
@@ -14,7 +14,7 @@ How each number is marked (as in `research/timpani.md`):
   page, or a machine summary of a page: the primary text was not read.
 - **[L]** player lore: a teaching text or a player's description. Not a measurement.
 - **[E]** my estimate, fit or arithmetic from cited values; not a published value. Where it comes
-  from running code (the DX7 voice through a re-implementation of Dexed's engine), this is said.
+  from running code (the FM synth voice through a re-implementation of Dexed's engine), this is said.
 - **[M]** from general knowledge, not looked up: check before relying on it.
 
 References are short keys in brackets; the list with URLs is section 13. What could not be found
@@ -22,7 +22,7 @@ is in section 12.
 
 **Short answer.**
 - **Electric basses (GM 34, 35, 37, 38).** A 34 in. (864 mm) scale, four steel roundwound strings
-  E1–G2 at 155–215 N each (D'Addario EXL170: E 34.7 lb, A 40.1, D 48.4, G 42.6 lb) **[S]**, on a
+  E1–G2 at 155–215 N each (standard EXL170: E 34.7 lb, A 40.1, D 48.4, G 42.6 lb) **[S]**, on a
   solid body whose *neck*, not bridge, takes the strings' energy (neck conductance 0.3 ms/kg at a
   live spot, over 2 and up to 20 ms/kg at a dead spot; bridge ≤ 0.3 ms/kg) **[T, Fleischer]**.
   - Losses: the string's own loss factor is 0.0004–0.001, so the open E's fundamental lasts tens
@@ -38,12 +38,12 @@ is in section 12.
     letting it snap onto the frets. In both slaps the string hits the frets during its first one
     or two periods (about 0–90 ms), which gives the metallic burst near 4–5 kHz **[T, Rank97;
     Issanchou18]**.
-- **Minimoog bass (GM 39).** Three free-running VCOs (saw, triangle-saw, square, two pulses), a
+- **classic monosynth bass (GM 39).** Three free-running VCOs (saw, triangle-saw, square, two pulses), a
   mixer that can be overdriven into the 24 dB/oct transistor ladder (10 Hz–20 kHz, self-oscillates
   to a sine), two contours with attack 1 ms–10 s and decay 4 ms–35 s, filter contour up to
-  4 octaves **[T, Moog manual]**. The project's ladder is already Huovilainen's; the Minimoog bass
+  4 octaves **[T, Moog manual]**. The project's ladder is already Huovilainen's; the classic monosynth bass
   needs the three oscillators beating, the mixer drive and single triggering, not a new filter.
-- **DX7 "E.BASS 1".** ROM3A voice 12, parameter for parameter the same as ROM1A voice 15 "BASS 1"
+- **FM synth "E.BASS 1".** ROM3A voice 12, parameter for parameter the same as ROM1A voice 15 "BASS 1"
   (checked byte by byte) **[T, sysex parsed here]**.
   - Algorithm 16: one carrier, op1 at 0.5 × the key, transposed down an octave, so a key sounds
     two octaves low. op1 is modulated by op2 (1:1, index ≈ 2.4 rad, slowly fading: the body), by
@@ -76,29 +76,29 @@ is in section 12.
   and slap, with the frets as the contact points and much stiffer contacts. Also there: tension
   modulation (pitch starts sharp), `setLength` slides, `touch` harmonics, the thumb (finger 3), the
   calloused skin knob, the two polarisations with a turning plane.
-- **`src/clavinet.cc`**: magnetic pickups reading string velocity at a point, with the magnet's
+- **`src/clavi.cc`**: magnetic pickups reading string velocity at a point, with the magnet's
   nonlinearity, selector in or out of phase, and a passive tone network turned into an exact
   filter by `tools/clavtone.py`. The P and J pickups, pots, tone cap and cable are the same
   problem with other values (§3).
 - **`src/lead.cc`**: the expo converter and ramp core, the Huovilainen ladder (2× oversampled
   inside), the OTA, RC envelopes, per-voice part tolerances and drift, the shared board. The
-  Minimoog needs three cores per voice, a mixer stage that can saturate, and Minimoog contour
+  classic monosynth needs three cores per voice, a mixer stage that can saturate, and classic monosynth contour
   and trigger behaviour (§7).
 - **No FM engine.** `research/electric_pianos.md` §6 parsed ROM1A "E.PIANO 1" and decided to play
-  GM 6 on the Rhodes model; nothing implements operators. The DX7 voice (§8) needs one.
+  GM 6 on the tine piano model; nothing implements operators. The FM synth voice (§8) needs one.
 
-## 2. The electric bass: what the Precision and the Jazz share
+## 2. The electric bass: what the split-coil bass and the Jazz share
 
 ### 2.1 Scale, frets, strings
 
 - **Scale 34 in. = 863.6 mm**, nut to saddle (the saddles move a few mm for intonation) **[M]**.
   Fret q lies at L(1 − 2^(−q/12)) from the nut. Measured: 0.863 m on the bass of [Issanchou18]
-  **[T]**; 0.873 m on a Sadowsky 5-string [Kemp20] **[T]**.
+  **[T]**; 0.873 m on a one bass maker 5-string [Kemp20] **[T]**.
 - **Frets:** 20 on the classic P and J, 21 on many later ones **[M]**. With 20 frets the G string
   reaches D#4 (MIDI 63). Where the neck meets the body (the last frets) the string stands about
   L·2^(−20/12) ≈ 27 cm from the saddle **[E]**; this is where the thumb slaps.
 - **Tuning:** E1 41.2, A1 55.0, D2 73.4, G2 98.0 Hz **[T, Fleischer II, Tab. IV]**.
-- **A standard set, D'Addario EXL170 (45-65-80-100) long scale:**
+- **A standard set, standard EXL170 (45-65-80-100) long scale:**
 
 | String | Gauge (in.) | Tension (lb) **[S]** | Tension (N) **[E]** | μ (g/m) from T = μ(2Lf)² **[E]** | Z = √(Tμ) (kg/s) **[E]** |
 |---|---|---|---|---|---|
@@ -107,8 +107,8 @@ is in section 12.
 | A1 | .080 | 40.1 | 178.6 | 19.8 | 1.88 |
 | E1 | .100 | 34.7 | 154.8 | 30.6 | 2.18 |
 
-  - The E figure (34.7 lb, 15.75 kg) is from D'Addario's own product pages **[S]**; the other
-    three are a retailer's copy of D'Addario's chart for the same singles (kg, converted) **[S]**.
+  - The E figure (34.7 lb, 15.75 kg) is from standard's own product pages **[S]**; the other
+    three are a retailer's copy of standard's chart for the same singles (kg, converted) **[S]**.
   - **Check against a measured string:** the electric bass G string of [Issanchou18] has
     d = 1.14 mm (.045 in.), core 0.43 mm, T = 191.6 N, μ = 6.69 g/m, L = 0.863 m **[T, Tab. IV]**,
     within 1 % of the table's G row.
@@ -169,7 +169,7 @@ is in section 12.
   - at a *live* spot that is the fundamental, internally damped;
   - at a *dead* spot the neck's conductance is high at the fundamental's frequency, which
     "switches off" that partial, and the decay follows the 2nd partial (twice as fast), or even
-    the 3rd. Example: the A1 string's 5th fret of the Action Bass (a Fender P copy) has
+    the 3rd. Example: the A1 string's 5th fret of the Action Bass (an American amp P copy) has
     G > 2 ms/kg at 73.5 Hz and an extreme value at 147 Hz, so the third partial carries the note.
     The live 12th fret has G = 0.3 ms/kg at 110 Hz.
 - **Neck modes** (Action bass in playing position) **[T, Fleischer I §8]**: rigid-body motion at
@@ -177,15 +177,15 @@ is in section 12.
   second near 150 Hz (minimum near the 12th, maximum at the low frets); the third just under
   300 Hz; the fourth above 500 Hz. Torsion of the neck and head makes the conductance differ
   between strings at the same fret. Bridge conductance is about 0.3 ms/kg or less. A
-  well-known Fender dead spot, the G string around the 5th–7th fret (C3–D3, 131–147 Hz), sits on
+  well-known American amp dead spot, the G string around the 5th–7th fret (C3–D3, 131–147 Hz), sits on
   the second bending mode **[L for the lore; T for the mode]**.
-- **A measured high-frequency loss** **[T, Kemp20]**: on the Sadowsky B string, T60 is 0.4 s at
+- **A measured high-frequency loss** **[T, Kemp20]**: on the one bass maker B string, T60 is 0.4 s at
   8 kHz at every fret, 13 s at 600 Hz (open and 12th fret), 10 s at 600 Hz at the 21st. Between
   600 Hz and 8 kHz the decay rate grows about as f^1.35 **[E]**: the `loss0 + loss1·k^1.2` form of
   `BassString` fits.
 - **The magnetic pickup adds no measurable damping** (shown for the guitar) **[S, PLC14 via
   guitars.md]**; Kemp mentions magnetic drag as a cause of the two polarisations differing **[T]**.
-- **Not found:** measured T60 tables for a Fender P or J. Fleischer's figures 50–67 hold T30 per
+- **Not found:** measured T60 tables for an American amp P or J. Fleischer's figures 50–67 hold T30 per
   fret for two basses, but only as plots, which pdftotext cannot read.
 
 ### 2.4 Two polarisations
@@ -251,13 +251,13 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
 
 | Pickup | DC resistance | Inductance | Source |
 |---|---|---|---|
-| Fender '62 P (Original / Pure Vintage '62 reissue) | 10.5 kΩ | 6.4 H | **[S, Fender part page]** |
-| Fender Pure Vintage '63 P | 12.0 kΩ | 7.0 H | **[S]** |
-| Fender Cobalt Chrome P | 12.4 kΩ | 8.5 H | **[S]** |
-| Fender Original Jazz, bridge | 7.5 kΩ | 3.35 H | **[S]** |
-| Fender Original Jazz, neck | 7.25 kΩ | 3.2 H | **[S]** |
+| American amp '62 P (Original / Pure Vintage '62 reissue) | 10.5 kΩ | 6.4 H | **[S, Fender part page]** |
+| American amp Pure Vintage '63 P | 12.0 kΩ | 7.0 H | **[S]** |
+| American amp Cobalt Chrome P | 12.4 kΩ | 8.5 H | **[S]** |
+| American amp Original Jazz, bridge | 7.5 kΩ | 3.35 H | **[S]** |
+| American amp Original Jazz, neck | 7.25 kΩ | 3.2 H | **[S]** |
 
-- Unloaded self-resonances in makers' charts: "vintage P-bass 11.6 kHz, J about 9 kHz", which
+- Unloaded self-resonances in makers' charts: "vintage split-coil bass 11.6 kHz, J about 9 kHz", which
   implies coil capacitances of about 30 pF (P) and 90 pF (J) **[S, forum; E]**. Treat 50–150 pF
   as the range **[E]**.
 
@@ -281,11 +281,11 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
     Zollner]**.
   - The J's volume pots interact: turning one pickup down loads the other (the blend is not
     independent) **[M]**.
-- **After the jack:** basses are usually recorded through a DI and/or an amp (an Ampeg B-15 or
-  SVT and a 1×15 / 8×10 cabinet) **[M]**. A first model can stop at the DI: pickup + pots + cable
+- **After the jack:** basses are usually recorded through a DI and/or an amp (an bass amp fliptop or
+  bass stack and a 1×15 / 8×10 cabinet) **[M]**. A first model can stop at the DI: pickup + pots + cable
   + a preamp's 1 MΩ input.
 
-## 4. The Fender Precision Bass
+## 4. The split-coil bass
 
 - **What it is:** 1951 (single coil, slab body); from 1957 the split-coil humbucker at 121–152 mm
   from the bridge, one volume, one tone **[M]**; 20 frets, 34 in. scale.
@@ -303,7 +303,7 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
   124 mm), each with an aperture; the coil's L, R and C; a tone network (250 k pot + 0.047 µF);
   the cable. The variant for GM 35 (pick bass) should be the P.
 
-## 5. The Fender Jazz Bass
+## 5. The two-pickup bass
 
 - **What it is:** 1960. An offset body and a narrower nut (1.5 in.). Two single coils at about
   155 mm and 55–67 mm from the bridge ('60s vs '70s spacing; 1960–62 had stacked
@@ -443,9 +443,9 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
 - **In this project it is the double bass's board contact** (`Bass`, `kBoard`), which
   double_bass.md already credits with the steel-string "mwah". GM 36 stays there (§1).
 
-## 7. The Minimoog bass (GM 39, Synth Bass 1)
+## 7. The classic monosynth bass (GM 39, Synth Bass 1)
 
-### 7.1 The instrument (Model D; the 2016 reissue's manual) **[T, Moog]**
+### 7.1 The instrument (classic monosynth; the 2016 reissue's manual) **[T, Moog]**
 
 - **Oscillators:** three, 0.1 Hz–20 kHz in six overlapping ranges (LO, 32', 16', 8', 4', 2'),
   short-term stability "> 0.25 %" as printed. Waveforms: triangle, triangle-sawtooth (osc 1 and
@@ -456,7 +456,7 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
   increasing the External Input volume far enough, the Mixer can overload, introducing varying
   levels of overdrive or distortion"; fully up "only one sound is heard and different pitches do
   not sound". Keep the main output at or below 6 for "the most musical range of overdrive".
-- **Filter:** "a traditional Moog Ladder Filter", 24 dB/oct low-pass, cutoff 10 Hz–20 kHz (the
+- **Filter:** "a traditional classic ladder Ladder Filter", 24 dB/oct low-pass, cutoff 10 Hz–20 kHz (the
   text also says 10 Hz–32 kHz), Emphasis feeds the output back to the input; turned up with a low
   cutoff "the Filter can be coaxed into a self-oscillating state, acting as a sine-wave oscillator"
   playable from the keyboard. Keyboard tracking switches 1/3 and 2/3, both on = one octave per
@@ -470,7 +470,7 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
 
 ### 7.2 The ladder
 
-- **Circuit** (Moog 1969 patent; [Huovilainen04] §2) **[T]**: four stages, each two transistors and
+- **Circuit** (the 1969 transistor ladder patent; [Huovilainen04] §2) **[T]**: four stages, each two transistors and
   a capacitor, driven by the stage below. The bottom is a differential pair carrying the input,
   biased by the control current I_c (exponential in the cutoff voltage). The output is taken
   differentially off the top stage, and resonance is "a portion of the output ... routed to the
@@ -486,7 +486,7 @@ middle of the pole piece, cm, 34 in. basses) **[S, pickup-position-db]**; from t
 - **Already in `src/lead.cc`:** this model, its gain under cutoff 1/(1 + 4r) (−14 dB at
   self-oscillation; research/synth_leads.md §"Loudness under the cutoff"), and per-voice pair
   offsets. **The ladder needs no new work.** What matters for bass:
-  - the **passband loss with emphasis**: a resonant Moog bass thins out, so players keep the
+  - the **passband loss with emphasis**: a resonant classic ladder bass thins out, so players keep the
     emphasis moderate for bass **[M]**;
   - the **input drive**: the mixer level sets how hard the input pair is driven (tanh at 2V_T ≈
     52 mV) **[T for the tanh]**.
@@ -507,17 +507,17 @@ Bass", "More Bounce Bass", "Sub Bass", "Soft Rez Bass") are drawings. The common
 
 `synth-bass-1` (lead.cc:176): one core, its ramp and the octave below from a flip-flop (sub 0.7),
 cutoff −12 semitones, filter envelope 1.6 × with 2 ms attack, 0.12 s decay, sustain 0.05,
-resonance ×1.2, amp 2 ms / 0.6 s / 0.7, release ×0.4. Against a Minimoog:
-- **The octave below is phase-locked** (a divider) where the Minimoog's oscillators are free and
+resonance ×1.2, amp 2 ms / 0.6 s / 0.7, release ×0.4. Against a classic monosynth:
+- **The octave below is phase-locked** (a divider) where the classic monosynth's oscillators are free and
   beat. The slow phase walk of three VCOs, each with its own drift, is the most recognisable
-  thing about a Minimoog bass **[M]**.
+  thing about a classic monosynth bass **[M]**.
 - **No mixer stage:** the summed oscillators should meet a saturating stage (the mixer's own
   overload, plus the optional output-to-input loop) before the ladder's input pair.
 - **Triggering:** legato notes should not restart the contours; glide between them.
 - **Contour shapes:** RC charges, as now. Times as §7.3; the decay switch is the release.
 - **Keyboard tracking** of the cutoff, 1/3 by default.
 
-## 8. The DX7 "E.BASS 1"
+## 8. The FM synth "E.BASS 1"
 
 ### 8.1 Where the data come from
 
@@ -562,7 +562,7 @@ resonance ×1.2, amp 2 ms / 0.6 s / 0.7, release ×0.4. Against a Minimoog:
 ### 8.3 What it does, in numbers
 
 The voice was run through a float re-implementation of Dexed's envelope, scaling and operator
-code (`msfa/env.cc`, `dx7note.cc`, `fm_core.cc`; 44.1 kHz; transpose applied to the scaling note)
+code (`msfa/env.cc`, `fmsynthnote.cc`, `fm_core.cc`; 44.1 kHz; transpose applied to the scaling note)
 **[E]**. Operator output g (1 = full scale) is a modulation index of 2πg rad.
 
 - **Decay rates** at the E1 key (scaling note 40; dB/s, from the EG formula):
@@ -586,7 +586,7 @@ code (`msfa/env.cc`, `dx7note.cc`, `fm_core.cc`; 44.1 kHz; transpose applied to 
 - **op5 is scaled out in the bass:** its −LIN left depth 75 below breakpoint 52 leaves an index of
   0.003 rad at the E1 key, 0.19 at E3 and 0.53 (its maximum) from about A3 up (scaling notes
   40 / 64 / 69). **The feedback pair matters only in the top of the voice's range** **[E]**. If
-  the DX7 scales from the untransposed key, op5 is still under 0.03 rad at E1 **[E]**.
+  the FM synth scales from the untransposed key, op5 is still under 0.03 rad at E1 **[E]**.
 - **The resulting sound** (E1, 41.2 Hz; spectral centroid and the share above 1 kHz):
 
 | Window | vel 127 | vel 100 | vel 64 | vel 32 |
@@ -616,14 +616,14 @@ code (`msfa/env.cc`, `dx7note.cc`, `fm_core.cc`; 44.1 kHz; transpose applied to 
   that click, but only where op5 lets it through: on the high notes. Dexed implements feedback
   as half the mean of the last two outputs shifted by (8 − feedback) bits **[T, Dexed
   `fm_op_kernel.cc`]**.
-- **The DX7 hardware** around the patch: the YM21280 operator chip computes in the log domain (a
+- **The FM synth hardware** around the patch: the YM21280 operator chip computes in the log domain (a
   quarter-wave log-sine ROM, then an exponential ROM), and its algorithm is a fixed routing of 6
   operators per voice **[S, Shirriff]**. The sample rate is about 49.1 kHz, and the DAC (12 bits
   with a gain stage) adds noise and grit to quiet passages **[M]**.
 
 ### 8.4 What a model of it is
 
-The DX7 is a digital circuit, so "physical" here means an exact model of its arithmetic: six
+The FM synth is a digital circuit, so "physical" here means an exact model of its arithmetic: six
 sine operators, the algorithm table, the envelope generator with its level and rate tables,
 keyboard rate and level scaling, the velocity table, feedback, and ideally the chip's log-sine
 and exponential quantisation and the DAC. Dexed's `msfa` code (Apache 2.0) holds all of these
@@ -652,7 +652,7 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
    conductance landscape that makes 1–3 dead spots per string. Bridge: nearly rigid
    (≤ 0.3 ms/kg). A real instrument's dead spots are its own: vary per instance.
 6. **Pickups:** velocity taps at the positions of §3.1, each with a Gaussian aperture (10–20 mm),
-   the perpendicular polarisation, and the magnet's distance nonlinearity (clavinet code). Then
+   the perpendicular polarisation, and the magnet's distance nonlinearity (clavi code). Then
    per coil the L–R–C of §3.2, the pots, tone network and cable of §3.3 as an exact passive
    filter (`tools/clavtone.py` method). P: two half-coils in series, each under two strings. J:
    two coils, each its volume pot, summed in parallel.
@@ -667,21 +667,21 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
 8. **Output:** the DI signal (pickups to a 1 MΩ input). An amp/cabinet stage is optional; a
    compressor for Slap Bass 2 (§6.4).
 
-### 9.2 The Minimoog bass
+### 9.2 The classic monosynth bass
 
 - Three VCO cores per voice from `lead.cc` (each its own parts, drift and temperature), each with
-  the Minimoog waveforms (triangle-saw hybrid, saw, square, wide and narrow pulse) and range
+  the classic monosynth waveforms (triangle-saw hybrid, saw, square, wide and narrow pulse) and range
   switches.
 - A mixer stage that saturates (and the optional output → external input loop), then the
   existing ladder with keyboard tracking 1/3.
-- Contours with the Minimoog ranges, single triggering and low-note priority, glide.
+- Contours with the classic monosynth ranges, single triggering and low-note priority, glide.
 - A patch per §7.3.
 
-### 9.3 The DX7 E.BASS 1
+### 9.3 The FM synth E.BASS 1
 
 - An FM voice: 6 operators, the 32 algorithms (Dexed's flag table), feedback, the EG and scaling
   tables, velocity table, oscillator key sync, transpose. Load the 155 voice parameters from the
-  sysex (the instrument could then play any DX7 voice; E.PIANO 1 for GM 6 would come free).
+  sysex (the instrument could then play any FM synth voice; E.PIANO 1 for GM 6 would come free).
 - Optional fidelity: the log-sine/exp quantisation (Shirriff), 49.096 kHz internal rate and its
   resampling, the DAC.
 - Check against Dexed's output for the same patch, note and velocity (spectra within a dB).
@@ -701,12 +701,12 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
 6. **A slap that is just a bright pluck:** without the fret contact in the first ~90 ms there is
    no clank, no 4–5 kHz burst, and the pop doesn't snap.
 7. **Every slap the same:** the thumb's rebound, the hand's force and the fret clatter vary note
-   to note; a DX slap does not (but that is the DX7's character, and it must stay identical).
+   to note; a DX slap does not (but that is the FM synth's character, and it must stay identical).
 8. **Notes not stopped:** a bassist damps nearly every note at its end; a ringing tail under the
    next note sounds like a synth.
-9. **A Minimoog bass with an octave locked in phase:** no beating, no motion. Or a filter whose
+9. **A classic monosynth bass with an octave locked in phase:** no beating, no motion. Or a filter whose
    bass thins with emphasis left at a high setting.
-10. **Legato lines whose envelope retriggers** on every note (the Minimoog doesn't).
+10. **Legato lines whose envelope retriggers** on every note (the classic monosynth doesn't).
 11. **The DX bass an octave off** (the patch sounds two octaves below its key), or louder with
     velocity (it shouldn't be: only brighter).
 
@@ -714,26 +714,26 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
 
 | GM (from 1) | Name | Proposed instrument |
 |---|---|---|
-| 34 | Electric Bass (finger) | Jazz Bass, fingerstyle, both pickups (neck a little stronger), roundwounds |
-| 35 | Electric Bass (pick) | Precision Bass, pick, roundwounds, tone open |
+| 34 | Electric Bass (finger) | two-pickup bass, fingerstyle, both pickups (neck a little stronger), roundwounds |
+| 35 | Electric Bass (pick) | split-coil bass, pick, roundwounds, tone open |
 | 36 | Fretless Bass | **stays on the double bass** (the user's decision); a fretless J only on request |
-| 37 | Slap Bass 1 | Jazz Bass, both pickups full, thumb and pop by register |
+| 37 | Slap Bass 1 | two-pickup bass, both pickups full, thumb and pop by register |
 | 38 | Slap Bass 2 | as 37 with a compressor and brighter pops (§6.4; to be judged by ear) |
-| 39 | Synth Bass 1 | Minimoog-style: today's `synth-bass-1` upgraded (§7.4) |
-| 40 | Synth Bass 2 | keep today's patch; the DX7 E.BASS 1 as its own `-inst` (or as GM 40 if the user prefers) |
+| 39 | Synth Bass 1 | classic monosynth-style: today's `synth-bass-1` upgraded (§7.4) |
+| 40 | Synth Bass 2 | keep today's patch; the FM synth E.BASS 1 as its own `-inst` (or as GM 40 if the user prefers) |
 
 ## 11. Proposed build order
 
 1. **The electric bass core and GM 34 (J, fingerstyle).** A new class on `Guitar`'s pattern, the
    string table of §2.1, losses fitted to the IDMT finger notes, the J pickups and passive
-   network (clavinet code). The most notes in the user's files; no contact solver needed for
+   network (clavi code). The most notes in the user's files; no contact solver needed for
    moderate plucks. Also takes the bass lines on guitar programs.
 2. **GM 35 (P, pick).** A new spec (split coil), the pick excitation and click, the foam/palm mute.
    Small once step 1 exists.
-3. **The DX7 E.BASS 1.** Self-contained, exactly specified, and checkable against Dexed. A day or
+3. **The FM synth E.BASS 1.** Self-contained, exactly specified, and checkable against Dexed. A day or
    two, and the FM engine then also offers GM 6 (E.PIANO 1). It can be done in parallel with
    step 1.
-4. **The Minimoog upgrade of `synth-bass-1`.** Three free cores, the mixer drive, single
+4. **The classic monosynth upgrade of `synth-bass-1`.** Three free cores, the mixer drive, single
    triggering and glide, inside `lead.cc`.
 5. **Slap (GM 37, 38).** The fret contacts, more modes, the thumb as a returning contact, the pop,
    the player's thumb/pop choice. The hardest and costliest part: test stability and cost (20
@@ -743,7 +743,7 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
 
 ## 12. Not found, or uncertain
 
-- **Measured T60 tables for a real Fender P or J** (per string and fret). Fleischer has T30 per fret
+- **Measured T60 tables for a real American amp P or J** (per string and fret). Fleischer has T30 per fret
   for two basses, but only as plots. The IDMT single notes would let us measure it.
 - **Core diameters** of the EXL170 strings, hence measured B for E, A, D (only G is measured).
 - **Measured loaded responses of P and J pickups** (with a real cable and pots); the resonances
@@ -752,14 +752,14 @@ tables. It costs a few hundred operations per voice-sample; the bass is monophon
 - **A primary description of GM Slap Bass 1 against Slap Bass 2.** Only one snippet (Soundhouse:
   Slap 2 "more compressed, squashed").
 - **Any measurement of the fretless "mwah"**, or of finger squeak and fret noise on a bass.
-- **The Minimoog manual's bass patch charts** (drawings only), and measured Minimoog contour
-  curves, oscillator waveshapes and mixer overload transfer curves. The original (1970s) Model D
+- **The classic monosynth manual's bass patch charts** (drawings only), and measured classic monosynth contour
+  curves, oscillator waveshapes and mixer overload transfer curves. The original (1970s) classic monosynth
   service data were not read; the reissue's specifications were.
 - **Pluck positions and depths** for fingerstyle, pick and slap: only lore (§6). The motion
   capture literature found is for the guitar.
 - **Kramer et al., ICASSP 2012** (the 11-technique waveguide bass) was not opened. Its follow-up
   [Abeßer13] was.
-- **Whether the DX7 applies its transpose before keyboard rate and level scaling.** The run above
+- **Whether the FM synth applies its transpose before keyboard rate and level scaling.** The run above
   assumes it does. Either way op5 stays near silent on bass notes.
 
 ## 13. References

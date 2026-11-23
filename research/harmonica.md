@@ -49,7 +49,7 @@ session scratchpad).
     8 dB louder, has it at 4 × f0.
   - **No speech was found in harmonica2.wav.** Its last 1.7 s (8.9-10.58 s) is the sustained draw
     chord: steady partials, no voice-band fundamental, no moving formants. It is all used.
-- **The widest real layout** is the 16-hole C chromatic, Hohner 64 Chromonica 280/64 or Super 64:
+- **The widest real layout** is the 16-hole C chromatic, one maker 64 Chromonica 280/64 or Super 64:
   **C3-D7, MIDI 48-98, 64 reeds** **[web, HPG11; dealer]**. Its exact note map is §2.1.
 - **Valves (windsavers)** are plastic flaps on the slots of the low and middle holes. The top
   octave or so is unvalved. They send all the air to the speaking reed and stop the two reeds of a
@@ -65,8 +65,8 @@ Richter harp, repeated in every octave ("solo tuning") **[web, HPG11]**. Per fou
 are C E G C and the draw notes D F A B. Solo tuning "eliminates the G on the draw and doubles the Cs
 that are not on the ends" **[web, WCH]**.
 
-**The 16-hole C chromatic (Hohner 280/64, Super 64, Super 64X; Suzuki and Seydel 16-holes the same),
-C3-D7.** The 12-hole (Hohner 270, Toots Mellow Tone and Hard Bopper) is holes 5-16 of this table,
+**The 16-hole C chromatic (one maker 280/64, Super 64, Super 64X; one maker and another maker 16-holes the same),
+C3-D7.** The 12-hole (one maker 270, Toots Mellow Tone and Hard Bopper) is holes 5-16 of this table,
 C4-D7 **[web, HPG11, WCH; calc]**:
 
 | Hole | Blow | Draw | Blow + slide | Draw + slide |
@@ -89,7 +89,7 @@ C4-D7 **[web, HPG11, WCH; calc]**:
 | 16 | C7 96 | B6 95 | C#7 97 | **D7 98** |
 
 - **Every MIDI note 48-98 is present** **[calc]**. The top hole's slide-in draw is D7, not a third
-  C7. Hohner's chart shows it, and Wikipedia calls it "common, though by no means present in all
+  C7. One maker's chart shows it, and Wikipedia calls it "common, though by no means present in all
   chromatic harmonicas" **[web, HPG11, WCH]**.
 - **Several pitches have more than one place [calc]:**
   - C (60, 72, 84) is blow on two holes (4/5, 8/9, 12/13) and also draw with the slide in (holes 4, 8,
@@ -99,7 +99,7 @@ C4-D7 **[web, HPG11, WCH; calc]**:
   - C7 (96) is only the hole-16 blow.
   So C and F can be played in either breath direction, and players use this to stay on one breath
   (§10.3).
-- **Other real ranges:** the Hohner Meisterklasse is 3½ octaves, G3-C7. The 10-hole (260) is 2½
+- **Other real ranges:** the one maker Meisterklasse is 3½ octaves, G3-C7. The 10-hole (260) is 2½
   octaves, the 12-hole 3 **[web, HPG11]**. Bass and chord harmonicas exist but are not solo
   instruments. **No solo chromatic wider than C3-D7 was found.**
 - **What the user's files need:** MIDI 50-88 **[file]**, inside the 16-hole and also inside the
@@ -117,8 +117,8 @@ C4-D7 **[web, HPG11, WCH; calc]**:
   through the slide" **[web, search summary of a BH guide]**. Plastic bumpers stop the slide clanking
   on the screws. The slide is a thin plate, about 0.8-1.0 mm thick in a patent's overblow slide
   **[web, US5739446 summary]**. Leakage at the slide is the chromatic's main air loss **[web, BHC]**.
-- **Travel and stroke:** no maker publishes a stroke in mm. Hohner's Toots models and the 270/280 have
-  a "short slide action" **[web, HPG11]**, and a Seydel model's slide action is "2 mm shorter"
+- **Travel and stroke:** no maker publishes a stroke in mm. One maker's Toots models and the 270/280 have
+  a "short slide action" **[web, HPG11]**, and a another maker model's slide action is "2 mm shorter"
   **[web, Thomann listing]**. **Estimate [calc, memory]:** a hole pitch of ~7-8 mm (16 holes in a
   193 mm body) with zigzag openings gives a travel of half a pitch, **~3-4 mm**, and a button stroke
   of about the same, 3-5 mm. The spring force is a few newtons **[memory, unverified]**.
@@ -139,7 +139,7 @@ C4-D7 **[web, HPG11, WCH; calc]**:
 ### 2.3 Windsavers (valves)
 
 - **Material:** thin one-way flaps "of plastic, knit paper, leather, or Teflon" glued to the plate,
-  "slightly larger than the air channel" **[web, search summary of WB, BH]**. Modern Hohners use
+  "slightly larger than the air channel" **[web, search summary of WB, BH]**. Modern harmonicas use
   plastic film, often two-layer **[memory]**.
 - **Where:**
   - each reed's slot is covered on the side away from the reed: the blow reed's valve outside, the
@@ -172,7 +172,7 @@ C4-D7 **[web, HPG11, WCH; calc]**:
   - thicker plates make a longer slot: more inertance in the slot, fuller and louder, slower to speak
     **[web, HPG11 claims; memory]**;
   - MB07's diatonic plate is 0.9 mm **[paper, MB07]**.
-- **Reed material:** brass (Hohner), phosphor bronze (Suzuki), stainless steel (Seydel: the "first
+- **Reed material:** brass (one maker), phosphor bronze (another maker), stainless steel (another maker: the "first
   mass-produced chromatic harmonica with stainless steel reeds") **[web, search; memory]**.
   √(E/ρ) is ~3430 m/s for brass, ~3600 for phosphor bronze and ~5000 for stainless **[calc, memory
   moduli]**. Steel is stiffer and less damped (a higher Q, a longer life, a slightly brighter and
@@ -520,7 +520,7 @@ design]**. The algorithm is §10.3.
     (D5 → F5 draw at 0.28 s);
   - same-direction re-attacks with the tongue give 13-23 dB.
   - No click is visible. The gap is the breath's zero crossing plus the new reed's onset.
-- **Toots' jazz technique [memory, web; to check]:** 12-hole Hohner (his Mellow Tone / Hard Bopper
+- **Toots' jazz technique [memory, web; to check]:** 12-hole one maker (his Mellow Tone / Hard Bopper
   later); long legato lines with chromatic passing tones (the slide used as articulation), a light
   vibrato, scoops into notes, a soft, breathy, close-miked tone. "Waltz for Debby" in the user's
   files has 319 small downward bends **[file]**, which matches.
@@ -742,7 +742,7 @@ accordion's reeds, with a half-band filter to 48 kHz.
 
 1. **Range:** 16-hole C3-D7 (recommended, all of the files' 50-88) with the top D7, or a C7 top?
    And should the 12-hole Toots model (C4-D7) be offered as an option?
-2. **Tuning:** A = 440, or Hohner's 442/443? harmonica2.wav sits at ~444.
+2. **Tuning:** A = 440, or one maker's 442/443? harmonica2.wav sits at ~444.
 3. **The room:** may `src/room.*` get a per-source reverberant send, so the hands' opening can change
    the direct-to-room balance (directivity), not only the level and tilt? It is shared code.
 4. **Pitch bend up:** ignore it, or allow a few cents from pressure?

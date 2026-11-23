@@ -1,5 +1,5 @@
-// The Hohner Clavinet (-inst clavinet: the D6, GM 8; clavinet-e7; clavinet-c;
-// research/clavinet.md).
+// The clavi (-inst clavi: the D6, GM 8; clavi-late; clavi-early;
+// research/clavi.md).
 //
 // 60 strings, F1 .. E6, one a key. A key's rubber tangent strikes its string
 // against an anvil and holds it there: the string's end moves by h (1 mm) in
@@ -41,13 +41,13 @@
 
 namespace pajupilli {
 
-bool clavinet(const Instrument& inst);  // -inst clavinet, clavinet-e7, clavinet-c
+bool clavi(const Instrument& inst);  // -inst clavi, clavi-late, clavi-early
 
-class ClavinetModel : public Tube {
+class ClaviModel : public Tube {
  public:
   static constexpr int kKeys = 60, kLowest = 29;  // F1 .. E6
-  enum class Model { kD6, kE7, kC };
-  explicit ClavinetModel(const Instrument& inst);
+  enum class Model { kMiddle, kLate, kEarly };
+  explicit ClaviModel(const Instrument& inst);
   // The tangent: key speed (m/s at the tip).
   void strike(int key, double speed);
   void release(int key);
@@ -113,10 +113,10 @@ class ClavinetModel : public Tube {
 // selector, hardness the keys' speed (a harder touch). The breath (pad
 // pressure, joystick up) presses the held keys harder; the joystick across
 // rocks the wah (centred: out); K4 above its usual is the envelope filter.
-// No sustain pedal on a Clavinet: the hold keeps the tangents down.
-class ClavinetPlayer : public Performer {
+// No sustain pedal on a Clavi: the hold keeps the tangents down.
+class ClaviPlayer : public Performer {
  public:
-  explicit ClavinetPlayer(ClavinetModel& m);
+  explicit ClaviPlayer(ClaviModel& m);
   void noteOn(int midi, int velocity) override;
   void noteOff(int midi) override;
   void render(float* out, int n) override;
@@ -124,8 +124,8 @@ class ClavinetPlayer : public Performer {
   void seed(unsigned) override {}
 
  private:
-  ClavinetModel& m_;
-  bool keyDown_[ClavinetModel::kKeys] = {};
+  ClaviModel& m_;
+  bool keyDown_[ClaviModel::kKeys] = {};
 };
 
 }  // namespace pajupilli

@@ -1,11 +1,11 @@
-# Fender Rhodes: per-key data, measurements, electronics and flaws for the physical model
+# tine electric piano: per-key data, measurements, electronics and flaws for the physical model
 
 Status: 2026-11-19, research only; nothing here is built. SI units. This note sits on top of
-`research/electric_pianos.md` (§3 Rhodes, §6 FM piano, §7 model plan) and does not repeat its
+`research/electric_pianos.md` (§3 tine piano, §6 FM piano, §7 model plan) and does not repeat its
 derivations: the tip-loaded cantilever table, the bell-shaped flux function and its harmonic table,
 the Hunt–Crossley hammer numbers, the Shore → modulus conversion. It fills the gaps a modeller needs
 as numbers (per key, per era, per circuit stage), corrects that note where primary sources disagree
-(§2), and updates its model plan (§12). The aim is the depth of `research/hammond_b3.md`: per-part
+(§2), and updates its model plan (§12). The aim is the depth of `research/tonewheel_organ.md`: per-part
 physics, tolerances, flaws, leakage, circuit stages with values, noise and ageing.
 
 Marks as in the other notes: **[web, KEY]** from the sources in §15 (primary texts, patents,
@@ -24,7 +24,7 @@ forum: weakest; **[calc]** worked out here (one-off Python in the session scratc
   numbers, as listed); f2/f1 runs 5.8–7.9 and f3/f1 17.6–20.5 **[calc]** (§3.3). The 88-key piano's
   seven lowest keys (A0–D#1) use the *same* 156.4 mm tine and an identical tonebar as E1, tuned down
   by heavier springs (~0.4–1.3 g) **[web, RSM ch. 6; calc]**.
-- **The tonebar is not tuned to the tine in the bass and middle.** Rhodes's own patents say the bar
+- **The tonebar is not tuned to the tine in the bass and middle.** tine piano's own patents say the bar
   has a low Q and is set "about 2.5 piano tones" (≈ 500 cents) away from the tine in the low and mid
   range, within half a tone only at the top, and that low notes are deliberately put off the
   resonance peak to cut their dwell to about 17 s (treble 3–5 s) **[web, P656, P922]**. Muenster &
@@ -90,7 +90,7 @@ forum: weakest; **[calc]** worked out here (one-off Python in the session scratc
   1–73 on earlier ones; early 88s labelled the seven bars below the first as "0" because they were
   identical **[web, RSM ch. 6]**. The cutting chart labels each bar "n73–n88" (1-8 = E1 … 73-80 = E7,
   then 74-81 … 81-88 for the 88's top octave).
-- The hammer-tip table uses the 88 numbering (§3.7); the Rhodes tip page uses the chart's 73-based
+- The hammer-tip table uses the 88 numbering (§3.7); the tine piano tip page uses the chart's 73-based
   numbering 0–81 **[web, RSM ch. 4; RHT]**. They agree: n88 = n73 + 7.
 
 ### 3.2 Tine lengths (factory cutting sheet, and the manual's chart)
@@ -130,7 +130,7 @@ In inches as printed: key 1 6-5/32, 13 4-23/64, 25 3-9/64, 33 2-5/8, 37 2-9/32, 
 
 - Three generations, with the dimensions from the manual's figures **[web, RSM-AF figs 7-4…7-6;
   RSM ch. 7]**:
-  1. original: uniform piano wire 0.075 in (1.905 mm); 40 000 blows to failure in Rhodes's test;
+  1. original: uniform piano wire 0.075 in (1.905 mm); 40 000 blows to failure in tine piano's test;
   2. tapered by centerless grinding: 0.100 in (2.54 mm) at the root, tapering over 1 in (25.4 mm) to
      0.070 in (1.78 mm), then 0.060 in (1.524 mm) to the tip; 1 500 000 blows;
   3. **swaged (current, from ~1975): 0.100 in (2.54 mm) for the first 1/2 in (12.7 mm), then a short
@@ -175,7 +175,7 @@ In inches as printed: key 1 6-5/32, 13 4-23/64, 25 3-9/64, 33 2-5/8, 37 2-9/32, 
 - The spring: a crimped helical coil, friction fit, "moved by hand with some effort"; low-pitch springs
   heavier with more turns, high-pitch ones "only a few turns"; range "as much as 1-1/2 steps above or
   below optimum" **[web, RSM ch. 5; P922]**. Detuning by sliding it also moves the tine against its
-  tonebar; Rhodes claimed a target G can be retuned to F…A "without appreciable loss of support" from
+  tonebar; tine piano claimed a target G can be retuned to F…A "without appreciable loss of support" from
   the bar **[web, RSM ch. 1]**: the bar's resonance is broad (§3.5).
 
 ### 3.4 Tuning practice and stretch
@@ -252,7 +252,7 @@ In inches as printed: key 1 6-5/32, 13 4-23/64, 25 3-9/64, 33 2-5/8, 37 2-9/32, 
   mode near the note; the paper does not say. Either way the bar is driven far from its resonance and
   "enslaved" at the tine's frequency, in or anti phase, and its own modes appear only in the
   transient, adding the "glockenspiel" component, more in the upper register **[web, MP14, PM17]**.
-- **A conflicting observation (Moog 1980).** Bob Moog, explaining the Rhodes in *Contemporary
+- **A conflicting observation (Moog 1980).** Bob Moog, explaining the tine piano in *Contemporary
   Keyboard* (April 1980, reposted on the EP Forum), says the mounting post is not rigid, the
   resonator (tonebar) is "tuned to be very near" the tine's frequency, and energy goes back and forth
   between them "for several seconds"; on a low note with the top off "after a second or so the
@@ -262,7 +262,7 @@ In inches as printed: key 1 6-5/32, 13 4-23/64, 25 3-9/64, 33 2-5/8, 37 2-9/32, 
   picture (beating exchange, two-stage decay), opposite to MP14's enslaved, far-detuned bar. Both can
   be true on different instruments and keys: the patent's ±2.5-tone design window and a sliding
   tuning spring (±1.5 semitones) allow anything from near coincidence to far detuning. Model: make
-  the bar's detuning a per-key parameter; near 0 it gives Moog's slow exchange (a beat of period
+  the bar's detuning a per-key parameter; near 0 it gives the classic ladder's slow exchange (a beat of period
   1/Δf of a few seconds in the pickup signal, since the pickup reads only the tine), far it gives
   MP14's slaving **[design]**. The rest of the thread has no measured modes **[web, EPF2896]**.
 - Mounting: each tone-bar assembly sits on the tonebar rail on a soft elastomer grommet, with two
@@ -330,7 +330,7 @@ authentic flaw) with a smoothing option.
   strike point (~7 kN/m at E1, `electric_pianos.md` §3.5): the contact is tine-limited in the bass
   and middle, as argued there. Sønderbo's Hunt–Crossley tip on a rigid wall gives 0.6–1.5 ms: the
   tip stiffness alone does not set the contact time.
-- The hammer is braked against rebound after the blow (a 1980 Rhodes patent adds restraint "to
+- The hammer is braked against rebound after the blow (a 1980 tine piano patent adds restraint "to
   prevent bouncing, rebounding" **[web, P848]**): double strikes exist on older actions (§7).
 
 ### 3.8 Dampers
@@ -345,7 +345,7 @@ authentic flaw) with a smoothing option.
   Mark I/II the returning damper briefly touches the tine during the attack (or on fast repetition),
   cutting the high partials early; a model needs a per-era "damper bounce" that applies a short
   extra loss in the first tens of ms **[design]**.
-- Release: no published T60 of a damped Rhodes note. Sønderbo's spring–dashpot damper
+- Release: no published T60 of a damped tine piano note. Sønderbo's spring–dashpot damper
   (K1 = 100 N/m, R = 0.5 kg/s) **[web, So24]** and the felt's role suggest 50–200 ms to −60 dB in the
   middle **[memory]**; the bass, with its long tine and large amplitude, rings audibly through the
   damper ("thunk") **[web, snippet: forum reports]**.
@@ -355,10 +355,10 @@ authentic flaw) with a smoothing option.
 - Volume (gap, horizontal, tine end to pole): 1/16–1/8 in (1.6–3.2 mm); from March 1972, 0.020 in
   (0.51 mm) possible in the middle and treble; "the smaller the gap … the more pronounced the DYNAMIC
   RESPONSE", defined as "percentage of volume increase in response to increased weight of touch"
-  **[web, RSM ch. 4]**. Rhodes's later tine-settings page: bass 1/16 in, middle 1/32 in (0.8 mm),
+  **[web, RSM ch. 4]**. tine piano's later tine-settings page: bass 1/16 in, middle 1/32 in (0.8 mm),
   wood tips 1/16 in **[web, RTS]**.
 - Timbre (vertical: tine rest height relative to the pole tip's edge): "slightly above dead center",
-  by ear **[web, RSM ch. 4]**. Rhodes's settings page: lowest 15 notes "mostly fundamental", rest
+  by ear **[web, RSM ch. 4]**. tine piano's settings page: lowest 15 notes "mostly fundamental", rest
   "most preferred", wood-tip zone "mostly fundamental" **[web, RTS]**: i.e. bass and top set further
   off the edge (δ/w larger) than the middle.
 - The manual's timbre diagram (fig. 4-8) draws the pole tip as a cone and three settings: tine
@@ -367,10 +367,10 @@ authentic flaw) with a smoothing option.
   **[web, RSM-AF p. 29]**. Read off the drawing, "ideal" is roughly one tine diameter above the axis
   (~1–1.5 mm, δ/w ≈ 0.4–0.7) and "deep" two or more (δ/w ≳ 1) **[calc, rough]**.
 - Pole geometry from the 1975 CBS patent (Seth Lover; not certain it went into production, but it
-  describes the Rhodes-type geometry it improves on) **[web, P321]**: mild-steel (SAE 1010) pole
+  describes the tine-piano geometry it improves on) **[web, P321]**: mild-steel (SAE 1010) pole
   piece, shank 0.197 in (5.0 mm) Ø, head 0.25 in (6.35 mm) Ø, an Alnico 5 rod magnet 0.5 in long ×
   0.1875 in Ø (12.7 × 4.8 mm) behind it, magnetised lengthwise, "weak enough to avoid excessive
-  magnetic drag on the tine"; the production Rhodes pole ends in a chisel (wedge) edge; the patent's
+  magnetic drag on the tine"; the production tine piano pole ends in a chisel (wedge) edge; the patent's
   version has two peaks ~0.2 in apart with a 60° groove ~1/8 in deep between them, the tine resting
   ~0.030 in (0.76 mm) from the base line, "roughly 1/8 in from the pole axis … on a steep part of
   the field-strength curve". The production pole's chisel tip with flattened sides is confirmed by
@@ -405,7 +405,7 @@ authentic flaw) with a smoothing option.
 
 ### 4.2 Decay of the fundamental
 
-| Register | Shear Q → T60 (1974 Mk I 88) | Rhodes design target | Model T60 (mf, clean voicing) |
+| Register | Shear Q → T60 (1974 Mk I 88) | tine piano design target | Model T60 (mf, clean voicing) |
 |---|---|---|---|
 | E♭2 (78 Hz) | 949 → 27 s | low notes ~17 s | 20–27 s |
 | E♭3 (156 Hz) | 731 → 10 s | | 10–14 s |
@@ -421,12 +421,12 @@ the fundamental's envelope; in the bass at forte the pickup's compression (§4.4
 - Mechanism **[calc, standard tuning-fork physics; consistent with P922]**: a balanced fork cancels
   the bending moment at the base, so little energy leaks into the harp rail; an unbalanced one (bar
   detuned) leaks through the base into the mount. The tine's mode loss is therefore
-  1/Q = 1/Q_tine + 1/Q_leak(Δf), with Q_leak largest near bar–tine coincidence. Rhodes used the
+  1/Q = 1/Q_tine + 1/Q_leak(Δf), with Q_leak largest near bar–tine coincidence. tine piano used the
   detuning to *shorten* the bass dwell. The bar's own (lossy) mode, excited by the blow, dies within
   the transient. Model: one tine mode per polarisation with its Q from the table, plus 1–2 bar modes
   at the bar's own frequency (§3.5) with Q ~ 20–100 excited through the base reaction, contributing
   only to the first 10–50 ms **[design]**.
-- Two-stage decay: not reported in the measurements found. A Rhodes note decays nearly
+- Two-stage decay: not reported in the measurements found. A tine piano note decays nearly
   exponentially in the fundamental; what looks like a fast initial drop in recordings is the pickup
   harmonics (next point).
 - **Harmonics decay faster than the tine.** For A/w < ~0.5 the pickup's n-th harmonic ∝ (A/w)^n, so
@@ -480,13 +480,13 @@ levels of V = dΦ/dt relative to the A/w = 0.3 fundamental at the same voicing *
   of the attack partials **[calc; consistent with MP14 "the more growl"]**.
 - In time: a bass note struck at A/w = 2 decays through A/w = 1 and 0.8, so the fundamental *rises*
   by ~5 dB during the first part of the decay while the harmonics fall: a "bloom" or swell lasting
-  ~(ln 2.5)·τ ≈ 0.9 τ, i.e. 1.5–3.5 s in the bass (τ 1.5–3.9 s, §4.2) **[calc]**. Pianoteq exposes a "Blooming" parameter
+  ~(ln 2.5)·τ ≈ 0.9 τ, i.e. 1.5–3.5 s in the bass (τ 1.5–3.9 s, §4.2) **[calc]**. a commercial piano model exposes a "Blooming" parameter
   for its electric pianos **[web, MOD]**; whether it models this is not documented. A validation
   target (§13).
 - Voicing at the edge (δ/w ≈ 0.25) gives H2 above H1 already at A/w = 1: "the fundamental and all odd
   partials are attenuated, leaving the second partial as the dominant" when centred **[web, Sh11]**;
   Dyno-My-Piano set tines to "emphasize the overtones more than the fundamental" with the pickups
-  "as close to the tines as possible" **[web, FR-DY]**: the 1980s "bell" Rhodes is δ/w small and
+  "as close to the tines as possible" **[web, FR-DY]**: the 1980s "bell" tine piano is δ/w small and
   gap small, with low amplitudes (light touch, hard tips).
 
 ### 4.5 Beating and slow modulations
@@ -500,7 +500,7 @@ levels of V = dΦ/dt relative to the A/w = 0.3 fundamental at the same voicing *
 - Tine vs bar: no steady beating, since the bar is enslaved at the tine's frequency **[web, MP14]**;
   a transient beat between the free bar mode and the tine during the first 10–50 ms is possible but not
   reported.
-- Moog's description of a low note's energy moving into the tonebar within ~1 s (tine almost still)
+- the classic ladder's description of a low note's energy moving into the tonebar within ~1 s (tine almost still)
   implies a slow tine-amplitude beat when bar and tine are close in frequency **[web, EPF2896]**; the
   pickup sees it as a dip and recovery of the whole note (all harmonics together, the high ones by
   n× in dB). Not reported in the measured papers; a per-key option (§3.5).
@@ -514,7 +514,7 @@ levels of V = dΦ/dt relative to the A/w = 0.3 fundamental at the same voicing *
 ### 4.6 Velocity response and dynamic range
 
 - Hammer speed range used in models: 0.5–4 m/s **[web, So24]** (≈18 dB). The tine is linear, so
-  tine amplitude ∝ hammer speed over that range; the Rhodes action's ratio from key to hammer is not
+  tine amplitude ∝ hammer speed over that range; the tine piano action's ratio from key to hammer is not
   published **[open]**.
 - Output: in the treble (A/w ≲ 0.5 up to forte) the output level follows the tine almost linearly,
   ~18–25 dB from pp to ff; in the bass the total level still rises ~5 dB per doubling, but the
@@ -530,7 +530,7 @@ levels of V = dΦ/dt relative to the A/w = 0.3 fundamental at the same voicing *
 | Era / model | Tines | Tips / hammers | Tonebars, pickups, other | Sound reports |
 |---|---|---|---|---|
 | 1959–65 Piano Bass, Pre-CBS | uniform 0.075 in wire | felt | cast iron bars (1959 patent) | – |
-| 1965–69 Fender Rhodes ("Sparkle Top") | Raymac | felt, voiced per note | early bars; Suitcase: mono tremolo, Jordan amp | "darker and mellower attack"; Raymac bark "entirely different" [CEP-T] |
+| 1965–69 tine electric piano ("Sparkle Top") | Raymac | felt, voiced per note | early bars; Suitcase: mono tremolo, Jordan amp | "darker and mellower attack"; Raymac bark "entirely different" [CEP-T] |
 | 1969–early 1971 Mark I (early) | Raymac | felt → neoprene | twisted steel bars; stereo vibrato from 1969 | "warm bark" |
 | 1971–1976 Mark I | Torrington (swaged, shorter taper) | cube neoprene 3/8 in on maple head | 0.5 mm gap possible from 3/1972; 88-key from 1973 | "deep lows, clear highs" [CEP-M] |
 | mid-1975 | – | all-plastic hammer, new contour ("tighter") | – | [CEP-T] |
@@ -555,7 +555,7 @@ adjusted for more bell **[web, APL]**. So the model's era presets are mostly *se
 Schematics read from the service manual's ch. 11 figures (11-1 Haigler/Janus 100 W preamp, 11-3
 100 W power amp, 11-8 Peterson 80 W preamp, 11-9 80 W power module, 11-10 80 W supply, 11-17 Jordan
 50 W) and ch. 10 (harp wiring) **[web, RSM ch. 10–11]**; values below are printed on them unless
-marked [calc] or tagged otherwise. Pickup and harp data from Steve Woodyard's Rhodes service pages
+marked [calc] or tagged otherwise. Pickup and harp data from Steve Woodyard's tine piano service pages
 and Vintage Vibe **[web, FRS-PU, VV-PDF, VV-HIST]**.
 
 ### 6.1 The pickup as a circuit element
@@ -630,7 +630,7 @@ and Vintage Vibe **[web, FRS-PU, VV-PDF, VV-HIST]**.
   web, MORRIN gives ~1.8 kHz]**. Since the EMF ∝ dΦ/dt rises 6 dB/oct for a given tine
   displacement, above the corner the output follows the *displacement* (flat), below it the
   velocity: the harp integrates the pickup's differentiation above ~2 kHz **[calc]**. This shapes the
-  bark's upper harmonics and the treble's level; it is a central part of the "Rhodes sound" and absent
+  bark's upper harmonics and the treble's level; it is a central part of the "tine piano sound" and absent
   from models that take V = dΦ/dt straight to the output.
 - With the 47 nF bass cut engaged: series resonance with L at f = 1/(2π√(LC)) ≈ 790 Hz, Q ≈ 0.36 with
   ~12 kΩ: a broad mid band-pass **[calc; MORRIN qualitatively]**; a wrong 50 k volume pot moves the
@@ -639,9 +639,9 @@ and Vintage Vibe **[web, FRS-PU, VV-PDF, VV-HIST]**.
   300 pF → 9.9 kHz, 500 pF → 7.7 kHz, 1 nF → 5.4 kHz (L = 0.854 H) **[calc]**. Loaded by the 10 kΩ pot
   it is overdamped (Q ≈ 0.2–0.35, no peak); unloaded (pot removed, harp into a 1 MΩ amp or DI) it
   would peak with Q ~10–20 (limited by coil R and eddy losses) in the 5–10 kHz range **[calc]**: a
-  "modded" bright Rhodes. Cable ~100 pF/m **[memory]**.
-- **Fender Twin Reverb (AB763)**: Input 1 1 MΩ, Input 2 136 kΩ (−6 dB); tone stack slope 100 k,
-  treble 250 pF, bass 0.1 µF, mid 0.047 µF **[web, ROB]**: the usual Fender mid scoop; guitar-amp
+  "modded" bright tine piano. Cable ~100 pF/m **[memory]**.
+- **clean 2x12 combo (AB763)**: Input 1 1 MΩ, Input 2 136 kΩ (−6 dB); tone stack slope 100 k,
+  treble 250 pF, bass 0.1 µF, mid 0.047 µF **[web, ROB]**: the usual American amp mid scoop; guitar-amp
   presence around 3–4 kHz "can sound too piercing" **[web, FR-FX]**. The Stage's 10 k pot dominates
   the load, so the amp input impedance hardly matters **[web, snippet: EPF-6237; MORRIN]**.
 
@@ -740,7 +740,7 @@ circuit near the pole, and (b) acoustic: in a Suitcase or with a mic, the action
 
 - **Hammer contact (electrical).** During the 6.4 ms contact the hammer pushes the tine up through the
   field: the pickup sees a low-frequency pulse ("thump") before the oscillation, polarity and size
-  set by δ and the push; part of the "attack" of a direct-out Rhodes **[calc from MP14 contact time;
+  set by δ and the push; part of the "attack" of a direct-out tine piano **[calc from MP14 contact time;
   design]**. Generated by the model for free if the pickup reads the full tine displacement.
 - **Damper (electrical).** On release the felt presses the tine off its rest position for ~10–50 ms:
   a small step through the pickup plus the fast decay; on Mk I/II the damper's snap-back touches the
@@ -762,7 +762,7 @@ circuit near the pole, and (b) acoustic: in a Suitcase or with a mic, the action
   Lounge Lizard model has a damper-noise layer with attack/release balance and a mallet-noise layer
   with pitch and decay **[web, AAS]**. Level: no measurement; −40 to −30 dB re a mf note at the
   player, mixed only for "Suitcase in the room" presets **[memory/design]**.
-- **The direct tine sound.** An unamplified Rhodes is audible at a quiet "tink" level from the tines
+- **The direct tine sound.** An unamplified tine piano is audible at a quiet "tink" level from the tines
   and bars (a few dB SPL above the room at a metre) **[memory]**: irrelevant to the line signal,
   relevant to "in the room" presets.
 
@@ -798,19 +798,19 @@ with the source of the effect:
 
 ## 9. Recording chains and effects
 
-- **Stage → guitar amp**: the recommended amp was the Fender Twin Reverb; tube overdrive "became a
+- **Stage → guitar amp**: the recommended amp was the clean 2x12 combo; tube overdrive "became a
   normal part of the tone", with tremolo and spring reverb; guitar-amp EQ peaks around 3–4 kHz "can
-  sound too piercing on a Rhodes"; Roland JC-120 (stereo chorus, 2×12 in) popular **[web, FR-FX]**.
-  Herbie Hancock's *Head Hunters* is the reference for overdriven Rhodes **[web, FR-FX]**.
+  sound too piercing on a tine piano"; one maker JC-120 (stereo chorus, 2×12 in) popular **[web, FR-FX]**.
+  Herbie Hancock's *Head Hunters* is the reference for overdriven tine piano **[web, FR-FX]**.
 - **Wah** (Hancock, Corea, Zawinul; often parked as a static band-pass, or with fuzz in the early
-  1970s); **phaser** (late 1970s–80s ballads: Small Stone, MXR Phase 90; Billy Joel "Just the Way You
-  Are", Paul Simon "Still Crazy After All These Years"); **Boss CE-1** chorus (stereo, the JC-120
+  1970s); **phaser** (late 1970s–80s ballads: Small Stone, one pedal maker Phase 90; Billy Joel "Just the Way You
+  Are", Paul Simon "Still Crazy After All These Years"); **one pedal maker CE-1** chorus (stereo, the JC-120
   circuit); **Univibe**; **ring modulator** (Jan Hammer) **[web, FR-FX]**. Richard Tee: Small Stone
   **[web, snippet: RVB]**.
 - **Dyno-My-Piano** (1974–mid 1980s): pickups as close as possible, tines set for overtones, an EQ
   preamp in the Stage namerail (bass boost/"overtone"), a tri-stereo tremolo (left–centre–right;
   square, sawtooth, sine), stereo chorus, shielding against 60 Hz hum **[web, FR-DY]**: the 1980s
-  bright Rhodes. Model it as a voicing preset + preamp EQ + stereo chorus.
+  bright tine piano. Model it as a voicing preset + preamp EQ + stereo chorus.
 - **Mark V Stage 73**: 3-band EQ and MIDI out **[web, FR-M5]**.
 - **Direct inject**: the passive harp into a DI or console (high-impedance input), common in studios
   **[memory]**: the cleanest reference for validation.
@@ -824,11 +824,11 @@ with the source of the effect:
 | Falaize & Hélie 2015/17 [FH15, FH17] | port-Hamiltonian (passive): hammer, beam, magnetic pickup, RLC load | energy-consistent pickup with gap and offset; audible voicing examples | no tonebar; pickup field model 1-D (2-D in JSV) |
 | Gabrielli et al. 2020 [Ga20] | laser vibrometry; modal model + pickup intermodulation; keyboard-wide mode map | inharmonic attack explained by tine/bar modes + pickup intermodulation | full text not obtained here |
 | Sønderbo 2024 [So24] | FDTD tine (uniform 1 mm), Hunt–Crossley, filter + tanh pickup | strike point and stiffness effects | wrong diameter (all notes flat, overtones at 6.37/35.3); pickup non-physical, harsh; overtones too long |
-| jstolberg/rhodes (GitHub) [JS] | modes + force pulse + magnetic pickup, parameters fitted to Pianobook samples (p, mp, mf, f) in 4 stages | per-key fitted pickup (p_d, p_o, κ) and modes from recordings | no published values; force-pulse hammer |
+| jstolberg/tinepiano (GitHub) [JS] | modes + force pulse + magnetic pickup, parameters fitted to Pianobook samples (p, mp, mf, f) in 4 stages | per-key fitted pickup (p_d, p_o, κ) and modes from recordings | no published values; force-pulse hammer |
 | AAS Lounge Lizard EP-4 [AAS] | commercial physical model: mallet (stiffness, force, noise), fork (tine level/colour/decay, tone bar level/decay), pickup (symmetry, distance, R/W type, input drive), damper noise, tremolo (triangle or soft square, stereo 180°) | exposes exactly the voicing controls | treats tine and tone bar as two additive layers; key/vel mapping by knobs |
-| Modartt Pianoteq Vintage Tines MKI/MKII (2016) [MOD] | commercial physical model | "Bark" from pickup distance + symmetry; tine noise; "Blooming" | internals unpublished |
+| the piano-modelling forum a commercial piano model Vintage Tines MKI/MKII (2016) [MOD] | commercial physical model | "Bark" from pickup distance + symmetry; tine noise; "Blooming" | internals unpublished |
 | Apple EVP88 / Vintage Electric Piano [APL] | modelled/sample hybrid | era list, "bell vs bark by tine–pickup proximity" | – |
-| Spectrasonics Keyscape, Wonder Rhodes (Pianobook) etc. | samples (4 velocity layers for Wonder Rhodes) | real instruments; reference recordings | fixed voicing; layer crossfades |
+| a sample-library maker Keyscape, Wonder tine piano (Pianobook) etc. | samples (4 velocity layers for Wonder tine piano) | real instruments; reference recordings | fixed voicing; layer crossfades |
 
 **[web, sources as tagged]**. Common failure modes: treating the tonebar as a second additive
 "layer" with its own pitch (it is enslaved); pickup as a static tanh on a filtered signal (wrong
@@ -890,7 +890,7 @@ the rest are fits or design values.
 
 ### 12.1 What the model must do that samples cannot
 
-A user comparison of real and sampled Rhodes lists four things samples miss. Each becomes a
+A user comparison of real and sampled tine piano lists four things samples miss. Each becomes a
 requirement with the numbers found above:
 
 1. **Continuous velocity, no layers.** Hammer speed 0.5–4 m/s maps linearly to tine amplitude
@@ -903,7 +903,7 @@ requirement with the numbers found above:
    displacement every sample. No crossfades, no per-velocity filters.
 2. **Mechanical coupling.**
    - *Through the rail and mount.* Every tonebar sits on a soft grommet and two springs on one rail
-     (§3.5). Moog says the mounting post is "not rigid" **[web, EPF2896]**, and the 1983 patent
+     (§3.5). classic ladder says the mounting post is "not rigid" **[web, EPF2896]**, and the 1983 patent
      changed the mount because it leaked treble energy **[web, P418]**. No measured rail-coupling
      coefficient or sympathetic level was found. Requirement: a shared rail mode (or a weak all-to-all
      coupling through one rail velocity) that every tonebar's base reaction drives and feels. Start
@@ -965,16 +965,16 @@ requirement with the numbers found above:
    faster than H1 at soft levels; Shear's G3 voicing series **[Sh11 figs 2.4–2.5]**; Falaize–Hélie
    gap/offset audio examples **[FH17 page]**.
 5. Same touch across the keyboard: bark in the lower half, clean bell above ~C5 (§4.1).
-6. Velocity series against recorded samples (Pianobook "Matt's Fender Rhodes" p/mp/mf/f used by
-   [JS]; Wonder Rhodes 1976 Mk I, 4 layers): spectra of H1–H8 vs time, attack partials.
+6. Velocity series against recorded samples (Pianobook "Matt's tine electric piano" p/mp/mf/f used by
+   [JS]; Wonder tine piano 1976 Mk I, 4 layers): spectra of H1–H8 vs time, attack partials.
 7. Electronics: Suitcase pan rate and depth range, preamp EQ curves (§6) against schematic
    simulation and recordings; Stage into a 1 MΩ/cable load: resonance frequency and Q.
-8. Listening: DI, Suitcase in the room, Twin Reverb, with and without phaser/chorus.
+8. Listening: DI, Suitcase in the room, clean 2x12 combo, with and without phaser/chorus.
 
 ## 14. Open questions
 
 - Gabrielli et al.'s keyboard-wide mode map (tine + bar modes, levels and decays): the main missing
-  table; JASA paywalled, not obtained (the EP-Forum thread on Moog's article has no measured modes,
+  table; JASA paywalled, not obtained (the EP-Forum thread on the classic ladder's article has no measured modes,
   so it does not close this).
 - Is the tonebar near-tuned (Moog 1980: slow energy exchange) or far-detuned (MP14: slaved)? Probably
   both, per key and instrument; a recording of a held low note on a DI showing (or not) a slow dip

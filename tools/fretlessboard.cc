@@ -146,14 +146,14 @@ int main() {
   }
   {
     // Off: the fretted bass's Guitar untouched; stop() at whole frets as fret().
-    Guitar a(48000, jazzBass()), b(48000, jazzBass());
+    Guitar a(48000, twoPickupBass()), b(48000, twoPickupBass());
     a.fret(1, 5);
     b.stop(1, 5);
     a.pluckPad(1, 2e-3, 0.1, 0.4, 0.010, 0.002, 0.001);
     b.pluckPad(1, 2e-3, 0.1, 0.4, 0.010, 0.002, 0.001);
     double diff = 0;
     for (int i = 0; i < 24000; ++i) diff = std::max(diff, double(std::fabs(a.sample() - b.sample())));
-    std::snprintf(d, sizeof d, "the Jazz Bass's D2 by fret() and by stop(): largest difference %.3g", diff);
+    std::snprintf(d, sizeof d, "the two-pickup bass's D2 by fret() and by stop(): largest difference %.3g", diff);
     check(diff == 0, "fretless glide: stop() at a fret is fret()", d);
   }
   return fails ? 1 : 0;

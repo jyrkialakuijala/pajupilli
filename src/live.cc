@@ -1,4 +1,4 @@
-// Live: ALSA audio out, ALSA sequencer MIDI in (the Akai MPK mini mk3).
+// Live: ALSA audio out, ALSA sequencer MIDI in (the 25-key MIDI controller).
 //
 // One thread: read the pending MIDI events, render one period, write it.
 // The blocking write paces the loop. Latency from a key to sound: the MIDI
@@ -20,9 +20,9 @@
 
 #include "bassinst.h"
 #include "pianoinst.h"
-#include "clavinet.h"
-#include "dx7.h"
-#include "rhodes.h"
+#include "clavi.h"
+#include "fmsynth.h"
+#include "tinepiano.h"
 #include "scifi.h"
 #include "rain.h"
 #include "soundtrack.h"
@@ -30,7 +30,7 @@
 #include "brightness.h"
 #include "goblins.h"
 #include "echoes.h"
-#include "cp80.h"
+#include "electricgrand.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "player.h"
@@ -138,11 +138,11 @@ bool openMidi(Midi& m) {
   return m.port >= 0;
 }
 
-// The MPK mini mk3 map (research/playing_techniques.md section 5, research/
+// The 25-key MIDI controller map (research/playing_techniques.md section 5, research/
 // player_and_controller.md part B). Keys on any channel but 10; pads on 10.
 class Controls {
  public:
-  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked() && !grandPiano(inst) && !electricGrand(inst) && !clavinet(inst) && !dx7Piano(inst) && !rhodes(inst) && !sciFi(inst) && !fxRain(inst) && !fxSoundtrack(inst) && !fxAtmosphere(inst) && !fxBrightness(inst) && !fxGoblins(inst) && !fxEchoes(inst)), bowed_(inst.plucked() && bowedBass(inst)) {
+  Controls(Ensemble& p, const Instrument& inst, const LiveOptions& o) : p_(p), o_(o), circuit_(inst.circuit()), plucked_(inst.plucked() && !grandPiano(inst) && !electricGrand(inst) && !clavi(inst) && !fmPiano(inst) && !tinepiano(inst) && !sciFi(inst) && !fxRain(inst) && !fxSoundtrack(inst) && !fxAtmosphere(inst) && !fxBrightness(inst) && !fxGoblins(inst) && !fxEchoes(inst)), bowed_(inst.plucked() && bowedBass(inst)) {
     singing_ = std::strcmp(inst.name, "pad-choir") == 0;
     // Sounding range; keys outside it fold in by octaves.
     lo_ = p.lo();
@@ -231,8 +231,8 @@ class Controls {
   }
   void cc(int num, int v) {
     const double x = v / 127.0;
-    // (an instrument's own use of a knob first: the Hammond's drawbars on K1-K4, its overdrive on K5,
-    // its Leslie on K6; the choirs' vowel on K2, dark u .. bright i, and their openness on K3, closed
+    // (an instrument's own use of a knob first: the Tonewheel's drawbars on K1-K4, its overdrive on K5,
+    // its Rotary on K6; the choirs' vowel on K2, dark u .. bright i, and their openness on K3, closed
     // and breathy .. the jaw open and clear: src/choir.h, as pad-choir's K2 vowel and K3 breath)
     if (num >= 70 && num <= 77 && p_.instrumentKnob(num - 70, x)) {
       if (o_.verbose) std::fprintf(stderr, "cc %d = %d\n", num, v);
@@ -296,7 +296,7 @@ class Controls {
   const LiveOptions& o_;
   int sounding_[128] = {};
   int lo_, hi_, transpose_;
-  int kitShift_ = -12;       // the keys as drum keys: the MPK's lowest C (48) the bass drum (36)
+  int kitShift_ = -12;       // the keys as drum keys: the controller's lowest C (48) the bass drum (36)
   bool warned_[128] = {};
   bool breathPad_ = false;
   bool circuit_ = false;  // a synth lead: K2 cutoff, K3 resonance
@@ -350,7 +350,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
   if (!o.kitOnKeys) std::fprintf(stderr, "ensemble: %s\n", player.describe().c_str());
   if (o.kit)
     std::fprintf(stderr, "drum kit on the %s (General MIDI keys%s):\n%s", o.kitOnKeys ? "keys and pads" : "pads",
-                 o.kitOnKeys ? "; the MPK's lowest C is the bass drum, 36" : "", o.kit->describe().c_str());
+                 o.kitOnKeys ? "; the keyboard's lowest C is the bass drum, 36" : "", o.kit->describe().c_str());
 
   std::vector<float> left(period), right(period), f32(period * 2);
   std::vector<int16_t> s16(period * 2);
@@ -373,7 +373,7 @@ int runLive(const Instrument& inst, const LiveOptions& o, Ensemble& player) {
       else if (ev->type == SND_SEQ_EVENT_PORT_EXIT) ctl.allOff();  // unplugged mid-note
       else ctl.handle(ev);
     }
-    // A port appeared (the MPK plugged in again): connect. Rare, so the few
+    // A port appeared (the controller plugged in again): connect. Rare, so the few
     // syscalls here are fine in this thread.
     if (portStarted) midi.connected = connectSources(midi, o.midiName, true) || midi.connected;
     if (o.selfTest && o.kit && o.kitOnKeys) {  // a bar of drums without a keyboard

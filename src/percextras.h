@@ -1,6 +1,6 @@
 // The small sounds of the drum maps below 35 (research/gm2_extras.md):
 // -inst perc-extras, one instrument holding them all, keyed by GS/GM2's
-// numbers, with Yamaha XG's extra small sounds on keys GS leaves free.
+// numbers, with XG's extra small sounds on keys GS leaves free.
 //
 //   20 click noise (XG 20)       27 High Q (GS 27, XG 15)
 //   21 castanets (XG 30, GM2 85) 28 slap: the whip (GS 28, XG 16)

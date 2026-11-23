@@ -29,7 +29,7 @@ bank 1 **[U]** (MIDI tables quoted in search results).
 |---|---|---|
 | MuseScore_General (SF2/SF3, the GM set shipped with MuseScore) | "**Harmon Mute Trumpet**" (preset 000:059) | its changelog [MSG] |
 | MuseScore forum (users and developers) | GM has one muted trumpet. "By convention it is taken to be harmon, and harmon is far more commonly used in music created today." Straight, cup and plunger are not in GM | [MSF] **[U]** (forum, via search) |
-| Roland Sound Canvas / GS "Mute Trumpet", FluidR3, General User GS | It sounds like a stemless Harmon (thin, buzzy, Miles-Davis-like, no low end) **[G]**, from memory of the sound, not checked | none |
+| one maker Sound Canvas / GS "Mute Trumpet", FluidR3, General User GS | It sounds like a stemless Harmon (thin, buzzy, Miles-Davis-like, no low end) **[G]**, from memory of the sound, not checked | none |
 
 **Decision:** model the **Harmon without stem** ("Miles Davis", 1946 on [WIKI]) as the GM 60 default. Keep **stem in**
 and the **straight mute** as variants (GM 2 bank 1, or a controller). The straight mute is what "con sordino" means in
@@ -83,7 +83,7 @@ What matters is the **bell diameter at the mute's tip and corks**, not the depth
 | Seal / leak | Three corks (~1 cm thick [ABLG22 **[U]**], 6–8 mm radial gap **[G]**). Sound leaves through the annulus [CGM21] | Annulus, then the gap between bowl rim and bell rim (adjustable 5–25 mm **[G]**) | **Sealed** (cork strip all round) [CGM21, F10] | Gap h between the rim and the cup, 0–30 mm **[G]** |
 | Internal volume | ≈ 0.63 L **[G]** (cone 24 → 96 mm, 200 mm) | + bowl cavity ≈ 0.3 L **[G]** | Chamber ≈ 0.5 L (Ø 88 × 85 mm) **[G]** | cavity ≈ 0.24 L **[G]** |
 | Exit | Annulus to the rim | Bowl-rim slot | Hole Ø ≈ 17 mm (fits the stem), sleeve 30 mm into the chamber **[G]**. Stem: tube Ø 15 × 105 mm + small bell to Ø 40 **[G]** | radial slot |
-| Cork effect on pitch | 0.5 mm cork steps → ~4 cents each. Six sizes span 19–21 cents. Factory corks +3.6 c (Bach 180S37) and +9.7 c (Yamaha C) [S23] | | | |
+| Cork effect on pitch | 0.5 mm cork steps → ~4 cents each. Six sizes span 19–21 cents. Factory corks +3.6 c (Bach 180S37) and +9.7 c (one maker C) [S23] | | | |
 
 ### 1.3 What each does (literature)
 

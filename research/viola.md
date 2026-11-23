@@ -45,7 +45,7 @@ the strings they sit about 2–4 semitones higher. The viola is less directional
     42–43 cm) **[T, wf]** [Johannsson].
   - Pirastro's strings are rated for 37 cm; small "ergonomic" 15.75-inch violas use 35.6 cm
     **[S]** [Heath].
-  - D'Addario's size classes by body length: XS 13–14 in, S 14–15, M 15–16, L 16–17, XL 17 and
+  - standard's size classes by body length: XS 13–14 in, S 14–15, M 15–16, L 16–17, XL 17 and
     over **[T]** [DAdd].
   - Model **[E]**: 35.5 cm for a 15-inch body, 37 cm for 16 inches, 38–39 cm for 16.5–17 inches.
     One viola, unlike the violin and the cello, has no standard size: the size is a parameter.
@@ -53,7 +53,7 @@ the strings they sit about 2–4 semitones higher. The viola is less directional
   writing **[M]**. GM program 42 counted from 1 (41 from 0) **[M]**. This repository's GM table
   (`src/midifile.cc` around line 192) currently maps "viola" to the fiddle.
 
-**Ranges over brands** (L = 37.5 cm, a = 440; Guettler, data from D'Addario and Corelli) **[T]**
+**Ranges over brands** (L = 37.5 cm, a = 440; Guettler, data from standard and Corelli) **[T]**
 [KnutStr]:
 
 | | A4 | D4 | G3 | C3 |

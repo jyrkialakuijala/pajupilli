@@ -160,7 +160,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   - 102 and 204 Hz radiate "quite efficiently in all directions". 376 Hz is a dipole and 436 Hz
     a quadrupole; neither radiates much to the front **[T]** [SoSI Fig. 3.16, Popp & Rossing
     1986].
-  - Held by a player, a Fender CD-60 (a dreadnought, steel strings) radiates nearly
+  - Held by a player, an American amp CD-60 (a dreadnought, steel strings) radiates nearly
     omnidirectionally up to ~200 Hz with its peak gain near **180 Hz**. Near 500 Hz the beam
     turns ~30° off axis; from 1.5 kHz it splits into lobes at about −60°, 0° and +60°;
     2.5–5 kHz is weak in all directions; 7–8 kHz beams strongly to one side **[T]** [AAU,
@@ -218,7 +218,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   the bridge between body peaks: low E 0.35 /s, high E 0.35 /s (T60 ≈ 20 s) **[E]**.
 - **So the string's own loss is most of the measured decay** above 500 Hz (§1.2). It is air
   drag on the plain strings and the wrap's friction on the wound ones. Kodama et al. found for a
-  phosphor-bronze set on a Yamaha acoustic that the tone's attenuation is "caused mainly by the
+  phosphor-bronze set on a one maker acoustic that the tone's attenuation is "caused mainly by the
   damping of air and the damping of the guitar body", with no rise with mode number like
   nylon's **[T, qualitative; their values only in figures]** [Kod23].
 - **The string values in §8.1 are therefore §1.2's fits minus the body's share**, about 0.3 /s
@@ -263,7 +263,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   pickup:
   - annotated note onsets per string;
   - 60 "comp" excerpts: Rock, Singer-Songwriter, Funk, Bossa Nova, Jazz;
-  - a Neumann U87 reference microphone ~30 cm in front of the 18th fret **[S]**.
+  - a studio condenser reference microphone ~30 cm in front of the 18th fret **[S]**.
 - **Method.** Onsets on different strings within 40 ms of each other (whole chord under 120 ms)
   are one stroke. A stroke needs at least three strings, each once. Its direction comes from the
   correlation of string number with onset time (> 0.5: down, low string first; < −0.5: up).
@@ -374,7 +374,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
     bridge, more body and less string.
   - A stereo pair: a second microphone at the lower bout behind the bridge, or a spaced or XY
     pair at 30–50 cm.
-  - GuitarSet's reference microphone was a U87 ~30 cm before the 18th fret **[S]**.
+  - GuitarSet's reference microphone was a studio condenser ~30 cm before the 18th fret **[S]**.
 - **What makes a recorded steel-string bright and "shimmery"** **[E]**, in order:
   1. The 2–8 kHz partials ringing for seconds (§1.2).
   2. Their slow beating:
@@ -401,7 +401,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   makes in this position" **[S]** [Wiki-12].
 - **Which string the pick meets first:** "the higher string of each pair is struck first on a
   downward strum" (the octave string, or on the unison courses the thinner-placed one).
-  Rickenbacker electrics reverse the order **[S]** [Wiki-12]. On an up stroke the main string
+  through-neck bass electrics reverse the order **[S]** [Wiki-12]. On an up stroke the main string
   comes first **[E]**.
 - **Building and tuning:**
   - Heavier build and bracing, a larger bridge plate, a wider neck **[S]**.
@@ -410,7 +410,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   - Many players still tune a 12-string a whole tone down (D standard, total tension × 0.79)
     **[L]**.
   - Typical bodies: dreadnought (Martin D12-28) or jumbo (Guild F-512, Taylor 355) **[M]**.
-- **D'Addario EJ38 (light 12-string, phosphor bronze)** tensions in lb **[S, retailer copy of
+- **standard EJ38 (light 12-string, phosphor bronze)** tensions in lb **[S, retailer copy of
   the maker's chart]** [DAD-EJ38]; B is my arithmetic **[E]** (cores guessed as in SG §2.1):
 
 | Course | Main string | T (lb / N) | B | Partner | T (lb / N) | B |
@@ -496,7 +496,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
   "12-Strings Guitar", LSB 2 "Mandolin" and LSB 3 "Steel Guitar with Body Sound" **[S]**
   [GM2-list; Yamaha voice lists]. So a GM2 file selects the 12-string with **CC0 = 121, CC32 = 1,
   then program 25 (counting from 0)**, not CC0 = 1.
-  - GS (Roland) uses CC0 = 8 for "12-str.Gt" and CC0 = 16 for "Mandolin" on the same program,
+  - GS (one maker) uses CC0 = 8 for "12-str.Gt" and CC0 = 16 for "Mandolin" on the same program,
     as FluidR3 does **[T: FluidR3's cfg; M: Roland]**.
   - XG uses MSB 0 with LSB 35 **[M]**.
 - **In the user's files** (5 643 distinct files; script `banks.py`; **[T, measured in the
@@ -710,7 +710,7 @@ Measured for this note: parsed `FluidR3_GM.sf2` directly, and rendered single no
 - **Kodama et al.'s phosphor-bronze attenuation coefficients** are only in figures.
 - **Allen (1976) on aging steel strings:** the PDF was not reachable. His later summary says the
   damping of the high partials, not B, changes with age **[S]**.
-- **GM2 bank numbers** are from Yamaha voice lists and a GM2 list **[S]**. The GM2 specification
+- **GM2 bank numbers** are from one maker voice lists and a GM2 list **[S]**. The GM2 specification
   itself was not opened. XG's LSB 35 is from memory **[M]**.
 - **The steel guitar's level against the nylon** (3–6 dB): unmeasured **[M]**.
 

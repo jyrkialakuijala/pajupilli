@@ -62,7 +62,7 @@ from mallet *hardness* (stiffening with compression, Hunt–Crossley exponent α
 ### 1.1 What it is in GM sets
 - GM lists it simply as "Tinkle Bell" (Percussive group) [WGM]. Sound On Sound's survey of GM/GS/XG exotic sounds
   dismisses it ("Tinkly bells are no great shakes") and suggests the Javanese bonang/gender as better bells [SOS-ex].
-- I found no description of the SC-55 sample's timbre. From memory of GM modules, it is a bright, small struck
+- I found no description of the early GS module sample's timbre. From memory of GM modules, it is a bright, small struck
   bell with a long ring, a high register and a strong inharmonic shimmer: a small handbell or tuned bell-plate rather
   than sleigh bells **[G]**. Sleigh bells (jingles) are a GM drum-map sound (key 83 in GS/GM2), not this program **[U]**.
 - **Choice: a small English handbell (bronze), struck by its internal clapper.** Reasons: (a) it is tuned, so it has

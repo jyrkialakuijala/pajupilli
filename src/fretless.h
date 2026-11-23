@@ -1,5 +1,5 @@
 // The fretless bass (-inst fretless-bass; General MIDI program 36, "Fretless Bass";
-// research/fretless_bass.md): the Jazz Bass (src/bassspec.cc jazzBass()) with its frets pulled and
+// research/fretless_bass.md): the two-pickup bass (src/bassspec.cc twoPickupBass()) with its frets pulled and
 // the slots filled, played by a fretless player.
 //   - The string ends under a fingertip pressing it onto a hard board, not on a fret. Behind the
 //     finger the string rises from the board at a small angle (the action over the board's end,
@@ -14,7 +14,7 @@
 //   - The fingertip's loss: half the double bass's (2.4, 8.2.3), instead of the fret's x1.15.
 //   - The bridge pickup favoured (the neck one at half its volume; PJ_FRETLESS_PICKUP 1: the bridge
 //     alone, 2: both full, 3: the neck alone), the J network; into "fretless-di" (src/guitaramp.cc:
-//     an active DI 70 % with the Variamp's mid push, +3 dB at 800 Hz, the B-15 30 %, an LA-2A at 3:1)
+//     an active DI 70 % with the Variamp's mid push, +3 dB at 800 Hz, the fliptop 30 %, an optical compressor at 3:1)
 //     and, if asked (PJ_FRETLESS_CHORUS 0..1, off as on a Sound Canvas), a bucket-brigade chorus:
 //     7 +- 2 ms at 0.6 Hz, the lows under 150 Hz dry, the right side's sweep inverted.
 // The player (3, 7.5): every stopped note is one quantity, the stopping finger's place in cents

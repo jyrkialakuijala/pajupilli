@@ -1,4 +1,4 @@
-// A large harpsichord (research/harpsichord.md, research/harpsichord_clavinet.md):
+// A large harpsichord (research/harpsichord.md, research/harpsichord_clavi.md):
 // a North German double of the Hass kind, 61 keys F1 .. F6, four choirs of
 // strings: two at pitch (8'), one an octave up (4'), one an octave down
 // (16'). On the grand's engine (piano.h): each string is one "key" of it, a

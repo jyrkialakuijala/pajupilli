@@ -1,4 +1,4 @@
-// The Fender Rhodes (-inst electric-piano-1, General MIDI 5; research/rhodes.md, the model plan
+// The tine electric piano (-inst electric-piano-1, General MIDI 5; research/tinepiano.md, the model plan
 // in its section 12; research/electric_pianos.md section 3).
 //
 // Per key (A0 .. C8, the 88's harp; the 73's keys are E1 .. E7):
@@ -19,7 +19,7 @@
 //     Phi = [1 + ((x + delta) / w)^2]^-p, w the gap (+ ~1 mm), the sideways motion changing the gap;
 //     the EMF its time derivative, analytic, on the full tip motion: soft notes nearly sines, hard
 //     ones (the bass first) barking, the fundamental folding back, the bloom as a note decays.
-//   - Each key its own: gap, offset, strike point, tuning, Q (seeded; PJ_RHODES_WEAR scales the
+//   - Each key its own: gap, offset, strike point, tuning, Q (seeded; PJ_TINEPIANO_WEAR scales the
 //     spread from "factory fresh" to "road-worn").
 //
 // The electronics (one for the instrument): the harp (the coils in groups of three, 24 groups in
@@ -29,8 +29,8 @@
 //     antiphase, each lamp's filament heating and cooling, each CdS cell following its light fast
 //     and letting go slowly, shunting its channel), the power amplifier on its unregulated supply
 //     (sagging under bass chords, clipping), and the 4 x 12 in cabinet; or
-//   - a Stage (PJ_RHODES_SUITCASE=0): the harp into its 10 kOhm volume pot, straight out (DI).
-// A trace of mains hum through the harp's groups (PJ_RHODES_HUM).
+//   - a Stage (PJ_TINEPIANO_SUITCASE=0): the harp into its 10 kOhm volume pot, straight out (DI).
+// A trace of mains hum through the harp's groups (PJ_TINEPIANO_HUM).
 #pragma once
 
 #include <cstdint>
@@ -41,12 +41,12 @@
 
 namespace pajupilli {
 
-bool rhodes(const Instrument& inst);  // -inst electric-piano-1
+bool tinepiano(const Instrument& inst);  // -inst electric-piano-1
 
-class RhodesModel : public Tube {
+class TinePianoModel : public Tube {
  public:
   static constexpr int kLowest = 21, kKeys = 88;  // A0 .. C8
-  explicit RhodesModel(const Instrument& inst);
+  explicit TinePianoModel(const Instrument& inst);
   // The hammer's speed at the tip (m/s).
   void strike(int key, double speed);
   void damp(int key, bool on);  // the damper on (key up, no pedal) or off
@@ -110,9 +110,9 @@ class RhodesModel : public Tube {
 
 // Velocity is the hammer's speed; the sustain pedal lifts the dampers. The vibrato: K3 its speed,
 // K4 its intensity (live); the breath / mod wheel deepens it.
-class RhodesPlayer : public Performer {
+class TinePianoPlayer : public Performer {
  public:
-  explicit RhodesPlayer(RhodesModel& m);
+  explicit TinePianoPlayer(TinePianoModel& m);
   void noteOn(int midi, int velocity) override;
   void noteOff(int midi) override;
   void render(float* out, int n) override;
@@ -121,7 +121,7 @@ class RhodesPlayer : public Performer {
   bool setKnob(int k, double x) override;
 
  private:
-  RhodesModel& m_;
+  TinePianoModel& m_;
   bool keyDown_[128] = {};
   double rate_ = -1, depth_ = -1;
 };

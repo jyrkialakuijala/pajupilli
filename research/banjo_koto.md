@@ -47,7 +47,7 @@ the 5th fret, so its sounding length is 5/12 of an octave shorter [D].
 - μ = T/(2Lf)². B = π³ E d⁴/(64 T L²), with E = 200 GPa for steel [P21] and the plain diameter (for the
   wound 4th string, the core). The μ values reproduce the published Z within 1 % [D].
 - A typical "medium" set is 10-12-14-22w-10 thousandths of an inch (0.25-0.30-0.36-0.56w-0.25 mm) [P19]. The
-  light D'Addario EJ60 is 9-10-12-20w-9 [U, retailers], with about 11 lbf (49 N) on the 0.009 in D string [U].
+  light standard EJ60 is 9-10-12-20w-9 [U, retailers], with about 11 lbf (49 N) on the 0.009 in D string [U].
 - Total string tension is about 270 N [P21].
 - Measured inharmonicity: the standard deviation of the first 15 partials from integer ratios is 0.10 % on a
   banjo, against 0.09 % on a guitar [P14]. B ≈ 2.5e-5 gives a shift of B n²/2 = 0.28 % at n = 15, so the

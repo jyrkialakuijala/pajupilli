@@ -40,7 +40,7 @@ PianoDesign harpsichordDesign() {
   const bool just = !(tuning && std::strcmp(tuning, "equal") == 0);
   int tonic = SongClock::get().tonic >= 0 ? SongClock::get().tonic : 0;
   if (std::getenv("PJ_HPSI_TONIC")) tonic = ((std::atoi(std::getenv("PJ_HPSI_TONIC")) % 12) + 12) % 12;
-  // The scales (research/harpsichord_clavinet.md 2.2, harpsichord.md 3): Taskin's 8' and 4' shortened
+  // The scales (research/harpsichord_clavi.md 2.2, harpsichord.md 3): Taskin's 8' and 4' shortened
   // to Hass's c'' = 340 mm; the 16' a guess for a 2.74 m case. Length and wire by key.
   static const int k8[] = {29, 36, 48, 60, 72, 84, 89};
   static const double l8[] = {1.764, 1.617, 1.178, 0.711, 0.357, 0.179, 0.135}, d8[] = {0.55e-3, 0.49e-3, 0.40e-3, 0.30e-3, 0.25e-3, 0.21e-3, 0.20e-3};

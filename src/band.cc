@@ -15,7 +15,7 @@ bool any(const char* s, std::initializer_list<const char*> names) {
   return false;
 }
 // How each family's note falls while it rings (dB/s; research/fretless_bass.md 7.4: a piano
-// about -8, a Rhodes -6, vibes with the motor off -3), and whether it rings on after its key.
+// about -8, a TinePiano -6, vibes with the motor off -3), and whether it rings on after its key.
 double fallOf(int fam) {
   switch (fam) {
     case kBandPiano: return 8;
@@ -41,7 +41,7 @@ int bandFamily(const char* family, const char* name) {
   if (any(family, {"guitar", "banjo", "koto", "sitar", "shamisen", "dulcimer"})) return kBandPluck;
   if (any(family, {"harp", "kalimba", "music box", "bells", "bell", "celesta", "glockenspiel", "pan"})) return kBandBell;
   if (any(family, {"vibraphone", "marimba", "xylophone"})) return kBandMallet;
-  if (any(family, {"organ", "hammond", "reed organ", "accordion", "harmonica", "bandoneon", "bagpipe"})) return kBandOrgan;
+  if (any(family, {"organ", "tonewheel", "reed organ", "accordion", "harmonica", "bandoneon", "bagpipe"})) return kBandOrgan;
   if (any(family, {"choir", "choir-singer", "voice"})) return kBandChoir;
   if (any(family, {"flute", "recorder", "panflute", "whistle", "ocarina", "shakuhachi", "bottle"})) return kBandFlute;
   if (any(family, {"strings", "violin", "viola", "cello", "fiddle", "orchestra"})) return kBandStrings;

@@ -7,7 +7,7 @@
 // stay silent. Each channel is a pool of its instrument (a piano or a plucked
 // instrument: one voice that takes every key), in the chosen room; the
 // sustain pedal (CC 64), volume (7), expression (11), channel pressure (the
-// breath) and pitch bend (the lips; a Clavinet: the wah) are followed. The
+// breath) and pitch bend (the lips; a Clavi: the wah) are followed. The
 // song is rendered on its own thread and played (ALSA) as it comes, a second
 // behind; should the rendering be slower than real time, the player waits
 // once, long enough to play on to the end. With -o: written to a file.

@@ -86,14 +86,14 @@ pull on it, strung with strings that lose almost nothing of their own, and playe
 | Style | Lower bout | Depth (at the tail) | Scale | Typical sound | Source |
 |---|---|---|---|---|---|
 | Dreadnought (Martin D-18/D-28) | 15⅝ in. (397 mm) | ~4⅞ in. (124 mm) | 25.4 in. (645 mm) | big bass, "boom" near G2 | [M]; scale [S] |
-| Slope-shoulder dreadnought (Gibson J-45) | 16 in. | ~4¾ in. | 24.75 in. (629 mm) | darker, drier | [M] |
+| Slope-shoulder dreadnought (humbucker guitar J-45) | 16 in. | ~4¾ in. | 24.75 in. (629 mm) | darker, drier | [M] |
 | OM / 000 (Martin) | 15 in. (381 mm) | ~4⅛ in. (105 mm) | 25.4 (OM) / 24.9 in. (000) | balanced, quicker, finger-style | [M] |
-| Jumbo (Gibson J-200) | 17 in. | ~4½ in. | 25.5 in. | | [M] |
+| Jumbo (humbucker guitar J-200) | 17 in. | ~4½ in. | 25.5 in. | | [M] |
 
 - **For GM 26 take the dreadnought** **[E]**. It is the default "acoustic guitar" of the pop,
   rock and country records that most GM files transcribe (§9: the Eagles, the Beatles, ABBA,
   REM). An OM body is a variant: smaller, its air mode 5–15 % higher (§3.2).
-- **Scale for the model:** 645 mm (25.4 in.); D'Addario's charts use 25.5 in. (648 mm) **[T]**
+- **Scale for the model:** 645 mm (25.4 in.); standard's charts use 25.5 in. (648 mm) **[T]**
   [DAD]. The 3 mm makes 1 % in tension.
 - **Frets:** 20 on a 14-fret dreadnought **[M]**; the top fret is C#6 on the high E (85).
 
@@ -118,21 +118,21 @@ pull on it, strung with strings that lose almost nothing of their own, and playe
 | A2 110.0 | PB042 | " | .042 | 128.7 | 6.34 (6.56 [S]) | 0.903 | .016 | 4.9e-5 |
 | E2 82.4 | PB053 | " | .053 | 111.0 | 9.74 (10.17 [S]) | 1.040 | .019 | 1.1e-4 |
 
-- **Tension:** D'Addario's EJ16 chart on the maker's page gives 10.619, 10.595, 13.66, 13.605,
+- **Tension:** standard's EJ16 chart on the maker's page gives 10.619, 10.595, 13.66, 13.605,
   13.152 and 11.34 kg (E4 → E2) at 25.5 in. **[T]** [DAD]; retailer copies of the same chart in
   pounds: 23.36, 23.31, 30.06, 29.93, 28.93, 24.95 lb **[S]**. Total 160.5 lb = 714 N.
   - Martin's MA540 (92/8 phosphor bronze, .012-.016-.025-.032-.042-.054) totals 168.5 lb, its
     80/20 twin MA140 167.3 lb **[S]** [Martin-str].
-  - D'Addario's 80/20 EJ11 (same gauges): 23.3, 23.3, 29.4, 29.5, 28.4 lb for the first five
+  - standard's 80/20 EJ11 (same gauges): 23.3, 23.3, 29.4, 29.5, 28.4 lb for the first five
     **[S]** [DAD-EJ11]. The 80/20 wound strings are 2 % lighter: brass (~8.5 g/cm³) is less dense
     than phosphor bronze (~8.8) **[M]**.
   - Fletcher & Rossing: "steel strings require tensions of 100 to 180 N", nylon 50–80 N **[T]**
     [FR].
-- **μ** is backed out of the tension (T = μ (2Lf)²) **[E]**. The bracketed μ is D'Addario's own
+- **μ** is backed out of the tension (T = μ (2Lf)²) **[E]**. The bracketed μ is standard's own
   unit weight converted to g/m by a third party **[S]** [WSH]; they differ by 1–4 %, the chart's
   rounding or the scale.
 - **Inharmonicity** B = π³ E d⁴ / (64 T L²), E = 200 GPa, d the plain wire or the *core*
-  **[E]**. The core diameters are my guesses (D'Addario does not publish them); the wrap adds a
+  **[E]**. The core diameters are my guesses (standard does not publish them); the wrap adds a
   little stiffness, so the wound strings' B is a lower bound. Partial k is (√(1 + B k²) − 1) ×
   1731 cents sharp: on the low E the 10th partial is 10 cents sharp, the 20th 35 cents; on the
   G string the 36th is 10 cents sharp **[E]**. A banded, metallic low E needs this.
@@ -305,7 +305,7 @@ pull on it, strung with strings that lose almost nothing of their own, and playe
   2 dB) **[T]** [FMSS14].
 - **OM / 000 against dreadnought** (no measured modal table found for an OM; lore only):
   - air resonance of a dreadnought "around G on the low E string (~98 Hz)"; about 95 Hz for a
-    Martin dreadnought, below 90 Hz for a Gibson 16 in. jumbo-shouldered body; OM and Gibson
+    Martin dreadnought, below 90 Hz for a humbucker guitar 16 in. jumbo-shouldered body; OM and humbucker guitar
     L-00 "air resonances ranging between 100 Hz to 115 Hz"; one builder's OMs on G# or A
     **[L]** [PG, UMGF, LF];
   - so the OM's air mode is 5–15 % higher, its top (0,0) mode likewise higher (smaller, lighter
@@ -317,7 +317,7 @@ pull on it, strung with strings that lose almost nothing of their own, and playe
 
 ### 3.3 Bridge mobility (the admittance the strings see)
 
-- **Measured, six Fylde guitars and a Yamaha FG-403MS** (read off [CBWFP18] Fig. 1A,
+- **Measured, six Fylde guitars and a one maker FG-403MS** (read off [CBWFP18] Fig. 1A,
   ±2 dB) **[T]**:
 
 | Region | |Y| (dB re 1 m/(s N)) | |Y| (m/(s N)) |
@@ -329,7 +329,7 @@ pull on it, strung with strings that lose almost nothing of their own, and playe
 | 500 Hz–2 kHz, dense modes | −53 ± 8 | 0.0022 |
 | 2–5 kHz | −55 … −58 | 0.0015 |
 
-  (The Yamaha's second peak is near 210 Hz and its third is not separate.)
+  (The one maker's second peak is near 210 Hz and its third is not separate.)
 - **As masses for `GuitarSpec::body`** (m = Q / (2π f |Y|) at a peak) **[E]**: 98 Hz, Q 35,
   1.1 kg; 182 Hz, Q 23, 0.22 kg; 350 Hz, Q 40, 0.6 kg. The built nylon guitar has 100 Hz /
   0.9 kg / Q 25 and 200 Hz / 0.30 kg / Q 22: the steel body's low end is the same size of
@@ -721,7 +721,7 @@ note-ons on one channel within 35 ms of the previous one.
 
 | Instrument | Strings | Scale | Tuning (low → high) | Body / pickup | Source |
 |---|---|---|---|---|---|
-| Lap steel (electric: Rickenbacker "frying pan", Fender) | 6 (or 8) | 22.5–24.75 in. | C6: C3 E3 G3 A3 C4 E4; also A6, E7, open G, open D | solid; one single-coil pickup | [M] |
+| Lap steel (electric: through-neck bass "frying pan", American amp) | 6 (or 8) | 22.5–24.75 in. | C6: C3 E3 G3 A3 C4 E4; also A6, E7, open G, open D | solid; one single-coil pickup | [M] |
 | Dobro / resonator (square neck) | 6 | ~25 in. | open G: G2 B2 D3 G3 B3 D4 (98, 123.5, 146.8, 196, 246.9, 293.7 Hz) [T, RS19] | wooden or metal body with a spun aluminium cone | [T, RS19; Pol23] |
 | Pedal steel (single neck) | 10 | 24 in. (24¼ on some) | E9 (§10.5) | solid; one or two pickups | [S, WikiPS, WikiCop] |
 | Pedal steel (double neck) | 10 + 10 | 24 in. | E9 (far neck) and C6 (near neck) | | [S, WikiCop] |
@@ -796,9 +796,9 @@ note-ons on one channel within 35 ms of the previous one.
 ### 10.5 Tunings, pedals and knee levers (pedal steel)
 
 - **E9, 10 strings** (string 1 farthest from the player) **[S]** [WikiCop, WikiPS]; octaves from
-  D'Addario's E9 set's gauges and the standard layout **[S/M]**:
+  standard's E9 set's gauges and the standard layout **[S/M]**:
 
-| String | Open | Gauge (D'Addario E9 set [S]) | Changes (Emmons-style, per [WikiCop]) |
+| String | Open | Gauge (standard E9 set [S]) | Changes (Emmons-style, per [WikiCop]) |
 |---|---|---|---|
 | 1 | F#4 | .013 | RKL: +2 → G# (some set-ups +1 → G) |
 | 2 | D#4 | .015 | RKL: +1 → E; RKR: −1 → D (half), −2 → C# (full) |
@@ -877,13 +877,13 @@ note-ons on one channel within 35 ms of the previous one.
 
 ### 10.8 Pickups, amplifiers and the volume pedal
 
-- **Pickups:** lap steels have single coils (Rickenbacker's horseshoe magnet around the strings,
-  Fender's single coil) **[M]**; pedal steels have wide, high-output single coils or humbuckers
+- **Pickups:** lap steels have single coils (through-neck bass's horseshoe magnet around the strings,
+  the American amp's single coil) **[M]**; pedal steels have wide, high-output single coils or humbuckers
   under 10 strings, mounted near the bridge for a bright, clear sound **[M]**. The electric
-  chain of `research/guitars.md` §4 (the clavinet's pickup: velocity at a point, the magnet's
+  chain of `research/guitars.md` §4 (the clavi's pickup: velocity at a point, the magnet's
   nonlinearity; L–C–R resonance) applies.
-- **Amplifiers:** clean and loud with plenty of headroom: Fender Twin Reverb, Peavey Session 400
-  (a 15 in. JBL, later the Peavey "Black Widow") and Nashville 400/112 are the classics **[L]**
+- **Amplifiers:** clean and loud with plenty of headroom: clean 2x12 combo, amp maker Session 400
+  (a 15 in. JBL, later the amp maker "Black Widow") and Nashville 400/112 are the classics **[L]**
   [SGF-amp]. Settings: treble low ("2–4" gives the warm sound), bass control a low shelf near 45 Hz
   **[L]**. Spring reverb, often a delay **[L]**.
 - **Volume pedal:** "plugged in between the guitar and the amplifier … The player reduces volume
@@ -949,7 +949,7 @@ note-ons on one channel within 35 ms of the previous one.
 ## 13. Not used here, but checked
 
 - The [LEI] student paper cited in `research/guitars.md` §1.2 for "high E ~1.1 s, low E ~7.8 s"
-  models a *solid-body electric* (an Ibanez RG570), not an acoustic **[T]**: its numbers should not
+  models a *solid-body electric* (a one maker RG570), not an acoustic **[T]**: its numbers should not
   be used for the acoustic guitars.
 
 ## 14. Not found, or uncertain
@@ -958,7 +958,7 @@ note-ons on one channel within 35 ms of the previous one.
   estimates from the string's Q and the bridge mobility.
 - **Phosphor bronze against 80/20**: no measurement of damping, mass or decay; only retailer and
   forum claims.
-- **Core diameters** of bronze-wound strings (needed for B): not published by D'Addario.
+- **Core diameters** of bronze-wound strings (needed for B): not published by standard.
 - **An OM or 000 modal table.** Only lore for its air resonance.
 - **In-plane bridge mobility** of a steel-string guitar.
 - **Strum timing measured** on real players (time between strings, up against down). One
@@ -1112,7 +1112,7 @@ Where a number in parts 1–2 or in B is reused, its mark there is translated: [
 | 00 | 479 (18.9) | 364 (14.3) | 105 (4.13) | 24.9 | ~10–11 L | " |
 | 000 / OM | 492 (19.3) | 381 (15.0) | 105 (4.1) | 000: 24.9 in. (632 mm); OM: 25.4 in. (645 mm) | ~11–13 L | " |
 | Dreadnought (D-18, D-28) | 508 (20.0) | 397 (15.6) | 124 (4.8) | 25.4 | ~15–19 L | dims [MEAS via GW]; volume [DER] below |
-| Jumbo (Martin J; Gibson J-200 is 17 in.) | 511 (20.1) | 406 (16.0); J-200 432 | 124 (4.8) | 25.4–25.5 | ~17–21 L | dims [MEAS via GW]; J-200 and volume [GUESS] |
+| Jumbo (Martin J; humbucker guitar J-200 is 17 in.) | 511 (20.1) | 406 (16.0); J-200 432 | 124 (4.8) | 25.4–25.5 | ~17–21 L | dims [MEAS via GW]; J-200 and volume [GUESS] |
 
 - **Volume of a dreadnought, two ways** **[DER]**:
   - From the rigid-wall Helmholtz frequency of the D-28, 121 Hz **[MEAS]** [FR, §3.1 above]:
@@ -1125,7 +1125,7 @@ Where a number in parts 1–2 or in B is reused, its mark there is translated: [
 - **Shapes.** The dreadnought has a wide waist (about 273 mm against the 000's 235 mm
   **[GUESS]**): nearly a box, hence the largest air volume and plate area for its length. The
   000/OM and the parlour sizes are waisted like a classical guitar. The jumbo is the widest but
-  strongly waisted. The slope-shoulder dreadnought (Gibson J-45, 24.75 in. scale) is §1.1's.
+  strongly waisted. The slope-shoulder dreadnought (humbucker guitar J-45, 24.75 in. scale) is §1.1's.
 - **What the size does** (part 1 §3.2 has the lore numbers; nothing new measured):
   - smaller body → higher air mode (OM 100–115 Hz against 95–102 Hz), less output below
     120 Hz, relatively more 300–1 000 Hz: "balanced", "focused", the finger-style preference;
@@ -1134,7 +1134,7 @@ Where a number in parts 1–2 or in B is reused, its mark there is translated: [
   - jumbo: a larger plate with a tight waist: air mode 85–95 Hz **[GUESS, lore]**, loud and
     "wide" when strummed, less mid punch than a dreadnought.
 - **Scale 25.4 against 24.9 in.** At the same pitch and gauge the tension goes as L²:
-  24.9 in. carries 0.961 of 25.4's tension (−3.9 %); 24.75 in. (Gibson) 0.950 **[DER]**. The
+  24.9 in. carries 0.961 of 25.4's tension (−3.9 %); 24.75 in. (humbucker guitar) 0.950 **[DER]**. The
   short scale bends more easily (§20.5), buzzes a little sooner, and B rises by about 8 %
   (B ∝ 1/(T L²) ∝ 1/L⁴ at fixed pitch) **[DER]**. A listener will not tell the scales apart in
   a mix; the player's feel differs.
@@ -1229,7 +1229,7 @@ Where a number in parts 1–2 or in B is reused, its mark there is translated: [
 
 ### 17.1 The medium set, and scale
 
-D'Addario EJ17 (medium, .013–.056, phosphor bronze) at 25.5 in. **[DER]** from D'Addario's
+standard EJ17 (medium, .013–.056, phosphor bronze) at 25.5 in. **[DER]** from standard's
 formula T = UW (2 L f)² / 386.4 and its unit weights, which are quoted here **from memory, not
 re-read** (the light-set weights from the same memory reproduce part 1's chart to 0.2 %); B as
 in §2.1 with guessed cores:
@@ -1959,7 +1959,7 @@ given; causes are **[DER]** from this note's numbers unless marked.
 
 ## 22. The 12-string, as a second variant of the same model
 
-B §6 has the first pass: the courses, D'Addario's light set EJ38 with tensions and B per
+B §6 has the first pass: the courses, standard's light set EJ38 with tensions and B per
 string, the fretting-stretch and inharmonicity arithmetic for the octave pairs, FluidR3's and
 the GM2/GS/XG selection, and how `guitar.cc` would grow to twelve strings (B §8.3). This section
 is complete enough to read alone but does not repeat B's derivations.
@@ -1975,16 +1975,16 @@ is complete enough to read alone but does not repeat B's derivations.
   courses sound simultaneously in two octaves, and a melody that moves from the G course to
   the B course drops by a seventh in its upper voice. This, as much as the beating, is the
   sound.
-- **Order within a course.** Usual (Martin, Guild, Taylor, Gibson): the octave string is on the
+- **Order within a course.** Usual (Martin, Guild, Taylor, humbucker guitar): the octave string is on the
   bass side of its main string, so a **down stroke meets the octave string first**, an up
-  stroke the main string first. "Rickenbacker usually reverses this": main string first on a
+  stroke the main string first. "through-neck bass usually reverses this": main string first on a
   down stroke **[MEAS, read]** [Wiki-12]. Consequences **[DER/GUESS]**:
   - usual order: down strokes are brighter and more "jangly" (the pick takes the thin string
     cleanly, then is already moving when it meets the thick one), up strokes are darker and
     more fundamental; a thumb or thumbpick playing bass notes downward hits the octave string
     first and hardest: bass lines sound an octave up as much as down;
-  - Rickenbacker order: the main string dominates on down strokes; the octave is a halo.
-    (The Rickenbacker is an electric; for GM 26's acoustic 12-string use the usual order.)
+  - through-neck bass order: the main string dominates on down strokes; the octave is a halo.
+    (The through-neck bass is an electric; for GM 26's acoustic 12-string use the usual order.)
 - **Tuning down.** Before truss rods, 12-strings "were often tuned below standard pitch to
   reduce neck stress"; Lead Belly "often used low C" on 26.5–27 in. scales **[MEAS, read]**
   [Wiki-12]. Today: many players tune a semitone or a whole tone low and put a capo on the 1st
@@ -1997,7 +1997,7 @@ is complete enough to read alone but does not repeat B's derivations.
 
 ### 22.2 Strings
 
-D'Addario EJ38, tensions **[MEAS: maker's chart via a retailer]** (B §6.1); μ = T/(2Lf)² and
+standard EJ38, tensions **[MEAS: maker's chart via a retailer]** (B §6.1); μ = T/(2Lf)² and
 Z₀ = √(Tμ) **[DER]**; B **[DER with guessed cores]** (B §6.1).
 
 | Course | String | Gauge | Kind | f (Hz) | T (N) | μ (g/m) | Z₀ (Ns/m) | B |
@@ -2157,7 +2157,7 @@ Z₀ = √(Tμ) **[DER]**; B **[DER with guessed cores]** (B §6.1).
 
 - **Build.** "The neck, body, and bracing are reinforced"; bridges "often had larger
   reinforcement plates" **[MEAS, read]** [Wiki-12]. Typically a dreadnought or jumbo body
-  (Martin D12-28, Guild F-212/F-512, Taylor 150e/355, Gibson B-45-12) with a thicker top,
+  (Martin D12-28, Guild F-212/F-512, Taylor 150e/355, humbucker guitar B-45-12) with a thicker top,
   taller or unscalloped X-braces, a wider bridge with two rows of six pins and a larger bridge
   plate, sometimes a 12-fret neck join **[GUESS, general]**.
 - **No modal measurement of a 12-string was found** (B §9). Expectation **[GUESS]**: bridge and
@@ -2246,7 +2246,7 @@ T, μ, Z₀, B: §22.2's table ([MEAS] tensions, the rest [DER]). The rest:
 
 | | Octave strings (G4, D4, A3 plain; E3 wound) | Main strings | Unison courses | Mark |
 |---|---|---|---|---|
-| Position in the course | bass side (met first on a down stroke) | treble side | — | [MEAS, read] Wiki-12; Rickenbacker reversed |
+| Position in the course | bass side (met first on a down stroke) | treble side | — | [MEAS, read] Wiki-12; through-neck bass reversed |
 | Delay of the second string in a strum | 1.6–2.5 ms (3 mm at 1.2–1.9 m/s) | | same | [DER] |
 | … in a slow picked note | 3–6 ms | | | [DER] |
 | … from a fingertip | 0–1 ms | | | [GUESS] |
@@ -2391,7 +2391,7 @@ Q ([MEAS] via part 1 §3.2).
   strings: estimates.
 - **Radiation efficiency** (acoustic power out per string energy in) of a steel-string: not
   looked up successfully; nothing in this note depends on it.
-- **D'Addario's unit weights** in §17.1 are from memory (cross-checked against part 1's chart
+- **standard's unit weights** in §17.1 are from memory (cross-checked against part 1's chart
   for four strings); re-read the maker's chart or its tension calculator before using the
   medium set's tensions to better than 1 %.
 - **Sources that disagree:** the radiation of the long dipole (strong to the front in [TUD20],

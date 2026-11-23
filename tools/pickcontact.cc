@@ -26,7 +26,7 @@ void write(const std::string& path, const std::vector<float>& x) {
 
 template <class Strike>
 std::vector<float> note(Strike strike, double secs = 1.0) {
-  Guitar g(kFs, precisionBass());
+  Guitar g(kFs, splitCoilBass());
   for (int s = 1; s < 4; ++s) g.damp(s, 40);
   strike(g);
   std::vector<float> x(size_t(secs * kFs));
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
   write(dir + "/contact_149.f32", note([&](Guitar& g) { g.pickContact(0, 2.5e-3, 0.149, 0.25, 0.006, 0.00015, 6000); }));
   // Stability: 1000 picks, each string, fret, place (4-27 cm), depth (0.3-4 mm), stiffness
   // (2-20 kN/m), push, slip and direction at random, over strings left ringing.
-  Guitar g(kFs, precisionBass());
+  Guitar g(kFs, splitCoilBass());
   uint32_t r = 2026;
   auto ur = [&]() { r = r * 1664525u + 1013904223u; return (r >> 8) * (1.0 / 16777216.0); };
   double peak[4] = {}, worst = 0;
@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
   double one = 0;
   for (int s = 0; s < 4; ++s)
     for (double place : {0.04, 0.27}) {
-      Guitar h(kFs, precisionBass());
+      Guitar h(kFs, splitCoilBass());
       for (int o = 0; o < 4; ++o) if (o != s) h.damp(o, 40);
       h.fret(s, 20);
       h.pickContact(s, 4e-3, place, 0.25, 0.002, 0.0001, 20000);

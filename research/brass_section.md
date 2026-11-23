@@ -12,7 +12,7 @@ section of the existing players needs.
 
 How each number is marked (as in `research/timpani.md` and `research/bass_section.md`):
 - **[T]** read in the primary text, or measured here from a primary artefact (the SoundFont file,
-  the Roland manual's tone list, the project's own binary). Measurements are said in words.
+  the one maker manual's tone list, the project's own binary). Measurements are said in words.
 - **[S]** from a secondary source: a paper citing another, an interview, a magazine, a search
   snippet. The primary text was not read.
 - **[L]** player or arranger lore: teaching texts, interviews. Not a measurement.
@@ -138,11 +138,11 @@ is in section 12. Scripts and renders for the measurements are in the session sc
 
 ## 2. What "Brass Section" is in GM practice
 
-### 2.1 Roland Sound Canvas
-From the SC-88Pro owner's manual tone list. Its columns are the SC-88Pro, SC-88 and SC-55 maps
+### 2.1 one maker Sound Canvas
+From the SC-88Pro owner's manual tone list. Its columns are the SC-88Pro, later GS module and early GS module maps
 (a number after a name is its partial count) **[T, SC88Pro]**:
 
-| PC 62 variation | SC-88Pro | SC-88 map | SC-55 map |
+| PC 62 variation | SC-88Pro | later GS module map | early GS module map |
 |---|---|---|---|
 | 000 | Brass 1 (2) | Brass 1 (1) | Brass 1 (1) |
 | 001 | Brass ff (1) | – | – |
@@ -153,14 +153,14 @@ From the SC-88Pro owner's manual tone list. Its columns are the SC-88Pro, SC-88 
 | 024 | Octave Brass (2) | – | – |
 | 025 | Brass + Reed (2) | – | – |
 
-- The SC-55's GM "Brass 1" is one partial: one sampled section, no layering.
+- The early GS module's GM "Brass 1" is one partial: one sampled section, no layering.
 - The articulations a GM file cannot ask for (ff, sfz, fall) became separate variation patches,
   so a GM-level file plays them only through bank select.
 - "Octave Brass" and "Brass + Reed" exist as variations. So the plain patch is neither
   octave-doubled nor mixed with saxophones.
 - The MT-32 map in the same manual has "Brass 1" and "Brass 2" at its programs 59–62 **[T, SC88Pro]**.
 
-### 2.2 Yamaha XG
+### 2.2 XG
 Program 62 is "BrssSect" (bank LSB 0, 1 element). Its variations, by bank LSB **[S, XG list
 snippet; QY100 data list]**:
 - 3 "StBrsSec" (stereo, 2 elements);
@@ -697,8 +697,8 @@ The only saving worth making is calibration: calibrate each instrument kind once
   Nothing was found. The numbers in 6.1–6.2 extrapolate from classical trios and quartets (Rasch,
   Wing), listener thresholds (Wing14), choir scatter (Ternström) and the beat rate in one GM
   sample. Rasch 1979's own text (a Dutch PDF) was not read.
-- **The Roland SC-55 "Brass 1" sample itself** (how many players, which instruments) was not
-  measured: no SC-55 here. XG's list was read only as a search snippet.
+- **The one maker early GS module "Brass 1" sample itself** (how many players, which instruments) was not
+  measured: no early GS module here. XG's list was read only as a search snippet.
 - **Meyer's "Acoustics and the Performance of Music"** (the choral effect, orchestral brass
   directivity) could not be downloaded.
 - **Kopiez 2003's cents figures** (trumpeters' intonation of intervals) were not read: only the

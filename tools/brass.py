@@ -231,7 +231,7 @@ TRUMPET = dict(
 )
 
 # CC tuba, 4 valves (research/tuba.md 2.2: a bore fitted to the measured
-# resonance pattern of a Besson BE994, transposed to C; the shape partly a guess).
+# resonance pattern of a one brass maker BE994, transposed to C; the shape partly a guess).
 TUBA = dict(
     name='tuba', transpose=0, f0=32.703,
     profile=[(0.0, 8.30), (14.0, 8.30), (90.0, 13.00), (534.7, 18.12), (558.7, 18.38), (582.7, 18.62), (606.7, 18.82),
@@ -250,7 +250,7 @@ TUBA = dict(
     fitPartials=(2, 10), fmax=600,
 )
 
-# Tenor trombone with F attachment: the Conn 8H (Bilbao & Chick 2013, Fig. 7;
+# Tenor trombone with F attachment: the large-bore tenor trombone (Bilbao & Chick 2013, Fig. 7;
 # research/trombone.md), x from the throat, the tuning slide pulled 75 mm.
 # The slide (62.6..1567.4 mm) stretches; 'slides': mm of tube per position.
 TROMBONE = dict(

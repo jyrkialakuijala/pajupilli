@@ -1,8 +1,8 @@
-# Why players love the Hammond B-3 and its Leslie, and what the model must keep
+# Why players love the tonewheel organ and its rotary speaker, and what the model must keep
 
 Status: 2026-11-16. Research and requirements; nothing is built. This paper sits on top of
-`research/hammond_b3.md` (the organ: generator, contacts, percussion, scanner, AO-28 preamp, model
-plan in its §13) and `research/leslie.md` (the 122 speaker: rotors, acoustics, amplifier, model plan
+`research/tonewheel_organ.md` (the organ: generator, contacts, percussion, scanner, AO-28 preamp, model
+plan in its §13) and `research/rotary.md` (the 122 speaker: rotors, acoustics, amplifier, model plan
 in its §12). It does not repeat their physics. It asks which of their mechanisms carry the
 instrument's emotional pull, turns those into requirements and tests, and lists what in the two
 plans must change (§6).
@@ -18,24 +18,24 @@ knowledge, to check; **[calc]** worked out here (in the session scratchpad, one-
 
 - **What players say they love is not a timbre but a relationship.** The recurring words are
   *feel* ("you feel it in your bones", Jimmy Smith), *body*, *sing like a human voice* (Booker T.
-  Jones, about the Leslie and the swell), *a very strong physical relationship* and *it's not a
+  Jones, about the rotary speaker and the swell), *a very strong physical relationship* and *it's not a
   volume pedal; it's an expression pedal* (Jon Lord), *an extension of me* (Dr. Lonnie Smith), *the
   most soulful instrument* (Cory Henry), and, from the church, that a pipe organ "couldn't shout"
-  and a Hammond could (Bob Marovich) **[web]** (§2).
+  and a tonewheel organ could (Bob Marovich) **[web]** (§2).
 - **What players say clones miss** (forums and reviews, many voices, consistent) **[web]**:
   1. the key contacts: an on/off trigger and a click that sounds the same every time;
   2. each real organ's own amount of click and leakage;
   3. the chorus/vibrato ("close though");
-  4. above all the Leslie: "clones are much closer to a real organ than a Leslie simulator is to a
-     real tube Leslie"; "nothing really fills the space the way a real Hammond/tube Leslie does";
-  5. overdrive that "will not follow the distortion of a vintage Hammond/Leslie setup when you
+  4. above all the rotary speaker: "clones are much closer to a real organ than a rotary speaker simulator is to a
+     real tube rotary speaker"; "nothing really fills the space the way a real tonewheel organ/tube rotary speaker does";
+  5. overdrive that "will not follow the distortion of a vintage tonewheel organ/Rotary setup when you
      change drawbars and play in different registers";
   6. the mechanical presence: "the feeling that you're sitting at the helm of a massive, powerful,
      potentially dangerous machine".
 
   A Sound On Sound history adds that samplers "can come very close when each note is played
   individually" **[web]**: so what fails is the **ensemble behaviour**, not the single note.
-- **The causes, in one sentence [design, from §3]:** the B-3's tone itself is a static sum of
+- **The causes, in one sentence [design, from §3]:** the tonewheel organ's tone itself is a static sum of
   near-sines; everything players respond to is **state and coupling** that their playing drives:
   - the momentum of two rotors;
   - the charge of the percussion capacitor;
@@ -47,51 +47,51 @@ knowledge, to check; **[calc]** worked out here (in the session scratchpad, one-
   A model built from free-running per-voice oscillators, an LFO-driven rotary effect and a
   post-mix volume pedal removes exactly these, and is what the complaints describe.
 - **The ten properties to keep, ranked** (details §7):
-  1. Leslie rotors as mechanics the player rides: continuous, asymmetric, horn ≠ drum, partial
+  1. rotary speaker rotors as mechanics the player rides: continuous, asymmetric, horn ≠ drum, partial
      ramps, brake;
   2. the expression pedal driving one nonlinear chain (AO-28 + 122 amp) whose growl grows with the
      pedal, the number of keys and the drawbars;
   3. a key click from nine bouncing contacts, never identical twice, shaped by touch and
      registration;
   4. one phase-locked, always-running generator: shared wheels add coherently, no phase reset;
-  5. Leslie acoustics: Doppler, directivity, reflections with their own Doppler, the 800 Hz split,
+  5. rotary speaker acoustics: Doppler, directivity, reflections with their own Doppler, the 800 Hz split,
      distortion spun by the horn, and a room fed by a moving source;
   6. the percussion circuit: single trigger, partial recharge, the 1' steal, the level drop;
   7. drawbars and preset flips that move while notes sound, in the transformer's nine steps;
-  8. one seed per "organ serial" for sidebands, leakage, capacitor age, contacts, Leslie speeds;
+  8. one seed per "organ serial" for sidebands, leakage, capacitor age, contacts, rotary speaker speeds;
   9. the scanner chorus/vibrato as a delay line scanned by a capacitor rotor (C3);
   10. body and presence: the pedals' and the 15-inch woofer's low end, the noise floor, the
       mechanical noises, the motor.
 - **Plans that must change (§6):** the MIDI CC numbers proposed for percussion collide with the
-  clone conventions for the Leslie; velocity must also reach slow presses (harmonics entering one at
-  a time) and per-key contact order; the Leslie needs an automatic "rider" for MIDI files without
+  clone conventions for the rotary speaker; velocity must also reach slow presses (harmonics entering one at
+  a time) and per-key contact order; the rotary speaker needs an automatic "rider" for MIDI files without
   speed changes, a reachable brake, mechanical noises and a room fed by its moving source; CC11 must
-  stay ahead of the Leslie amp; the drawbars need A/B preset "flips".
+  stay ahead of the rotary speaker amp; the drawbars need A/B preset "flips".
 
 ## 2. What players say
 
 ### 2.1 Jazz organists
 
 - **Jimmy Smith** (DownBeat, 1994, interviewed by Dan Ouellette; read via Blue Note) **[web]**:
-  "The Hammond has body. It's got depth—and resonance. It's got clarity—and quality. And you can
+  "The tonewheel organ has body. It's got depth—and resonance. It's got clarity—and quality. And you can
   feel it." "It's not so much that you can hear it. It's the feeling that's important." "It's like a
-  drummer. You don't want to hear him. You want to feel him." "With the Hammond, you feel it in your
+  drummer. You don't want to hear him. You want to feel him." "With the tonewheel organ, you feel it in your
   bones."
 - **Jimmy Smith** (JazzTimes, Sept. 1994, via Milkowski) **[web]**: "Then I cut my tremelo off to
   give it a big sound, and that sounded good." "I can put my tremelo to fast or medium or whatever
-  to get the sound you want." So for him the Leslie's speed, including *off*, was a registration
+  to get the sound you want." So for him the the rotary speaker's speed, including *off*, was a registration
   choice, and stopping it gave the "big" sound.
-- **Dr. Lonnie Smith** **[web]**: the B-3 as "an extension of me" (NPR) **[web, snippet]**; the
+- **Dr. Lonnie Smith** **[web]**: the tonewheel organ as "an extension of me" (NPR) **[web, snippet]**; the
   music as a spirit that "comes out through my fingers" (Albumism) **[web, snippet]**. On pedals,
   read directly: "Do you want a real legit sound? Do you want a grumpy sound? Do you want a warm
-  sound?"; "I like for it to flow a lot" **[web, Milkowski IV]**. He moved his first B-3 himself:
+  sound?"; "I like for it to flow a lot" **[web, Milkowski IV]**. He moved his first tonewheel organ himself:
   "It weighed over 400 pounds, but I was determined to move it".
-- **Joey DeFrancesco** called the B-3 "a groove machine" and credited Jimmy Smith with showing what
+- **Joey DeFrancesco** called the tonewheel organ "a groove machine" and credited Jimmy Smith with showing what
   it could do **[web, snippet: SFJAZZ]**. **Counter-evidence:** he later judged the Diversi
-  clone so good that he no longer needed a Leslie, and became a stakeholder **[web, snippet:
-  Wikipedia "Diversi"]**; he called Hammond-Suzuki's digital B-3s hard to tell from originals
+  clone so good that he no longer needed a rotary speaker, and became a stakeholder **[web, snippet:
+  Wikipedia "Diversi"]**; he called the organ maker's digital tonewheel organs hard to tell from originals
   **[web, snippet: Panken]**. A top player can accept a model, so the bar is reachable.
-- **Barbara Dennerlein**: the B-3's sound "was her dream from childhood"; the pedals are "absolutely
+- **Barbara Dennerlein**: the tonewheel organ's sound "was her dream from childhood"; the pedals are "absolutely
   crucial" for her rhythm, "which the double bass can't easily imitate" **[web, snippet: AAJ,
   Kennedy Center]**. (She plays MIDI pedals with her own bass sound, so for her the *feet* matter
   more than the tonewheel pedal tone.)
@@ -99,17 +99,17 @@ knowledge, to check; **[calc]** worked out here (in the session scratchpad, one-
   with her feet so that "a club owner didn't need to hire a bass player" **[web, snippet:
   Wikipedia, Myers 2011]**.
 - **Larry Young, Jimmy McGriff:** no first-person statements about the sound were found. McGriff
-  and Groove Holmes "spent a great deal of time experimenting and modifying their B3's and Leslie
-  speakers", some of which Hammond and Leslie adopted **[web, snippet: Wikipedia]**: players
+  and Groove Holmes "spent a great deal of time experimenting and modifying their B3's and rotary speaker
+  speakers", some of which tonewheel organ and rotary speaker adopted **[web, snippet: Wikipedia]**: players
   treated the machine as something to voice.
-- **Teaching material** (Bob Wijnen, *Hammond organ for the advanced jazz pianist*, 2022, read)
+- **Teaching material** (Bob Wijnen, *tonewheel organ for the advanced jazz pianist*, 2022, read)
   **[web]**:
   - The expression pedal is used to "back off" after attacks, after ballad chords and in single
     lines; "you can pump the pedal back in to get more volume, highs and lows".
   - With percussion on, accents come from lifting the fingers, since "percussion only works when the
     notes are not connected".
-  - "Squabbling": 800008888 with "the Leslie spins fast"; at a solo's climax "all drawbars out" and
-    the Leslie to fast. Slides and swoops (Shirley Scott, Jimmy Smith; Mike LeDonne: "He might slide
+  - "Squabbling": 800008888 with "the rotary speaker spins fast"; at a solo's climax "all drawbars out" and
+    the rotary speaker to fast. Slides and swoops (Shirley Scott, Jimmy Smith; Mike LeDonne: "He might slide
     down the keyboard to the next chord").
 - **Bass:** most jazz organists play bass with the left hand on the lower manual; the left foot taps
   a pedal for attack ("just hitting a pedal note slightly to obtain an attack effect") **[web,
@@ -117,125 +117,125 @@ knowledge, to check; **[calc]** worked out here (in the session scratchpad, one-
 
 ### 2.2 Soul, rock and pop
 
-- **Booker T. Jones** (Songfacts, read) **[web]**: "The first time I saw a Hammond organ I just got a
+- **Booker T. Jones** (Songfacts, read) **[web]**: "The first time I saw a tonewheel organ I just got a
   feeling inside about it and I was comfortable." "It's a sustained sound as opposed to a piano …
-  you can make it sustain louder or softer." "Because it has those Leslie cabinets and the horns
-  turn, you can make it sing like a human voice." *Green Onions* was an M-3, "half of a B-3"; "I
+  you can make it sustain louder or softer." "Because it has those rotary speaker cabinets and the horns
+  turn, you can make it sing like a human voice." *Green Onions* was an M-3, "half of a tonewheel organ"; "I
   favor the sound of the M-3". "It's a very difficult instrument to maintain. It's not meant to be
   moved around." On digital organs: "I'm still not sure about it."
 - **Jon Lord** (Keyboard, Jan. 1994, R. L. Doerschuk, read) **[web]**:
-  - "A proper Hammond is a combination of electronics and mechanics." With the XB-2: "I'm still
+  - "A proper tonewheel organ is a combination of electronics and mechanics." With the XB-2: "I'm still
     aware of the lack of a mechanical feel."
-  - "There's a very strong physical relationship between me and the Hammond." "I'm used to standing
+  - "There's a very strong physical relationship between me and the tonewheel organ." "I'm used to standing
     behind a piece of furniture."
   - "It's not a volume pedal; it's an expression pedal."
   - Drive, not drawbars, gives the edge: "That's how I get the edge, rather than from using the top
-    drawbars to cut through"; "this woody sort of sound, but with the amps and Leslies way up"; "one
-    small Leslie, which we cranked up to get that nice growly sound".
-  - Speed as structure: "I didn't want to spoil the build-up with a bunch of Leslie vibrato." Of a
-    stationary Leslie: "It's less forgiving. Therefore it holds your attention just a little bit
+    drawbars to cut through"; "this woody sort of sound, but with the amps and rotary speakers way up"; "one
+    small rotary speaker, which we cranked up to get that nice growly sound".
+  - Speed as structure: "I didn't want to spoil the build-up with a bunch of rotary speaker vibrato." Of a
+    stationary rotary speaker: "It's less forgiving. Therefore it holds your attention just a little bit
     more."
-  - And: "the Hammond organ, when treated like that, makes a heck of a noise" **[web, jonlord.org]**.
-- **Keith Emerson:** "it's very difficult to make a 350lb Hammond part of you" (why he fought it on
+  - And: "the tonewheel organ, when treated like that, makes a heck of a noise" **[web, jonlord.org]**.
+- **Keith Emerson:** "it's very difficult to make a 350lb tonewheel organ part of you" (why he fought it on
   stage); knives in the keys gave "a great sustain"; turning it over made it feed back **[web,
   snippet: Counter Culture, Louder]**.
 - **Steve Winwood** used Jimmy Smith's left-hand bass technique **[web, snippet: Keyboard]**;
-  **Gregg Allman** ran a stock '69 B-3 into a 122RV **[web, snippet: MusicRadar]**; Warren Haynes
+  **Gregg Allman** ran a stock '69 tonewheel organ into a 122RV **[web, snippet: MusicRadar]**; Warren Haynes
   called Allman's tone "impeccable", "the most important element of organ playing" **[web, snippet:
-  Relix]**. **Billy Preston:** no first-person statement found; his rig is described as the B-3
-  and its Leslie as "one of the essential elements" **[web, snippet: Mix]**.
+  Relix]**. **Billy Preston:** no first-person statement found; his rig is described as the tonewheel organ
+  and its rotary speaker as "one of the essential elements" **[web, snippet: Mix]**.
 
 ### 2.3 The church
 
-- **Bob Marovich** (NPR, 2016): the Hammond offered many sounds, and a pipe organ "couldn't shout"
-  while a Hammond could **[web, snippet]**. The first Black church Hammond: First Church of
+- **Bob Marovich** (NPR, 2016): the tonewheel organ offered many sounds, and a pipe organ "couldn't shout"
+  while a tonewheel organ could **[web, snippet]**. The first Black church tonewheel organ: First Church of
   Deliverance, Chicago, 1939 (Rev. Clarence Cobbs, music director Kenneth Morris) **[web,
   snippet]**.
 - **Cory Henry** (Jazz Weekly, read): "I feel that the organ is the most soulful instrument that
   there is." He grew up with one at home and in church from age 4 **[web]**.
-- **Ashon Crawley** (religious studies; a B-3 player in the Black Pentecostal church): the B-3 "is
+- **Ashon Crawley** (religious studies; a tonewheel organ player in the Black Pentecostal church): the tonewheel organ "is
   considered to constitute 'the sound' of the Black Church" **[web, UCHRI]**; of the chord changes,
   "They are actually playing what it feels like to be a question" **[web, Duke]**.
-- **Braxton Shelley**, "Playing in Tongues: The Hammond Organ and Black Pentecostal
-  Instrumentality", *Music & Science* 2025: Twinkie Clark's solos use a registration Hammond's
+- **Braxton Shelley**, "Playing in Tongues: The tonewheel organ Organ and Black Pentecostal
+  Instrumentality", *Music & Science* 2025: Twinkie Clark's solos use a registration the tonewheel organ's
   manuals discourage, and "flips", where one timbral element gives way to another; each set of nine
   drawbars is "its own distinct timbral space" mapped onto spiritual and physical escalation
-  **[paper, abstract via snippet]**. His talk title: "the Hammond Organ's Vocality" **[web]**.
+  **[paper, abstract via snippet]**. His talk title: "the tonewheel organ Organ's Vocality" **[web]**.
 - **Preaching chords:** the organist answers the preacher's "whooping" sermon close, call and
-  response; the Hammond "can approximate what the voice does" **[web, snippet: NPR/WBUR,
+  response; the tonewheel organ "can approximate what the voice does" **[web, snippet: NPR/WBUR,
   Wikipedia]**.
 
 ### 2.4 Technicians, history, forums
 
-- **The click was a defect Hammond fought.** Hammond tried to eliminate or reduce it with filtering;
+- **The click was a defect tonewheel organ fought.** tonewheel organ tried to eliminate or reduce it with filtering;
   jazz and rock players liked it and it became part of the sound **[web, snippet: Sweetwater;
   Wikipedia]**. Larry Heathcote: the click "is very difficult to filter out without serious
   degradation of the organ tone"; "the percussive attack relates to the note being keyed partway
-  though its cycle"; Baldwin's resistive contact ramped the note in, and "In the Hammond there is no
-  'roll'" **[web, SV-nature, read]**. Laurens Hammond also disliked the Leslie (and the "pop" it
-  made audible) and kept it off his organs for decades **[web, snippet: Hammond Organ Co. history,
+  though its cycle"; another maker's resistive contact ramped the note in, and "In the tonewheel organ there is no
+  'roll'" **[web, SV-nature, read]**. Laurens Tonewheel also disliked the rotary speaker (and the "pop" it
+  made audible) and kept it off his organs for decades **[web, snippet: tonewheel organ Organ Co. history,
   PS Audio]**. So the two things players love most were both outside the maker's intent.
-- **Touch matters, measurably.** Moro, McPherson and Sandler measured a Hammond's nine contacts:
+- **Touch matters, measurably.** Moro, McPherson and Sandler measured a the tonewheel organ's nine contacts:
   velocity, the type of touch and the key's position over time change the contacts' bounce, and in
   a listening study listeners could tell the type of touch from the sound **[paper, MMS17,
   abstract]**. Their follow-up: "Because of manufacturing tolerances, each contact closes at a
-  different point in the key-throw … The Hammond is therefore touch-responsive, in such a way that
+  different point in the key-throw … The tonewheel organ is therefore touch-responsive, in such a way that
   cannot be captured with traditional velocity-based keyboard sensing." Players use "partial key
   presses (a key press that does not … trigger all of the key contacts), and very slow presses (…
-  the harmonics start playing one at a time)" **[paper, MM20, read]**. Hammond-Suzuki's own XK-5
+  the harmonics start playing one at a time)" **[paper, MM20, read]**. the organ maker's own XK-5
   page: "Depress a key slowly, however, and you hear the harmonics come in at slightly different
-  times. Many beloved Hammond keyboard 'tricks' were born of this unintended imperfection" **[web,
+  times. Many beloved tonewheel organ keyboard 'tricks' were born of this unintended imperfection" **[web,
   read]**.
 - **Forums on clones** (organforum.com, Music Player Network) **[web, snippet]**:
   - "the big problem is the ON/OFF nature of the key contacts"; no clone has the key weight, strike
     and feel;
-  - "Each HAMMOND has it's own unique level of keyclick and leakage"; an identical click on every
+  - "Each TONEWHEEL has it's own unique level of keyclick and leakage"; an identical click on every
     key "sounds fake";
   - "one of the differences between real keyclick and many (all?) sims is that for the sims, it's
     the exact same sound each time"; the contact order "is not random, but it's not consistent,
     either";
   - "no clone has got the chor/vib right yet (close though)"; the same C/V settings sound different
     on different organs;
-  - "clones are much closer to a real organ than a Leslie simulator is to a real tube Leslie";
-    clones "sound best going through a real leslie";
+  - "clones are much closer to a real organ than a rotary speaker simulator is to a real tube rotary speaker";
+    clones "sound best going through a real rotary";
   - "the one big element missing from the clones is the feeling that you're sitting at the helm of
-    a massive, powerful, potentially dangerous machine"; a real B-3 "seems like it might overwhelm
+    a massive, powerful, potentially dangerous machine"; a real tonewheel organ "seems like it might overwhelm
     you and surround you at any moment" **[web, snippet: realgearonline]**;
-  - a full clone rig with a real Leslie and 25 pedals gives "about 95% of the sound, feel, and
+  - a full clone rig with a real rotary speaker and 25 pedals gives "about 95% of the sound, feel, and
     control".
-- **The Leslie ramp as a gesture** **[web, snippet: Music Player "Leslie speed control: foot switch
+- **The rotary speaker ramp as a gesture** **[web, snippet: Music Player "rotary speaker speed control: foot switch
   or half moon, and why"]**: a player loves "the sound of the ramp up" and "weave[s] it around
   vocalists"; another habitually switches to fast "and then switch[es] off before it reaches full
-  speed"; some use a momentary footswitch so that the Leslie sits on fast and goes to chorale only
+  speed"; some use a momentary footswitch so that the rotary speaker sits on fast and goes to chorale only
   while held; some put the speed switch on the damper input so speed and expression go to different
-  feet. Jazz players toggle between brake and fast **[web, snippet: Muzikus]**. Hammond's guide
+  feet. Jazz players toggle between brake and fast **[web, snippet: Muzikus]**. the tonewheel organ's guide
   calls the inertia ramp "the most dramatic part of the sound" **[web, snippet]**. Mike Finnigan
-  changes Leslie speeds "often and quickly" **[web, snippet: MusicRadar]**.
-- **Overdrive:** the grit "comes from POWER amp tubes" of the Leslie, not the preamp **[web,
+  changes rotary speaker speeds "often and quickly" **[web, snippet: MusicRadar]**.
+- **Overdrive:** the grit "comes from POWER amp tubes" of the rotary speaker, not the preamp **[web,
   snippet: Music Player "Jimmy Smith's overdrive on The Sermon"]**. Players on clones put the swell
-  pedal on the virtual Leslie amp's gain because on a real Hammond "the whole point is to push the
-  Leslie amp to breakup" **[web, snippet: Cantabile forum]**. A drive pedal review: it "will not
-  follow the distortion of a vintage Hammond/Leslie setup when you change drawbars and play in
+  pedal on the virtual rotary speaker amp's gain because on a real tonewheel organ "the whole point is to push the
+  rotary speaker amp to breakup" **[web, snippet: Cantabile forum]**. A drive pedal review: it "will not
+  follow the distortion of a vintage tonewheel organ/Rotary setup when you change drawbars and play in
   different registers" **[web, snippet: Thomann]**. Henricksen: "When you really lean on it … a warm
-  rich distortion like nothing you've heard" (`leslie.md` §7) **[paper]**.
+  rich distortion like nothing you've heard" (`rotary.md` §7) **[paper]**.
 - **Restorers:** Goff Professional recalibrates a generator "to the original factory calibration
   curve, or to another specific curve" designed for touring organists **[web, snippet]**: the
   wheels' level curve is a voicing choice. Wax-capacitor drift (2-4×) changes the top octaves
-  (`hammond_b3.md` §3.4); recapping is debated, and one owner asks for same-organ before/after tests
+  (`tonewheel_organ.md` §3.4); recapping is debated, and one owner asks for same-organ before/after tests
   rather than videos **[web, snippet]**. A Mix article attributes the "organic quality" to small
   differences between points on the tone wheel **[web, snippet]**.
 - **Percussion as a tool** **[web, snippet]**: "use the percussion's single-trigger to your
   advantage": legato notes get another timbre than staccato ones, tenuto in between; the decay can
-  be shaped by how far the matching drawbar is pulled. Roland's VR-760 manual: on real tonewheel
+  be shaped by how far the matching drawbar is pulled. One maker's VR-760 manual: on real tonewheel
   organs a very short gap between keys leaves the percussion under-charged, so it sounds quieter.
 - **The motor:** turning RUN off and on gives a pitch dive of the whole organ as the generator
   coasts; holding START while running can also bend the pitch **[web, snippet: Wikipedia, manual
-  excerpt]**; a forum post disputes how usable this is on a real B-3 **[web, snippet]**.
-- **The other side.** Jim Alfredson: the B-3's status is "one of those fortuitous marraiges of
+  excerpt]**; a forum post disputes how usable this is on a real tonewheel organ **[web, snippet]**.
+- **The other side.** Jim Alfredson: the tonewheel organ's status is "one of those fortuitous marraiges of
   luck, limited but ingeniously engineered technology, and hype"; "a C3 or an A100 … are just as
   good and sometimes even better. But the B3 has the name" **[web, organissimo, read]**. So the
-  love attaches to the tonewheel-Leslie system, not to the B-3 cabinet as such: the model should
-  treat B-3, C-3 and A-100 as one, and the M-3 as a close sibling (Booker T. prefers it).
+  love attaches to the tonewheel-Rotary system, not to the tonewheel organ cabinet as such: the model should
+  treat tonewheel organ, C-3 and A-100 as one, and the M-3 as a close sibling (Booker T. prefers it).
 
 ## 3. Causes, and how sure we are
 
@@ -246,37 +246,37 @@ voices or a primary document; **low** = one voice or an inference.
 
 | Cause | Evidence | Confidence |
 |---|---|---|
-| **Additive sines and drawbars:** a near-pure, sustained, controllable spectrum; the drawbars as "timbral spaces" | Vorkoetter: "the crux of the Hammond sound" is additive vs subtractive; Shelley; Booker T. "sustain louder or softer" **[web; paper]** | high |
-| **One shaft, locked phases, wheels shared between keys and drawbars** | Physics (`hammond_b3.md` §3.5, §7.2); samplers fine "when each note is played individually" but not in ensemble **[web]**; Electric Druid: the phase relationships' influence is "unknown" **[web]** | medium (mechanism certain; players do not name it) |
-| **Imperfections: sidebands, leakage, aged capacitors** | "Each HAMMOND has it's own unique level of keyclick and leakage"; Mix "organic quality"; restorers' curves **[web]** | medium |
-| **The key click** | Many forum voices; Moro et al. listening test; Hammond fought it, players kept it **[paper; web]** | high |
-| **Percussion** | Jimmy Smith's registration (`hammond_b3.md` §11); "use the single trigger to your advantage" **[web]** | high for jazz, low for rock (often off) |
+| **Additive sines and drawbars:** a near-pure, sustained, controllable spectrum; the drawbars as "timbral spaces" | Vorkoetter: "the crux of the tonewheel organ sound" is additive vs subtractive; Shelley; Booker T. "sustain louder or softer" **[web; paper]** | high |
+| **One shaft, locked phases, wheels shared between keys and drawbars** | Physics (`tonewheel_organ.md` §3.5, §7.2); samplers fine "when each note is played individually" but not in ensemble **[web]**; Electric Druid: the phase relationships' influence is "unknown" **[web]** | medium (mechanism certain; players do not name it) |
+| **Imperfections: sidebands, leakage, aged capacitors** | "Each TONEWHEEL has it's own unique level of keyclick and leakage"; Mix "organic quality"; restorers' curves **[web]** | medium |
+| **The key click** | Many forum voices; Moro et al. listening test; tonewheel organ fought it, players kept it **[paper; web]** | high |
+| **Percussion** | Jimmy Smith's registration (`tonewheel_organ.md` §11); "use the single trigger to your advantage" **[web]** | high for jazz, low for rock (often off) |
 | **The scanner chorus/vibrato** | "no clone has got the chor/vib right yet"; C3 central to gospel and ballads **[web; memory]** | medium |
 | **Overdrive** | Lord, Henricksen, the forums; "power amp tubes" **[web; paper]** | high for rock and gospel, medium for jazz |
 
 - **The 7th harmonic is missing, and the "harmonics" are tempered** (5th 13-16 c sharp,
-  `hammond_b3.md` §7.3) **[web, SV-nature; calc]**. Players do not name this, but it is why
+  `tonewheel_organ.md` §7.3) **[web, SV-nature; calc]**. Players do not name this, but it is why
   drawbar chords never fuse completely and why drive turns them into "growl" (§3.4) **[design]**.
 
-### 3.2 The Leslie
+### 3.2 The rotary speaker
 
 | Cause | Evidence | Confidence |
 |---|---|---|
 | **The ramps, ridden as a gesture** | "love the sound of the ramp up", "weave it around vocalists", switching back before full speed, "most dramatic part" **[web]**; Lord's build-ups **[web]** | high |
-| **The voice: Doppler + AM make the sustained tone "sing"** | Booker T. "sing like a human voice"; Shelley's "vocality"; Hammond "approximates what the voice does" **[web]** | high |
-| **Room filling: a rotating, beaming source in a real room** | "nothing really fills the space"; Leslie sims judged worse than organ clones **[web]**; reflections each with their own Doppler **[paper, SSAB02]** | high (the complaint); medium (the mechanism) |
+| **The voice: Doppler + AM make the sustained tone "sing"** | Booker T. "sing like a human voice"; Shelley's "vocality"; tonewheel organ "approximates what the voice does" **[web]** | high |
+| **Room filling: a rotating, beaming source in a real room** | "nothing really fills the space"; rotary speaker sims judged worse than organ clones **[web]**; reflections each with their own Doppler **[paper, SSAB02]** | high (the complaint); medium (the mechanism) |
 | **Horn ≠ drum** | the drum's slower response is "distracting" to some, who disconnect it **[paper, Henricksen]** | medium |
-| **Stopped Leslie as a colour** | Jimmy Smith "cut my tremelo off to give it a big sound"; Lord "less forgiving" **[web]** | medium |
+| **Stopped rotary speaker as a colour** | Jimmy Smith "cut my tremelo off to give it a big sound"; Lord "less forgiving" **[web]** | medium |
 
 ### 3.3 Touch and technique
 
 | Cause | Evidence | Confidence |
 |---|---|---|
-| **No velocity; expression by the swell pedal** | Lord "not a volume pedal"; Wijnen "back off … pump the pedal back in … more volume, highs and lows" **[web]**; the compensation network (`hammond_b3.md` §10.3) **[paper]** | high |
+| **No velocity; expression by the swell pedal** | Lord "not a volume pedal"; Wijnen "back off … pump the pedal back in … more volume, highs and lows" **[web]**; the compensation network (`tonewheel_organ.md` §10.3) **[paper]** | high |
 | **Touch still matters through the contacts** | Moro et al.; XK-5 page; forum "ON/OFF" complaint **[paper; web]** | high |
 | **Fast keys, waterfall action, glissandi, smears, slides** | Wijnen, LeDonne; "Ever do a smear on your clonewheel and sweep it off the stand?" (thread title) **[web]** | high |
 | **Drawbar moves and preset flips while playing** | "all drawbars out" at climaxes; Shelley's "flips" **[web; paper]** | medium |
-| **Percussion's single trigger as articulation** | forum, Wijnen, Roland **[web]** | high |
+| **Percussion's single trigger as articulation** | forum, Wijnen, one maker **[web]** | high |
 | **Bass: left hand plus pedal taps, or full pedals** | Lonnie Smith, Dennerlein, Rhoda Scott, Helevä **[web]** | medium (for the sound of the pedal attack) |
 
 ### 3.4 Interaction (the instrument answering the player)
@@ -291,22 +291,22 @@ voices or a primary document; **low** = one voice or an inference.
   depends on what happened in the last one **[calc]**. **High.**
 - **The percussion capacitor remembers.** A gap of 10 ms between legato notes re-arms only 25 % of
   the swing, 34 ms 63 %, 100 ms 95 %, so quasi-staccato playing gives softer, shorter pings (§4.6)
-  **[calc from `hammond_b3.md` §8.2]**; Roland says the same **[web]**. **High.**
-- **The amp breathes.** Cathode-bias shift and supply sag (`leslie.md` §7) compress after a loud
+  **[calc from `hammond_b3.md` §8.2]**; one maker says the same **[web]**. **High.**
+- **The amp breathes.** Cathode-bias shift and supply sag (`rotary.md` §7) compress after a loud
   chord and recover over 0.1-0.5 s **[memory; to check against the schematic]**. No player names it.
   **Low** as a cause, but it is part of "it responds".
 
 ### 3.5 Individuality
 
 - Every organ has its own click, leakage, sideband pattern, capacitor age, generator calibration,
-  contact wear, and its Leslie its own speeds, belt and amp **[web]** (`hammond_b3.md` §4-§5,
-  `leslie.md` §4-§5). Owners talk about *their* organ; restorers sell a voicing. Confidence
+  contact wear, and its rotary speaker its own speeds, belt and amp **[web]** (`tonewheel_organ.md` §4-§5,
+  `rotary.md` §4-§5). Owners talk about *their* organ; restorers sell a voicing. Confidence
   **medium**: well attested as a fact, less as a reason for love; but "sounds fake" is the reaction to
   its absence.
 
 ### 3.6 Presence and physicality
 
-- Weight (300-425 lb plus the Leslie), furniture, standing "behind a piece of furniture" (Lord), the
+- Weight (300-425 lb plus the rotary speaker), furniture, standing "behind a piece of furniture" (Lord), the
   bones (Jimmy Smith), the "helm of a machine" **[web]**. A synthesizer cannot give weight; it can
   give what the body hears of it:
   - full low end (32-62 Hz pedal wheels through a 15-inch woofer);
@@ -319,15 +319,15 @@ voices or a primary document; **low** = one voice or an inference.
 
 ### 3.7 Culture
 
-- **Church:** the B-3 as "the sound" of the Black church, "shouting", answering the preacher,
-  swelling with the congregation; gospel uses full drawbars, C3, frequent Leslie ramps
-  (`hammond_b3.md` §11.2) **[web; memory]**. **High.**
+- **Church:** the tonewheel organ as "the sound" of the Black church, "shouting", answering the preacher,
+  swelling with the congregation; gospel uses full drawbars, C3, frequent rotary speaker ramps
+  (`tonewheel_organ.md` §11.2) **[web; memory]**. **High.**
 - **Jazz trio:** Jimmy Smith's 888000000 with third-harmonic fast percussion, left-hand bass,
-  "groove machine"; the Leslie mostly slow, fast for climaxes **[web; memory]**. **High.**
-- **Rock:** drive and volume, "a heck of a noise", fast Leslie, physical abuse as theatre **[web]**.
+  "groove machine"; the rotary speaker mostly slow, fast for climaxes **[web; memory]**. **High.**
+- **Rock:** drive and volume, "a heck of a noise", fast rotary speaker, physical abuse as theatre **[web]**.
   **High.**
 - So one model must serve three playing cultures with different defaults. It does that through
-  registrations, drive and how often the Leslie is switched (§5.5), not through three engines
+  registrations, drive and how often the rotary speaker is switched (§5.5), not through three engines
   **[design]**.
 
 ## 4. Requirements
@@ -336,11 +336,11 @@ Each requirement has: **Mechanism** (the plan section that provides it, or *miss
 **Destroyed by** (the typical digital mistake), **Test** (measurable). All **[design]** unless
 marked; numbers are **[calc]** where derived.
 
-### 4.1 R1: Leslie rotors the player can ride
+### 4.1 R1: rotary speaker rotors the player can ride
 
-- **Mechanism:** `leslie.md` §5.2: torque, belt slip, inertia and drag per rotor, integrated
+- **Mechanism:** `rotary.md` §5.2: torque, belt slip, inertia and drag per rotor, integrated
   continuously; the speed switch only selects which motor is energised. Defaults horn τ ≈ 0.5 s up /
-  0.8 s down, drum 3.5 s / 2.5 s (`leslie.md` §12.2).
+  0.8 s down, drum 3.5 s / 2.5 s (`rotary.md` §12.2).
 - **Partial ramps fall out of it:** a fast switch held 0.7 s and then released takes the horn from
   0.80 to 5.2 Hz while the drum only reaches 1.6 Hz **[calc, first-order]**. That is the "switch off
   before it reaches full speed" gesture: a horn flutter over a still-slow drum.
@@ -365,9 +365,9 @@ marked; numbers are **[calc]** where derived.
 ### 4.2 R2: One nonlinear chain that the pedal, the keys and the drawbars drive
 
 - **Mechanism:**
-  - CC11 drives the AO-28 expression capacitor with its compensation network (`hammond_b3.md`
+  - CC11 drives the AO-28 expression capacitor with its compensation network (`tonewheel_organ.md`
     §10.1 item 7, §10.3), *before* V4b and the output stage, so the pedal sets level, tilt **and**
-    the drive into the 122 amp (`leslie.md` §7);
+    the drive into the 122 amp (`rotary.md` §7);
   - the 122 amp: driver clip, push-pull 6550 saturation, cathode-bias shift, sag, output
     transformer;
   - the passive 800 Hz crossover after the amp, so a bass note's distortion products go to the
@@ -383,7 +383,7 @@ marked; numbers are **[calc]** where derived.
   - a "drive" effect after a per-voice sum normalised by voice count;
   - a static waveshaper with no bias memory;
   - a separate distortion per voice;
-  - an output limiter ahead of the Leslie that flattens the pedal;
+  - an output limiter ahead of the rotary speaker that flattens the pedal;
   - distortion placed after the rotary simulation (it must be before the crossover, so it spins).
 - **Tests:**
   1. at fixed pedal, THD+IMD (energy not at the input partials) rises monotonically with 1, 2, 4,
@@ -397,11 +397,11 @@ marked; numbers are **[calc]** where derived.
   6. after a 2 s ff chord, the gain of a following pp note recovers with a time constant in
      0.1-0.5 s;
   7. CC11 from 127 to 64 lowers the level by the network's dB **and** tilts the spectrum (more
-     bass relative to treble, `hammond_b3.md` §10.3).
+     bass relative to treble, `tonewheel_organ.md` §10.3).
 
 ### 4.3 R3: A key click that is never the same twice and answers the touch
 
-- **Mechanism:** `hammond_b3.md` §6.2: nine contacts per key, each a step onto a running wheel, with
+- **Mechanism:** `tonewheel_organ.md` §6.2: nine contacts per key, each a step onto a running wheel, with
   closure time, bounce and contact resistance. Additions **[design, from MM20, MMS17]**:
   - **per key and organ, a fixed nominal closing order and spacing of the nine contacts** (from
     the seed: manufacturing tolerance), plus per-press jitter, so "not random, but not consistent";
@@ -432,7 +432,7 @@ marked; numbers are **[calc]** where derived.
 
 ### 4.4 R4: One phase-locked generator that never stops
 
-- **Mechanism:** `hammond_b3.md` §13.1 item 1: 91 wheels from one master clock, integer phase
+- **Mechanism:** `tonewheel_organ.md` §13.1 item 1: 91 wheels from one master clock, integer phase
   accumulation, the shared speed factor, no phase reset. Keys and drawbars only gate (via contacts)
   wheels that are already running. Wheels shared between keys and between drawbars (foldback, §7.2)
   are one signal.
@@ -453,13 +453,13 @@ marked; numbers are **[calc]** where derived.
      function of absolute time and the key set only);
   2. C4 + C5 at 888000000: the 130.8, 261.5 Hz … components' levels are the same on every press
      (spread < 0.1 dB over 50 presses at random times);
-  3. 61 keys down at once: no note is dropped, CPU within budget (`hammond_b3.md` §13.4);
+  3. 61 keys down at once: no note is dropped, CPU within budget (`tonewheel_organ.md` §13.4);
   4. the 2⅔' vs 3×8' drift (−0.62 Hz at C4) is present and identical between two renders started
      at the same absolute time.
 
-### 4.5 R5: Leslie acoustics that sing and fill a room
+### 4.5 R5: rotary speaker acoustics that sing and fill a room
 
-- **Mechanism:** `leslie.md` §6, §12.1:
+- **Mechanism:** `rotary.md` §6, §12.1:
   - moving-tap delay lines per path and mic;
   - angle-dependent directivity per band;
   - early reflections as image sources, each with its own Doppler (the "chorus" of reflections,
@@ -469,7 +469,7 @@ marked; numbers are **[calc]** where derived.
   - two horn mics plus a drum mic.
 
   **Missing:** the room (`src/room.*`) is fed by the mid/side mix, so the room's reverb is a static
-  reverb of a swirling signal. A real Leslie's beam *sweeps the room*, so the reverb itself
+  reverb of a swirling signal. A real the rotary speaker's beam *sweeps the room*, so the reverb itself
   fluctuates. Proposed: feed the room from 2-4 directional injection points (front, back, sides) with
   the horn's and drum's directivity gains for those directions, so the late field fluctuates at the
   rotor rates **[design]**.
@@ -480,7 +480,7 @@ marked; numbers are **[calc]** where derived.
   - the drum treated like the horn (FM in the bass);
   - a fixed-impulse reverb after a static rotary;
   - mono collapse that cancels the FM.
-- **Tests:** `leslie.md` §12.6 (Doppler depth, drum AM by band, stereo side signal, crossover).
+- **Tests:** `rotary.md` §12.6 (Doppler depth, drum AM by band, stereo side signal, crossover).
   Added:
   1. with room on, the late reverberant energy (> 80 ms) in the 2-4 kHz band fluctuates at the horn
      rate by ≥ 1 dB (a static post-reverb gives ~0);
@@ -488,7 +488,7 @@ marked; numbers are **[calc]** where derived.
 
 ### 4.6 R6: The percussion circuit, with memory
 
-- **Mechanism:** `hammond_b3.md` §8, §13.1 item 6: C31's RC, the control-tube transfer with
+- **Mechanism:** `tonewheel_organ.md` §8, §13.1 item 6: C31's RC, the control-tube transfer with
   cut-off, single trigger on "any upper key", re-arm through R55 + R56 (τ = 34 ms), the 1' steal,
   the R1 level drop, soft/normal and fast/slow. **The re-arm must be partial.** The grid starts its
   next decay from where the recharge had reached when a key went down again **[calc]**:
@@ -509,7 +509,7 @@ marked; numbers are **[calc]** where derived.
   - percussion with vibrato (it joins after the scanner);
   - leaving the 1' sounding with percussion on;
   - no level drop.
-- **Tests:** `hammond_b3.md` §13.6, plus:
+- **Tests:** `tonewheel_organ.md` §13.6, plus:
   1. legato line: one ping on the first note only;
   2. the same line with 20 ms gaps: every note pings, each starting ≥ 6 dB softer and decaying to
      cut-off in 0.40 ± 0.06 s (slow) vs 0.79 s for a fully re-armed note;
@@ -517,9 +517,9 @@ marked; numbers are **[calc]** where derived.
 
 ### 4.7 R7: Drawbars and preset flips that move while notes sound
 
-- **Mechanism:** `hammond_b3.md` §6.1, §7.1: each drawbar is a slider over nine transformer taps
+- **Mechanism:** `tonewheel_organ.md` §6.1, §7.1: each drawbar is a slider over nine transformer taps
   (Hamre's steps), on the busbar side, so moving it changes the level of every sounding key at
-  once, in **steps**. Preset keys: the B-3 has two drawbar sets per manual (A# and B keys) plus fixed
+  once, in **steps**. Preset keys: the tonewheel organ has two drawbar sets per manual (A# and B keys) plus fixed
   presets; switching is instant and is the gospel "flip" **[paper, HSM; paper, Shelley]**.
   **Missing:**
   - the sound of a drawbar passing between taps (a brief break or bridge; a soft tick)
@@ -538,11 +538,11 @@ marked; numbers are **[calc]** where derived.
 
 ### 4.8 R8: One seed per organ, and the restorer's voicing
 
-- **Mechanism:** `hammond_b3.md` §4.6 ("organ serial number") draws eccentricities, tooth errors,
+- **Mechanism:** `tonewheel_organ.md` §4.6 ("organ serial number") draws eccentricities, tooth errors,
   capacitor ages, gains, leakage, tapering. Extend the one seed to:
   - the per-key contact order and spacing (R3), contact dirt;
   - the generator calibration curve (factory, or a "restorer's curve" as a named preset);
-  - the Leslie: speeds ±3 %, belt age, the amp's tube balance (`leslie.md` §4, §5).
+  - the rotary speaker: speeds ±3 %, belt age, the amp's tube balance (`rotary.md` §4, §5).
 - **Destroyed by:**
   - a fixed "vintage noise" sample;
   - irregularity re-randomised every note or every run;
@@ -551,12 +551,12 @@ marked; numbers are **[calc]** where derived.
   1. the same seed renders bit-identically;
   2. two seeds: per-wheel sideband levels at f ± f_rot (long FFT, 0.1 Hz resolution) correlate
      < 0.5 across wheels, the leakage floor spectra differ by > 3 dB in at least a third of the
-     bands, and the Leslie fast rates differ;
+     bands, and the rotary speaker fast rates differ;
   3. the "age" knob at 0 brings any seed's sidebands below −50 dB.
 
 ### 4.9 R9: The scanner vibrato and chorus (C3 above all)
 
-- **Mechanism:** `hammond_b3.md` §9, §13.1 item 7: the 18-section LC line (frequency-dependent
+- **Mechanism:** `tonewheel_organ.md` §9, §13.1 item 7: the 18-section LC line (frequency-dependent
   delay and a ~7 kHz edge), a 9-tap capacitive crossfade scanned at 6.867 Hz from the generator
   motor (so mains-locked with the wheels), V1-V3, and C1-C3 as dry plus scanned.
 - **Destroyed by:**
@@ -574,13 +574,13 @@ marked; numbers are **[calc]** where derived.
 ### 4.10 R10: Body, noise and machinery
 
 - **Mechanism:**
-  - pedals 1-12 as complex wheels through the pedal filter (`hammond_b3.md` §3.3, §3.4);
+  - pedals 1-12 as complex wheels through the pedal filter (`tonewheel_organ.md` §3.3, §3.4);
   - the 15-inch woofer's low end and the output-transformer saturation on pedal notes
-    (`leslie.md` §7);
+    (`rotary.md` §7);
   - no high-pass in the chain above ~30 Hz;
-  - the leakage background with no key down (`hammond_b3.md` §5), and tube hiss and hum (§10.3).
+  - the leakage background with no key down (`tonewheel_organ.md` §5), and tube hiss and hum (§10.3).
 
-  **Missing in `leslie.md`:**
+  **Missing in `rotary.md`:**
   - the motor hum;
   - the belt;
   - the horn's wind noise at fast speed (broadband, modulated at the horn rate);
@@ -588,7 +588,7 @@ marked; numbers are **[calc]** where derived.
   - a soft keybed thump per key.
 
   **Optional:** the run-switch dive (generator coasting and re-locking) on pitch bend down
-  (`hammond_b3.md` §13.3 already allows an "organ stop/start effect").
+  (`tonewheel_organ.md` §13.3 already allows an "organ stop/start effect").
 - **Pedal tapping:** a short pedal note under a left-hand bass line must give an attack (its own
   contacts' click on the complex wheels) without a long tone.
 - **Destroyed by:**
@@ -600,7 +600,7 @@ marked; numbers are **[calc]** where derived.
   1. a pedal C1 has energy at 32.7 Hz within 6 dB of its 65.4 Hz;
   2. with no key down and drawbars out, the output is the leakage-plus-hiss floor at its set level,
      not zero;
-  3. at Leslie fast, the noise floor between notes is modulated at the horn rate;
+  3. at rotary speaker fast, the noise floor between notes is modulated at the horn rate;
   4. a 40 ms pedal note gives a transient whose energy above 1 kHz is ≥ 10 dB over its sustained
      part's.
 
@@ -610,29 +610,29 @@ marked; numbers are **[calc]** where derived.
 
 - **CC11 → the expression capacitor's travel** (R2), with the taper of the compensation network,
   smoothed with a slew limit like a real pedal (~50-100 ms full travel) **[design]**. **CC7** is the
-  output gain *after* the Leslie (a mixer fader), never the drive. The drive setting (the 122's
+  output gain *after* the rotary speaker (a mixer fader), never the drive. The drive setting (the 122's
   volume, how hard the console drives the amp) is a per-program parameter: GM 17/18 clean-to-crunch
-  at the top of the pedal, GM 19 driven (`hammond_b3.md` §13.3).
-- **Velocity is not loudness** (`hammond_b3.md` §13.3; Lord, Booker T.). It is key speed (R3).
+  at the top of the pedal, GM 19 driven (`tonewheel_organ.md` §13.3).
+- **Velocity is not loudness** (`tonewheel_organ.md` §13.3; Lord, Booker T.). It is key speed (R3).
 
 ### 5.2 Live drawbars: the clone conventions
 
 The conventions are incompatible, so the model needs a selectable map **[web, Apple EVB3 MIDI
-modes, read; web, snippet: Nord forum]**:
+modes, read; web, snippet: stage keyboard forum]**:
 
-| Convention | Upper drawbars | Lower drawbars | Leslie | Vibrato | Percussion |
+| Convention | Upper drawbars | Lower drawbars | rotary speaker | Vibrato | Percussion |
 |---|---|---|---|---|---|
-| **RK** (Roland VK, Korg CX-3) | CC 70-78 | — | CC 80 or 92 chorale/brake/tremolo; 81 chorale/brake; 118 fast rate | 85 / 86 on, 87 type | 94 on, 95 2nd/3rd, 102 volume, 103 decay |
-| **NE** (Nord Electro) | CC 16-24 | CC 70-78 | GP6 on (CC 81), GP7 speed (CC 82), GP8 brake (CC 83) | 85 / 86 on, 84 mode | 87 on, 88 volume/time, 95 harmonic |
-| **NI** (Native Instruments B4) | CC 12-20 | CC 21-29 | GP7 fast (CC 82), GP8 accelerate (CC 83), mod wheel speed, CC 68 brake | 31 / 30 on | named only |
-| **HS** (Hammond XB/XK) | CC 80, all upper (value-encoded) | CC 81 | named | 87 type | named |
+| **RK** (one maker VK, one maker CX-3) | CC 70-78 | — | CC 80 or 92 chorale/brake/tremolo; 81 chorale/brake; 118 fast rate | 85 / 86 on, 87 type | 94 on, 95 2nd/3rd, 102 volume, 103 decay |
+| **NE** (stage keyboard) | CC 16-24 | CC 70-78 | GP6 on (CC 81), GP7 speed (CC 82), GP8 brake (CC 83) | 85 / 86 on, 84 mode | 87 on, 88 volume/time, 95 harmonic |
+| **NI** (a software maker B4) | CC 12-20 | CC 21-29 | GP7 fast (CC 82), GP8 accelerate (CC 83), mod wheel speed, CC 68 brake | 31 / 30 on | named only |
+| **HS** (tonewheel organ XB/XK) | CC 80, all upper (value-encoded) | CC 81 | named | 87 type | named |
 
 - GP5-8 are CC 80-83 by the MIDI standard **[memory]**.
 - **[design] Default: RK** for the drawbars and percussion (most hardware drawbar controllers send
   70-78), with NE and NI selectable.
-- **Leslie, always on whatever the drawbar map:**
-  - CC1 ≥ 64 fast, < 64 slow (`leslie.md` §9);
-  - CC64 momentary or latching (Leslie 2101 default);
+- **rotary speaker, always on whatever the drawbar map:**
+  - CC1 ≥ 64 fast, < 64 slow (`rotary.md` §9);
+  - CC64 momentary or latching (digital rotary speaker default);
   - CC82 speed (NE/NI);
   - CC80/92 as a three-state half-moon (RK: low third chorale, middle brake, top third tremolo);
   - CC68 or CC83 brake.
@@ -646,21 +646,21 @@ modes, read; web, snippet: Nord forum]**:
   The MIDI value map must allow a throw from tremolo to stop (brake) and from stop to chorale. Every
   transition goes through the rotor mechanics (R1). The "flick to fast, back before full speed"
   gesture needs nothing special: the mechanics give it.
-- **The brake** stops the rotors, with the DC brake option (`leslie.md` §5.1), and parks at random
-  angles (R1). `leslie.md` §9 proposes "CC1 = 0 held 1 s" for a stop. Players' files rarely do that
-  (CC1 is a continuous wheel in the user's pop collection, `hammond_b3.md` §12.1), so the brake
+- **The brake** stops the rotors, with the DC brake option (`rotary.md` §5.1), and parks at random
+  angles (R1). `rotary.md` §9 proposes "CC1 = 0 held 1 s" for a stop. Players' files rarely do that
+  (CC1 is a continuous wheel in the user's pop collection, `tonewheel_organ.md` §12.1), so the brake
   should also have its own CC (above) **[design]**.
 
 ### 5.4 What a MIDI file can still say
 
 The user's files: one jazz file with no CC1, CC64 or CC11 changes; ~900 pop files of which only a
-fraction send CC1 (a wheel) or CC64 (`hammond_b3.md` §12.1) **[file]**. Velocities are used as
-dynamics. Without help most files would play an organ whose Leslie never changes speed and whose
+fraction send CC1 (a wheel) or CC64 (`tonewheel_organ.md` §12.1) **[file]**. Velocities are used as
+dynamics. Without help most files would play an organ whose rotary speaker never changes speed and whose
 pedal never moves: everything §2 says players love would be absent. So two automatic "hands", off
-when the file supplies the control (any CC1/CC64/CC80/82/92 on the channel disables the Leslie
+when the file supplies the control (any CC1/CC64/CC80/82/92 on the channel disables the rotary speaker
 rider; any CC11 change disables the pedal rider) **[design]**.
 
-### 5.5 The Leslie rider (rules)
+### 5.5 The rotary speaker rider (rules)
 
 Phrases are segmented as in the harmonica's hand rules (`harmonica.md` §5.2): onsets, rests,
 held-note lengths. **[design; rules drawn from §2's players]**:
@@ -700,7 +700,7 @@ held-note lengths. **[design; rules drawn from §2's players]**:
   - a dip of 3-6 dB 100-200 ms after accented chords ("back off after the attack"), then back.
 - **The point:** the pedal then moves the drive as players do (R2), and per-note velocity never
   becomes per-note loudness.
-- Off when the file sends CC11, and as an option (`hammond_b3.md` §14 question 4) **[design]**.
+- Off when the file sends CC11, and as an option (`tonewheel_organ.md` §14 question 4) **[design]**.
 
 ### 5.7 Velocity, and notes that MIDI cannot carry
 
@@ -716,39 +716,39 @@ held-note lengths. **[design; rules drawn from §2's players]**:
 
 ## 6. What must change in the existing plans
 
-1. **`hammond_b3.md` §13.3, MIDI:**
-   - "CC80-83 for percussion" collides with the Leslie in two conventions (RK rotor CC 80/81, NE and
+1. **`tonewheel_organ.md` §13.3, MIDI:**
+   - "CC80-83 for percussion" collides with the rotary speaker in two conventions (RK rotor CC 80/81, NE and
      NI GP7/GP8 = CC 82/83). Move percussion to the RK numbers (94, 95, 102, 103);
    - make the drawbar CCs a selectable map (RK 70-78 default; NE 16-24 / 70-78; NI 12-20 / 21-29)
      instead of "CC12-20 or NRPN";
    - add the A/B preset flip (§5.2);
-   - add the Leslie rider and the pedal rider (§5.5, §5.6) with their disable rules.
-2. **`hammond_b3.md` §6.2 / §13.1 item 4, contacts:**
+   - add the rotary speaker rider and the pedal rider (§5.5, §5.6) with their disable rules.
+2. **`tonewheel_organ.md` §6.2 / §13.1 item 4, contacts:**
    - a per-key, per-organ fixed contact order and spacing from the seed, plus jitter;
    - velocity mapped down to a slow-press regime (10-100 ms stagger), not just 0.1-3 ms;
    - a bounce model driven by the contact's closing speed;
    - add R3's tests 1, 2, 4, 5 to §13.6.
-3. **`hammond_b3.md` §8 / §13.6, percussion:** state that the re-arm is partial (the charge reached
+3. **`tonewheel_organ.md` §8 / §13.6, percussion:** state that the re-arm is partial (the charge reached
    at the next key-down sets both the start level and the decay), and add the table of §4.6 as a
    test.
-4. **`hammond_b3.md` §13.1 items 4 and 8:**
+4. **`tonewheel_organ.md` §13.1 items 4 and 8:**
    - drawbars act on held notes, in steps;
-   - CC11 stays inside the AO-28, ahead of the Leslie amp (already so in §10.3: make it a stated
+   - CC11 stays inside the AO-28, ahead of the rotary speaker amp (already so in §10.3: make it a stated
      invariant);
-   - CC7 is after the Leslie.
-5. **`hammond_b3.md` §13.6:** add R4's absolute-time test and the shared-wheel coherence test (C4 +
+   - CC7 is after the rotary speaker.
+5. **`tonewheel_organ.md` §13.6:** add R4's absolute-time test and the shared-wheel coherence test (C4 +
    C5).
-6. **`leslie.md` §9 / §12.3, control:**
+6. **`rotary.md` §9 / §12.3, control:**
    - add CC82 (NE/NI), the CC80/92 three-state half-moon and a brake CC, keeping CC1 and CC64;
-   - the rider of §5.5 belongs to the organ instance (it reads the notes) and drives the Leslie's
+   - the rider of §5.5 belongs to the organ instance (it reads the notes) and drives the the rotary speaker's
      switch input.
-7. **`leslie.md` §12.1, room:** feed `src/room.*` from directional injection points carrying the
+7. **`rotary.md` §12.1, room:** feed `src/room.*` from directional injection points carrying the
    rotors' directivity, not only the mid/side mix (R5).
-8. **`leslie.md` §12.1, noises:** add the motor hum, belt, horn wind noise (rate-modulated), relay
+8. **`rotary.md` §12.1, noises:** add the motor hum, belt, horn wind noise (rate-modulated), relay
    click on speed changes.
-9. **`leslie.md` §12.6, tests:** add the partial-ramp test, phase continuity and the brake's spread
+9. **`rotary.md` §12.6, tests:** add the partial-ramp test, phase continuity and the brake's spread
    of stop angles (R1).
-10. **Defaults:** keep `leslie.md`'s horn τ ≈ 0.5 s up. The players' "ramp up" love needs an
+10. **Defaults:** keep `rotary.md`'s horn τ ≈ 0.5 s up. The players' "ramp up" love needs an
     *audible* horn ramp (about 1 s to 90 %), which this gives, and a drum several times slower.
     setBfree's 0.16 s horn is too fast to "ride" **[design]**.
 
@@ -759,30 +759,30 @@ how completely a typical digital model destroys it.
 
 | # | Property | Mechanism | Key test |
 |---|---|---|---|
-| 1 | **Leslie speed as a gesture** | rotor mechanics (`leslie.md` §5.2), horn ≠ drum, partial ramps, brake; the rider for files (§5.5) | 0.7 s tap: horn → 5.2 Hz, drum ≤ 2 Hz; continuous speed; spread stop angles (R1) |
+| 1 | **rotary speaker speed as a gesture** | rotor mechanics (`rotary.md` §5.2), horn ≠ drum, partial ramps, brake; the rider for files (§5.5) | 0.7 s tap: horn → 5.2 Hz, drum ≤ 2 Hz; continuous speed; spread stop angles (R1) |
 | 2 | **The pedal drives one amp that hears everything** | CC11 in the AO-28 → 122 amp (bias, sag, transformer) → crossover → rotors; one amp for both manuals and pedals | distortion rises with pedal, key count and drawbars; pedal-note sidebands on chords; distortion spun by the horn (R2) |
 | 3 | **A living key click** | 9 contacts per key, per-key order from the seed, velocity → stagger and bounce, steps onto running wheels | 100 presses never identical; brighter with 1'; slow press staggers footages (R3) |
 | 4 | **One locked machine** | 91 wheels on one clock, no reset, shared wheels coherent, busbars with no voice limit | output depends only on absolute time and keys; C4 + C5 same level every press (R4) |
-| 5 | **A Leslie that sings and fills the room** | moving taps per path and mic, directivity, image sources with own Doppler, drum AM, room fed by the moving source | late reverb fluctuates at the horn rate; mono keeps the FM (R5) |
+| 5 | **A rotary speaker that sings and fills the room** | moving taps per path and mic, directivity, image sources with own Doppler, drum AM, room fed by the moving source | late reverb fluctuates at the horn rate; mono keeps the FM (R5) |
 | 6 | **Percussion with memory** | the C31 circuit, single trigger, partial re-arm, 1' steal, R1 drop | legato: one ping; 20 ms gaps: softer pings, 0.40 s decay (R6) |
 | 7 | **Registration while playing** | drawbars in 9 taps on the busbars; A/B preset flips; CC maps | stepped sweep at Hamre's dB; flip within 5 ms with no key retrigger (R7) |
-| 8 | **This organ, not an organ** | one seed: sidebands, leakage, capacitor age, contacts, calibration curve, Leslie speeds and belt | same seed bit-identical; two seeds differ in sidebands, floor, rates (R8) |
+| 8 | **This organ, not an organ** | one seed: sidebands, leakage, capacitor age, contacts, calibration curve, rotary speaker speeds and belt | same seed bit-identical; two seeds differ in sidebands, floor, rates (R8) |
 | 9 | **The scanner chorus/vibrato** | LC line with dispersion, 9-tap capacitive scan at 6.867 Hz, C3 = dry + scanned | near-square FM (3rd harmonic ≥ −15 dB); dispersive comb (R9) |
 | 10 | **Body and machinery** | complex pedal wheels, full low end, leakage and hiss floor, motor, belt, horn wind, relay, keybed; optional motor coast | 32.7 Hz present; floor never digital silence; floor modulated at fast (R10) |
 
 ## 8. Open questions for the user
 
-1. **The riders:** should the Leslie and pedal riders be on by default for files that lack the
+1. **The riders:** should the rotary speaker and pedal riders be on by default for files that lack the
    controls (§5.4), and with which style per GM program (jazz for 17/18, rock for 19, or gospel for
    17)?
-2. **Drawbar CC map:** RK (70-78) as default, or the Nord convention, matching a controller you own?
+2. **Drawbar CC map:** RK (70-78) as default, or the stage keyboard convention, matching a controller you own?
 3. **A/B flip CC:** which controller number (none of the conventions found has a standard one)?
 4. **Slow-press regime:** may very low velocities (below ~20) mean "slow press" with harmonics
    entering one at a time, or should low velocities stay ordinary?
 5. **Machinery noises** (motor, belt, horn wind, relay): on by default at a realistic level, or
    behind a knob at 0?
-6. **A recording** remains the single most useful input (`hammond_b3.md` §14 question 1,
-   `leslie.md` §13 question 1). For this paper's tests a few seconds of the same key pressed ten
+6. **A recording** remains the single most useful input (`tonewheel_organ.md` §14 question 1,
+   `rotary.md` §13 question 1). For this paper's tests a few seconds of the same key pressed ten
    times, a speed change on a held chord, and a chord swelled with the pedal would settle R1-R3.
 
 ## 9. Sources
@@ -900,5 +900,5 @@ blocked or timing out).
 - **[EVB3-MIDI]** Apple, Logic/MainStage EVB3 "MIDI modes" (RK, HS, NI, NE CC maps).
   https://help.apple.com/mainstage/mac/2.2/en/mainstage/logicproinstruments/chapter_7_section_13.html ;
   **[Nord-CC]** Nord user forum (CC 82 rotor speed; snippet). https://www.norduserforum.com/viewtopic.php?p=168518
-- **[Henricksen]**, **[SSAB02]**, **[HSM]**, **[L2101]**: as in `leslie.md` §14 and `hammond_b3.md`
+- **[Henricksen]**, **[SSAB02]**, **[HSM]**, **[L2101]**: as in `rotary.md` §14 and `tonewheel_organ.md`
   §15.

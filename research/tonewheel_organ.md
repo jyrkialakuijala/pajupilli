@@ -1,23 +1,23 @@
-# The Hammond B-3 tonewheel organ (GM 17, 18, 19) as a physical model
+# The tonewheel organ tonewheel organ (GM 17, 18, 19) as a physical model
 
 Status: 2026-11-16. Research and plan; nothing is built. GM 17 (Drawbar Organ), 18 (Percussive
 Organ) and 19 (Rock Organ) still go to `lead-calliope` in `src/midifile.cc`'s program table. The
 church organ (`research/church_organ.md`, `src/organ.cc`) is a different instrument and is not
-repeated here. **The Leslie speaker is a separate paper, `research/leslie.md`**; this one ends at
-the organ's console output (the AO-28 preamp's output transformer), which is what a Leslie 122
-receives (§10.6, and `leslie.md` §9 for the interface).
+repeated here. **The rotary speaker is a separate paper, `research/rotary.md`**; this one ends at
+the organ's console output (the AO-28 preamp's output transformer), which is what a rotary speaker
+receives (§10.6, and `rotary.md` §9 for the interface).
 
 The user asked for:
 - **a faithful tonewheel generator**: the wheels' teeth, the magnetic pickups and coils, the filters;
 - **the wheels' irregularities** (tooth-to-tooth variation, eccentricity, wobble), modelled because
   they make **sidebands and subharmonic lines** tied to each wheel's rotation rate (§4).
 
-Marks: **[paper]** a paper or a primary document in §15 (the Hammond service manual counts as
+Marks: **[paper]** a paper or a primary document in §15 (the tonewheel organ service manual counts as
 primary, and its Figure 24 schematic was read directly from the scan); **[web]** a weaker web
 source in §15 (restorers, forums, emulator manuals); **[calc]** worked out here (scripts in the
-session scratchpad, `hammond/wheels.py`, `drawbars.py`, `calcs.py`); **[memory]** general
+session scratchpad, `tonewheel/wheels.py`, `drawbars.py`, `calcs.py`); **[memory]** general
 knowledge, to be checked; **[design]** a modelling choice; **[file]** measured in the user's MIDI
-files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
+files; **[rec]** measured in the user's recordings (none has a tonewheel organ: §12.2).
 
 ## 1. Short answer
 
@@ -39,7 +39,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
 
   The wheels on one shaft share f_rot. All wheels also share the drive shaft's 20 Hz and the
   motor's 120 Hz (2 × mains) pulsation, which springs and couplings absorb **[paper, HSM]** (§4).
-- **Hammond itself documents the irregularities.** The service manual: "The wheels are cut so to
+- **tonewheel organ itself documents the irregularities.** The service manual: "The wheels are cut so to
   give as nearly a sine wave as possible, but the generated voltage seldom reaches that ideal
   condition, since even a change in the air gap will change the wave form". Copper rings on low
   coils reduce "harmonics which may be produced by irregularities in the tone wheels". Oxidation
@@ -66,24 +66,24 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
 - **The user's files:** in `~/Music/midi`, one file (*Good Bait*) has two GM 17 tracks (2646
   notes, 41-81, chords) and no CC1, CC64 or speed switching **[file]**. The large pop collection in
   `~/midifiles` has 269/218/434 files on GM 17/18/19. Their CC1 is a continuous wheel, not a
-  switch **[file]**. **No Hammond recording** was found in the user's music **[rec]** (§12.2).
+  switch **[file]**. **No tonewheel organ recording** was found in the user's music **[rec]** (§12.2).
 
 ## 2. The family, and what this paper models
 
 | Model | Years | Manuals / pedals | Generator | Preamp / output | Notes |
 |---|---|---|---|---|---|
-| **B-3** | 1955-1974 | 2 × 61 (C-C, 5 oct.) + 25 pedals | 91 wheels, 12 complex 2-tooth wheels, 5 blanks | AO-28; external tone cabinet or Leslie | percussion (the "-3"), scanner vibrato/chorus **[paper, HSM]** |
-| **C-3** | 1955-1974 | same | same | same | "Same as Model C-2 but with Hammond Percussion"; the C cabinet is the B-3 in a closed "church" case **[paper, HSM; web, goffprof]** |
+| **tonewheel organ** | 1955-1974 | 2 × 61 (C-C, 5 oct.) + 25 pedals | 91 wheels, 12 complex 2-tooth wheels, 5 blanks | AO-28; external tone cabinet or rotary speaker | percussion (the "-3"), scanner vibrato/chorus **[paper, HSM]** |
+| **C-3** | 1955-1974 | same | same | same | "Same as Model C-2 but with tonewheel organ Percussion"; the C cabinet is the tonewheel organ in a closed "church" case **[paper, HSM; web, goffprof]** |
 | **A-100** | 1959-1965 | same | same | AO-28 + built-in power amp, speakers, reverb | same schematic (Fig. 24: "Models B3, C3, RT3, A-100, D-100") **[paper, HSM]** |
 | **M, M-2, M-3** | 1948-1964 | 2 × 44 + 12/13 pedals | **85 wheels** | built-in amp | spinet; 9 upper, 8 lower drawbars **[paper, M100]** |
 | **M-100** | 1961-1968 | 2 × 44 + 13 pedals | **87 wheels** | AO-29 built-in amp | percussion; different line box **[paper, M100; web, SV-AO29]** |
 
 - **What differs in sound [memory unless marked]:**
-  - The A-100 sounds like a B-3 through a small built-in amplifier and speakers, plus reverb.
+  - The A-100 sounds like a tonewheel organ through a small built-in amplifier and speakers, plus reverb.
   - The M-series has a shorter compass (44 keys) and fewer wheels.
   - Its own power amp and small speakers give the "gritty spinet" sound when overdriven.
   - Its pedals are the lowest 12-13 generator frequencies, decaying, with no drawbars **[paper, M100]**.
-- **This paper models the B-3/C-3** (and so the A-100 without its speakers). The M-series is a
+- **This paper models the console tonewheel organ** (and so the A-100 without its speakers). The M-series is a
   parameter set: fewer keys, 85/87 wheels, its own amp **[design]**.
 
 ## 3. The tonewheel generator
@@ -142,7 +142,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
     beats against any 5th harmonic from distortion, for example 10.7 Hz at middle C (§7.3).
 - **Mains frequency:**
   - Pitch follows the grid: a 0.02 Hz grid drift is 0.58 c, and 0.1 Hz is 2.9 c **[calc]**.
-  - Every wheel, the scanner (§9) and the Leslie motors (shaded-pole, not synchronous, so only
+  - Every wheel, the scanner (§9) and the rotary speaker motors (shaded-pole, not synchronous, so only
     roughly) move together.
   - A slow global pitch wander of under 1 c is authentic **[design]**.
 
@@ -206,7 +206,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
   - One analysis: the pickup tip's finite width averages the field over part of a tooth. That
     smooths the high wheels, where a tooth pitch (0.83 mm on a 192-tooth 2-inch wheel **[calc]**)
     is comparable to the tip **[web, JT30, NI]**.
-- **The air gap.** No figure was found in the service manual (Hammond sets it at the factory "while
+- **The air gap.** No figure was found in the service manual (tonewheel organ sets it at the factory "while
   observing an output meter" and advises technicians not to touch it) **[paper, HSM]**. 0.2-0.5 mm
   is assumed below **[design; to check]**.
 - **Measured harmonic content of a single wheel: not found.**
@@ -226,7 +226,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
   shaped towards a square ("closer to a square wave, with some 3rd and 5th harmonics"
   **[web, ED]**). No harmonic levels were found. **[design]**: 3rd −10 to −15 dB, 5th −20 to
   −25 dB, then the pedal filter (§6.4). They feed the pedals (and the 16' of the lowest manual
-  octave on early models only; the B-3 manuals fold back, §7.2).
+  octave on early models only; the tonewheel organ manuals fold back, §7.2).
 
 ### 3.4 Filters, resonances and output level by wheel
 
@@ -245,7 +245,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
   organ measured 0.22 µF at best (2.1×) and 0.40 µF at worst (~4×) **[web, SV-caps]**. That moves
   the resonance down by √(C ratio): 0.69× (−6.4 semitones) to 0.5× (an octave) **[calc]**. The
   wheel then sits on the filter's upper skirt, its level drops and its phase rotates. Some aged
-  B-3s sound uneven in the top two octaves for this reason. This is an "age" parameter
+  tonewheel organs sound uneven in the top two octaves for this reason. This is an "age" parameter
   **[design]**.
 - **Output level by wheel.** The generator gives at most ~30 mV p-p **[web, SV-caps]**. On an
   M-series organ a restorer recalibrated the filtered wheels to "a straight line from 12 mV
@@ -268,7 +268,7 @@ files; **[rec]** measured in the user's recordings (none has a Hammond: §12.2).
 - **Drawbar partials of one key are not phase-locked harmonics.** The 2⅔' wheel is a tempered
   twelfth, so it drifts against the 8' at 3f_8' − f_2⅔', for example −0.62 Hz at C4 (§7.3)
   **[calc]**. The composite waveform slowly changes shape. It is inaudible on its own, but
-  distortion (preamp, Leslie amp) and the Leslie turn it into slow beating. That is part of the
+  distortion (preamp, rotary speaker amp) and the rotary speaker turn it into slow beating. That is part of the
   "alive" quality **[calc; design]**.
 - **The spring coupling on each wheel** lets the wheel lag or lead its shaft slightly under
   torque changes. Oil damps it. No resonance figure was found **[paper, HSM; to check]**.
@@ -420,7 +420,7 @@ s(t) is the shared speed factor below):
     minimum positions" **[web, EVB3]**.
   - setBfree's defaults are compartment crosstalk 0.01, terminal-strip 0.01, wiring 0.01 and
     transformer 0 (i.e. **−40 dB per path**) **[web, SBF]**.
-  - A patent on Hammond-inspired effects tries −24, −18 and −12 dB as settings **[web, US10199024]**,
+  - A patent on tonewheel organ-inspired effects tries −24, −18 and −12 dB as settings **[web, US10199024]**,
     which is too loud for a healthy organ **[memory]**.
 - **[design] Defaults:**
   - The shaft partner at −45 dB into its neighbour's output.
@@ -475,7 +475,7 @@ s(t) is the shared speed factor below):
   - Release clicks happen the same way, quieter (setBfree 0.25 vs 0.5 attack) **[web, SBF]**.
   - Tune contact scatter and bounce until a full-drawbar note's click is ~10-20 dB above the steady
     tone in the first 2 ms above 5 kHz **[design; to check against a recording]**.
-- **No velocity.** A Hammond has no velocity sensitivity. Key speed only changes the click's
+- **No velocity.** A tonewheel organ has no velocity sensitivity. Key speed only changes the click's
   spread **[memory]**. That is the one honest use of MIDI velocity (§13.3).
 
 ## 7. Drawbars, foldback and tapering
@@ -536,9 +536,9 @@ octaves into 13…91:
 
 ### 7.4 Tapering and loading
 
-- **Tapering.** The key resistance wires are not all equal ("manual tapering"). Hammond graded the
+- **Tapering.** The key resistance wires are not all equal ("manual tapering"). tonewheel organ graded the
   level of each harmonic along the keyboard. In particular the upper footages are reduced on high
-  keys **[web, SV-draw]**. The B-3 values were not found. setBfree carries a per-key, per-bus,
+  keys **[web, SV-draw]**. The tonewheel organ values were not found. setBfree carries a per-key, per-bus,
   per-wheel taper table **[web, SBF]**. **[design]** Begin with a 0 to −6 dB linear roll-off over
   the top two octaves for 2' to 1'. Expose it.
 - **Loading.** Many keys sharing a wheel load it through their resistance wires, and a dense chord
@@ -676,7 +676,7 @@ octaves into 13…91:
    acoustical conditions" **[paper, HSM]**.
 10. **Output: V3 12BH7 (second half)**, plate ~285 V, cathode 12 V (R42 1.2 kΩ ∥ C26 30 µF), into
     **T3**, a balanced output transformer (G-BN-G). It goes to the "power amplifier and speakers
-    (in tone cabinets)", i.e. a Hammond tone cabinet or a **Leslie 122** (`leslie.md` §9).
+    (in tone cabinets)", i.e. a tonewheel organ tone cabinet or a **rotary speaker** (`rotary.md` §9).
 11. **Power supply:** T7 (340-0-340 V rms), **V8 6X4** rectifier (375 V → R91 900 Ω → 335 V), and
     a decoupling chain to +290, +280, +205, +37 and +33 V (R94-R101; C56-C60 30-50 µF).
 
@@ -704,11 +704,11 @@ octaves into 13…91:
   about 30-40 dB **[to check]**.
 - **Where it distorts.** The 6AU6 and 12AX7 stages run at small signals (generator mV), so they are
   clean. The 12BH7 output into T3 can be driven harder when many drawbars and keys sum, with the
-  expression open and the Normal volume. The famous "growl" comes mostly from the **Leslie 122's
-  power amp** (`leslie.md` §7) and from players adding external preamps. **[design]**: a mild
+  expression open and the Normal volume. The famous "growl" comes mostly from the **rotary speaker's
+  power amp** (`rotary.md` §7) and from players adding external preamps. **[design]**: a mild
   tube waveshaper on V3's output half (asymmetric, soft) and on V4b. Most of the drive goes in the
-  Leslie amp.
-- **Where it is noisy.** The 6AU6 inputs see mV-level signals through megohm resistors. The B-3 has
+  rotary speaker amp.
+- **Where it is noisy.** The 6AU6 inputs see mV-level signals through megohm resistors. The tonewheel organ has
   a hiss and hum floor, partly the leakage of §5 **[memory]**. **[design]**: thermal noise of R5,
   R14 (10 MΩ class) and a −70 dB 60/120 Hz hum, with a knob.
 
@@ -721,7 +721,7 @@ octaves into 13…91:
   - The separate "exact circuit of preamplifier" (amplifier section) and the line-box drawings
     (vibrato section) of the same manual, which the figure refers to.
   - The AO-28 schematic on elektrotanya (a gated DjVu) **[web, ELT]**.
-  - The Leslie 122 amplifier schematic (gated), discussed in `leslie.md` §7.
+  - The Leslie 122 amplifier schematic (gated), discussed in `rotary.md` §7.
 
 ## 11. Sound and use
 
@@ -743,7 +743,7 @@ Frequencies come from §3.1.
   - each wheel's own harmonics (§3.3) and its irregularity sidebands (§4);
   - the leakage floor (§5);
   - the key click at onset (§6.2);
-  - vibrato/chorus (§9) and the Leslie (`leslie.md`).
+  - vibrato/chorus (§9) and the rotary speaker (`rotary.md`).
 
 ### 11.2 Character
 
@@ -753,7 +753,7 @@ Frequencies come from §3.1.
   - the click;
   - the percussion;
   - the scanner's square-ish ±20 c at 6.9 Hz (C3 adds the dry signal, giving a shimmering chorus);
-  - the Leslie;
+  - the rotary speaker;
   - the overdrive (sum and difference tones of the 1.5f/3f twelfths and the 13 c sharp third make
     rough beating);
   - a faint shimmer at the wheels' rotation rates **[calc; design]**.
@@ -762,13 +762,13 @@ Frequencies come from §3.1.
   - vibrato off or C3;
   - lower 838000000 or 008530000 for comping;
   - pedals or left-hand bass;
-  - the Leslie mostly on chorale, switched to fast for climaxes.
+  - the rotary speaker mostly on chorale, switched to fast for climaxes.
 - **Rock (Jon Lord, Keith Emerson, Gregg Allman) [memory]:**
   - full drawbars or 888800000;
-  - the Leslie fast, and the 122 amp and often an external guitar amp driven hard;
+  - the rotary speaker fast, and the 122 amp and often an external guitar amp driven hard;
   - percussion often off;
   - glissandi and palm smears.
-- **Gospel:** 888888888 or 888000000 with C3, the Leslie ramped often **[memory]**.
+- **Gospel:** 888888888 or 888000000 with C3, the rotary speaker ramped often **[memory]**.
 
 ## 12. The user's files and recordings
 
@@ -783,7 +783,7 @@ Frequencies come from §3.1.
 
 - *Good Bait* also sets GM 18 on channel 2 and GM 17 on channel 3, with no notes there. Its bank
   select (CC0 = 0, CC32 = 126) and a "Kontakt 1" port name show it was made for a sampler.
-  Velocities 1-127 (median 49-60) are used as dynamics. A Hammond would ignore them **[file]**.
+  Velocities 1-127 (median 49-60) are used as dynamics. A tonewheel organ would ignore them **[file]**.
 - **CC1 on organ tracks is a continuous wheel.** On GM 19, for example: 2974 values in 1-63, 1447
   in 64-126, 286 at 0 and 44 at 127, so it is not a 0/127 switch. CC64 takes 2-6 distinct values
   (a switch). CC11 is the most used, as expression **[file]**.
@@ -792,7 +792,7 @@ Frequencies come from §3.1.
 
 ### 12.2 Recordings [rec]
 
-- No filename in `~/Music`, `~/Musici`, `~/Downloads` or `~/Videos` mentions Hammond, Leslie,
+- No filename in `~/Music`, `~/Musici`, `~/Downloads` or `~/Videos` mentions tonewheel organ, rotary speaker,
   Jimmy Smith, Booker T, Deep Purple, Procol Harum, McGriff, DeFrancesco, Larry Young or Lonnie
   Smith. The only "organ" files are the church-organ recordings used by `church_organ.md`
   **[rec]**.
@@ -807,7 +807,7 @@ Frequencies come from §3.1.
   - The 4.5-8 Hz envelope lines were tempo harmonics of the drum stem.
   - St Germain's *Sure Thing* has a 5.60 Hz line (5-8× the median, 20-365 s). But it is exactly
     7× the bar rate, the same in both bands to 0.01 Hz, and steady for six minutes: a rhythmic
-    loop, not a Leslie.
+    loop, not a rotary speaker.
   - Stems had 0-1 stable partials per 3 s window.
   - A partial-FM tracker, verified on a synthetic 6.7 Hz ±20 c tone (read 19.1 c), found only
     scattered vibrato and artefacts.
@@ -850,10 +850,10 @@ Frequencies come from §3.1.
    6.867 Hz, V1-3 / C1-3, the switch per manual.
 8. **AO-28 preamp:** the linear filters as drawn (channel balance, expression network, tone
    control), the expression capacitor, and soft tube nonlinearity in V4b/V3. Output = the balanced
-   console signal, in volts, to the Leslie (`leslie.md`) or a plain "tone cabinet" (a fixed
+   console signal, in volts, to the rotary speaker (`rotary.md`) or a plain "tone cabinet" (a fixed
    speaker plus a room).
-9. **Leslie:** a separate object (`leslie.md`), owned by the organ instance, one per channel
-   carrying GM 17-19. The Leslie's mid/side output goes through `Tube::takeSide` as in
+9. **rotary speaker:** a separate object (`rotary.md`), owned by the organ instance, one per channel
+   carrying GM 17-19. The the rotary speaker's mid/side output goes through `Tube::takeSide` as in
    `src/accordion.cc` and `src/organ.h`. Then the room (`src/room.*`).
 
 ### 13.2 Parameters (defaults)
@@ -887,20 +887,20 @@ Frequencies come from §3.1.
   (§6.2), and nothing else. A "velocity to level" option for GM files written with dynamics,
   *Good Bait* for example, is off by default (open, §14).
 - **CC11 → expression pedal** (the capacitor's travel). **CC7 →** output gain after the preamp.
-- **Leslie speed** (`leslie.md` §9): **CC1 ≥ 64 → fast, < 64 → slow** (a continuous wheel crossing
-  the middle, as Hammond's own XK-series and the Leslie 2101 receive "Modulation"). **CC64** as an
-  alternative switch: the Leslie 2101's factory default for its slow/fast control code is 64, the
+- **rotary speaker speed** (`rotary.md` §9): **CC1 ≥ 64 → fast, < 64 → slow** (a continuous wheel crossing
+  the middle, as the tonewheel organ's own XK-series and the digital rotary speaker receive "Modulation"). **CC64** as an
+  alternative switch: the digital rotary speaker's factory default for its slow/fast control code is 64, the
   damper **[web, L2101]**. Use both, the last one wins.
 - **CC12-20 or NRPN** for the drawbars (optional). **CC80-83** for percussion on, 2nd/3rd,
   fast/slow, soft/normal (optional) **[design]**.
-- **Pitch bend: ignored** (a Hammond cannot bend). Players imitate bends by turning the motor off,
+- **Pitch bend: ignored** (a tonewheel organ cannot bend). Players imitate bends by turning the motor off,
   which slows all wheels; an "organ stop/start" effect is optional.
 
-| GM | Registration [design] | Percussion | Vibrato | Leslie default | Drive |
+| GM | Registration [design] | Percussion | Vibrato | rotary speaker default | Drive |
 |---|---|---|---|---|---|
 | 17 Drawbar Organ | upper 888000000 | off | C3 | slow (chorale) | mild |
 | 18 Percussive Organ | upper 888000000 (1' stolen) | on, 3rd, fast, normal | off | slow | mild |
-| 19 Rock Organ | upper 888800000 | off | off | fast | strong (Leslie amp driven hard) |
+| 19 Rock Organ | upper 888800000 | off | off | fast | strong (rotary speaker amp driven hard) |
 
 ### 13.4 Costs [calc]
 
@@ -919,7 +919,7 @@ Frequencies come from §3.1.
 - **Vibrato line:** 18 sections of 2nd-order WDF ≈ 36 states → ~0.1 µs per sample per channel.
   Two channels (vibrato and dry; the dry one is just a gain).
 - **Preamp:** a few biquads and two waveshapers, under 0.05 µs.
-- **Total organ without the Leslie: well under 1 % of one core.** The Leslie's cost is in its paper.
+- **Total organ without the rotary speaker: well under 1 % of one core.** The the rotary speaker's cost is in its paper.
 
 ### 13.5 Build order
 
@@ -929,7 +929,7 @@ Frequencies come from §3.1.
 4. Scanner.
 5. Preamp and expression.
 6. Leakage and irregularities (the age knob).
-7. The Leslie (`leslie.md`).
+7. The rotary speaker (`rotary.md`).
 8. Pedals and the lower manual.
 9. MIDI program table: GM 17/18/19 off `lead-calliope`.
 
@@ -963,25 +963,25 @@ Frequencies come from §3.1.
   - the leakage floor between notes;
   - the click's first 5 ms;
   - the percussion decay curve;
-  - the scanner rate and depth (with the Leslie off).
+  - the scanner rate and depth (with the rotary speaker off).
 
 ## 14. Open questions for the user
 
-1. **A recording**: can you supply (or point to) a dry Hammond (Leslie off or a direct line out) and
-   one through a Leslie? Even a few held notes and chords would let us fit the sideband levels,
+1. **A recording**: can you supply (or point to) a dry tonewheel organ (rotary speaker off or a direct line out) and
+   one through a rotary speaker? Even a few held notes and chords would let us fit the sideband levels,
    leakage, click and percussion. None of your music has one (§12.2).
-2. **Irregularity default**: a "new organ" (sidebands ~−35 dB, barely audible) or a "well-used B-3"
+2. **Irregularity default**: a "new organ" (sidebands ~−35 dB, barely audible) or a "well-used tonewheel organ"
    (~−25 dB, the sub-octave lines of the low wheels audible)? Should "age" be a single knob?
 3. **Drawbar taps**: Hamre's measured transformer steps or the folklore 3 dB?
-4. **Velocity**: ignore it for level, as on a real Hammond (velocity only changes the click), or
+4. **Velocity**: ignore it for level, as on a real tonewheel organ (velocity only changes the click), or
    allow an option for files like *Good Bait* that use velocity as dynamics?
 5. **Lower manual and pedals**: one MIDI channel = upper manual only, or a split (e.g. below MIDI 48
    to the lower manual with its own registration, below 36 to the pedals)?
-6. **Leslie speed control**: CC1 ≥ 64 = fast and CC64 as a switch, as proposed (§13.3)?
+6. **rotary speaker speed control**: CC1 ≥ 64 = fast and CC64 as a switch, as proposed (§13.3)?
 7. **GM 17/18/19 registrations**: accept §13.3's table, or name settings (e.g. Jimmy Smith,
    Booker T's *Green Onions*, Jon Lord)?
 8. **50 Hz organs**: worth modelling (a different gear table, not found), or 60 Hz only?
-9. **The M-100 or A-100** as variants later, or only the B-3?
+9. **The M-100 or A-100** as variants later, or only the tonewheel organ?
 
 ## 15. Sources
 
@@ -1042,13 +1042,13 @@ Frequencies come from §3.1.
 
 ## 16. Built (2026-11-17)
 
-`src/hammond.cc`, `src/hammond.h` (the generator, manuals, percussion, scanner, preamp),
-`src/hammondplan.cc` (the plan of a MIDI part), the Leslie in `src/leslie.cc` (`leslie.md` §15). §14
+`src/tonewheel.cc`, `src/tonewheel.h` (the generator, manuals, percussion, scanner, preamp),
+`src/tonewheelplan.cc` (the plan of a MIDI part), the rotary speaker in `src/rotary.cc` (`rotary.md` §15). §14
 answered with the defaults:
-- a used organ (sidebands ~−30 dB) with one age knob (`PJ_HAMMOND_AGE`);
+- a used organ (sidebands ~−30 dB) with one age knob (`PJ_TONEWHEEL_AGE`);
 - 3 dB per drawbar step;
 - velocity only as the key's speed (the contacts' spread; the expression rider in `-play`);
-- CC1 / CC64 for the Leslie;
+- CC1 / CC64 for the rotary speaker;
 - the GM 17/18/19 registrations of §13.3;
 - the lower manual and pedals in one instrument, fed by the plan;
 - 60 Hz gearing only.
@@ -1076,10 +1076,10 @@ gearing; the A/B preset flip and drawbar CCs; slow-press for the percussion; mac
 **Added 2026-11-17 (the user's requests):**
 - Three tracks are an organist's three staves: the lowest the pedals (if its mean pitch is under
   A3 and it holds under 1.6 notes per onset), the other two the manuals.
-- Every channel on one Hammond program is one organ.
-- The Leslie:
+- Every channel on one tonewheel organ program is one organ.
+- The rotary speaker:
   - the file's CC1 / CC64 / CC82 if present (CC82 0-42 stop, 43-85 slow, 86-127 fast, after the
-    Leslie 2101's default; CC1 kept as two-way, ≥ 64 fast, since pop files use the wheel
+    digital rotary speaker's default; CC1 kept as two-way, ≥ 64 fast, since pop files use the wheel
     continuously and a centre "stop" would brake them);
   - otherwise planned: about 1 in 4 pieces (1 in 2 on the rock organ) fast in their strongest
     phrase or two, the rest slow; seeded by a hash of the notes.
@@ -1126,7 +1126,7 @@ Hucklebuck*.
 
 - **At first** the organ sat 0.8-19 dB under TiMidity's against the band (median +1.9 dB needed).
 - **Two causes found:**
-  - one Hammond playing several channels took the first channel's CC7 only (*Whiter Shade*'s
+  - one tonewheel organ playing several channels took the first channel's CC7 only (*Whiter Shade*'s
     organ channels are at 27, 87, 41 and 89). It now takes their note-weighted mean.
   - the 122's amp divided its output by its drive, so the rock organ got quieter as it was driven
     harder. Its output now grows as drive^0.7, compressed.
@@ -1134,7 +1134,7 @@ Hucklebuck*.
 - **After:** organ against the band, TiMidity minus pajupilli −6.8 to +5.4 dB per file, median
   −0.3 dB.
 
-**The drawbar knobs (2026-11-17, the user's request: "K1 to K4 ... respecting the Hammond tradition";
+**The drawbar knobs (2026-11-17, the user's request: "K1 to K4 ... respecting the tonewheel organ tradition";
 then: "not a linear mapping, an emotional one ... K1 the most used, soft to hard ... another from
 full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated") [design]:**
 - A first version reduced 43 classics by PCA to four components (79 % of their variety). Decoding
@@ -1148,7 +1148,7 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
 - **K3:** dark (2' and above out, 4' and 2⅔' halved) to bright (1' to 8, 1⅓' and 2' rising).
 - **K4:** light (16', 5⅓' out) to deep (16' to 8, 5⅓' to 6).
 - The middles of K2-K4 (±10 %) leave K1's registration as it is.
-- **K5** is the Leslie's half-moon: stop / slow / fast.
+- **K5** is the the rotary speaker's half-moon: stop / slow / fast.
 - **Continuous and controlled (the user: "the drawbars need to move softly without integer values,
   a PI control system that brings them to the goal values dynamically"):**
   - The knobs give fractional goals.
@@ -1164,7 +1164,7 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
   - lower_d = upper_d × keep_d − 1 step (0 where the upper is 0);
   - keep = 0.85, 0.45, 1, 0.55, 0.45, 0.3, 0.25, 0.2, 0.15 (16' .. 1'): the foundation kept, the
     5⅓' halved (less buzz under the tune), the top mostly gone;
-  - the 1 step (~3 dB) is `PJ_HAMMOND_LOWER_SOFTER`;
+  - the 1 step (~3 dB) is `PJ_TONEWHEEL_LOWER_SOFTER`;
   - examples: jazz 888000000 → ~637000000 (near the classic 838 comping), ballad 838000000 →
     ~607000000, gospel 888800000 → ~637300000;
   - live from K1-K4, and in `-play`'s plans (replacing their fixed 838 / 808).
@@ -1177,8 +1177,8 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
   - live and in `-play`'s plans.
 
 **By ear (2026-11-17, the user):**
-- **The tone:** the Hammond was "a bit too dark". The preamp's tone control now lifts the mids and
-  highs 3 dB (a first-order shelf from 1 kHz, `PJ_HAMMOND_BRIGHT`): +2.7 dB at 2-5 kHz, +3.2 dB
+- **The tone:** the tonewheel organ was "a bit too dark". The preamp's tone control now lifts the mids and
+  highs 3 dB (a first-order shelf from 1 kHz, `PJ_TONEWHEEL_BRIGHT`): +2.7 dB at 2-5 kHz, +3.2 dB
   above 6 kHz.
 - **Played low, registered higher (the user: "higher drawbar settings so that it doesn't get too
   muddy, or even the 000800000 kind"):** `-play`'s plan moves the upper registration up an
@@ -1188,7 +1188,7 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
 - **A line that never sounds two notes together** is a tune, whatever its register: it goes to
   the upper manual (before, a single low line went to the lower).
 - **The user's ~/Downloads/rdmdngt.mid ("the accompaniment louder than the melody"):**
-  - Its tracks, "Hammond Left" and "Hammond Right", had been assigned right: right to the upper,
+  - Its tracks, "tonewheel organ Left" and "tonewheel organ Right", had been assigned right: right to the upper,
     left to the lower.
   - But it writes its balance in velocity (the tune 127, the left hand ~56) and per-channel CC11.
     The organ ignored the one and let either channel's CC11 move its single pedal.
@@ -1206,8 +1206,8 @@ full to hollow"; "K1 the 16 most used settings, piecewise linearly interpolated"
   - the lower manual and pedals follow.
 
   rdmdngt.mid has one such pause (0.66 beat): 888000000 → 888800000.
-- **Routing instruments** (the user, via the organ session): hammond-upper-manual,
-  hammond-lower-manual and hammond-pedal join the one Hammond and pin their notes to that
+- **Routing instruments** (the user, via the organ session): tonewheel-upper-manual,
+  tonewheel-lower-manual and tonewheel-pedal join the one tonewheel organ and pin their notes to that
   division.
 - **A 4' melody** (the user: "when the melody is relatively low in comparison to the accompaniment
   and by itself, it might be a 000800000-like melody, perhaps with some subharmonics"): a tune whose

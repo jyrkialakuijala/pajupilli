@@ -28,7 +28,7 @@ of it exists and what does not.
   just before the key through `Ensemble::direct` → `Performer::direct`. The base player turns it
   into attack hardness and vibrato; the bow player also scales its own vibrato, its delay, and
   sets the mute.
-- **Organs:** `organ-plan` and Hammond parts take only the shared time; their own plans still do
+- **Organs:** `organ-plan` and tonewheel organ parts take only the shared time; their own plans still do
   their articulation and balance. The migration below is not started.
 
 Not built: the meter map, anacrusis, harmony and cadences, sections, appoggiaturas, sforzando
@@ -56,8 +56,8 @@ today, but each one guesses alone:
   strong beats and the phrase breaths. The articulation block in `src/midifile.cc` (around lines
   670–900) also handles the Baroque *toucher ordinaire* (the normal, slightly detached touch), the
   silence before a strong beat, live trills and the pedal played ahead.
-- `src/hammondplan.cc` finds the style, climaxes, pauses, the final chord, the expression-pedal
-  shape (`swell`), the Leslie arc and the glissandos.
+- `src/tonewheelplan.cc` finds the style, climaxes, pauses, the final chord, the expression-pedal
+  shape (`swell`), the rotary speaker arc and the glissandos.
 - `noteLead()` (`src/instrument.h:216`, applied in `src/midifile.cc` around line 464) plays slow
   instruments ahead of the beat.
 - The wind players' `Vibrato` (`src/performer.h`) gives every player its own rate and phase. Depth
@@ -91,7 +91,7 @@ values to tune):
 
 Turn it on by hand with `-director on|off|auto` (default `auto`), and set its strength with
 `PJ_DIRECTOR` (0..2, default 1, scaling every deviation it makes). Print one line saying whether it
-took over and why, in the style of the organ and Hammond plan summaries.
+took over and why, in the style of the organ and tonewheel organ plan summaries.
 
 ## What it decides, once per piece
 
@@ -125,12 +125,12 @@ no audio code.
 
 ### 3. Style (era)
 
-This sets the defaults for everything below. Reuse and generalise the organ's and the Hammond's
+This sets the defaults for everything below. Reuse and generalise the organ's and the the tonewheel organ's
 detection:
 
 - **Baroque:** a motor rhythm (an even sixteenth or eighth pulse throughout), a continuo-like
   bass line, sequences, terraced texture changes, few long notes. The Bach files in `~/midi`
-  are the reference: the Hammond plan currently calls them "jazz".
+  are the reference: the tonewheel organ plan currently calls them "jazz".
 - **Classical:** an Alberti or repeated-note accompaniment, periodic 4- and 8-bar phrases, clear
   cadences.
 - **Romantic:** wide range, long melodic notes, chromatic harmony, tempo changes in the file.
@@ -205,7 +205,7 @@ strings through their bow-arm or left-hand hooks when they exist, and the organ'
   together; the Director scales only the depth and the onset delay, and nudges the rate slightly.
 - Organ: the tremulant only in a slow, quiet, meditative movement. The organ plan already knows
   "meditative" and the céleste; tie the tremulant to it.
-- Hammond: the vibrato tabs are its own (`src/hammondplan.cc`); the Director only informs the
+- tonewheel organ: the vibrato tabs are its own (`src/tonewheelplan.cc`); the Director only informs the
   counterpoint vs. ballad decision.
 
 ### 8. Timing: ritardando, fermata, agogics
@@ -271,7 +271,7 @@ The Director decides the *what*; each part's player decides the *how*, according
 | Bowed strings | bow pressure and speed (needs a hook) | bow weight at the start | the left hand (needs a hook) | lengths, bow changes at the breaths |
 | Piano, harpsichord, plucked | velocity per note | velocity; on the harpsichord, which has no dynamics, timing and length | — | lengths |
 | Church organ (`organ-plan`) | registration terraces per section (already planned there); the swell box only on an enclosed division | the gap before the note and the note's length (already there) | the tremulant (meditative only) | the existing articulation block, reading the Director's phrases |
-| Hammond | the expression-pedal shape (`HammondPlan::swell`) | velocity and the percussion's detaches | its own tabs | its own |
+| tonewheel organ | the expression-pedal shape (`TonewheelPlan::swell`) | velocity and the percussion's detaches | its own tabs | its own |
 | Drums | velocity follows the level | the metric weight | — | — |
 
 The wind path is the cheapest and most audible first target: today `-play` drives
@@ -285,10 +285,10 @@ In `playMidiFile` (`src/midifile.cc`):
 2. **New: `Direction dir = direct(song, partsInfo)`.** It runs on the raw song, before the leads
    and the plans. Apply `dir.tempoWarp` to the events' `t` (and to `Song::tempo`) here.
 3. `noteLead` and the other per-instrument leads (unchanged).
-4. The organ plan and the Hammond plan, now given `dir` to read the phrases, sections, climax,
+4. The organ plan and the tonewheel organ plan, now given `dir` to read the phrases, sections, climax,
    style and final chord instead of guessing their own.
 5. During the render: at each block, for every part, look up its level and vibrato curves at
-   `now` and set them on the players (the same clock loop that applies the Hammond's
+   `now` and set them on the players (the same clock loop that applies the the tonewheel organ's
    `swell`, around line 980). Per-note accent, length and swell are applied at the note-on and
    the note-off.
 
@@ -301,8 +301,8 @@ After the Director exists and is tested, in this order:
 1. The organ articulation block: its strong beats, phrase-end breaths and Baroque detach read
    `dir.meter` and `dir.phrases`. The physical rules (pedal speech, repeated keys, trills) stay.
 2. `planOrgan`: its style detection is fed or replaced by `dir.style` and `dir.sections`.
-3. `planHammond`: climaxes, the final chord (`endAt`), the pauses, and the counterpoint vs. ballad
-   decision from `dir`. The Hammond-idiomatic choices (Leslie, percussion, glissandos, drawbars)
+3. `planTonewheel`: climaxes, the final chord (`endAt`), the pauses, and the counterpoint vs. ballad
+   decision from `dir`. The tonewheel organ-idiomatic choices (rotary speaker, percussion, glissandos, drawbars)
    stay in its own plan.
 
 Each step must keep the existing tests in `tools/test.py` passing, or update them deliberately.
@@ -311,7 +311,7 @@ Each step must keep the existing tests in `tools/test.py` passing, or update the
 
 1. **Analysis only.** `src/director.{h,cc}`: detection (does it act), the meter map, phrases,
    cadences, sections, climaxes, style, fermatas, and the summary. Print it under `-play`. No
-   audible change yet. Tests on synthetic MIDI files made in `tools/test.py` (the Hammond tests
+   audible change yet. Tests on synthetic MIDI files made in `tools/test.py` (the tonewheel organ tests
    show how to write small files):
    - a quantized 4/4 piece with a clear 8-bar phrase structure and a final cadence;
    - a fermata written as a long chord + general pause, and one written as a tempo drop;
@@ -329,7 +329,7 @@ Each step must keep the existing tests in `tools/test.py` passing, or update the
    whoever owns the bowed-string and cello work** (`src/bass*`, `src/cellobody_data.h`,
    `research/cello.md`; uncommitted work exists there). Don't edit those files without that
    owner.
-6. **The migration** of the organ and Hammond logic (above).
+6. **The migration** of the organ and tonewheel organ logic (above).
 
 ## Knobs (environment, in the existing `PJ_` style)
 
@@ -340,7 +340,7 @@ Each step must keep the existing tests in `tools/test.py` passing, or update the
 
 ## Principles and constraints
 
-- **Deterministic.** Like the Hammond plan: any randomness comes from hashing the note's (tick,
+- **Deterministic.** Like the tonewheel organ plan: any randomness comes from hashing the note's (tick,
   key, channel), never from a clock or a global RNG. The same file renders the same way.
 - **Subtle by default.** A good conductor's reading is felt rather than noticed. The default
   deviations should sound natural at strength 1, and caricatured only at 2.
@@ -351,7 +351,7 @@ Each step must keep the existing tests in `tools/test.py` passing, or update the
   gives musical intentions; each player realises them within what its instrument can do.
 - **Explainable.** Every decision appears in the printed summary, so a listener can check it
   against the score.
-- **Docs.** Each step updates `README.md` (the `-play` section) as the organ and Hammond work did.
+- **Docs.** Each step updates `README.md` (the `-play` section) as the organ and tonewheel organ work did.
 - **Repository rules.** Commits are made in the user's name only, and only when asked. Do not
   touch another session's in-progress files: `src/bore.*`, `src/horn.*`, `src/hornplayer.cc`,
   `tools/brass.py`, and the bowed-string and cello work above.

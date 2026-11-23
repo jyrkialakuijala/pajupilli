@@ -54,7 +54,7 @@ GuitarSpec classicalGuitar() {
   return g;
 }
 
-// The Stratocaster (research/electric_guitars.md 4, 6): 648 mm, 21 frets, D'Addario 10-46. GM 28
+// The three-pickup solid-body (research/electric_guitars.md 4, 6): 648 mm, 21 frets, standard 10-46. GM 28
 // ("clean-guitar") and GM 29 ("muted-guitar": the same guitar, the palm on the strings) differ
 // only in the pickups selected and how they are played.
 GuitarSpec electricGuitar(const char* name) {
@@ -85,7 +85,7 @@ GuitarSpec electricGuitar(const char* name) {
   const double neck = knob("PJ_EGTR_NECK", 1.0);
   g.body = {{knob("PJ_EGTR_DEADHZ", 212), 25, 0.12 / neck, 0, 0, 0.15}, {338, 30, 0.2 / neck, 0, 0, -0.1}};
   g.radiate = 0;
-  // The pickups (6.1, measured on a Stratocaster; low E first): from the saddle; the gaps
+  // The pickups (6.1, measured on a three-pickup solid-body; low E first): from the saddle; the gaps
   // [E] (set lower under the treble strings, the neck pickup further off); a single coil
   // 2.2 H, 6.5 kOhm, 110 pF (6.2); its field ~20 mm wide.
   const double volts = 0.15 * knob("PJ_EGTR_VOLTS", 1.0), width = knob("PJ_EGTR_WIDTH", 6e-3);
@@ -117,15 +117,15 @@ GuitarSpec electricGuitar(const char* name) {
   g.pots = 125e3;  // (250 k volume and 250 k tone, both full up)
   g.palmSat = knob("PJ_EGTR_PALMSAT", 30.0);
   if (std::strcmp(name, "overdriven-guitar") == 0 || std::strcmp(name, "distortion-guitar") == 0) {
-    // A Les Paul (GM 30 and 31, 2.4, 13; distortion_guitar.md 10.7: the same hot bridge pickup): 628 mm, 22 frets; the same strings 6 % slacker and 13 % more
-    // inharmonic; two humbuckers (Les Paul: bridge ~40 mm, neck ~155 mm from the saddle [M]),
+    // A twin-humbucker solid-body (GM 30 and 31, 2.4, 13; distortion_guitar.md 10.7: the same hot bridge pickup): 628 mm, 22 frets; the same strings 6 % slacker and 13 % more
+    // inharmonic; two humbuckers (twin-humbucker solid-body: bridge ~40 mm, neck ~155 mm from the saddle [M]),
     // each two coils 18 mm apart in series: twice a coil's signal, and the pair's own comb. The
     // bridge one hot (a 498T: 8.0 H, 6.2 [T]); 500 k pots.
     const double r = 0.648 / 0.628;
     g.scale = 0.628;
     g.frets = 22;
-    // (Its overtones ring longer: the Les Paul's sustain, the mahogany and the set neck [L];
-    // half the Strat's estimated loss above the fundamental.)
+    // (Its overtones ring longer: the twin-humbucker solid-body's sustain, the mahogany and the set neck [L];
+    // half the three-pickup solid-body's estimated loss above the fundamental.)
     const double lpHigh = knob("PJ_EGTR_LPRING", 0.5);
     for (GuitarString& st : g.str) { st.tension /= r * r; st.B *= r * r; st.loss1 *= lpHigh; }
     const double hv = 0.15 * 2.6 * knob("PJ_EGTR_VOLTS", 1.0), hw = knob("PJ_EGTR_WIDTH", 5e-3);
@@ -193,13 +193,13 @@ GuitarSpec steelGuitar() {
   return g;
 }
 
-// The jazz guitar (GM 27; research/jazz_guitar.md 9.1): a Gibson ES-175. 628 mm, 20 frets.
-//   - Flatwounds 12-52 (3.1: TI JS112 / D'Addario ECG25 at 628 mm): ~590 N in all, 1.4x the
-//     Strat's set; the G wound (B ~1e-5: a wound G against the plain G's 1.1e-4), the wound strings'
+// The jazz guitar (GM 27; research/jazz_guitar.md 9.1): a laminated archtop. 628 mm, 20 frets.
+//   - Flatwounds 12-52 (3.1: TI JS112 / standard ECG25 at 628 mm): ~590 N in all, 1.4x the
+//     three-pickup solid-body's set; the G wound (B ~1e-5: a wound G against the plain G's 1.1e-4), the wound strings'
 //     B 1.75x their core's (the flat ribbon carries some of the bending). Their loss above the
 //     fundamental steep (k^2: the ribbon's turns rubbing), fitted to Rau17's one measured
 //     flatwound (3.2): the fundamental of the open low E 15 dB down in ~5.5 s, its 3rd-5th
-//     harmonics in ~1 s (loss1 0.036-0.054 k^2). The plain strings as the Strat's, their loss
+//     harmonics in ~1 s (loss1 0.036-0.054 k^2). The plain strings as the three-pickup solid-body's, their loss
 //     above 1.1x.
 //   - The body (2.3): the neck's three modes (85, 175, 332 Hz: Rau17), the air through the
 //     f-holes (125), the arched top's first (240), the bridge rocking on its two feet (420), the
@@ -222,7 +222,7 @@ GuitarSpec jazzGuitar() {
   // (The research's loss0 0.30-0.90 x0.6: the swing along the top rings on, the one towards it
   // dies 2x as fast (towardsLoss): the archtop's punch, then the long tail.)
   const double l0[6] = {0.18, 0.21, 0.27, 0.33, 0.42, 0.54};
-  // (wound: k^2; plain: k^1.2, 1.1x the Strat's 0.06 (f / 82.41)^0.8)
+  // (wound: k^2; plain: k^1.2, 1.1x the three-pickup solid-body's 0.06 (f / 82.41)^0.8)
   const double l1[6] = {0.036, 0.0405, 0.045, 0.054, 1.125 * 0.06 * std::pow(246.94 / 82.41, 0.8), 1.125 * 0.06 * std::pow(329.63 / 82.41, 0.8)};
   const double flatExp = knob("PJ_JAZZ_FLATEXP", 2.0);
   for (int i = 0; i < 6; ++i) {

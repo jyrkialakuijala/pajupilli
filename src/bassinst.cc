@@ -80,17 +80,17 @@ extern const Instrument kPlucked[] = {
     {"violin", 0, 55, 105, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kBassDesign, "violin"},
     // The concert grand (src/piano.cc, src/pianoinst.cc): A0 .. C8.
     {"grand-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    // The bright piano (General MIDI 2): a Shigeru Kawai SK-7, the 229 cm grand (src/sk7.cc).
+    // The bright piano (General MIDI 2): a semi-concert grand, the 229 cm grand (src/brightgrand.cc).
     {"bright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // A 121 cm upright (src/upright.cc): its scale and board.
     {"upright-piano", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The honky-tonk (General MIDI 4): the upright out of tune, its hammers worn (src/pianoinst.cc).
     {"honky-tonk", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    // The Yamaha CP-80 electric grand (src/cp80.cc): A0 .. C8.
+    // The electric grand (src/electricgrand.cc): A0 .. C8.
     {"electric-grand", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    // The Fender Rhodes (src/rhodes.cc), General MIDI 5: the 88's harp, A0 .. C8.
+    // The tine electric piano (src/tinepiano.cc), General MIDI 5: the 88's harp, A0 .. C8.
     {"electric-piano-1", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    // The DX7's E.PIANO 1 (src/dx7.cc), General MIDI 6: A0 .. C8.
+    // The FM synth's E.PIANO 1 (src/fmsynth.cc), General MIDI 6: A0 .. C8.
     {"electric-piano-2", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // FX 8 (sci-fi) (src/scifi.cc), General MIDI 104: a folded discharge and an FM'd filter ping, A0 .. C8.
     {"fx-sci-fi", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
@@ -109,10 +109,10 @@ extern const Instrument kPlucked[] = {
     // FX 7 (echoes) (src/echoes.cc), General MIDI 103: a tuning-fork keyboard into a tape echo,
     // A0 .. C8.
     {"fx-echoes", 0, 21, 108, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "fx"},
-    // The Hohner Clavinet D6, E7 and C (src/clavinet.cc): F1 .. E6.
-    {"clavinet", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    {"clavinet-e7", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
-    {"clavinet-c", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    // The clavi, E7 and C (src/clavi.cc): F1 .. E6.
+    {"clavi", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    {"clavi-late", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
+    {"clavi-early", 0, 29, 88, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "piano"},
     // The snare drum under brushes (src/snare.cc): General MIDI's drum keys 37 .. 41.
     {"brush-snare", 0, 36, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     // The hi-hat (src/hihat.cc): General MIDI's drum keys 42, 44, 46.
@@ -131,24 +131,24 @@ extern const Instrument kPlucked[] = {
     {"clean-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
     // The steel-string acoustic (GM 26; src/guitar.cc steelGuitar()): a dreadnought, flatpicked.
     {"steel-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
-    // The jazz guitar (GM 27; src/guitar.cc jazzGuitar(), src/jazzguitar.cc): an ES-175, flatwounds, into a
+    // The jazz guitar (GM 27; src/guitar.cc jazzGuitar(), src/jazzguitar.cc): an laminated archtop, flatwounds, into a
     // clean jazz amp; E2 .. C6 (notes outside folded in by octaves).
     {"jazz-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
     {"muted-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
     {"overdriven-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
-    // The electric bass (src/ebass.cc): a Jazz Bass, fingerstyle; E1 .. D#4, notes outside moved in by octaves.
+    // The electric bass (src/ebass.cc): a two-pickup bass, fingerstyle; E1 .. D#4, notes outside moved in by octaves.
     {"electric-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
-    // GM 35 (src/ebass.cc PickBassPlayer): a Precision Bass played with a pick, into an SVT; E1 .. D#4.
+    // GM 35 (src/ebass.cc PickBassPlayer): a split-coil bass played with a pick, into an bass stack; E1 .. D#4.
     {"pick-bass", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
-    // GM 36 (src/fretless.cc): the Jazz Bass defretted, its board under the finger (the mwah), slides,
+    // GM 36 (src/fretless.cc): the two-pickup bass defretted, its board under the finger (the mwah), slides,
     // scoops, vibrato, tuned by ear to the band; E1 .. D#4 stopped, natural harmonics above (to E4).
     {"fretless-bass", 0, 24, 76, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
-    // GM 37, 38 (src/ebass.cc SlapBassPlayer): the Jazz Bass slapped and popped, its frets
+    // GM 37, 38 (src/ebass.cc SlapBassPlayer): the two-pickup bass slapped and popped, its frets
     // struck; 38 active, stainless, pop-forward; E1 .. D#4.
     {"slap-bass-1", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
     {"slap-bass-2", 0, 24, 72, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "bass"},
     {"distortion-guitar", 0, 28, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
-    // GM 32: the clean Strat in harmonics (src/guitarinst.cc HarmonicsPlayer): E3 .. G#7 as heard.
+    // GM 32: the clean three-pickup solid-body in harmonics (src/guitarinst.cc HarmonicsPlayer): E3 .. G#7 as heard.
     {"guitar-harmonics", 0, 52, 104, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "guitar"},
     // The harpsichord (src/harpsichord.cc, on the piano's strings): F1 .. F6; 8' + 8', the back 8'
     // alone, and all four choirs (16' 8' 8' 4').
@@ -224,16 +224,16 @@ extern const Instrument kPlucked[] = {
     {"harmonica", 0, 48, 98, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "harmonica"},
     // The reed organ (src/harmonium.cc; research/reed_organ.md): a pressure harmonium, C2..C7 (General MIDI 21).
     {"reed-organ", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "reed organ"},
-    // The Hammond B-3 through its Leslie 122 (src/hammond.cc, src/leslie.cc; research/hammond_b3.md,
-    // research/leslie.md): General MIDI 17 (drawbar-organ), 18 (percussive-organ), 19 (rock-organ).
-    {"hammond", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    {"drawbar-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    {"percussive-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    {"rock-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    // (routing: one Hammond and its Leslie, the notes on this division: -reinstrument piano=hammond-upper-manual)
-    {"hammond-upper-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    {"hammond-lower-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
-    {"hammond-pedal", 0, 24, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "hammond"},
+    // The tonewheel organ through its rotary speaker (src/tonewheel.cc, src/rotary.cc; research/tonewheel_organ.md,
+    // research/rotary.md): General MIDI 17 (drawbar-organ), 18 (percussive-organ), 19 (rock-organ).
+    {"tonewheel", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    {"drawbar-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    {"percussive-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    {"rock-organ", 0, 24, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    // (routing: one Tonewheel and its Rotary, the notes on this division: -reinstrument piano=tonewheel-upper-manual)
+    {"tonewheel-upper-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    {"tonewheel-lower-manual", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
+    {"tonewheel-pedal", 0, 24, 48, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "tonewheel"},
 };
 extern const int kNumPlucked = sizeof(kPlucked) / sizeof(kPlucked[0]);
 

@@ -1,4 +1,4 @@
-# The vibraphone (Musser M55 Pro-Vibe) on the pajupilli modal engine — research notes
+# The vibraphone (one mallet maker M55 Pro-Vibe) on the pajupilli modal engine — research notes
 
 Status: 2026-11-15. Research only: nothing is built yet. It covers GM program 12 "Vibraphone", MIDI 53–89 (F3–F6).
 SI units. c = 344 m/s (air at 20 °C). Aluminium 2024-T4: E = 73.1 GPa, ρ = 2780 kg/m³, ν = 0.33, so √(E/ρ) =
@@ -32,7 +32,7 @@ literature as I remember it, not checked for this file. Check these before relyi
   is ≈ 10 cents at F3 and ≈ 70 cents at F6 **[calc]**. This explains why the sound and the sustain depend so much on
   temperature: the air in the tube shifts ≈ +3 cents/K, while the aluminium shifts −0.4 cents/K **[calc]**.
 - **Fan:** one disc per tube, all on shafts turned by one motor. Each disc opens and closes its tube twice per
-  revolution. Modern motors turn **30–145 rpm** (Yamaha), 25–150 or 40–140 rpm (Adams) and 20–160 rpm (Adams
+  revolution. Modern motors turn **30–145 rpm** (one maker), 25–150 or 40–140 rpm (Adams) and 20–160 rpm (Adams
   Nomad) **[web]**. That is a 0.5–2.4 Hz shaft, so the **tremolo runs at ≈ 1–5 Hz** **[calc]**. Wikipedia's
   "1–12 Hz" (citing Meyer 1973) is the outer bound. I found no published rpm for the M55's own motor, an Oriental
   Motor speed-control unit at 1/140 HP **[web]**. The effect is mostly **amplitude modulation of the fundamental**:
@@ -51,16 +51,16 @@ literature as I remember it, not checked for this file. Check these before relyi
 
 ---
 
-## 1. The instrument: Musser M55 Pro-Vibe
+## 1. The instrument: one mallet maker M55 Pro-Vibe
 
 | Item | Value | Tag / source |
 |---|---|---|
-| Range | F3–F6, 3 octaves, 37 bars (MIDI 53–89) | [web] retailers, Conn-Selmer [CS], Wikipedia [WV] |
-| Tuning | A = 442 Hz standard since 1 Jan 1994 (A = 440 before; 440/445 to order) | [web] Ludwig/Musser parts list [M55P], Ozwinds |
-| Bar width | graduated 2¼" → 1½" (57 → 38 mm) | [web] French retailer "57–38 mm"; same as Yamaha YVT-2700 [YVT] |
+| Range | F3–F6, 3 octaves, 37 bars (MIDI 53–89) | [web] retailers, a brass maker [CS], Wikipedia [WV] |
+| Tuning | A = 442 Hz standard since 1 Jan 1994 (A = 440 before; 440/445 to order) | [web] one drum maker/Musser parts list [M55P], Ozwinds |
+| Bar width | graduated 2¼" → 1½" (57 → 38 mm) | [web] French retailer "57–38 mm"; same as one maker YVT-2700 [YVT] |
 | Bar thickness | ½" (12.7 mm); a 37-bar instrument at Grinnell measured 0.52" (13.2 mm) | [web] [YVT], [GRN] |
-| Bar length | ≈ 15" → 6.9" (381 → 175 mm) on a 37-bar F3–F6 vibraphone (Grinnell; the maker is not confirmed as Musser) | [web] [GRN] |
-| Alloy | 2024-T4 aluminium (a vibraphone patent; a Musser forum statement says the same). Some makers use 6061-T6 | [web] [P749], [VW]; 6061: [memory] |
+| Bar length | ≈ 15" → 6.9" (381 → 175 mm) on a 37-bar F3–F6 vibraphone (Grinnell; the maker is not confirmed as one mallet maker) | [web] [GRN] |
+| Alloy | 2024-T4 aluminium (a vibraphone patent; a one mallet maker forum statement says the same). Some makers use 6061-T6 | [web] [P749], [VW]; 6061: [memory] |
 | Finish | anodised: silver (M55), gold (M55G), black (M55B) | [web] [CS] |
 | Suspension | "node wire, plain/sharp" through holes at the nodes; 40 saddle posts, 40 hook posts, 88 post insulators | [web] [M55P] |
 | Node holes | 0.244 L from each end (undercut bar; a uniform bar has 0.224 L) | [web] [P749]; [WV] |
@@ -269,11 +269,11 @@ at σ_b + κ²σ_r/(σ_r² + Δ²) **[calc]**. Fitting κ to "T60 bar → T60 wi
   is 2 × the shaft rate **[calc/standard]**. One builder says a tube tuned too high peaks at 45°, giving four
   maxima per revolution, "doubling the vibrato frequency" **[web, VW-Nico]**. In the coupled model this is
   detuning that moves through zero twice per opening.
-- **Speeds:** Yamaha YVD10/YVD20 drivers **30–145 rpm**; Adams Concert 25–150 rpm (another listing says 40–140);
+- **Speeds:** One maker YVD10/YVD20 drivers **30–145 rpm**; Adams Concert 25–150 rpm (another listing says 40–140);
   Adams Nomad 20–160 rpm **[web, YVD, AD]**. That is a 0.33–2.7 Hz shaft and a **≈ 0.7–5.3 Hz tremolo** **[calc]**.
-  Wikipedia: motor "1–12 Hz" (Meyer 1973) **[web, WV]**. A Deagan owner runs a retrofitted Yamaha motor at 3.5–6
+  Wikipedia: motor "1–12 Hz" (Meyer 1973) **[web, WV]**. A one mallet maker owner runs a retrofitted one maker motor at 3.5–6
   rpm (a slow "breathing") **[web, VW2]**. M55: an Oriental Motor speed-control set behind a belt reduction, ratio
-  not published. Assume ≈ 20–160 rpm like its competitors **[guess]**. Yamaha's "pause memory" stops the shaft at
+  not published. Assume ≈ 20–160 rpm like its competitors **[guess]**. One maker's "pause memory" stops the shaft at
   a preset angle, open for volume or closed for sustain **[web, YVD]**.
 - **Depth:** open "≈ 85–90 % of maximum resonance", closed "≈ 10–15 %": leakage around the disc means the tube never
   fully closes **[web, P691]**. Read as amplitude of the tube-radiated fundamental, that is 20·log(0.12/0.88) ≈
@@ -342,7 +342,7 @@ at σ_b + κ²σ_r/(σ_r² + Δ²) **[calc]**. Fitting κ to "T60 bar → T60 wi
 - **Bar:** the top and bottom faces move in antiphase, so the bar is a dipole (a quadrupole along its length for
   mode 1, whose ends and middle move in opposite directions). At F3, k·w/2 ≈ 0.09 and the radiation efficiency is
   tiny, ∝ (kw)² for the dipole part **[calc/memory]**. At F6, kw/2 ≈ 0.49, which is respectable. This is why a
-  vibraphone without resonators (Deagan's 1970 ElectraVibe, pickups instead **[web, WV]**) is thin in the bass.
+  vibraphone without resonators (one mallet maker's 1970 ElectraVibe, pickups instead **[web, WV]**) is thin in the bass.
 - **Resonator mouth:** a monopole with volume velocity U, omnidirectional below ka ≈ 1, which holds for every
   vibraphone tube at its fundamental. At the low end it dominates the fundamental by ~20 dB (§2.2, Rucz's > 10 dB on
   a xylophone F4) **[calc/web]**. The underside of the bar drives the tube, while the top face radiates in

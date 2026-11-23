@@ -81,8 +81,8 @@ class Performer {
     vibDepth_ = 0.05 * c.v[kCueVibDepth];
     vibRate_ = 5.0 * c.v[kCueVibRate];
   }
-  // (live) An instrument's own use of the MPK's knobs K1..K8 (k 0..7, x 0..1); true if it took
-  // the knob (the Hammond's drawbars on K1-K4), false to leave it to the common map.
+  // (live) An instrument's own use of the controller's knobs K1..K8 (k 0..7, x 0..1); true if it took
+  // the knob (the Tonewheel's drawbars on K1-K4), false to leave it to the common map.
   virtual bool setKnob(int /*k*/, double /*x*/) { return false; }
 
   void setDynamics(double d) { dyn_ = d; }      // 0 pp .. 1 ff (breath, lip opening)

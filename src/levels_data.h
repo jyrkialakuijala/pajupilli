@@ -59,11 +59,11 @@ constexpr LevelTrim kLevelTrims[] = {
     {"bright-piano", 4.6f},  // (tools/levels.py's measure(): -32.8 LUFS untrimmed against the median -28.2 of the others with their trims)
     {"upright-piano", 6.2f},
     {"honky-tonk", 5.4f},  // (measured 0.8 dB over the upright: brighter, harder hammers and tacks, in its closed case)
-    {"clavinet", -3.5f},
+    {"clavi", -3.5f},
     {"electric-piano-2", -9.9f},
     {"electric-piano-1", 1.0f},
-    {"clavinet-e7", -4.0f},
-    {"clavinet-c", -9.4f},
+    {"clavi-late", -4.0f},
+    {"clavi-early", -9.4f},
     {"brush-snare", 12.0f},
     {"hi-hat", 20.0f},
     {"celesta", 17.0f},
@@ -80,10 +80,10 @@ constexpr LevelTrim kLevelTrims[] = {
     {"overdriven-guitar", -4.5f},  // (measured -23.7 LUFS at three notes)
     {"distortion-guitar", -11.2f},  // (measured -17.0 LUFS at three notes)
     {"guitar-harmonics", 15.1f},  // (tools/levels.py's measure(): -43.3 LUFS untrimmed, the median -28.2)
-    {"electric-bass", 9.7f},  // (measured -37.9 LUFS at three notes, through the B-15, the DI and the LA-2A; the bare DI -34.7)
-    {"pick-bass", 10.8f},  // (tools/levels.py's measure(): -39.0 LUFS untrimmed through the SVT, the DI and the 1176; the median -28.2)
+    {"electric-bass", 9.7f},  // (measured -37.9 LUFS at three notes, through the fliptop, the DI and the optical compressor; the bare DI -34.7)
+    {"pick-bass", 10.8f},  // (tools/levels.py's measure(): -39.0 LUFS untrimmed through the bass stack, the DI and the FET compressor; the median -28.2)
     {"fretless-bass", 16.4f},  // (tools/levels.py's measure(): -44.6 LUFS untrimmed through "fretless-di": the round pad's pluck, D#4 high on the G string; the median -28.2)
-    {"slap-bass-1", 7.7f},  // (tools/levels.py's measure(): -35.9 LUFS untrimmed through the slap DI, the 4x10 and the 1176; the median -28.2)
+    {"slap-bass-1", 7.7f},  // (tools/levels.py's measure(): -35.9 LUFS untrimmed through the slap DI, the 4x10 and the FET compressor; the median -28.2)
     {"slap-bass-2", 8.4f},  // (-36.6 LUFS untrimmed: the active J popped, the same chain)
     {"muted-guitar", 8.6f},  // (-44.4 LUFS by the 1 s rule: a muted note is short; set so its strokes are as loud as the clean guitar's over 100 ms)
     {"harpsichord", 24.0f},
@@ -159,13 +159,13 @@ constexpr LevelTrim kLevelTrims[] = {
     {"bandoneon", -5.7f},  // (measured -22.5 LUFS)
     {"harmonica", 2.2f},  // (measured -30.4 LUFS with the hands cupped)
     {"reed-organ", 9.3f},  // (measured -37.5 LUFS, stops 1 + 4)
-    {"hammond", 0.6f},           // (its output x5 (+14 dB: a Leslie is loud, the room hears it so; heard from 4 m in a room, ~3 dB under
+    {"tonewheel", 0.6f},           // (its output x5 (+14 dB: a Rotary is loud, the room hears it so; heard from 4 m in a room, ~3 dB under
                                   // its close microphones), then 3 dB over the common level: in a
                                   // band it sat ~3 dB under TiMidity's FluidR3 organ, against the band, in 5 GM files)
     {"drawbar-organ", 0.6f},
-    {"hammond-upper-manual", 0.6f},
-    {"hammond-lower-manual", 0.6f},
-    {"hammond-pedal", 0.6f},
+    {"tonewheel-upper-manual", 0.6f},
+    {"tonewheel-lower-manual", 0.6f},
+    {"tonewheel-pedal", 0.6f},
     {"percussive-organ", 4.1f},  // (measured -41.3: the ping decays within the measured second; +3 dB as above)
     {"rock-organ", -4.2f},         // (measured -31.9, the 122 driven hot; +3 dB as above)
 };

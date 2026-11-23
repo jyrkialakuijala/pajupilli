@@ -2,7 +2,7 @@
 
 Status: research only, nothing built. Today `slap-bass-1` falls back to `double-bass`
 (`src/midifile.cc:192`). The amp preset is ready (`GuitarAmp::slapDi()`, `src/guitaramp.cc:251`;
-`research/bass_amps.md` 10.4). The Jazz Bass it plays on is built (`src/ebass.*`, GM 34). Slap
+`research/bass_amps.md` 10.4). The two-pickup bass it plays on is built (`src/ebass.*`, GM 34). Slap
 Bass 2 (GM 38) is being researched in parallel in `research/slap_bass_2.md`; this file covers it
 only to say how the two differ.
 
@@ -24,27 +24,27 @@ How each fact is marked:
 
 - **GM itself names the two programs and nothing more** ("Slap Bass 1", "Slap Bass 2")
   [web, polyphone]. Each maker defines the sound.
-- **The names are Roland's, older than GM.**
+- **The names are one maker's, older than GM.**
   - The MT-32 (1987) already had "Slap Bass 1" (described as "nice slap") and "Slap Bass 2"
     ("variation") as presets 69/70 [web, synthmania MT-32].
   - The SC-88Pro's CM-64 map keeps them at bank 127, programs 69/70. The CM-32P's PCM tones,
     at bank 126, also hold a "Slap Bass 1" (programs 16–19) and a "Slap Bass 2" (20–23)
     [web, SC-88Pro manual].
-  - Roland's 1988–89 PCM slap tones are key-split multisamples. On the U-20, every slap tone is
-    "Thumped, pulled, harmonics" over key ranges, roughly E2/B2 and F#4/C#4 in Roland naming,
+  - one maker's 1988–89 PCM slap tones are key-split multisamples. On the sample-based module, every slap tone is
+    "Thumped, pulled, harmonics" over key ranges, roughly E2/B2 and F#4/C#4 in one maker naming,
     i.e. MIDI 40/47 and 66/61. They come in pairs: "SINGLE", and "DETUNE" (two voices). There
     are also "V-SW" tones that switch from thumped to pulled at velocity 100 [web, U-20 manual].
 - **Sound Canvas.**
-  - Slap Bass 1 takes **one voice** in every map (SC-55, SC-88, SC-88Pro).
-  - Slap Bass 2 takes **one voice in the SC-55 map and two in the SC-88 and SC-88Pro maps**
-    [web, SC-88Pro manual]. So the 38 of the SC-88 era is a layered or doubled sound; the 37 is a
+  - Slap Bass 1 takes **one voice** in every map (early GS module, later GS module, SC-88Pro).
+  - Slap Bass 2 takes **one voice in the early GS module map and two in the later GS module and SC-88Pro maps**
+    [web, SC-88Pro manual]. So the 38 of the later GS module era is a layered or doubled sound; the 37 is a
     single sample set.
   - GS variations under 37 (bank:program, counted from 0) [web, SC-88Pro manual; polyphone]:
     - "Slap Pop" (1 voice);
     - "Reso Slap" (bank 8, 1 voice);
     - "Unison Slap" (bank 9, 2 voices).
   - Under 38 there is only "FM Slap" (bank 8, 2 voices).
-- **Yamaha XG.**
+- **XG.**
   - Variations of 37: "ResoSlap" (bank 27) and **"PunchThm" (Punch Thumb, bank 32)**.
   - Variation of 38: **"VeloSlap"** (bank 43, a velocity switch) [web, polyphone].
   - So in XG the *thumb* variation hangs on 37, and the *velocity-switched thumb/pop* hangs on
@@ -70,7 +70,7 @@ How each fact is marked:
   does not [memory].
 
 **What this gives for pajupilli** (a proposal; the user decides by ear):
-- **GM 37, Slap Bass 1: the thumb-led slap.** A Jazz Bass, both pickups full, DI-dominant through
+- **GM 37, Slap Bass 1: the thumb-led slap.** A two-pickup bass, both pickups full, DI-dominant through
   `slapDi`. Most notes are thumbed (with fret clank); pops only where a player must pop (octave
   and upward leaps onto the D/G strings, accented high notes). Ghost notes and hammer-ons as the
   line asks. The compressor is moderate.
@@ -79,43 +79,43 @@ How each fact is marked:
   `research/slap_bass_2.md` decides.
 - Both programs share one physical bass, player and fret-contact model. Only the player's
   thumb/pop bias and the chain differ. That matches the reference sets: FluidR3 splits the two by
-  technique, Roland and the SoundFonts by brightness and compression.
+  technique, one maker and the SoundFonts by brightness and compression.
 
 ---
 
 ## 1. The GM 37 patch in the reference implementations
 
-### 1.1 Roland
+### 1.1 one maker
 
 - **MT-32 (LA synthesis, 1987).** "Slap Bass 1" (#69, "Nice slap") and "Slap Bass 2" (#70,
   "Variation") [web, synthmania MT-32]. These are the CM-64 map's bank 127 programs 69/70 on the
   SC-88Pro [web, SC-88Pro manual]. Whether the MT-32 used a PCM slap attack under an LA sustain
   is [memory, unverified]; the MT-32's PCM ROM holds short attack samples, and a slap transient
   is the kind of sample it holds.
-- **U-110 / CM-32P / U-20 (PCM, 1988–89).**
-  - The U-110's factory tones include "a clean electric bass played with slap technique" [web,
-    search snippet of the U-110 pages].
-  - The CM-32P (the U-110's ROM in a CM box) provides the bank 126 "Slap Bass 1" and
+- **sample-based module / CM-32P / sample-based module (PCM, 1988–89).**
+  - The sample-based module's factory tones include "a clean electric bass played with slap technique" [web,
+    search snippet of the sample-based module pages].
+  - The CM-32P (the sample-based module's ROM in a CM box) provides the bank 126 "Slap Bass 1" and
     "Slap Bass 2" [web, SC-88Pro manual; the U-110 link is [memory]].
-  - The U-20's slap tones: "SLAP 1 SINGLE: Thumped, pulled, harmonics (E2, F#4)" and "SLAP 2
-    DETUNE: …". "SLAP 5 V-SW: Thumped/pulled (v = 100), harmonics (F#4)" [web, U-20 manual;
+  - The sample-based module's slap tones: "SLAP 1 SINGLE: Thumped, pulled, harmonics (E2, F#4)" and "SLAP 2
+    DETUNE: …". "SLAP 5 V-SW: Thumped/pulled (v = 100), harmonics (F#4)" [web, sample-based module manual;
     OCR-damaged, so the key names are approximate].
-  - So Roland's PCM slap is **thumb at the bottom, popped ("pulled") notes above a split, and
+  - So one maker's PCM slap is **thumb at the bottom, popped ("pulled") notes above a split, and
     harmonics at the top**. "2" is the **detuned (two-voice) copy** of "1".
-  - **[Inference]** The SC-55's GM 37 most likely descends from this family: one voice, thumb
-    low and pop high by key split. The SC-88 map's two-voice Slap Bass 2 continues the
-    SINGLE/DETUNE pairing. The SC-55 was not heard or measured here.
-- **SC-55 / SC-88 / SC-88Pro.** For the voice counts and the GS variations, see §0 [web, SC-88Pro
-  manual]. "Slap Pop" as a variation of 37 shows that Roland treated the pop as a *variant*: the
+  - **[Inference]** The early GS module's GM 37 most likely descends from this family: one voice, thumb
+    low and pop high by key split. The later GS module map's two-voice Slap Bass 2 continues the
+    SINGLE/DETUNE pairing. The early GS module was not heard or measured here.
+- **early GS module / later GS module / SC-88Pro.** For the voice counts and the GS variations, see §0 [web, SC-88Pro
+  manual]. "Slap Pop" as a variation of 37 shows that one maker treated the pop as a *variant*: the
   main 37 is not pop-dominated.
-- **Not found:** an SC-55 recording or ROM analysis showing where 37's split lies and whether it
-  switches by velocity. Roland's sample ROMs are not documented per tone.
+- **Not found:** an early GS module recording or ROM analysis showing where 37's split lies and whether it
+  switches by velocity. One maker's sample ROMs are not documented per tone.
 
-### 1.2 Yamaha XG
+### 1.2 XG
 
 - 37 bank 0 "SlapBas1" (MSB 0, LSB 0, program 37 [web, Yamaha CLP data list]); bank 27
   "ResoSlap"; bank 32 "PunchThm" [web, polyphone].
-- 38 bank 0 "SlapBas2"; bank 43 "VeloSlap", a velocity switch [web, polyphone]. Yamaha's bank 43
+- 38 bank 0 "SlapBas2"; bank 43 "VeloSlap", a velocity switch [web, polyphone]. One maker's bank 43
   is the "Velo-Switch" bank [web, Yamaha QY100 list via search].
 - How many elements the MU-series SlapBas1/2 have, and which way they switch, was not read
   [not found].
@@ -377,24 +377,24 @@ the octave bands 20–60 … 8–16 kHz of the first 30 ms, in dB under the stro
 
 - **Larry Graham** (Sly and the Family Stone, late 1960s; Graham Central Station). He is credited
   with inventing slap on electric bass; he was "trying to emulate a drum set" before his band had
-  a drummer; he calls it **"thumpin' and pluckin'"** [web, Wikipedia]. He played a Fender Jazz
+  a drummer; he calls it **"thumpin' and pluckin'"** [web, Wikipedia]. He played an American amp Jazz
   Bass, later Moon basses.
 - **Louis Johnson** (The Brothers Johnson, "Thunder Thumbs"; Quincy Jones and Michael Jackson
-  sessions) played a **Music Man StingRay**: a single humbucker near the bridge and an active
+  sessions) played a **active single-humbucker bass**: a single humbucker near the bridge and an active
   2-band EQ. It is one of the archetypal slap sounds, punchy in the upper mids.
-- **Marcus Miller:** a **1977 Fender Jazz Bass**, ash body, maple board, with a **Bartolini
-  preamp** fitted by Roger Sadowsky. Both pickups full, bass and treble boosted ("smile"), usually
+- **Marcus Miller:** a **1977 two-pickup bass**, ash body, maple board, with a **Bartolini
+  preamp** fitted by Roger one bass maker. Both pickups full, bass and treble boosted ("smile"), usually
   DI'd. This is the J slap of the 1980s and of GM's era.
 - **Mark King** (Level 42): fast 16th-note thumb with left-hand slaps and pops ("machine-gun"
-  triplets). Jaydee and Alembic basses.
-- **Flea** (RHCP): an aggressive thumb on StingRay, Spector and Modulus basses, later Fender J.
+  triplets). Jaydee and one bass maker basses.
+- **Flea** (RHCP): an aggressive thumb on active single-humbucker bass, one bass maker and Modulus basses, later American amp J.
 - **Victor Wooten:** double thumbing, open-hammer patterns; Fodera.
-- **Stanley Clarke** and **Bootsy Collins** too. Stanley Clarke played an Alembic with a bright
+- **Stanley Clarke** and **Bootsy Collins** too. Stanley Clarke played a one bass maker with a bright
   active tone.
 
-**For GM 37:** the GM sets come from 1987–91 studio practice. Both the J (Miller) and the StingRay
+**For GM 37:** the GM sets come from 1987–91 studio practice. Both the J (Miller) and the active single-humbucker bass
 (Johnson) are typical. pajupilli has the J built, and bass_section.md §10 and bass_amps.md §2.2
-already chose the J for 37 and 38. A StingRay spec (one humbucker, active EQ) would be a later
+already chose the J for 37 and 38. An active single-humbucker bass spec (one humbucker, active EQ) would be a later
 variant, not needed for 37.
 
 ### 3.2 Patterns [memory, lore]
@@ -613,11 +613,11 @@ Checked against the user's files, the rules give these targets [T, by counting]:
   - 0.9 MΩ splitter;
   - the DI with the VPF at noon (+4 dB at 35 Hz, −6 dB at 380 Hz, +4 dB at 10 kHz), 75 %;
   - a GK-like clean head with Mid Contour into a 4×10 + horn, 25 %;
-  - an 1176 at 4:1, 0.8 ms / 150 ms.
+  - a FET compressor at 4:1, 0.8 ms / 150 ms.
 - **An active preamp on the bass** (Bartolini-like, Miller): a +6 dB low shelf at 40 Hz and a
   +6 dB high shelf at 3.5 kHz before the cable, i.e. the "smile". It is already roughly the DI's
   VPF, so add it only if the ear asks (a knob, default 0).
-- **Compression target:** pops within ~4 dB of thumbs after the 1176 (bass_amps.md 10.6 check 7).
+- **Compression target:** pops within ~4 dB of thumbs after the FET compressor (bass_amps.md 10.6 check 7).
   GM 38's `slapSquash` squeezes to ≤ 2 dB and adds grit: **that is the main audible difference
   between 37 and 38 besides the thumb/pop balance.**
 
@@ -727,12 +727,12 @@ Results:
 
 ## 6. Not found, or uncertain
 
-- **The SC-55's GM 37 itself:** where its thumb/pop key split lies (if it has one), whether it
-  switches by velocity, and which bass was sampled. Only the U-20's tone remarks, the voice
+- **The early GS module's GM 37 itself:** where its thumb/pop key split lies (if it has one), whether it
+  switches by velocity, and which bass was sampled. Only the sample-based module's tone remarks, the voice
   counts and the variation names were found.
-- **The SC-88 map's two-voice Slap Bass 2:** whether the second voice is a detuned copy (as the
-  U-20's DETUNE), a pop layer, or a velocity switch.
-- **Yamaha's SlapBas1/2 element structure** (MU80/MU100 data lists not read).
+- **The later GS module map's two-voice Slap Bass 2:** whether the second voice is a detuned copy (as the
+  sample-based module's DETUNE), a pop layer, or a velocity switch.
+- **one maker's SlapBas1/2 element structure** (MU80/MU100 data lists not read).
 - **Measured thumb speed, mass, contact time and pop depth on a real bass.** No motion-capture
   study was found. The §5.3–5.4 numbers are assumptions; the model results follow from them.
 - **The Soundhouse column's full text.** It timed out again; only the snippet is used.

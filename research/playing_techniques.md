@@ -3,7 +3,7 @@
 Status: draft, 2026-11-11. Purpose: list the sounds a flutist makes (articulations, dynamics,
 ornaments, extended techniques), say how each is made with air, tongue, lips and fingers, and turn
 that into settings for the pajupilli player model (REQUIREMENTS.md R10–R17). Section 5 is a
-**proposal** for the MPK mini mk3 mapping.
+**proposal** for the 25-key MIDI controller mapping.
 
 Notation: **[E]** = my estimate (no measurement found; set it by ear and expose it as a knob, R23).
 Source keys are in brackets and listed in §6. Most numeric articulation data in the literature is
@@ -198,7 +198,7 @@ compensation.
    - a voice oscillator (sing and play, growl);
    - the multiphonic fingering table.
 
-## 5. PROPOSAL: real-time mapping to the MPK mini mk3 (< 20 ms)
+## 5. PROPOSAL: real-time mapping to the 25-key MIDI controller (< 20 ms)
 
 This is my proposal, not a requirement. Hardware facts are from player_and_controller.md B2. Keys
 have velocity but no aftertouch. Pads have velocity and channel or poly pressure. The joystick X

@@ -57,14 +57,14 @@ GuitarModel::GuitarModel(const Instrument& inst) : Tube(inst), g_(inst.fs, specF
     kAcoustic_ = float(kJazzLevel * kAcousticCal_ * std::pow(10.0, knob("PJ_JAZZ_ACOUSTIC", 0) / 20));
     return;
   }
-  // The amp: a clean Fender Twin for GM 28; with a compressor in front for GM 29; a Marshall
-  // JCM800 at crunch for GM 30; a Soldano SLO into a V30 4x12, gated, for GM 31. What is plugged
+  // The amp: a clean clean 2x12 combo for GM 28; with a compressor in front for GM 29; a British stack
+  // British crunch stack at crunch for GM 30; a high-gain amp SLO into a 60 W British 4x12, gated, for GM 31. What is plugged
   // in: the selected pickups' coils (two in parallel: half the inductance and resistance, twice
   // the capacitance), the pots.
-  amp_.reset(new GuitarAmp(inst.fs, std::strcmp(inst.name, "muted-guitar") == 0        ? GuitarAmp::twinComp()
-                                    : std::strcmp(inst.name, "overdriven-guitar") == 0 ? GuitarAmp::jcm800()
+  amp_.reset(new GuitarAmp(inst.fs, std::strcmp(inst.name, "muted-guitar") == 0        ? GuitarAmp::cleanComboComp()
+                                    : std::strcmp(inst.name, "overdriven-guitar") == 0 ? GuitarAmp::crunchStack()
                                     : std::strcmp(inst.name, "distortion-guitar") == 0 ? GuitarAmp::slo()
-                                                                                        : GuitarAmp::twin()));
+                                                                                        : GuitarAmp::cleanCombo()));
   const GuitarSpec& s = g_.spec();
   const GuitarSpec::Pickup& p = s.pickups[s.select[0]];
   const int n = s.select[1] >= 0 ? 2 : 1;

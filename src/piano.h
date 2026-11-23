@@ -18,7 +18,7 @@
 //     along it; the strings' answer shapes the blow. A harder blow presses
 //     the felt deeper, where it is stiffer: shorter, brighter.
 //   - A damper: felt on the strings beside the hammer; every mode loses by
-//     how much it moves there. The top 17 keys (G#6 up) have none, as on a Steinway D.
+//     how much it moves there. The top 17 keys (G#6 up) have none, as on a 274 cm concert grand.
 //   - The soundboard: 256 resonances of a ribbed spruce plate and 96 broad
 //     ones above them, each with its share at every key's bridge point.
 //   - The sound: the board in patches, each moving the air over it; a
@@ -38,6 +38,7 @@ struct PianoKey {
   double len = 0, tension = 0, mu = 0, B = 0;  // per string: m, N, kg/m, stiffness (partial n at n f0 sqrt(1 + B n^2))
   double f1 = 0;                   // the first partial as tuned (Hz)
   double strike = 0.122;           // the hammer's place, a share of the length
+  double rear = 0;                 // the string from the bridge to the plate, a share of the speaking length (0: none)
   // The hammer: mass (kg); the felt F = K x^p as it is at a gentle blow, and
   // from the force `pivot` (N a string) up an exponent higher by `colour`.
   double mh = 0, K = 0, p = 0, pivot = 2, colour = 0;
@@ -130,6 +131,19 @@ struct PianoDesign {
   // From the mid-bass up (C2 to C3 gliding in) the partials over ~600 Hz, fully from ~1.7 kHz, lose
   // their energy this much faster in the wire (x 1 + it); the lower ones keep their sustain.
   double hiDecay = 0;
+  // The strings behind the bridge (PianoKey::rear): their sound on the bridge (x; 0: none), what
+  // their own key's strings hand them across it, what the bridge's vibration gives them (x the
+  // real coupling), and their Q: slightly resonant.
+  double rearGain = 0, rearOwn = 0, rearBridge = 0, rearQ = 60;
+  // The long strings' larger swing heard at the bridge: their sound x (length / C4's length)^this
+  // (1: as the length, 0.5: its square root; 0: none), their sustain and timbre as they were.
+  double bassLength = 0;
+  // A hammer landing on a string still ringing: how much of each partial's swing into the hammer
+  // it stops, at a place where that partial moves fully (0: none; Piano::restrikeStep).
+  double restrike = 0;
+  // How the blow's energy goes with the hammer's mass, as a power of it, for the hammers heavier
+  // than A4's (1: 1/2 m v^2 alone; 2: a heavier hammer also hands its energy over better).
+  double massPower = 1;
   // The pitch's rise at a loud blow: the swing stretches the string, its tension up and every
   // partial sharper until the swing has died (x the computed rise; 0: none).
   double glide = 0;
@@ -178,8 +192,8 @@ PianoDesign harpsichordDesign();
 // partial of the lower note against one of the upper: 2 with 1 going up,
 // 6 with 3 going down.
 void tuneByPartials(PianoDesign* d, int lo = 43, int hi = 54, bool byRegister = false);
-// The concert grand's own speaking lengths, key by key (the strings to A2 keep their tension,
-// their mass following; the plain ones above their wire, their tension following).
+// The concert grand's own speaking lengths, key by key (the 20 wound notes, A0 to E2, keep their
+// tension, their mass following; the plain wire from F2 up keeps its gauge, its tension following).
 void concertScale(PianoDesign* d);
 
 class Piano {
@@ -193,6 +207,8 @@ class Piano {
   int keys() const { return nKeys_; }
   // Key 0 .. keys() - 1 (the grand: A0 .. C8). The hammer leaves the action at `speed` (m/s).
   void strike(int key, double speed);
+  // A damper just let down laid on its strings over this long, with no landing: the sound fades.
+  void softLand(int key, double seconds);
   // The key's damper: on the strings, or lifted. Let down, it lands at `speed` (m/s; < 0: the
   // design's damperFall, each time a little its own).
   // `loud`: x its landing's push (the pedal let go: PianoDesign::pedalUp).
@@ -264,7 +280,15 @@ class Piano {
     double f1, B, len;
     float mh, K, p;       // the hammer: mass (kg), felt stiffness (N/m^p), exponent
     int glideN = 0;       // (samples to the next look at its strings' tension)
+    float softStep = 0, softT = 0;  // (a damper let down very slowly, Piano::softLand: its pace per sample, how far)
+    int restrikeT = -1;   // (samples into a restrike's stopping of the swing; -1: none)
     int bloomT = -1;      // (samples since the blow while its partials are still coming out; -1: not)
+    // (the strings behind the bridge: per string, kRear partials: state, turn, coupling)
+    static constexpr int kRear = 3;
+    int rearN = 0;
+    float rx[kMaxStr * kRear] = {}, rv[kMaxStr * kRear] = {}, rc[kMaxStr * kRear] = {}, rs[kMaxStr * kRear] = {};
+    float rin[kMaxStr * kRear] = {}, rout[kMaxStr * kRear] = {}, rdrive[kMaxStr * kRear] = {};
+    float lenGain = 1;    // (the long string's sound at the bridge, x; what comes back from the bridge / it)
     float inBack = 1;     // (under its damper the bridge's motion reaches the strings in full: x this)
     float nap = 0, napK = 0, napPack = 0;  // the felt's nap: thickness (m), stiffness (N/m a string), packing
     float pluckK = 0, pluckLimit = 0, pluckSide = 0;  // a plectrum in the hammer's place
@@ -287,6 +311,8 @@ class Piano {
   void build();
   void hammer(Key& k);
   void bloomStep(Key& k);
+  float rearStep(Key& k, float own);
+  void restrikeStep(Key& k);
   void glideStep(Key& k);
   void pluck(Key& k);
   void wake();
@@ -302,6 +328,7 @@ class Piano {
   float voicing_ = 1;
   std::vector<Str> str_;
   std::vector<float> wdt_, cs0_, sn0_, cs10_, sn10_;  // (each mode's turn per sample at rest)
+  std::vector<float> restrikeLn_;  // (each mode: the log of what a restrike leaves of its swing)
   std::vector<float> outFull_, bloomTau_, bloomFloor_;  // (each mode: its output in full, how long it takes (samples), from what)
   Key key_[kKeys];
   int total_ = 0;

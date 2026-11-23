@@ -13,7 +13,7 @@ tools/gmcompare.py keys. Every key of each program's GM range at velocities 64, 
 | 5 | Electric Piano 1 | electric-piano-1 | 2.7 | 2.4 | 2.7 | 88 |
 | 6 | Electric Piano 2 | electric-piano-2 | 2.6 | 2.6 | 2.1 | 88 |
 | 7 | Harpsichord | harpsichord | 5.1 | 4.7 | 1.7 | 88 |
-| 8 | Clavinet | clavinet | 1.6 | 1.5 | 2.7 | 88 |
+| 8 | clavi | clavi | 1.6 | 1.5 | 2.7 | 88 |
 | 9 | Celesta | celesta | 2.6 | 2.6 | 2.7 | 49 |
 | 10 | Glockenspiel | glockenspiel | 2.1 | 1.8 | 2.1 | 49 |
 | 11 | Music Box | music-box | 3.1 | 2.8 | 3.9 | 49 |

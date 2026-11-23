@@ -9,8 +9,8 @@ How I measured: I wrote offline drivers against the `Player`/`Flute` API in a sc
 analysis, and `experiment.patch` for the knobs I tried). All runs are calibrated (`calibrate(440)`),
 dyn 0.5, no vibrato unless stated. Pitch is frame-wise YIN (12–25 ms windows). "Wrong
 register" means more than 200 cents from the target while the level is within 20 dB of the
-steady level. The live mode was **not** started. The MPK was only listed (`aconnect -l` →
-client 32 "MPK mini 3", port 0).
+steady level. The live mode was **not** started. The controller was only listed (`aconnect -l` →
+client 32 "25-key MIDI controller 3", port 0).
 
 ## Summary
 
@@ -34,7 +34,7 @@ client 32 "MPK mini 3", port 0).
     over before the tone has built up (60–70 ms).
 - **Articulation rules work, but the syllables are barely different.** "tu" and "du" release
   over the same ≈8 ms, against 1–3 ms vs 4–8 ms in the research. Tongue settings hardly change
-  the onset at all (F5). The MPK's velocity range (mostly < 64, max ≈ 100) makes accents
+  the onset at all (F5). The controller's velocity range (mostly < 64, max ≈ 100) makes accents
   (> 90) and pedal re-tonguing (≥ 100) nearly unreachable.
 - **Live code problems:**
   - no MIDI hotplug after the first connection;
@@ -184,7 +184,7 @@ Fixes:
 The audible differences will be mostly in the noise transient and the speed of the upper
 partials, as in LI16.
 
-### F5. Velocity rules do not fit the MPK mini mk3's velocities (medium; S; low)
+### F5. Velocity rules do not fit the 25-key MIDI controller's velocities (medium; S; low)
 
 - research/player_and_controller.md B2: the keys usually send < 64 and at most ≈ 100.
 - Accent needs v > 90 at the default hardness, and pedal re-tonguing needs v ≥ 100. Both are
@@ -219,7 +219,7 @@ thresholds relative to it, and hit hard → "tu"/accent under the pedal.
 
 ### F7. Knob defaults, ranges and zipper (medium; S; low)
 
-The MPK's encoders keep their own value, so the first turn sends wherever the device was.
+The controller's encoders keep their own value, so the first turn sends wherever the device was.
 The code's defaults correspond to different knob positions:
 
 | knob | default | its position |
@@ -238,7 +238,7 @@ So the first touch of any knob jumps.
 Fixes:
 
 - Remap so that every default sits at 64, using exponential maps around the default.
-- Optionally use soft takeover, or SysEx-load a "pajupilli" program into the MPK (B2 gives the
+- Optionally use soft takeover, or SysEx-load a "pajupilli" program into the controller (B2 gives the
   message format).
 - Volume (`gain_ = 2x²`) is applied per period with no ramp: steps of up to 0.3 dB at
   ≈ 750 Hz. Ramp it inside the period.
@@ -346,12 +346,12 @@ loudness and brightness. Smooth the trims across notes (penalise steps) and cach
 - The C4→C5 dropout (60 ms at −28 dB): is it key timing (16 ms spring opening of many holes)
   or jet adaptation? Real flutes show dropouts of "tens of ms" (AL09). This is in that range
   but long.
-- The MPK unit's real settings were not checked:
+- The controller unit's real settings were not checked:
   - joystick Y (CC1 only, or dual CC);
   - pad aftertouch mode;
   - pedal polarity;
   - the key velocity spread.
-- They can be checked with `aseqdump -p "MPK mini 3"` while Jyrki plays. I did not send SysEx
+- They can be checked with `aseqdump -p "25-key MIDI controller 3"` while Jyrki plays. I did not send SysEx
   to the device.
 - The build-up time (40–80 ms to −6 dB) is set by the jet loop gain, not by the player. Is it
   realistic for this flute? Measured flute attacks (AL09, CA04) suggest 20–50 ms for tongued

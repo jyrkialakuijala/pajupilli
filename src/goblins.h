@@ -108,7 +108,7 @@ class PyrophoneModel : public Tube {
 };
 
 // Velocity is the flame's size; the sustain pedal holds the keys; the pitch bend is +-2
-// semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"): K1 the warming (the swell's length), K2
+// semitones. Knobs (the controller's K1-K4, -seq's "knob K X"): K1 the warming (the swell's length), K2
 // the puffing (the bubbling), K3 the roar, K4 the valve's closing (the release).
 class PyrophonePlayer : public Performer {
  public:

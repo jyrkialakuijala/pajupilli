@@ -1,4 +1,4 @@
-#include "leslie.h"
+#include "rotary.h"
 #include "vmath.h"
 #include "heard.h"
 
@@ -57,7 +57,7 @@ double biquad(double x, const double* b, const double* a, double* s) {
 
 }  // namespace
 
-void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double speed, double ratioSlow, double ratioFast) {
+void Rotary::setup(double fs, uint32_t seed, double spread, bool log, double speed, double ratioSlow, double ratioFast) {
   fs_ = fs;
   dt_ = 1 / fs;
   a5000_ = 1 - std::exp(-2 * M_PI * 5000 * dt_);
@@ -78,27 +78,27 @@ void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double spe
   accH_ = off();
   accD_ = off();
   const double sXover = off();
-  hornR_ = knob("PJ_LESLIE_HORNR", 0.17) * off();
+  hornR_ = knob("PJ_ROTARY_HORNR", 0.17) * off();
   drumR_ = 0.20 * off();
   const double sT60 = off();
   // Each cabinet its own pulleys and belts: the speeds ±3 % (several cabinets: their speeds set
   // outright, chosen away from simple ratios to each other, which a few % would undo: exact).
   const double pulley = spread > 0 ? 0.0 : 0.03;
-  hornSlow_ = knob("PJ_LESLIE_HORNSLOW", 0.80) * speed * (1 + pulley * urand()) * sHornSlow;
-  hornFast_ = knob("PJ_LESLIE_HORNFAST", 6.67) * speed * (1 + pulley * urand()) * sHornFast;
+  hornSlow_ = knob("PJ_ROTARY_HORNSLOW", 0.80) * speed * (1 + pulley * urand()) * sHornSlow;
+  hornFast_ = knob("PJ_ROTARY_HORNFAST", 6.67) * speed * (1 + pulley * urand()) * sHornFast;
   // (their own motors: the drum turns ~1.6 x slower than the horn, both on chorale and on tremolo;
-  // PJ_LESLIE_RATIO, or the drum's speeds set outright)
-  static const double kRatio = knob("PJ_LESLIE_RATIO", 1.6);
+  // PJ_ROTARY_RATIO, or the drum's speeds set outright)
+  static const double kRatio = knob("PJ_ROTARY_RATIO", 1.6);
   const double rs = ratioSlow > 0 ? ratioSlow : kRatio, rf = ratioFast > 0 ? ratioFast : kRatio;
-  drumSlow_ = knob("PJ_LESLIE_DRUMSLOW", 0.80 / rs) * speed * (1 + pulley * urand()) * sDrumSlow;
-  drumFast_ = knob("PJ_LESLIE_DRUMFAST", 6.67 / rf) * speed * (1 + pulley * urand()) * sDrumFast;
+  drumSlow_ = knob("PJ_ROTARY_DRUMSLOW", 0.80 / rs) * speed * (1 + pulley * urand()) * sDrumSlow;
+  drumFast_ = knob("PJ_ROTARY_DRUMFAST", 6.67 / rf) * speed * (1 + pulley * urand()) * sDrumFast;
   hornW_ = hornSlow_;
   drumW_ = drumSlow_;
   hornPh_ = M_PI * (1 + urand());
   drumPh_ = M_PI * (1 + urand());
-  // The cabinet's flaws (research/leslie.md §15, the user's "imperfections related to the Leslie"):
-  age_ = knob("PJ_LESLIE_AGE", 1.0);
-  noise_ = knob("PJ_LESLIE_NOISE", 1.0);
+  // The cabinet's flaws (research/rotary.md §15, the user's "imperfections related to the Rotary"):
+  age_ = knob("PJ_ROTARY_AGE", 1.0);
+  noise_ = knob("PJ_ROTARY_NOISE", 1.0);
   // - an off-centre pulley and a horn not quite balanced: each rotor runs a few % faster on one
   //   side of its turn than the other; its belt (~2.6 x the rotor's period, its seam and stretch)
   //   wobbles it on top, at a rate unrelated to the turn;
@@ -111,7 +111,7 @@ void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double spe
   // - the microphones never quite symmetric (±4°, ±3 cm);
   for (int m = 0; m < 2; ++m) {
     // (at the horn compartment's sides, in front of their louvres, as players mike it)
-    const double ang = (80 + 4 * urand()) * M_PI / 180, d = knob("PJ_LESLIE_MIC", 0.65) + 0.03 * urand();
+    const double ang = (80 + 4 * urand()) * M_PI / 180, d = knob("PJ_ROTARY_MIC", 0.65) + 0.03 * urand();
     micX_[m] = d * std::cos(ang);
     micY_[m] = (m == 0 ? 1 : -1) * d * std::sin(ang);
     micEl_[m] = (m == 0 ? 12 : -8) * (1 + 0.2 * urand()) * M_PI / 180;  // (one a little above the horn, one below)
@@ -120,13 +120,13 @@ void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double spe
   //   a loud bass;
   rattleW_ = 2 * M_PI * (150 + 70 * (1 + urand()) / 2);
   rattleQ_ = 15 + 10 * (1 + urand()) / 2;
-  rattleGap_ = knob("PJ_LESLIE_RATTLEGAP", 0.52) / std::max(age_, 0.05);
+  rattleGap_ = knob("PJ_ROTARY_RATTLEGAP", 0.52) / std::max(age_, 0.05);
   // - the crossover's capacitors aged: a few % off 800 Hz.
   const double xover = 800 * (1 + 0.08 * age_ * urand()) * sXover;
   butter(fs, xover, false, xa_, xb_);  // (the low-pass: xa_; both share the denominator xb_)
   double a[3];
   butter(fs, xover, true, xhb_, a);
-  // The horn's own response on its axis (research/leslie.md §3.1: "±5 dB from 400 Hz to 10 kHz"),
+  // The horn's own response on its axis (research/rotary.md §3.1: "±5 dB from 400 Hz to 10 kHz"),
   // a fixed filter: the source does not play with the horn (the driver is driven, nothing comes back
   // to the organ), so no wave in its bell is simulated, only what it does to the sound.
   //   - the flare's cutoff: below ~650 Hz the mouth hardly radiates (12 dB an octave, a little hump
@@ -135,10 +135,10 @@ void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double spe
   //     and dips a few dB, ~500 Hz apart, over 0.9-2.7 kHz, fading as the mouth radiates better
   //     (ka toward 1);
   //   - the driver running out: 2nd order from ~7 kHz.
-  // Each cabinet its own (±4 % in frequency x PJ_LESLIE_AGE: the driver's, the diffuser's seat);
-  // PJ_LESLIE_HORNEQ scales the ripple and the hump (0: flat, as before).
+  // Each cabinet its own (±4 % in frequency x PJ_ROTARY_AGE: the driver's, the diffuser's seat);
+  // PJ_ROTARY_HORNEQ scales the ripple and the hump (0: flat, as before).
   {
-    static const double kEq = knob("PJ_LESLIE_HORNEQ", 1.0);
+    static const double kEq = knob("PJ_ROTARY_HORNEQ", 1.0);
     const double v = 1 + 0.04 * age_ * urand();
     int n = 0;
     double a3[3];
@@ -162,21 +162,21 @@ void Leslie::setup(double fs, uint32_t seed, double spread, bool log, double spe
   for (int i = 0; i < 4; ++i) {
     fdnLen_[i] = int(kLen[i] * fs / 48000);
     fdn_[i].assign(fdnLen_[i], 0.0f);
-    fdnG_[i] = std::pow(10.0, -3.0 * fdnLen_[i] / (fs * knob("PJ_LESLIE_CABT60", 0.04) * sT60));
+    fdnG_[i] = std::pow(10.0, -3.0 * fdnLen_[i] / (fs * knob("PJ_ROTARY_CABT60", 0.04) * sT60));
   }
 }
 
-double Leslie::normal() {
+double Rotary::normal() {
   rng_ = rng_ * 1664525u + 1013904223u;
   const double a = std::max((rng_ >> 8) * (1.0 / 16777216.0), 1e-12);
   rng_ = rng_ * 1664525u + 1013904223u;
   return std::sqrt(-2 * std::log(a)) * std::cos(2 * M_PI * (rng_ >> 8) * (1.0 / 16777216.0));
 }
 
-void Leslie::process(float in, float& left, float& right, float* rays) {
+void Rotary::process(float in, float& left, float& right, float* rays) {
   const double kHornR = hornR_, kDrumR = drumR_;
-  static const double kMic = knob("PJ_LESLIE_MIC", 0.4);
-  static const double kDummy = knob("PJ_LESLIE_DUMMY", 0.16);
+  static const double kMic = knob("PJ_ROTARY_MIC", 0.4);
+  static const double kDummy = knob("PJ_ROTARY_DUMMY", 0.16);
   static const double kBack[3] = {-4, -12, -18};  // the mouth's loss behind it, low / mid / high (dB)
   // (the beam 10^(kBack (1 - cos) / 40), as an exponential: half a power's work)
   static const double kBeam[3] = {kBack[0] * M_LN10 / 40, kBack[1] * M_LN10 / 40, kBack[2] * M_LN10 / 40};
@@ -196,11 +196,11 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
     // error and its integral, the acceleration limited by what the motor can give (the horn 6 Hz
     // a second, the drum 1.2; no winding up against that limit). Speeding up the motor pulls
     // (natural frequency: horn 3 rad/s, drum 0.8); slowing down it is the friction and the
-    // coasting, gentler (2 and 0.7); the brake firmer. Damped at 1.8 (PJ_LESLIE_ZETA): it eases
+    // coasting, gentler (2 and 0.7); the brake firmer. Damped at 1.8 (PJ_ROTARY_ZETA): it eases
     // in and settles, barely past its speed (a PI on a mass undershoots more than its damping
     // says: at 0.85 the horn dipped to 0 on its way down to its slow speed). The horn reaches
     // its fast speed in ~1 s, the drum in ~4-5 s.
-    static const double zeta = knob("PJ_LESLIE_ZETA", 1.8);
+    static const double zeta = knob("PJ_ROTARY_ZETA", 1.8);
     auto rotor = [this, zeta = zeta](double& w, double& integ, double target, double wn, double wnDown, double maxAcc) {
       const bool up = target > w;
       const double n = up ? wn : wnDown;
@@ -212,15 +212,15 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       if (!limited) integ += e * dt_;
       w = std::max(0.0, w + a * dt_);
     };
-    static const double hWn = knob("PJ_LESLIE_HORNWN", 3.0), hWnDown = knob("PJ_LESLIE_HORNWNDOWN", 2.0);
-    static const double dWn = knob("PJ_LESLIE_DRUMWN", 0.8), dWnDown = knob("PJ_LESLIE_DRUMWNDOWN", 0.7);
-    static const double hAcc = knob("PJ_LESLIE_HORNACC", 6), dAcc = knob("PJ_LESLIE_DRUMACC", 1.2);
+    static const double hWn = knob("PJ_ROTARY_HORNWN", 3.0), hWnDown = knob("PJ_ROTARY_HORNWNDOWN", 2.0);
+    static const double dWn = knob("PJ_ROTARY_DRUMWN", 0.8), dWnDown = knob("PJ_ROTARY_DRUMWNDOWN", 0.7);
+    static const double hAcc = knob("PJ_ROTARY_HORNACC", 6), dAcc = knob("PJ_ROTARY_DRUMACC", 1.2);
     rotor(hornW_, hornI_, hT, hWn, hWnDown, hAcc * accH_);
     rotor(drumW_, drumI_, dT, dWn, dWnDown, dAcc * accD_);
-    static const bool kLog = std::getenv("PJ_LESLIE_LOG") != nullptr;
-    if (kLog && log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "leslie t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
-    static const bool kLog2 = std::getenv("PJ_LESLIE_LOG2") != nullptr;  // (the second cabinet's)
-    if (kLog2 && !log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "leslie2 t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
+    static const bool kLog = std::getenv("PJ_ROTARY_LOG") != nullptr;
+    if (kLog && log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "rotary t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
+    static const bool kLog2 = std::getenv("PJ_ROTARY_LOG2") != nullptr;  // (the second cabinet's)
+    if (kLog2 && !log_ && std::fmod(t_, 0.1) < dt_) say(stderr, "rotary2 t %.2f horn %.3f drum %.3f\n", t_, hornW_, drumW_);
     hornPh_ += 2 * M_PI * hornW_ * dt_ * (1 + hornEcc_ * std::cos(hornPh_ + hornEccPh_) + beltEcc_[0] * std::cos(beltPh_[0]));
     drumPh_ += 2 * M_PI * drumW_ * dt_ * (1 + drumEcc_ * std::cos(drumPh_ + drumEccPh_) + beltEcc_[1] * std::cos(beltPh_[1]));
     beltPh_[0] = std::fmod(beltPh_[0] + 2 * M_PI * hornW_ * 2.6 * dt_, 2 * M_PI);
@@ -278,9 +278,9 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
     buzz = 0.05 * (over - rattleHp_);
   }
   // (the two rotors turn opposite ways, as in a 122: the horn counter-clockwise seen from above,
-  // the drum clockwise; their Doppler shifts and beams sweep against each other. PJ_LESLIE_SAMEWAY=1:
+  // the drum clockwise; their Doppler shifts and beams sweep against each other. PJ_ROTARY_SAMEWAY=1:
   // both one way)
-  static const double kDrumDir = knob("PJ_LESLIE_SAMEWAY", 0) > 0 ? 1.0 : -1.0;
+  static const double kDrumDir = knob("PJ_ROTARY_SAMEWAY", 0) > 0 ? 1.0 : -1.0;
   const double hc = std::cos(hornPh_), hs = std::sin(hornPh_), dc = std::cos(drumPh_), ds = kDrumDir * std::sin(drumPh_);
   const double hx = kHornR * hc, hy = kHornR * hs;
   // The horn's images in the inside of its compartment (743 wide, 524 deep, ~300 mm high, the horn
@@ -288,7 +288,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   // turning the other way round for the walls (its Doppler opposite), the same way for the lid and
   // the motor board (later by their path). The solid back panel reflects most, the louvred sides
   // and front little (their slats let the sound out), the lid and the board between
-  // (PJ_LESLIE_INSIDE scales them). Each its own delay line read: the overtones meet their own
+  // (PJ_ROTARY_INSIDE scales them). Each its own delay line read: the overtones meet their own
   // mirrored, oppositely shifted copies, a comb moving with the turn.
   // The walls (the user's look at a 122's horn compartment): louvres on all four sides, of
   // their sound ~25 % out, ~25 % turned up and down by the slats (to the lid and the board), ~50 %
@@ -298,17 +298,17 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   // goes into a corner and its direct sound is gone; what it lost comes round off the walls. The
   // long sides (front and back) are narrowed in their middle too: six openings a turn.
   struct Img { double x, y, z, fx, fy, r; };
-  static const double kInside = knob("PJ_LESLIE_INSIDE", 1.0);
+  static const double kInside = knob("PJ_ROTARY_INSIDE", 1.0);
   // (the cabinet 737 x 533 mm outside, 29 x 21 in (b3world.com); its walls ~19 mm thick; the horn's
-  // axis off the middle, PJ_LESLIE_OFFX / _OFFY (m, back and left): its walls nearer on one side,
+  // axis off the middle, PJ_ROTARY_OFFX / _OFFY (m, back and left): its walls nearer on one side,
   // each side its own delays)
-  static const double kOffX = knob("PJ_LESLIE_OFFX", -0.03), kOffY = knob("PJ_LESLIE_OFFY", 0.04);
+  static const double kOffX = knob("PJ_ROTARY_OFFX", -0.03), kOffY = knob("PJ_ROTARY_OFFY", 0.04);
   static const double kFront = 0.248 - kOffX, kBackW = -0.248 - kOffX, kLeft = 0.35 - kOffY, kRight = -0.35 - kOffY;
   static const double kHalfW = 0.35, kHalfD = 0.248, kLid = 0.12, kBoard = 0.12;
-  static const double kPost = knob("PJ_LESLIE_POST", 0.06);  // (a corner post's reach along each wall, m)
+  static const double kPost = knob("PJ_ROTARY_POST", 0.06);  // (a corner post's reach along each wall, m)
   static const double kOut = std::sqrt(0.25), kBack_ = std::sqrt(0.5), kSlat = std::sqrt(0.25);
   // How much of a path from (sx, sy) toward (dx, dy) gets out where it meets the wall.
-  static const double kMid = knob("PJ_LESLIE_MIDPOST", 0.05);  // (the long sides' middle narrowing, half its width, m)
+  static const double kMid = knob("PJ_ROTARY_MIDPOST", 0.05);  // (the long sides' middle narrowing, half its width, m)
   auto out = [&](double sx, double sy, double dx, double dy) {
     double tx = 1e9, ty = 1e9;
     if (dx > 1e-12) tx = (kFront - sx) / dx;
@@ -350,7 +350,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       for (int b = 0; b < 2; ++b) sum += g * std::exp(kBeam[b] * (1 - cosPsi)) * horn_[b].read(delay);
       // (the highs through the louvre's slots, 5 cm apart one over another: a microphone a little
       // above or below the horn hears them at slightly different times, a grating's comb)
-      static const double kSlot = knob("PJ_LESLIE_SLOT", 0.05);
+      static const double kSlot = knob("PJ_ROTARY_SLOT", 0.05);
       const double step = kSlot * std::sin(micEl_[m]) / kC * fs_;
       double hiSum = 0;
       for (int k = 0; k < 6; ++k) hiSum += horn_[2].read(delay + (k - 2.5) * step);
@@ -371,7 +371,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
       for (int b = 0; b < 3; ++b) sum += g * std::exp(kBeam[b] * (1 - cosPsi)) * horn_[b].read(delay);
     }
     // The base's leakage, not turning.
-    static const double kLeak = knob("PJ_LESLIE_LEAK", 0.25);
+    static const double kLeak = knob("PJ_ROTARY_LEAK", 0.25);
     sum += kLeak * leak;
     // The drum's scoop.
     {
@@ -408,8 +408,8 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
                           1.5e-5 * std::sin(2 * M_PI * 60 * t_ + 2));
   if (click_ > 1e-4) {
     clickPh_ += 2 * M_PI * 2300 * dt_;
-    // (by ear, the user's: 40 dB under what it was, out of the way; PJ_LESLIE_RELAY, dB over that)
-    static const double kRelay = 0.004 * std::pow(10.0, (knob("PJ_LESLIE_RELAY", 0) - 40) / 20);
+    // (by ear, the user's: 40 dB under what it was, out of the way; PJ_ROTARY_RELAY, dB over that)
+    static const double kRelay = 0.004 * std::pow(10.0, (knob("PJ_ROTARY_RELAY", 0) - 40) / 20);
     mech += noise_ * kRelay * click_ * (std::sin(clickPh_) + 0.5 * normal());
     click_ *= 1 - dt_ / 0.004;
   }
@@ -419,7 +419,7 @@ void Leslie::process(float in, float& left, float& right, float* rays) {
   // the direction: the Doppler; the angle between its mouth and the direction: its beam), the
   // dummy bell opposite, the drum's scoop, the base's leakage, the fixed bass, the cabinet's tail.
   if (rays) {
-    static const double kLeakR = knob("PJ_LESLIE_LEAK", 0.25), kDummyR = knob("PJ_LESLIE_DUMMY", 0.16);
+    static const double kLeakR = knob("PJ_ROTARY_LEAK", 0.25), kDummyR = knob("PJ_ROTARY_DUMMY", 0.16);
     const double base = 0.6 / kC * fs_;  // (a common lag: every ray's moving delay stays positive)
     static const double kUx[kRays] = {std::cos(rayAngle(0)), std::cos(rayAngle(1)), std::cos(rayAngle(2)),
                                       std::cos(rayAngle(3)), std::cos(rayAngle(4)), std::cos(rayAngle(5))};

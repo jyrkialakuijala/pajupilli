@@ -11,7 +11,7 @@
 #include <cstring>
 
 #include "knob.h"
-#include "sk7.h"
+#include "brightgrand.h"
 
 namespace pajupilli {
 
@@ -27,7 +27,7 @@ static bool upright(const Instrument& inst) { return std::strcmp(inst.name, "upr
 
 static bool dulcimer(const Instrument& inst) { return std::strcmp(inst.name, "dulcimer") == 0; }
 
-// The bright piano (General MIDI 2): a Shigeru Kawai SK-7 (src/sk7.cc).
+// The bright piano (General MIDI 2): a semi-concert grand (src/brightgrand.cc).
 static bool brightPiano(const Instrument& inst) { return std::strcmp(inst.name, "bright-piano") == 0; }
 
 bool grandPiano(const Instrument& inst) {
@@ -91,7 +91,7 @@ const double kConcertStretch[88] = {
     0, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 1.8, 2.1, 2.5, 0, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 1.8, 2.1, 2.5,
     3, 3.2, 3.5, 0.8, 1.1, 1.4, 1.7, 2, 2.3, 2.7, 3, 3.4, 3.8, 4.2, 4.6, 4.9, 5.7, 6.2, 6.9, 7.5, 8.1, 8.7, 9.4, 10,
     11.2, 12, 13, 14.5, 15.7, 16.8, 18, 19.6, 22, 24.5, 26.2, 28.5, 31, 33.8, 36.8, 40.1};
-// A Modartt forum study (viewtopic.php?id=12942): its physics-constrained curve and its 4:2.
+// A piano-modelling forum study (viewtopic.php?id=12942): its physics-constrained curve and its 4:2.
 const double kVariable[88] = {
     -22, -22, -21, -21, -20, -20, -19, -18, -18, -17, -16, -16, -15, -14, -14, -13, -12, -12, -11, -10, -10, -9, -8, -8, -7, -6, -6, -5, -5, -4,
     -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15,
@@ -137,7 +137,7 @@ static PianoDesign designFor(const Instrument& inst) {
   if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
   if (honkyTonk(inst) && uprightDesign) return honkyTonkDesign(uprightDesign());
   if (brightPiano(inst)) {  // (its felt packs down as the grand's does: it stays the brighter)
-    PianoDesign d = sk7Design();
+    PianoDesign d = brightGrandDesign();
     d.napPack = knob("PJ_PIANO_NAPPACK", 1.0);
     return d;
   }
@@ -157,6 +157,13 @@ static PianoDesign designFor(const Instrument& inst) {
     const double strike = gHammerPos > 0 ? gHammerPos : knob("PJ_PIANO_STRIKE", 0.125);
     for (int key = 0; key < 88; ++key) d.key[key].strike = strike;
   }
+  d.massPower = knob("PJ_PIANO_MASSPOWER", 1);  // (1: the blow is 1/2 m v^2, the same v curve on every key; over 1: the bass hammers more)
+  d.restrike = knob("PJ_PIANO_RESTRIKE", 0.6);  // (a hammer on a ringing string stops part of its swing: 0 none)
+  d.bassLength = knob("PJ_PIANO_BASSLEN", 1);  // (the long strings louder by their length: 1 as it, 0.5 as its root, 0 none)
+  d.rearGain = knob("PJ_PIANO_REAR", 1);  // (the strings behind the bridge: their sound on it; 0 none)
+  d.rearOwn = knob("PJ_PIANO_REAROWN", 0.02);    // (what their own key hands them; it feeds back through the bridge: unstable from ~0.07)
+  d.rearBridge = knob("PJ_PIANO_REARBRIDGE", 1);  // (what the bridge's vibration gives them)
+  d.rearQ = knob("PJ_PIANO_REARQ", 60);
   d.bridgeIn = knob("PJ_PIANO_BRIDGEIN", 0.5);  // (the strings' sustain: lower, longer)
   d.bridgeBass = knob("PJ_PIANO_BRIDGEBASS", 0.25);  // (... the wound and long strings' further, C3 and under)
   return d;
@@ -437,10 +444,17 @@ void PianoPlayer::setHold(bool h) {
     held_ = h;
   }
   hold_ = h;
+  static const double kLast = knob("PJ_PIANO_LASTPEDAL", 1.5);
+  const bool last = lastUp_ && !h && pedalDown_ && kLast > 0;
+  if (!h) lastUp_ = false;
+  if (last) nextSpeed_ = 0.01;  // (the rail comes down without a knock)
   const double speed = pedalMoved(h);
   for (int k = 0; k < Piano::kKeys; ++k)
     if (h) m_.piano().damper(k, false);
-    else if (!down_[k]) m_.piano().damper(k, true, speed, m_.piano().design().pedalUp);
+    else if (!down_[k]) {
+      m_.piano().damper(k, true, speed, m_.piano().design().pedalUp);
+      if (last) m_.piano().softLand(k, kLast);
+    }
 }
 
 // The pedal's speed. Its controller moving through the values between (a continuous pedal

@@ -86,7 +86,7 @@ Total air volume (open) ≈ 442 cm³ **[D]**.
 
 **Bessel fit of the bell [D]:** over 941–1381 mm, d(x) = 2·b·(x₀ − x)^(−ε) with **x₀ = 1391.5 mm, b = 269.8 (mm units),
 ε = 0.61**. RMS error 3 % in log d. The fit runs ~6 % fat at 1290–1370 mm and 3 % thin at the rim. Use the points, not the fit.
-For comparison: Bach Stradivarius 37: 4.8" (122 mm) bell, #25 leadpipe, 0.459" bore [BACH]. A "37-like" variant
+For comparison: professional trumpet 37: 4.8" (122 mm) bell, #25 leadpipe, 0.459" bore [BACH]. A "37-like" variant
 would scale the last 40 mm to 122 mm **[G]**.
 
 ### 1.3 The same bore for `kTrumpetBore` (cup lumped, x from the throat entry)
@@ -143,13 +143,13 @@ The popping frequency, not the cup volume, sets the "formant" of the impedance e
 
 ### 2.2 Loop lengths
 
-| Valve | Interval | Fitted added length **[D]** (TMM on §1.2, partials 3–8 on their semitones) | HyperPhysics [HP] (L = 1.48 m) | NTBIS [NTBIS] (L ≈ 1.40 m) | Yamaha [YAM, U] |
+| Valve | Interval | Fitted added length **[D]** (TMM on §1.2, partials 3–8 on their semitones) | HyperPhysics [HP] (L = 1.48 m) | NTBIS [NTBIS] (L ≈ 1.40 m) | one maker [YAM, U] |
 |---|---|---|---|---|---|
 | 2 | 1 semitone | **87.7 mm** | 86 mm | 84 mm | 70 mm |
 | 1 | 2 semitones | **180.1 mm** | 179 mm | 173 mm | 160 mm |
 | 3 | 3 semitones | **277.3 mm** | 278 mm | 267 mm | 270 mm |
 
-Yamaha's figures (from a search snippet; the page refused my fetch) are probably physical slide-tube lengths, not added
+one maker's figures (from a search snippet; the page refused my fetch) are probably physical slide-tube lengths, not added
 acoustic length **[U]**. Use the fitted values in `ValveDef::len` (the added length, as for the horn). Loop bore =
 the main bore, 11.75 mm **[G]** (some trumpets have a larger 3rd slide).
 

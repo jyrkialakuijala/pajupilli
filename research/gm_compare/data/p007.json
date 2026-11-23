@@ -1,8 +1,8 @@
 {
 "key": "p007",
 "program": 7,
-"gm": "Clavinet",
-"pajupilli": "clavinet",
+"gm": "Clavi",
+"pajupilli": "clavi",
 "keys": [
 21,
 27,
@@ -1597,7 +1597,7 @@
 }
 },
 "pj_log": [
-"  channel  1: clavinet (1 at once, one voice)"
+"  channel  1: clavi (1 at once, one voice)"
 ],
 "build_md5": "a8b790266195d96f500cdf8fc1ba4cfb"
 }

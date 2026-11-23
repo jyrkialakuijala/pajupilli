@@ -102,7 +102,7 @@ worked out here; **[memory]** general knowledge, to be checked; **[design]** a c
 
   - The decays are 0.3–0.75 s.
   - The 472–580 Hz cluster gives the cowbell its rough "clank".
-  - The 2–3.7 kHz group gives its edge. (The TR-808 imitated a cowbell with two square waves at 540
+  - The 2–3.7 kHz group gives its edge. (The classic drum machine imitated a cowbell with two square waves at 540
     and 800 Hz **[memory]**: a rough pair, as here, but not these ratios.)
 
 ## 3. The agogo bells

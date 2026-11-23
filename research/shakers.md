@@ -163,7 +163,7 @@ constants **[code, STK]**:
 ### 6.1 One engine, three exciters
 
 `src/shaker.h/.cc`, one object per instrument for the whole song (as the kick):
-- **Bodies:** a few two-pole resonators each (complex rotation, the clavinet's), with gain and Q
+- **Bodies:** a few two-pole resonators each (complex rotation, the clavi's), with gain and Q
   per instrument.
 - **Rattle** (maracas, shaker): N particles (40–80) in 1-D along the shake axis, in a cavity of
   length L, in the body's frame.

@@ -3,8 +3,8 @@
 #include "organ.h"
 #include "organplan.h"
 #include "heard.h"
-#include "hammond.h"
-#include "hammondplan.h"
+#include "tonewheel.h"
+#include "tonewheelplan.h"
 #include "pianoinst.h"
 #include "pianoplan.h"
 
@@ -67,7 +67,7 @@ struct Song {
   std::string title;
   int tonic = -1;      // the key's tonic, a pitch class (-1: not known)
   bool minor = false, keySigned = false;
-  bool gs = false;  // a Roland GS or General MIDI 2 file (else the drum keys below 35 are Yamaha XG's)
+  bool gs = false;  // a GS or General MIDI 2 file (else the drum keys below 35 are XG's)
   // The tempo map: from `t` seconds on (at `beat` quarter notes), a quarter lasts `len` s.
   struct Tempo { double t, beat, len; };
   std::vector<Tempo> tempo;
@@ -136,7 +136,7 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
       }
       if (s == 0xf0 || s == 0xf7) {
         const uint32_t n = var();
-        // A Roland GS reset or a General MIDI 2 system-on: the drum keys below 35 are theirs.
+        // A GS reset or a General MIDI 2 system-on: the drum keys below 35 are theirs.
         static const uint8_t kGs[] = {0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41}, kGm2[] = {0x7e, 0x7f, 0x09, 0x03};
         if (s == 0xf0 && p + n <= end) {
           if (n >= sizeof kGs && d[p] == 0x41 && std::equal(kGs + 2, kGs + 9, d.begin() + p + 2)) song->gs = true;  // (any device number)
@@ -182,7 +182,7 @@ bool readSong(const std::string& path, Song* song, std::string* err) {
 const char* const kGm[128][3] = {
     {"grand-piano"}, {"bright-piano", "grand-piano"}, {"electric-grand", "grand-piano"}, {"honky-tonk", "upright-piano", "grand-piano"},
     {"electric-piano-1", "electric-grand", "grand-piano"}, {"electric-piano-2", "electric-grand", "grand-piano"},
-    {"harpsichord", "upright-piano", "grand-piano"}, {"clavinet", "electric-grand", "grand-piano"},
+    {"harpsichord", "upright-piano", "grand-piano"}, {"clavi", "electric-grand", "grand-piano"},
     // Chromatic percussion.
     {"celesta", "vibraphone", "tinkle-bell"}, {"glockenspiel", "vibraphone", "tinkle-bell"},
     {"music-box", "kalimba", "vibraphone"}, {"vibraphone"}, {"marimba", "vibraphone"}, {"xylophone", "vibraphone"},
@@ -247,16 +247,16 @@ const Instrument* forProgram(int prog) {
   return in;
 }
 
-// (an instrument of the Hammond family: all of a file's join one organ)
-bool isHammond(const Instrument* in) { return in && std::strcmp(in->family, "hammond") == 0; }
+// (an instrument of the Tonewheel family: all of a file's join one organ)
+bool isTonewheel(const Instrument* in) { return in && std::strcmp(in->family, "tonewheel") == 0; }
 
-// (the file's own program a Hammond, before -reinstrument: its sustain pedal and mod wheel are the
-// Leslie's switch; a piano's or a lead's reinstrumented onto the organ are its damper and its
-// vibrato, nothing on a Hammond)
-bool fileHammond(int prog) {
+// (the file's own program a Tonewheel, before -reinstrument: its sustain pedal and mod wheel are the
+// Rotary's switch; a piano's or a lead's reinstrumented onto the organ are its damper and its
+// vibrato, nothing on a Tonewheel)
+bool fileTonewheel(int prog) {
   for (const char* nm : kGm[prog & 127])
     if (nm)
-      if (const Instrument* in = findInstrument(nm)) return isHammond(in);
+      if (const Instrument* in = findInstrument(nm)) return isTonewheel(in);
   return false;
 }
 
@@ -434,16 +434,16 @@ struct Part {
   size_t planNext = 0;
   std::map<int, int> manualOf;               // track -> division
   std::map<int, std::pair<int, int>> organKey;  // channel * 128 + key -> (division, key)
-  // A Hammond by its plan (src/hammondplan.h): each note's division, the drawbars for the piece.
-  std::unique_ptr<HammondPlan> hplan;
+  // A Tonewheel by its plan (src/tonewheelplan.h): each note's division, the drawbars for the piece.
+  std::unique_ptr<TonewheelPlan> hplan;
   // The brass section (src/brasssect.h): the section the part stands for, the song's harmony per onset.
   std::unique_ptr<BrassPlan> bplan;
-  std::map<int, int> hammondDiv;             // channel * 128 + key -> division (held notes)
-  size_t leslieNext = 0;                     // the plan's next Leslie change
+  std::map<int, int> tonewheelDiv;             // channel * 128 + key -> division (held notes)
+  size_t rotaryNext = 0;                     // the plan's next Rotary change
   size_t lvibNext = 0;                       // the plan's next lower vibrato tab switch
   size_t percNext = 0;                       // the plan's next percussion switch
   size_t regNext = 0;                        // the plan's next re-registration
-  size_t boostNext = 0;                      // the plan's next Leslie nudge
+  size_t boostNext = 0;                      // the plan's next Rotary nudge
   size_t thinNext = 0;                       // the plan's next trill thinning
   size_t runNext = 0, swellNext = 0;         // the plan's next run switch, expression shape point
   // The plan's added notes (a glissando's) as events (tick, on, pitch, velocity, division), and
@@ -451,7 +451,7 @@ struct Part {
   std::vector<std::tuple<long, int, int, int, int>> hx;
   size_t hxNext = 0;
   std::vector<std::pair<long, int>> hrel;
-  std::map<int, int> hammondChans;           // channel -> its notes (a Hammond playing several)
+  std::map<int, int> tonewheelChans;           // channel -> its notes (a Tonewheel playing several)
   int maxPoly = 1, maxHeld = 1, played = 0;  // (voices: notes held at once, their tails counted)
   double vol = 100 / 127.0, expr = 1;
   std::vector<float> l, r;
@@ -655,7 +655,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         Event& on = song.ev[sp.on];
         Event& off = song.ev[sp.off];
         // (the organs articulate and balance by their own plans: they take the shared time only)
-        if (sp.inst && (std::strcmp(sp.inst->family, "organ") == 0 || isHammond(sp.inst))) continue;
+        if (sp.inst && (std::strcmp(sp.inst->family, "organ") == 0 || isTonewheel(sp.inst))) continue;
         on.cue = int(q);
         if (c.v[kCueLength] < 1) off.tick = on.tick + uint64_t(std::max(1.0, double(off.tick - on.tick) * c.v[kCueLength]));
         // Key velocity: the emphasis for all; the level too where velocity is the loudness.
@@ -722,9 +722,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   // (every channel played on the organ by a plan joins one organ part: its
   // lines are the channels' tracks, the plan gives them their manuals)
   int organPart = -1;
-  // (and every channel on one Hammond program joins one Hammond: both hands and the pedals on one
-  // organ through one Leslie, the channels its lines)
-  int hammondPart = -1;  // (one organ: every channel of the Hammond family, whatever its program or remap)
+  // (and every channel on one Tonewheel program joins one Tonewheel: both hands and the pedals on one
+  // organ through one Rotary, the channels its lines)
+  int tonewheelPart = -1;  // (one organ: every channel of the Tonewheel family, whatever its program or remap)
   auto partOf = [&](int ch, int key, int* playKey) -> int {
     if (ch != 9) {
       const Instrument* in = forProgram(prog[ch]);
@@ -733,10 +733,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         if (organPart < 0) organPart = ch * 128 + prog[ch];
         return organPart;
       }
-      if (in && std::strcmp(in->family, "hammond") == 0) {
+      if (in && std::strcmp(in->family, "tonewheel") == 0) {
         *playKey = key;
-        if (hammondPart < 0) hammondPart = ch * 128 + prog[ch];
-        return hammondPart;
+        if (tonewheelPart < 0) tonewheelPart = ch * 128 + prog[ch];
+        return tonewheelPart;
       }
     }
     if (ch == 9) {
@@ -851,10 +851,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     p.ens->setBrassMode(p.bplan->mode);
     std::fprintf(stderr, "    (%s)\n", p.bplan->summary.c_str());
   }
-  // A Hammond: its notes by track, its pedals and manuals and drawbars planned (src/hammondplan.h).
+  // A Tonewheel: its notes by track, its pedals and manuals and drawbars planned (src/tonewheelplan.h).
   for (auto& [id, p] : parts) {
-    if (std::strcmp(p.inst->family, "hammond") != 0 || id / 128 == 9) continue;
-    std::vector<HammondNote> notes;
+    if (std::strcmp(p.inst->family, "tonewheel") != 0 || id / 128 == 9) continue;
+    std::vector<TonewheelNote> notes;
     std::map<int, std::pair<uint64_t, int>> on;  // channel * 128 + key -> (tick, velocity)
     int progs[16] = {}, cc11[16];
     std::fill(cc11, cc11 + 16, 127);
@@ -863,34 +863,34 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       const int ech = e.status & 15, kind = e.status & 0xf0;
       if (kind == 0xc0) progs[ech] = e.a;
       if (kind == 0xb0 && e.a == 11) cc11[ech] = e.b;
-      if (ech == 9 || !isHammond(forProgram(progs[ech]))) continue;
+      if (ech == 9 || !isTonewheel(forProgram(progs[ech]))) continue;
       if (kind == 0x90 && e.b > 0) {
         on[ech * 128 + e.a] = {e.tick, e.b};
         onExpr[ech * 128 + e.a] = cc11[ech];
       } else if (kind == 0x80 || kind == 0x90) {
         auto it = on.find(ech * 128 + e.a);
         if (it == on.end()) continue;
-        // (an instrument routing to one division: hammond-upper-manual, -lower-manual, -pedal)
+        // (an instrument routing to one division: tonewheel-upper-manual, -lower-manual, -pedal)
         const std::string nm = forProgram(progs[ech])->name;
-        const int forced = nm == "hammond-upper-manual" ? HammondModel::kUpper : nm == "hammond-lower-manual" ? HammondModel::kLower
-                         : nm == "hammond-pedal" ? HammondModel::kPedal : -1;
+        const int forced = nm == "tonewheel-upper-manual" ? TonewheelModel::kUpper : nm == "tonewheel-lower-manual" ? TonewheelModel::kLower
+                         : nm == "tonewheel-pedal" ? TonewheelModel::kPedal : -1;
         notes.push_back({ech * 1000 + e.track, long(it->second.first), long(e.tick), e.a, it->second.second, ech, onExpr[ech * 128 + e.a], forced});
         on.erase(it);
       }
     }
-    // Does the file set the Leslie itself (the mod wheel, the sustain pedal, CC82)?
-    bool fileLeslie = false, fileExpr = false;
+    // Does the file set the Rotary itself (the mod wheel, the sustain pedal, CC82)?
+    bool fileRotary = false, fileExpr = false;
     {
       int pg[16] = {};
       for (const Event& e : song.ev) {
         const int ech = e.status & 15, kind = e.status & 0xf0;
         if (kind == 0xc0) pg[ech] = e.a;
-        if (kind == 0xb0 && ech != 9 && isHammond(forProgram(pg[ech])) && (e.a == 82 || ((e.a == 1 || e.a == 64) && fileHammond(pg[ech]))))
-          fileLeslie = true;
-        if (kind == 0xb0 && ech != 9 && isHammond(forProgram(pg[ech])) && e.a == 11) fileExpr = true;
+        if (kind == 0xb0 && ech != 9 && isTonewheel(forProgram(pg[ech])) && (e.a == 82 || ((e.a == 1 || e.a == 64) && fileTonewheel(pg[ech]))))
+          fileRotary = true;
+        if (kind == 0xb0 && ech != 9 && isTonewheel(forProgram(pg[ech])) && e.a == 11) fileExpr = true;
       }
     }
-    for (const HammondNote& n : notes) ++p.hammondChans[n.ch];
+    for (const TonewheelNote& n : notes) ++p.tonewheelChans[n.ch];
     const double bpm = song.tempo.empty() ? 120 : 60 / song.tempo[0].len;
     auto secondsAt = [&song](long tick) {
       const double b = double(tick) / song.div;
@@ -898,8 +898,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
       return song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
     };
-    p.hplan.reset(new HammondPlan(planHammond(notes, song.div, bpm, p.inst->name, fileLeslie, fileExpr, secondsAt)));
-    for (const HammondPlan::Extra& x : p.hplan->extra) {
+    p.hplan.reset(new TonewheelPlan(planTonewheel(notes, song.div, bpm, p.inst->name, fileRotary, fileExpr, secondsAt)));
+    for (const TonewheelPlan::Extra& x : p.hplan->extra) {
       p.hx.push_back({x.on, 1, x.pitch, x.vel, x.div});
       p.hx.push_back({x.off, 0, x.pitch, 0, x.div});
     }
@@ -907,9 +907,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     std::string sum = p.hplan->summary;
     for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
     std::fprintf(stderr, "    %s", sum.c_str());
-    if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) {
+    if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) {
       hp->setRegistration(p.hplan->reg);
-      hp->setLeslieExternal();  // (the file's controls or the plan: the player does not ride it)
+      hp->setRotaryExternal();  // (the file's controls or the plan: the player does not ride it)
     }
   }
   // A piano among an orchestra is not miked: it is heard through the hall, as the players around
@@ -1518,6 +1518,44 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   // end, it is let up carefully (0.035: ~13 dB softer, the landings smeared). Each its own
   // (x 0.85 .. 1.15). A pedal sending the values between keeps the speed its controller shows.
   std::map<std::pair<int, long long>, double> releaseSpeed;  // (channel, t in 0.1 ms) -> m/s
+  // (The gentlest releases of the pedal: each channel's last one, whatever the music, and any after
+  // which the pianist's own part holds nothing and begins nothing for PJ_PIANO_SILENCE seconds,
+  // 1.5, whatever the others play: free to let the foot up calmly, no rhythmic thump. Channel, t
+  // in 0.1 ms.)
+  std::set<std::pair<int, long long>> gentleUp;
+  {
+    static const double kSilence = knob("PJ_PIANO_SILENCE", 1.5);
+    std::map<int, std::vector<double>> onsOf, offsOf;
+    std::map<int, int> open;
+    for (const Event& e : song.ev) {
+      const int kind = e.status & 0xf0, id = (e.status & 15) * 128 + e.a;
+      if (kind == 0x90 && e.b > 0) {
+        onsOf[e.status & 15].push_back(e.t);
+        ++open[id];
+      } else if ((kind == 0x80 || kind == 0x90) && open[id] > 0) {
+        --open[id];
+        offsOf[e.status & 15].push_back(e.t);
+      }
+    }
+    for (auto& [c, v] : onsOf) std::sort(v.begin(), v.end());
+    for (auto& [c, v] : offsOf) std::sort(v.begin(), v.end());
+    std::map<int, bool> pedalIsDown;
+    std::map<int, double> lastUp;
+    for (const Event& e : song.ev) {
+      if ((e.status & 0xf0) != 0xb0 || e.a != 64) continue;
+      const int c = e.status & 15;
+      if (pedalIsDown[c] && e.b < 64) {
+        lastUp[c] = e.t;
+        const std::vector<double>& ons = onsOf[c], &offs = offsOf[c];
+        const auto next = std::upper_bound(ons.begin(), ons.end(), e.t);
+        // (a note let go with the foot, within 20 ms, is not held on)
+        const long held = long(next - ons.begin()) - long(std::upper_bound(offs.begin(), offs.end(), e.t + 0.02) - offs.begin());
+        if (held <= 0 && (next == ons.end() || *next >= e.t + kSilence)) gentleUp.insert({c, std::llround(e.t * 1e4)});
+      }
+      pedalIsDown[c] = e.b >= 64;
+    }
+    for (const auto& [c, t] : lastUp) gentleUp.insert({c, std::llround(t * 1e4)});
+  }
   {
     std::vector<double> onsets;
     double drumHits = 0;
@@ -1605,17 +1643,17 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             lv += (c[k + 1].second - lv) * (now - c[k].first) / std::max(1e-9, c[k + 1].first - c[k].first);
           p.ens->all(&Performer::setBreath, lv - 0.5);
         }
-      // A Hammond's planned Leslie nudges: in the middle of a long note, where no event comes, so
+      // A Tonewheel's planned Rotary nudges: in the middle of a long note, where no event comes, so
       // by the clock (their ticks turned to seconds by the tempo map).
       for (auto& [id, p] : parts) {
         if (!p.hplan) continue;
-          while (p.boostNext < p.hplan->leslieBoost.size()) {
-            const double b = double(p.hplan->leslieBoost[p.boostNext].first) / song.div;
+          while (p.boostNext < p.hplan->rotaryBoost.size()) {
+            const double b = double(p.hplan->rotaryBoost[p.boostNext].first) / song.div;
             size_t k = 0;
             while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
             const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
             if (at > now) break;
-            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslieBoost(p.hplan->leslieBoost[p.boostNext].second);
+            if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setRotaryBoost(p.hplan->rotaryBoost[p.boostNext].second);
             ++p.boostNext;
           }
           while (p.thinNext < p.hplan->thin.size()) {  // (a trill's thinned registration, by the clock)
@@ -1624,7 +1662,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
             const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
             if (at > now) break;
-            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setThin(p.hplan->thin[p.thinNext].second);
+            if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setThin(p.hplan->thin[p.thinNext].second);
             ++p.thinNext;
           }
           // (the tick's time by the tempo map)
@@ -1634,7 +1672,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
             return song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
           };
-          auto* hpl = dynamic_cast<HammondPlayer*>(&p.ens->player(0));
+          auto* hpl = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0));
           // The re-registrations (inside a held final chord too, no event to carry them).
           while (p.regNext < p.hplan->upperChanges.size() && when(p.hplan->upperChanges[p.regNext].first) <= now) {
             if (hpl)
@@ -1663,10 +1701,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           // Notes let go early (the percussion re-armed for the next).
           for (size_t r = 0; r < p.hrel.size();) {
             if (when(p.hrel[r].first) > now) { ++r; continue; }
-            auto k = p.hammondDiv.find(p.hrel[r].second);
-            if (k != p.hammondDiv.end()) {
+            auto k = p.tonewheelDiv.find(p.hrel[r].second);
+            if (k != p.tonewheelDiv.end()) {
               if (hpl) hpl->noteOffManual(k->second, p.hrel[r].second & 127);
-              p.hammondDiv.erase(k);
+              p.tonewheelDiv.erase(k);
             }
             p.hrel.erase(p.hrel.begin() + r);
           }
@@ -1681,42 +1719,42 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           }
           // (... and its speed changes by the clock too: a flick ends inside a held chord, with no
           // event to carry it)
-          while (p.leslieNext < p.hplan->leslie.size()) {
-            const double b = double(p.hplan->leslie[p.leslieNext].first) / song.div;
+          while (p.rotaryNext < p.hplan->rotary.size()) {
+            const double b = double(p.hplan->rotary[p.rotaryNext].first) / song.div;
             size_t k = 0;
             while (k + 1 < song.tempo.size() && song.tempo[k + 1].beat <= b) ++k;
             const double at = song.tempo.empty() ? b * 0.5 : song.tempo[k].t + (b - song.tempo[k].beat) * song.tempo[k].len;
             if (at > now) break;
-            if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(p.hplan->leslie[p.leslieNext].second ? 2 : 1);
-            ++p.leslieNext;
+            if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setRotary(p.hplan->rotary[p.rotaryNext].second ? 2 : 1);
+            ++p.rotaryNext;
           }
       }
       for (; next < song.ev.size() && song.ev[next].t < now; ++next) {
         const Event& e = song.ev[next];
         const int ch = e.status & 15, kind = e.status & 0xf0;
-        // A Hammond's planned Leslie: its speed changes from their tick on.
+        // A Tonewheel's planned Rotary: its speed changes from their tick on.
         for (auto& [id, p] : parts)
           if (p.hplan)
-            while (p.leslieNext < p.hplan->leslie.size() && p.hplan->leslie[p.leslieNext].first <= long(e.tick)) {
-              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(p.hplan->leslie[p.leslieNext].second ? 2 : 1);
-              ++p.leslieNext;
+            while (p.rotaryNext < p.hplan->rotary.size() && p.hplan->rotary[p.rotaryNext].first <= long(e.tick)) {
+              if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setRotary(p.hplan->rotary[p.rotaryNext].second ? 2 : 1);
+              ++p.rotaryNext;
             }
         for (auto& [id, p] : parts)
           if (p.hplan)
             while (p.percNext < p.hplan->percussion.size() && p.hplan->percussion[p.percNext].first <= long(e.tick)) {
-              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setPercussion(p.hplan->percussion[p.percNext].second);
+              if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setPercussion(p.hplan->percussion[p.percNext].second);
               ++p.percNext;
             }
         for (auto& [id, p] : parts)
           if (p.hplan)
             while (p.lvibNext < p.hplan->lowerVib.size() && p.hplan->lowerVib[p.lvibNext].first <= long(e.tick)) {
-              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLowerVibrato(p.hplan->lowerVib[p.lvibNext].second);
+              if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setLowerVibrato(p.hplan->lowerVib[p.lvibNext].second);
               ++p.lvibNext;
             }
         for (auto& [id, p] : parts)
           if (p.hplan)
             while (p.regNext < p.hplan->upperChanges.size() && p.hplan->upperChanges[p.regNext].first <= long(e.tick)) {
-              if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0)))
+              if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0)))
                 hp->setUpper(p.hplan->upperChanges[p.regNext].second, p.hplan->lowerExtra, p.hplan->clarity,
                              p.regNext < p.hplan->upperInstant.size() && p.hplan->upperInstant[p.regNext], p.hplan->lowerShape);
               ++p.regNext;
@@ -1784,16 +1822,16 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             ++op.played;
             continue;
           }
-          if (it->second.hplan) {  // (a Hammond by its plan: the note on its division)
+          if (it->second.hplan) {  // (a Tonewheel by its plan: the note on its division)
             Part& hp = it->second;
             auto d = hp.hplan->division.find({ch * 128 + e.a, long(e.tick)});
-            const int div = d != hp.hplan->division.end() ? d->second : HammondModel::kUpper;
-            if (auto* pl = dynamic_cast<HammondPlayer*>(&hp.ens->player(0))) {
-              auto old = hp.hammondDiv.find(ch * 128 + e.a);
-              if (old != hp.hammondDiv.end()) pl->noteOffManual(old->second, e.a);
+            const int div = d != hp.hplan->division.end() ? d->second : TonewheelModel::kUpper;
+            if (auto* pl = dynamic_cast<TonewheelPlayer*>(&hp.ens->player(0))) {
+              auto old = hp.tonewheelDiv.find(ch * 128 + e.a);
+              if (old != hp.tonewheelDiv.end()) pl->noteOffManual(old->second, e.a);
               auto tv = hp.hplan->velocity.find({ch * 128 + e.a, long(e.tick)});  // (a trill's rising touch)
               pl->noteOnManual(div, e.a, tv != hp.hplan->velocity.end() ? tv->second : e.b);
-              hp.hammondDiv[ch * 128 + e.a] = div;
+              hp.tonewheelDiv[ch * 128 + e.a] = div;
               auto rl = hp.hplan->release.find({ch * 128 + e.a, long(e.tick)});  // (to be let go early)
               if (rl != hp.hplan->release.end()) hp.hrel.push_back({rl->second, ch * 128 + e.a});
             }
@@ -1821,10 +1859,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             continue;
           }
           if (np.hplan) {
-            auto k = np.hammondDiv.find(ch * 128 + e.a);
-            if (k != np.hammondDiv.end()) {
-              if (auto* pl = dynamic_cast<HammondPlayer*>(&np.ens->player(0))) pl->noteOffManual(k->second, e.a);
-              np.hammondDiv.erase(k);
+            auto k = np.tonewheelDiv.find(ch * 128 + e.a);
+            if (k != np.tonewheelDiv.end()) {
+              if (auto* pl = dynamic_cast<TonewheelPlayer*>(&np.ens->player(0))) pl->noteOffManual(k->second, e.a);
+              np.tonewheelDiv.erase(k);
             }
             noteOwner.erase(it);
             continue;
@@ -1832,32 +1870,35 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           np.ens->noteOff(heldKey[ch * 128 + e.a]);
           noteOwner.erase(it);
         } else if (kind == 0xb0) {
-          // (a Hammond's part hears the controllers of every channel it plays)
+          // (a Tonewheel's part hears the controllers of every channel it plays)
           auto hears = [&](int id, const Part& p) {
-            return id / 128 == ch || (ch != 9 && std::strcmp(p.inst->family, "hammond") == 0 && isHammond(forProgram(prog[ch])));
+            return id / 128 == ch || (ch != 9 && std::strcmp(p.inst->family, "tonewheel") == 0 && isTonewheel(forProgram(prog[ch])));
           };
-          // (a Hammond takes the sustain pedal and the mod wheel as its Leslie's switch only from a
-          // channel the file wrote for a Hammond: a reinstrumented piano's pedalling is not the
-          // Leslie's, and would throw it, its relay clicking, at every pedal change)
-          auto leslieFrom = [&](const Part& p) { return std::strcmp(p.inst->family, "hammond") != 0 || fileHammond(prog[ch]); };
+          // (a Tonewheel takes the sustain pedal and the mod wheel as its Rotary's switch only from a
+          // channel the file wrote for a Tonewheel: a reinstrumented piano's pedalling is not the
+          // Rotary's, and would throw it, its relay clicking, at every pedal change)
+          auto rotaryFrom = [&](const Part& p) { return std::strcmp(p.inst->family, "tonewheel") != 0 || fileTonewheel(prog[ch]); };
           if (e.a == 64) band.pedal(ch, e.b >= 64);
           if (e.a == 64)  // the sustain pedal
             for (auto& [id, p] : parts)
-              if (hears(id, p) && leslieFrom(p)) {
+              if (hears(id, p) && rotaryFrom(p)) {
                 if (e.b < 64) {
                   const auto it = releaseSpeed.find({ch, std::llround(e.t * 1e4)});
                   if (it != releaseSpeed.end())
                     for (int q = 0; q < p.ens->size(); ++q)
                       if (auto* pp = dynamic_cast<PianoPlayer*>(&p.ens->player(q))) pp->planRelease(it->second);
+                  if (gentleUp.count({ch, std::llround(e.t * 1e4)}))
+                    for (int q = 0; q < p.ens->size(); ++q)
+                      if (auto* pp = dynamic_cast<PianoPlayer*>(&p.ens->player(q))) pp->planGentleRelease();
                 }
                 p.ens->sustainPedal(e.b);
               }
           if (e.a == 7) chVol[ch] = e.b / 127.0;
-          if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Hammond's expression pedal instead
+          if (e.a == 11) {  // expression: the mixer's fader; the church organ's swell pedal, the Tonewheel's expression pedal instead
             bool swell = false;
             for (auto& [id, p] : parts)
-              if (hears(id, p) && (std::strcmp(p.inst->family, "organ") == 0 || std::strcmp(p.inst->family, "hammond") == 0)) {
-                // (a plan's swell wins; a Hammond's pedal follows its tune's channels only, the
+              if (hears(id, p) && (std::strcmp(p.inst->family, "organ") == 0 || std::strcmp(p.inst->family, "tonewheel") == 0)) {
+                // (a plan's swell wins; a Tonewheel's pedal follows its tune's channels only, the
                 // accompaniment's loudness being in its registration)
                 if (!p.plan && !(p.hplan && !p.hplan->exprChannels.count(ch))) p.ens->all(&Performer::setBreath, e.b / 127.0 - 0.5);
                 swell = true;
@@ -1866,23 +1907,23 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             for (auto& [id, p] : parts)  // (the brass section: a swell moves its players' breath too)
               if (id / 128 == ch && brassSectionInstrument(*p.inst)) p.ens->brassExpression(e.b / 127.0);
           }
-          if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Hammond's Leslie (fast from 64); the timpani's roll
+          if (e.a == 1)  // the mod wheel: the harmonica's hand tremolo; the Tonewheel's Rotary (fast from 64); the timpani's roll
             for (auto& [id, p] : parts)
               if (hears(id, p) && (std::strcmp(p.inst->name, "harmonica") == 0 || std::strcmp(p.inst->name, "timpani") == 0 ||
                                    std::strcmp(p.inst->name, "fretless-bass") == 0 || std::strncmp(p.inst->name, "vibraphone", 10) == 0 ||
-                                   (std::strcmp(p.inst->family, "hammond") == 0 && leslieFrom(p))))
+                                   (std::strcmp(p.inst->family, "tonewheel") == 0 && rotaryFrom(p))))
                 p.ens->all(&Performer::setFlutter, e.b / 127.0);
-          if (e.a == 82)  // the Leslie's switch (as the Leslie 2101's default): stop, slow, fast
+          if (e.a == 82)  // the Rotary's switch (as the digital rotary speaker's default): stop, slow, fast
             for (auto& [id, p] : parts)
-              if (hears(id, p) && std::strcmp(p.inst->family, "hammond") == 0)
-                if (auto* hp = dynamic_cast<HammondPlayer*>(&p.ens->player(0))) hp->setLeslie(e.b < 43 ? 0 : e.b < 86 ? 1 : 2);
+              if (hears(id, p) && std::strcmp(p.inst->family, "tonewheel") == 0)
+                if (auto* hp = dynamic_cast<TonewheelPlayer*>(&p.ens->player(0))) hp->setRotary(e.b < 43 ? 0 : e.b < 86 ? 1 : 2);
           if (e.a == 123 || e.a == 120)  // all notes off
             for (auto& [k, id] : noteOwner)
               if (k / 128 == ch) { parts[id].ens->noteOff(heldKey[k]); band.off(ch, k % 128); }
-        } else if (kind == 0xd0) {  // channel pressure: the breath (a Clavinet: its keys pressed harder)
+        } else if (kind == 0xd0) {  // channel pressure: the breath (a Clavi: its keys pressed harder)
           for (auto& [id, p] : parts)
             if (id / 128 == ch) p.ens->all(&Performer::setBreath, 0.5 * e.a / 127.0);
-        } else if (kind == 0xe0) {  // pitch bend: the lips (a Clavinet: the wah)
+        } else if (kind == 0xe0) {  // pitch bend: the lips (a Clavi: the wah)
           const double b = ((e.b << 7 | e.a) - 8192) / 8192.0;
           for (auto& [id, p] : parts)
             if (id / 128 == ch) p.ens->all(&Performer::setLipRoll, b);
@@ -1931,11 +1972,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         // (and the program's level: where the SoundFonts put it against their piano, src/gmlevels_data.h;
         // the drums have theirs key by key, src/drumcal_data.h)
         if (ch != 9) g *= p.gmGain;
-        // (one Hammond playing several channels: one fader, the channels' own by how many of its
+        // (one Tonewheel playing several channels: one fader, the channels' own by how many of its
         // notes each plays)
-        if (!p.hammondChans.empty()) {
+        if (!p.tonewheelChans.empty()) {
           double sum = 0, w = 0;
-          for (auto& [c, n] : p.hammondChans) {
+          for (auto& [c, n] : p.tonewheelChans) {
             sum += n * std::pow(chVol[c] * 127 / 100.0, 2) * std::pow(chExpr[c], 2);
             w += n;
           }

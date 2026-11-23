@@ -21,15 +21,15 @@ How each fact is marked:
 
 **What GM 38 is, in the references.**
 - GM gives only the name. The name is older than GM: "Slap Bass 1" and "Slap Bass 2" are
-  programs 69 and 70 of the MT-32/CM-64 list. The SC-88 Pro manual's CM-64 map lists them as
+  programs 69 and 70 of the MT-32/CM-64 list. The later GS module Pro manual's CM-64 map lists them as
   "069 127 Slap Bass 1, 070 127 Slap Bass 2" **[T, SC-88Pro OM p.161]**.
-- **Roland GS.**
-  - Slap Bass 2 uses **2 voices** in the SC-88 map and the native SC-88 Pro map, but **1 voice**
-    in the SC-55 map. Slap Bass 1 uses 1 voice in all three **[T, SC-88Pro OM tone list]**. From
-    the SC-88 on, Roland built 38 as a two-partial tone, a layer or a velocity switch.
-  - The GS variation of 38 is **"FM Slap"** (bank 8, SC-88 Pro). The variations of 37 are "Slap
+- **GS.**
+  - Slap Bass 2 uses **2 voices** in the later GS module map and the native later GS module Pro map, but **1 voice**
+    in the early GS module map. Slap Bass 1 uses 1 voice in all three **[T, SC-88Pro OM tone list]**. From
+    the later GS module on, one maker built 38 as a two-partial tone, a layer or a velocity switch.
+  - The GS variation of 38 is **"FM Slap"** (bank 8, later GS module Pro). The variations of 37 are "Slap
     Pop", "Reso Slap" and "Unison Slap" **[T, same]**.
-- **Yamaha XG.** The variation of 38 is "VeloSlap" (Velocity Switch Slap, bank 43). The
+- **XG.** The variation of 38 is "VeloSlap" (Velocity Switch Slap, bank 43). The
   variations of 37 are "ResoSlap" (27) and "PunchThm" (Punch Thumb, 32)
   **[web, polyphone.io MIDI standards]**. XG files the thumb under 37 and a velocity-switched
   thumb/pop under 38. What the switch does is **[memory]**.
@@ -48,11 +48,11 @@ How each fact is marked:
   - 38 is **not more compressed**: its crest factor is equal or higher, and it **decays as fast or
     faster** in its first second.
   - So the "more compressed, squashed" description in bass_amps.md 10.5 (one Soundhouse snippet)
-    is **not supported by any SoundFont measured here**. Whether it fits the SC-55 itself is
+    is **not supported by any SoundFont measured here**. Whether it fits the early GS module itself is
     unknown (no hardware or ROM here).
 
 **What GM 38 should be, physically [E].**
-- The same Jazz Bass and player as 37, **pop-forward**:
+- The same two-pickup bass and player as 37, **pop-forward**:
   - every note that can lie on the D or G string is **popped** (the finger hooks the string,
     pulls it 2–6 mm away from the body, and lets it slam onto the frets);
   - only notes below D2 are thumbed.
@@ -68,43 +68,43 @@ How each fact is marked:
 
 ## 1. The GM 38 patch, reference by reference
 
-### 1.1 Roland: MT-32, SC-55, SC-88, SC-88 Pro
+### 1.1 one maker: MT-32, early GS module, later GS module, later GS module Pro
 
-- **Name lineage [T].** The SC-88 Pro's CM-64 map lists the MT-32 tones (bank 127) with
+- **Name lineage [T].** The later GS module Pro's CM-64 map lists the MT-32 tones (bank 127) with
   "069 Slap Bass 1, 070 Slap Bass 2". It also lists CM-32P tones (bank 126): "016–019 Slap Bass 1,
-  020–023 Slap Bass 2". GM Level 1 (1991) took its program names largely from Roland's lists
-  **[memory]**. So "Slap Bass 2" started as a Roland preset name. It does not describe a standard
+  020–023 Slap Bass 2". GM Level 1 (1991) took its program names largely from one maker's lists
+  **[memory]**. So "Slap Bass 2" started as a one maker preset name. It does not describe a standard
   playing technique.
 - **The MT-32's Slap Bass 1/2** were LA-synthesis tones: a short PCM attack spliced onto
   synthesised partials **[memory]**. That is one root of the "synth-like slap" side of the
-  family. The other is the DX7 "E.BASS 1" family; see bass_section.md §8.
+  family. The other is the FM synth "E.BASS 1" family; see bass_section.md §8.
 - **Voices [T, SC-88Pro OM pp. 154–161]:**
 
 | Map | 37 Slap Bass 1 | 38 Slap Bass 2 | Variations |
 |---|---|---|---|
-| SC-55 | 1 voice | **1 voice** | |
-| SC-88 | 1 | **2** (marked "#" for the native map: the same as the SC-88's) | 37: Reso Slap (bank 8) |
-| SC-88 Pro native | 1 | **2** | 37: Slap Pop (1), Reso Slap (8), Unison Slap (9, 2 voices); **38: FM Slap (8, 2 voices)** |
+| early GS module | 1 voice | **1 voice** | |
+| later GS module | 1 | **2** (marked "#" for the native map: the same as the later GS module's) | 37: Reso Slap (bank 8) |
+| later GS module Pro native | 1 | **2** | 37: Slap Pop (1), Reso Slap (8), Unison Slap (9, 2 voices); **38: FM Slap (8, 2 voices)** |
 
 - **What this says:**
-  - From the SC-88 on, Roland gave 38 two partials, a layered or velocity-switched tone. 37 kept
+  - From the later GS module on, one maker gave 38 two partials, a layered or velocity-switched tone. 37 kept
     one **[T for the counts; E for the reading]**.
-  - Roland's only named relative of 38 is a *synthetic* slap (FM Slap). The "Slap Pop" variation
-    sits under 37, so Roland did not treat 38 as "the pop" **[T for the names; E for the
+  - one maker's only named relative of 38 is a *synthetic* slap (FM Slap). The "Slap Pop" variation
+    sits under 37, so one maker did not treat 38 as "the pop" **[T for the names; E for the
     reading]**.
-- **Not found:** any Roland text describing how Slap Bass 2 sounds, or the content of its samples.
-  The SC-55's waves were not available (no ROM dump or hardware here). This is the largest gap
+- **Not found:** any one maker text describing how Slap Bass 2 sounds, or the content of its samples.
+  The early GS module's waves were not available (no ROM dump or hardware here). This is the largest gap
   (§9).
 
-### 1.2 Yamaha XG
+### 1.2 XG
 
 - Bank 0 program 38 "SlapBas2". Variation bank 43 "VeloSlap" (Velocity Switch Slap). Under 37:
-  bank 27 "ResoSlap" and bank 32 "PunchThm" **[web, polyphone.io]**. Yamaha's DD-65 and PSR
+  bank 27 "ResoSlap" and bank 32 "PunchThm" **[web, polyphone.io]**. One maker's DD-65 and PSR
   manuals list them in the order "Slap Bass 1, Punch Thumb Bass, Slap Bass 2, Velocity Switch
   Slap" **[web, manualslib snippets]**.
-- **Reading [E]:** Yamaha files the thumb-centred variant under 37. Under 38 it files one that
+- **Reading [E]:** One maker files the thumb-centred variant under 37. Under 38 it files one that
   switches samples by velocity. That points to 38 as the patch where the pop appears. The
-  switch's direction (pop on hard notes) is **[memory]**: no Yamaha data list was readable here
+  switch's direction (pop on hard notes) is **[memory]**: no one maker data list was readable here
   (their PDFs refused the download).
 
 ### 1.3 The SoundFonts, from their SF2 data [T]
@@ -168,7 +168,7 @@ searching.
 | FluidR3 | **Different technique, same bass** (pop against thumb) **[T]** |
 | TimGM6mb / Jnsgm2 | Different samples, and a deeper and faster filter sweep: **processed, synth-like** **[T]** |
 | SGM | Different samples (technique not named) **[T]** |
-| SC-55 | Unknown. 1 voice, like 37; becomes 2 voices on the SC-88 **[T]** |
+| early GS module | Unknown. 1 voice, like 37; becomes 2 voices on the later GS module **[T]** |
 
 ### 1.4 Rendered and measured [T]
 
@@ -335,13 +335,13 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
     unloaded "J about 9 kHz" **[web, via bass_section.md §3.2]**.
   - The pop's string spectrum reaches well above 5 kHz (§2.2), so this octave of extra pickup
     bandwidth is where 38's sustained zing lives.
-- **Marcus Miller's 1977 Jazz Bass:**
-  - Roger Sadowsky fitted a Stars Guitars preamp in 1979;
+- **Marcus Miller's 1977 two-pickup bass:**
+  - Roger one bass maker fitted a Stars Guitars preamp in 1979;
   - after it was destroyed in 1983 (a DI surge at Media Sound) he fitted a **Bartolini TCT**;
   - plus a Badass bridge. It is the bass on *The Man with the Horn* **[web, guitarworld;
     premierguitar]**.
   - Both pickups up and the preamp's treble boost give the canonical "J slap" **[L]**.
-- **Music Man StingRay (1976):**
+- **active single-humbucker bass (1976):**
   - One humbucker whose coils sit **75 and 99 mm from the saddle** (33.3/35.7 cm from the 12th
     fret on a 34″ bass; single-coil midpoints 34.3–34.8 cm) **[web, pickup-position-db]**.
   - A 9 V active preamp, 2-band originally. Treble about +20/−16 dB at ~10 kHz and bass about
@@ -353,10 +353,10 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
 
 | Pickup | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| StingRay HB (75 + 99 mm, series) | −9 | −4 | −1 | 0 | 0 | 0 | −2 | −5 | −11 | **−33** | −10 | −5 | −2 | −1 | −1 | −2 |
+| active single-humbucker bass HB (75 + 99 mm, series) | −9 | −4 | −1 | 0 | 0 | 0 | −2 | −5 | −11 | **−33** | −10 | −5 | −2 | −1 | −1 | −2 |
 | J both ('60s, 155 + 64 mm) | −6 | −1 | 0 | 0 | −2 | −6 | −15 | **−37** | −27 | −22 | −10 | −6 | −4 | −5 | −10 | −20 |
 
-  - The StingRay has no scoop at the 7th–9th harmonics. It is flat from the 3rd to the 7th and
+  - The active single-humbucker bass has no scoop at the 7th–9th harmonics. It is flat from the 3rd to the 7th and
     weaker at the fundamental: a punchier, more mid-forward slap than the scooped J.
 - **Strings:**
   - New roundwounds are much brighter than old ones. Stainless (Rotosound Swing Bass 66, the
@@ -370,11 +370,11 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
 - **TimGM6mb/Jnsgm2's 38** is a sampled click plus a looped cycle through a filter envelope
   (579 Hz → 6.4 kHz → 1.4 kHz in 0.4–0.5 s). It has a synth's wah-like sweep and is the same on
   every note **[T]**.
-- **Roland put "FM Slap" under 38 [T].** In the 80s the DX7 bass (bass_section.md §8: a harmonic
+- **one maker put "FM Slap" under 38 [T].** In the 80s the FM synth bass (bass_section.md §8: a harmonic
   burst at 13–19 f₀, identical on every note) was the "processed" slap of records.
 - **FluidR3 and SGM are plain recordings.** The pop's own brightness is enough, with no sweep
   **[T]**.
-- **Decision [E]:** keep 38 physical (a real pop, real frets). The DX7 E.BASS 1 already has its
+- **Decision [E]:** keep 38 physical (a real pop, real frets). The FM synth E.BASS 1 already has its
   own place (bass_section.md §10) and is the natural home for an "FM Slap". **Do not put a filter
   sweep on the physical pop.**
 
@@ -387,15 +387,15 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
   **[memory]**.
 - **Louis Johnson** (Brothers Johnson; on Michael Jackson's *Off the Wall* and *Thriller*
   sessions):
-  - a StingRay, hard thumb and pop, very bright, percussive octaves **[memory]**.
+  - an active single-humbucker bass, hard thumb and pop, very bright, percussive octaves **[memory]**.
 - **Stanley Clarke:**
-  - Alembic basses with active electronics, bright, a lot of popping and up-the-neck lines (*School
+  - one bass maker basses with active electronics, bright, a lot of popping and up-the-neck lines (*School
     Days*, 1976) **[memory]**.
 - **Marcus Miller:**
   - the '77 J + Bartolini (§2.3), both pickups, treble boosted, scooped;
   - pops and thumbs in tight 16ths, many ghost notes **[web; L]**.
 - **Mark King** (Level 42, from 1980):
-  - a Jaydee Supernatural from about 1981, later Status graphite and Alembic;
+  - a Jaydee Supernatural from about 1981, later Status graphite and one bass maker;
   - Trace Elliot amps (an AH500 head into two 4×10s);
   - "continuous 16th-note slap grooves played with a combination of slaps, pops, hammer-ons and
     fretting-hand slaps", the "machine-gun" thumb **[web, guitarworld; Wikipedia]**.
@@ -435,20 +435,20 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
 ## 4. The chain
 
 - **What 1980s slap records used [web/L/memory]:**
-  - active bass → DI (often the DI alone) → compression (1176 or dbx 160), plus a clean
+  - active bass → DI (often the DI alone) → compression (FET or VCA), plus a clean
     solid-state head into 4×10s live (Trace Elliot, GK);
   - Trace Elliot's graphic EQ was set in a "smile" (lows and highs up, 400–800 Hz down);
   - sometimes chorus on 1980s pop records; exciters (Aphex) in some mixes **[memory]**.
 - **What the GM references show [T]:** no chorus or modulation (only reverb sends), no
   distortion, no extra squash on 38.
 - **Proposal for "slap-squash" (GuitarAmp), revising bass_amps.md 10.5 [E]:**
-  - **Keep 37's 1176 settings or nearly**: 4:1, **attack ≥ 1 ms** (0.8 ms is 37's), release
+  - **Keep 37's FET compressor settings or nearly**: 4:1, **attack ≥ 1 ms** (0.8 ms is 37's), release
     120–150 ms, 4–6 dB on pops.
     - The planned 8:1 with 0.2 ms attack would flatten the pop's first 5 ms and lower its crest
       factor. Every reference keeps or raises the crest factor of 38.
   - **The stomp compressor in front: off by default** (or 2:1, ≤ 2 dB). It was there only for
     "squashed" (Soundhouse), which the measurements do not support.
-  - **SansAmp-like drive: off by default** (or ≤ 10 % blend).
+  - **tube-emulation drive: off by default** (or ≤ 10 % blend).
   - **The brightness comes from the bass, not the amp:** the active buffer (§2.3), and the
     preamp's EQ on the bass (treble +6 dB shelf at 4 kHz, bass +4 dB at 50 Hz, flat mids).
   - **DI path** at least as bright as 37's (VPF at noon: +4 dB at 35 Hz, −6 dB at 380 Hz, +4 dB
@@ -494,7 +494,7 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
 | Strings | EXL170 nickel, loss as GM 34 | **new stainless roundwounds: loss1 −35 %** | §2.3 |
 | Compressor | 4:1, 0.8 ms, 150 ms | **4:1, 1–2 ms, 120 ms; no stomp, no drive by default** | §1.4, §4 |
 | Loudness at v100 | reference | **within ±1 dB of 37** | §1.4 |
-| Alternative spec (by ear, a knob) | | `PJ_SLAP2_BASS=stingray`: one humbucker at 75 + 99 mm in series, 2-band preamp (treble +8 dB at 8–10 kHz, bass +5 dB at 40 Hz) | §2.3 |
+| Alternative spec (by ear, a knob) | | `PJ_SLAP2_BASS=humbucker-bass`: one humbucker at 75 + 99 mm in series, 2-band preamp (treble +8 dB at 8–10 kHz, bass +5 dB at 40 Hz) | §2.3 |
 
 ### 5.3 The chain for 38
 
@@ -502,7 +502,7 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
   load no longer matters).
 - DI path: the VPF at noon.
 - Amp path: the GK-like head and cabinet 5.
-- Blend DI 0.8, then the 1176 at 4:1, 1.5 ms / 120 ms.
+- Blend DI 0.8, then the FET compressor at 4:1, 1.5 ms / 120 ms.
 - Room reverb as for the other basses.
 - Optional chorus, off.
 
@@ -518,7 +518,7 @@ Raw samples taken from the `smpl` chunk; the >2 kHz share and the 3–6 kHz shar
    - a `GuitarSpec` flag `active`: the coil network loaded by ~200 pF and 1 MΩ, not the cable;
    - an onboard 2-band EQ (shelves);
    - for 38, stainless strings (loss1 × 0.65).
-   - A StingRay spec (one series humbucker at 75/99 mm) behind a knob, for an A/B by ear.
+   - An active single-humbucker bass spec (one series humbucker at 75/99 mm) behind a knob, for an A/B by ear.
 3. **The pop's pickup nonlinearity:** the field model (Novak, already in `Guitar`) must see the
    2.5 mm swing at the neck coil. Check that a 6 mm pop does not push the string "through" the
    pole (clamp the field term at ≥ 0.5 mm clearance).
@@ -570,7 +570,7 @@ probe keys and velocities as in §1.4, plus the first 32 notes of grelots.mid). 
   (the string, the pop), and is not only in the click (an EQ would brighten both equally).
 
 **Chain:**
-- The 1176 on 38: pops get 4–6 dB of gain reduction at v100, and the first 2 ms of a pop's
+- The FET compressor on 38: pops get 4–6 dB of gain reduction at v100, and the first 2 ms of a pop's
   waveform keep their peak within 1 dB of the uncompressed signal (attack ≥ 1 ms).
 - No THD > 1 % on a held E1 at v100.
 
@@ -583,8 +583,8 @@ probe keys and velocities as in §1.4, plus the first 32 notes of grelots.mid). 
 2. **"Squashed" 38:** a flat, lifeless pop with no snap (0.2 ms attack, 8:1). The references are
    peaky.
 3. **Low roots popped:** a pop on E1 sounds thin and flappy. Real players thumb the low roots.
-4. **A synth sweep:** a filter opening and closing on every note sounds like TimGM6mb, the DX7,
-   or a keyboard patch, not a bass. Keep that for "FM Slap" or the DX7.
+4. **A synth sweep:** a filter opening and closing on every note sounds like TimGM6mb, the FM synth,
+   or a keyboard patch, not a bass. Keep that for "FM Slap" or the FM synth.
 5. **Every pop identical:** the depth, the fret clatter and which frets the string strikes vary
    from note to note.
 6. **Legato lines chopped:** grelots.mid's notes are written legato. A slap player's pop rings
@@ -594,16 +594,16 @@ probe keys and velocities as in §1.4, plus the first 32 notes of grelots.mid). 
 
 ## 9. Not found, or uncertain
 
-- **The SC-55's Slap Bass 2 samples and envelope**, and any Roland text describing it. This is
-  the most important gap: the GM files were mostly made on SC-55/SC-88s **[memory]**. A Sound
-  Canvas VA or SC-55 recording of E1–A3 at four velocities, measured as in §1.4, would settle
-  whether Roland's 38 is pop-forward, compressed, or synthetic.
-- **Yamaha's XG 38** sample content and what "Velocity Switch Slap" switches between.
+- **The early GS module's Slap Bass 2 samples and envelope**, and any one maker text describing it. This is
+  the most important gap: the GM files were mostly made on early GS module/SC-88s **[memory]**. A Sound
+  Canvas VA or early GS module recording of E1–A3 at four velocities, measured as in §1.4, would settle
+  whether one maker's 38 is pop-forward, compressed, or synthetic.
+- **one maker's XG 38** sample content and what "Velocity Switch Slap" switches between.
 - **The Soundhouse column** (bass_amps.md's only source for "squashed") could not be loaded
   (timeouts). Its claim stands unverified and is contradicted by every SoundFont measured.
 - **Pop depths, places and release times** measured on players: only the one controlled case
   (3.6 mm at 22 cm). The IDMT-SMT-BASS "slap-pluck" notes would give real pop spectra to fit.
-- **The StingRay 2-band preamp's real curves:** clone makers' numbers only.
+- **The active single-humbucker bass 2-band preamp's real curves:** clone makers' numbers only.
 - **Stainless against nickel string losses:** no measurement found.
 - **Issanchou et al., Applied Acoustics 129 (2018)**, "String/frets contacts in the electric bass
   sound": only the abstract was read (HAL and core.ac.uk blocked the download). The ISMA 2017

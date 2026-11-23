@@ -101,7 +101,7 @@ One row per instrument. **Distance**: the mean of the eight largest weighted dif
 | 5 | Electric Piano 1 | electric-piano-1 | 2.84 | 60 | low (1.2) | brightens more with velocity (2.17 vs 0 ERB); a slower attack (29.0 vs 5 ms); less even from key to key (3.17 vs 1.23 dB) |
 | 6 | Electric Piano 2 | electric-piano-2 | 3.86 | 23 | medium (1.5) | a narrower dynamic range (1.6 vs 16.6 dB); brightens more with velocity (4.2 vs 0 ERB); less even from key to key (3.38 vs 1.04 dB) |
 | 7 | Harpsichord | harpsichord | 3.99 | 21 | low (1.2) | a narrower dynamic range (-2.2 vs 16.7 dB); less even from key to key (5.03 vs 0.88 dB); quieter (-6.9 vs -1.8 dB) |
-| 8 | Clavinet | clavinet | 3.73 | 28 | low (1.2) | brightens more with velocity (3.03 vs 0 ERB); less even from key to key (4.01 vs 0.945 dB); a slower attack (45.0 vs 1 ms) |
+| 8 | clavi | clavi | 3.73 | 28 | low (1.2) | brightens more with velocity (3.03 vs 0 ERB); less even from key to key (4.01 vs 0.945 dB); a slower attack (45.0 vs 1 ms) |
 | 9 | Celesta | celesta | 2.01 | 104 | low (1.0) | less even in tone from key to key (1.11 vs 0.202 ERB); brightens more with velocity (0.84 vs 0 ERB); a narrower dynamic range (13.1 vs 16.7 dB) |
 | 10 | Glockenspiel | glockenspiel | 2.30 | 90 | medium (1.6) | a slower attack (18.0 vs 1.5 ms); louder (-0.2 vs -4.2 dB); a narrower dynamic range (12.2 vs 16.6 dB) |
 | 11 | Music Box | music-box | 2.67 | 70 | medium (1.9) | a narrower dynamic range (6 vs 16.6 dB); less even from key to key (3.42 vs 0.53 dB); brightens slower up the keyboard (1.77 vs 3.34 ERB/oct) |
@@ -252,7 +252,7 @@ by more than half a JND. Medians are over the instruments.
      2.5 dB against 0.55–1.2 dB for the fonts. pajupilli is outside, and less even, in 97 of 128.
    - Brightness scatter is more uneven in 62 (none more even).
    - The legato scale is less even in 40 (more even in 1).
-   - Part of it is deliberate: Rhodes voicing, the guitarist's choice of string, choir sections
+   - Part of it is deliberate: tine piano voicing, the guitarist's choice of string, choir sections
      covering parts of the range. Part of it is the room: near-sines and their reflections add or
      cancel key by key, 3.9 dB in the hall against 0.5 dB dry in the fx-echoes note.
    - Part is the probe: keys outside an instrument's compass are folded by octaves.
@@ -338,7 +338,7 @@ by more than half a JND. Medians are over the instruments.
 
 Distance 1.77 (rank 113 of 129); the fonts disagree 1.1 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
-- **Staccato note dies at once (32 ms to −20 dB vs 131…208)**: a 100 ms note falls 20 dB within 32 ms. Together with the sharp onset (28 vs 8…14 dB/ms), this means the first few ms peak about 20 dB above what follows: a hammer/contact spike over the body. The bright piano gives 88 ms and the CP-80 217 ms on the same engine. Likely FAULT: look at the first 30 ms of a v80 note.
+- **Staccato note dies at once (32 ms to −20 dB vs 131…208)**: a 100 ms note falls 20 dB within 32 ms. Together with the sharp onset (28 vs 8…14 dB/ms), this means the first few ms peak about 20 dB above what follows: a hammer/contact spike over the body. The bright piano gives 88 ms and the electric grand 217 ms on the same engine. Likely FAULT: look at the first 30 ms of a v80 note.
 - **Key-to-key level scatter (5.0 vs 1.3…3.2 dB)**: the probe includes A0 and A7, where the grand drops. FluidR3 is 3.2 too. Worth checking, but not clearly wrong.
 - **Brightens with velocity (+1.07 vs 0 ERB)**: DELIBERATE (README "Concert grand": the felt hardens). This is mostly a TiMidity ARTIFACT: Jnsgm2 through FluidSynth brightens +1.4 ERB.
 - **Floor −90 dB, release 328 ms**: room ARTIFACT.
@@ -419,9 +419,9 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 
 Distance 1.97 (rank 105 of 129); the fonts disagree 1.1 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
-- **Key-to-key level scatter (5.1 vs 1.3…3.2 dB)**: the same engine as the grand and the same picture. research/shigeru_kawai_sk7.md measured 0.8–2.5 dB rms off the neighbours at v100. The extra here comes from the probe's extremes and its velocities: check before calling it a fault.
+- **Key-to-key level scatter (5.1 vs 1.3…3.2 dB)**: the same engine as the grand and the same picture. research/bright_grand.md measured 0.8–2.5 dB rms off the neighbours at v100. The extra here comes from the probe's extremes and its velocities: check before calling it a fault.
 - **Sharper onset (27.6 vs 8…15 dB/ms)**: the same hammer spike as p000, but the staccato length (88 ms) is less extreme. Possible FAULT shared with the grand.
-- **Brighter (11.3 vs 10.3…10.8 ERB), brightens with velocity (+1.16 ERB)**: DELIBERATE. This agrees with the earlier FluidR3 comparison (shigeru_kawai_sk7.md, "Against FluidR3"): FluidR3's GM 2 is its grand sample with a fixed brightness, and here the brightness grows with the blow. The >6 kHz excess re SGM (+33 dB) is the dark SGM sample.
+- **Brighter (11.3 vs 10.3…10.8 ERB), brightens with velocity (+1.16 ERB)**: DELIBERATE. This agrees with the earlier FluidR3 comparison (bright_grand.md, "Against FluidR3"): FluidR3's GM 2 is its grand sample with a fixed brightness, and here the brightness grows with the blow. The >6 kHz excess re SGM (+33 dB) is the dark SGM sample.
 - **Release 408 ms**: room ARTIFACT.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
@@ -501,7 +501,7 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 Distance 2.17 (rank 98 of 129); the fonts disagree 1.5 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
 - **Sharp onset (37.8 vs 5.5…13.8 dB/ms) but slow attack (39.5 vs 2…12 ms)**: the onset is steep and the peak comes late. This pattern repeats across plucked and struck programs (p004, p007, p014, p024, p025) and is most likely the hall's early reflections and reverb build-up adding to the first tens of ms. Probably a room ARTIFACT; a `-room dry` render would settle it.
-- **Key-to-key scatter (3.6 vs 0.75…2.8 dB)**: SGM is 2.8. Partly DELIBERATE: research/cp80.md models per-pickup spread.
+- **Key-to-key scatter (3.6 vs 0.75…2.8 dB)**: SGM is 2.8. Partly DELIBERATE: research/electricgrand.md models per-pickup spread.
 - **Brightens with velocity (+0.72 ERB)**: DELIBERATE (README "Electric grand"). Jnsgm2 through FluidSynth gives +1.7 ERB, so this is a TiMidity ARTIFACT.
 - Overall the nearest to the fonts of all programs (rank 67).
 
@@ -662,8 +662,8 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 
 Distance 2.84 (rank 60 of 129); the fonts disagree 1.2 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
-- **Brightens strongly with velocity (+2.63 vs 0 ERB), brighter (12.1 vs 8.0…9.9 ERB)**: DELIBERATE. The pickup's bark grows with the swing (README "Electric piano 1"; research/rhodes.md §4.6 quotes Muenster & Pfeifle: the timbre changes more than the volume). The fonts' TiMidity renders here do not move under FluidSynth either.
-- **Key-to-key level (4.6 vs 0.9…1.4 dB) and +2.8 dB/oct toward the top**: DELIBERATE uneven voicing. rhodes.md §5 gives ±3–6 dB between neighbours on a real harp. Still the outlier among the fonts: consider halving `PJ_RHODES_WEAR`'s spread if it sounds lumpy.
+- **Brightens strongly with velocity (+2.63 vs 0 ERB), brighter (12.1 vs 8.0…9.9 ERB)**: DELIBERATE. The pickup's bark grows with the swing (README "Electric piano 1"; research/tinepiano.md §4.6 quotes Muenster & Pfeifle: the timbre changes more than the volume). The fonts' TiMidity renders here do not move under FluidSynth either.
+- **Key-to-key level (4.6 vs 0.9…1.4 dB) and +2.8 dB/oct toward the top**: DELIBERATE uneven voicing. tinepiano.md §5 gives ±3–6 dB between neighbours on a real harp. Still the outlier among the fonts: consider halving `PJ_TINEPIANO_WEAR`'s spread if it sounds lumpy.
 - **Slow attack (36 vs 3…7 ms) with a sharp onset**: the room pattern from p002, perhaps with the Suitcase vibrato (on by default). Likely ARTIFACT.
 - **Release 346 ms**: room.
 
@@ -743,8 +743,8 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 
 Distance 3.86 (rank 23 of 129); the fonts disagree 1.5 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
-- **Velocity barely changes level (2.7 vs 16.6 dB) but brightens hugely (+4.3 ERB)**: DELIBERATE. This is the DX7's own velocity law (README "Electric piano 2"). The fonts' range is TiMidity's law.
-- **Speaks late (onset 44 vs 1…9 ms; attack 148 vs 5…53 ms; phrase onset 26 ms)** and **key scatter 3.8 vs 0.6…1.3 dB**: likely FAULT. A plausible common cause: each key is three whole DX7 voices 1/7 Hz apart with free-running phases. Their sum depends on the starting phases, partly cancelling at the start of some keys and swelling over a 7 s beat. Test with `PJ_DX_ONE=128` (a single voice).
+- **Velocity barely changes level (2.7 vs 16.6 dB) but brightens hugely (+4.3 ERB)**: DELIBERATE. This is the FM synth's own velocity law (README "Electric piano 2"). The fonts' range is TiMidity's law.
+- **Speaks late (onset 44 vs 1…9 ms; attack 148 vs 5…53 ms; phrase onset 26 ms)** and **key scatter 3.8 vs 0.6…1.3 dB**: likely FAULT. A plausible common cause: each key is three whole FM synth voices 1/7 Hz apart with free-running phases. Their sum depends on the starting phases, partly cancelling at the start of some keys and swelling over a 7 s beat. Test with `PJ_DX_ONE=128` (a single voice).
 - **Louder (+3.1 vs −4.5…−0.2 dB)**: minor; a trim.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
@@ -900,13 +900,13 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 
 </details>
 
-### 8 Clavinet: clavinet
+### 8 clavi: clavi
 
 Distance 3.73 (rank 28 of 129); the fonts disagree 1.2 JND. Keys 21,27,33,39,45,51,57,63,69,75,81,87,93,99,105, velocities 40/64/96/127.
 
-- **Odd/even partials (−13.4 vs −1.6…−4.1 dB)**: possible FAULT. The default pickup pair's comb is unverified. README "Clavinet" says the recorded D#3's first comb gap lies two partials lower than the model's.
-- **Release 708 ms vs 5…44**: the room accounts for ~300–400 ms (cf. p002, p004). The rest is the thunk and the dropped string, which research/clavinet.md says the yarn kills in 0.1–0.3 s. Probably too long: FAULT worth checking.
-- **Brightens with velocity (+3.7 ERB)**: DELIBERATE (README: "the Clavinet's dynamics are mostly its brightness"). Jnsgm2 through FluidSynth gives +3.0 ERB, so this is a TiMidity ARTIFACT.
+- **Odd/even partials (−13.4 vs −1.6…−4.1 dB)**: possible FAULT. The default pickup pair's comb is unverified. README "clavi" says the recorded D#3's first comb gap lies two partials lower than the model's.
+- **Release 708 ms vs 5…44**: the room accounts for ~300–400 ms (cf. p002, p004). The rest is the thunk and the dropped string, which research/clavi.md says the yarn kills in 0.1–0.3 s. Probably too long: FAULT worth checking.
+- **Brightens with velocity (+3.7 ERB)**: DELIBERATE (README: "the clavi's dynamics are mostly its brightness"). Jnsgm2 through FluidSynth gives +3.0 ERB, so this is a TiMidity ARTIFACT.
 - **Slow attack (85 vs 1…4 ms)**: likely the beating of the two swing directions (up to 15 dB deep, 0.5–2 Hz) moving the peak, plus the room. Mostly ARTIFACT of the measure.
 - **−20…−30 dB above 6 kHz**: DELIBERATE (stage 1 rolls off from 5 kHz).
 
@@ -1624,11 +1624,11 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 
 Distance 2.28 (rank 91 of 129); the fonts disagree 1.1 JND. Keys 36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96, velocities 40/64/96/127.
 
-- **No velocity response (0.7 vs 16.6…22 dB)**: DELIBERATE: a Hammond has none (README "Hammond B-3": "Velocity has no other effect" than the click).
+- **No velocity response (0.7 vs 16.6…22 dB)**: DELIBERATE: a tonewheel organ has none (README "tonewheel organ": "Velocity has no other effect" than the click).
 - **Floor −57 vs −112…−125 dB**: DELIBERATE: hum, leakage and the generator's whisper (README: "the idle floor is ~−53 dB under a note").
-- **Release 390 vs 60…80 ms**: room plus the Leslie at 4 m: ARTIFACT.
-- **Wobble 15.9 vs 0.1…6.9 c**: DELIBERATE (Leslie Doppler).
-- **Louder toward the bottom (−3.0 vs −0.5…+0.1 dB/oct)**: possible FAULT; also in p018 and p019. Check the generator taper or the Leslie drum's share. The level against a band agreed with TiMidity/FluidR3 to a median −0.3 dB (research/hammond_b3.md "Level against TiMidity").
+- **Release 390 vs 60…80 ms**: room plus the rotary speaker at 4 m: ARTIFACT.
+- **Wobble 15.9 vs 0.1…6.9 c**: DELIBERATE (rotary speaker Doppler).
+- **Louder toward the bottom (−3.0 vs −0.5…+0.1 dB/oct)**: possible FAULT; also in p018 and p019. Check the generator taper or the rotary speaker drum's share. The level against a band agreed with TiMidity/FluidR3 to a median −0.3 dB (research/tonewheel_organ.md "Level against TiMidity").
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
 
@@ -1706,7 +1706,7 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 Distance 2.21 (rank 94 of 129); the fonts disagree 1.9 JND. Keys 36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96, velocities 40/64/96/127.
 
 - **No velocity response, floor −53 dB, release 306 ms**: DELIBERATE or room, as in p016.
-- **Speaks later in a phrase (30 vs −4…5 ms)**: DELIBERATE. The percussion is single-trigger (README "Hammond B-3"), so legato notes lack the ping and their steepest rise comes later.
+- **Speaks later in a phrase (30 vs −4…5 ms)**: DELIBERATE. The percussion is single-trigger (README "tonewheel organ"), so legato notes lack the ping and their steepest rise comes later.
 - **Brightens slightly with velocity (+0.37 ERB)**: DELIBERATE (touch-sensitive percussion).
 - Otherwise close (rank 49).
 
@@ -1786,7 +1786,7 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 Distance 2.87 (rank 57 of 129); the fonts disagree 1.1 JND. Keys 36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96, velocities 40/64/96/127.
 
 - **No velocity response, floor −53 dB, release 462 ms**: DELIBERATE or room, as in p016.
-- **Speaks late (onset 44 vs 2…15 ms; phrase 38 vs ~0 ms)**: the Leslie heard at 4 m accounts for ~12 ms. The remaining ~25–30 ms is unexplained; possible FAULT in the driven 122 path (the amp's envelope?). Worth a look, since it is audible against a band.
+- **Speaks late (onset 44 vs 2…15 ms; phrase 38 vs ~0 ms)**: the rotary speaker heard at 4 m accounts for ~12 ms. The remaining ~25–30 ms is unexplained; possible FAULT in the driven 122 path (the amp's envelope?). Worth a look, since it is audible against a band.
 - **Louder toward the bottom (−3.4 vs −1.3…0 dB/oct)**: as in p016.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
@@ -1866,7 +1866,7 @@ Distance 3.41 (rank 37 of 129); the fonts disagree 1.4 JND. Keys 36,40,44,48,52,
 
 - **No velocity response (0.3 vs 16.6 dB)**: DELIBERATE (pipe organ).
 - **Release 1838 ms, floor −26 dB, onset 222 vs 34…86 ms**: DELIBERATE. These are the church and the pipes' speech: README "Church organ" gives ~230 ms at 8' C and ~70 at middle C, plus 24 ms pallets.
-- **Quieter (−7.9 vs −1.9…+0.4 dB)**: partly ARTIFACT: the slow speech and the room's build-up eat into the 0.5 s level window. Likely also a trim FAULT. Check the level against a band, as was done for the Hammond (hammond_b3.md).
+- **Quieter (−7.9 vs −1.9…+0.4 dB)**: partly ARTIFACT: the slow speech and the room's build-up eat into the 0.5 s level window. Likely also a trim FAULT. Check the level against a band, as was done for the tonewheel organ (tonewheel_organ.md).
 - **Uneven legato scale (3.1 vs 0.3…1.6 dB)**: probably pallet variation plus room. Minor.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
@@ -2510,7 +2510,7 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 Distance 1.88 (rank 109 of 129); the fonts disagree 1.1 JND. Keys 40,43,46,49,52,55,58,61,64,67,70,73,76,79,82, velocities 40/64/96/127.
 
 - **Brightness hardly rises up the neck (0.47 ERB/oct vs 3.2–4.8)**: probable fault. All four fonts agree. Either the low strings are too bright (modes to 8 kHz through the bridge and middle pickups) or the treble strings are too dull. The centroid at velocity 96 is inside the fonts' range (16.0 vs 12.8–18.4), so the problem is the tilt over the keyboard, not the overall level.
-- **Soft attack: 20 ms vs 1–8 ms, darker than the body (−0.5 vs +1.1…+5.0 ERB)**: possible fault. The pick has no click on the Strat (the steel guitar has `PJ_STEEL_CLICK`), and the two-polarisation bloom delays the peak.
+- **Soft attack: 20 ms vs 1–8 ms, darker than the body (−0.5 vs +1.1…+5.0 ERB)**: possible fault. The pick has no click on the three-pickup solid-body (the steel guitar has `PJ_STEEL_CLICK`), and the two-polarisation bloom delays the peak.
 - **Decays faster (14.1 vs 8.4–11.8 dB/s)**: fault-ish. README "Electric guitars" says the string losses are "not yet fitted to recordings".
 - **Brightens with velocity (+2.1 ERB vs 0)**: deliberate (pick physics). FluidR3's velocity layers change only the release (research/electric_guitars.md §2.7), and TiMidity drops filter modulators.
 - **Release 508 ms vs 124–140 ms**: room artifact (the fretting hand mutes at once).
@@ -2672,7 +2672,7 @@ Mean spectrum of pajupilli re each font, dB, level removed (velocity 96):
 Distance 1.64 (rank 117 of 129); the fonts disagree 1.1 JND. Keys 40,43,46,49,52,55,58,61,64,67,70,73,76,79,82, velocities 40/64/96/127.
 
 - **A 100 ms staccato sounds 400 ms (the cap) vs 116–155; release 732 ms vs 30–122**: suspect. The room alone gives the clean guitar 170 ms. Here the compressor pedal (0.2 s release) and the crunch probably hold up the muted string's tail. Check how fast the fretting-hand mute falls through the drive.
-- **Narrow velocity range (12.3 vs 16.6–20.1 dB; +0 dB from 96 to 127)**: deliberate. At crunch the pickup's 17 dB come out as 6 (README "The Marshall"). The fonts' 16.6 dB is TiMidity's velocity law.
+- **Narrow velocity range (12.3 vs 16.6–20.1 dB; +0 dB from 96 to 127)**: deliberate. At crunch the pickup's 17 dB come out as 6 (README "The British stack"). The fonts' 16.6 dB is TiMidity's velocity law.
 - **Slow swell (attack 256 ms; the fonts range from 32 to 193)**: deliberate. The compressor and the feedback hold make the note grow (README "Feedback").
 - **Quieter (−2.9 vs −0.7…+2 dB)**, more low end (<150 Hz +1…+17 dB), stereo coherence 0.47: the stereo is the room (artifact); the rest is minor.
 
@@ -2996,7 +2996,7 @@ Distance 1.55 (rank 122 of 129); the fonts disagree 1.3 JND. Keys 28,31,34,37,40
 - **Louder toward the top (+2.4 dB/oct vs −0.3…+0.9)**: probable fault, shared with every electric bass. The pickup hears the string's velocity, and the bassist does not even out the line.
 - **Quieter against the others (−3.7 vs +0.8…+1.4 dB)**: worth retrimming in the level table.
 - **Brightens with velocity (+1.3 ERB vs 0)**: deliberate (README "Electric bass": centroid 141/154/173 Hz at v40/80/120, "FluidR3's does not move"). Part of the fonts' 0 is TiMidity ignoring the filters.
-- **Narrow range (12.6 dB; +1 dB from 96 to 127)**: deliberate. The LA-2A narrows it, and README says "-play's velocity gain makes up the difference", but the top step is still flat.
+- **Narrow range (12.6 dB; +1 dB from 96 to 127)**: deliberate. The optical compressor narrows it, and README says "-play's velocity gain makes up the difference", but the top step is still flat.
 - **Purer**: sample-noise artifact. The spectrum agrees with FluidR3 within ±2 dB.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):
@@ -3160,7 +3160,7 @@ Distance 2.04 (rank 102 of 129); the fonts disagree 1.2 JND. Keys 28,31,34,37,40
 - **Pitch wobble 17.8 c vs 2.5–6.4**: deliberate. The landing error (sd 8 c), the scoops and the ±10 c vibrato are in README "Fretless bass". Audible, and the defining trait.
 - **Uneven from key to key (2.5 dB vs 0.04–1.1)**: partly the neck's dead spot (D3 on the G string, README "Electric bass"). Minor.
 - **Brightens with velocity (+1.6 ERB vs ≤0)**: deliberate. TiMidity ignores Jnsgm2's velocity-to-filter modulator (research/fretless_bass.md §4.2).
-- **Brighter above 2.5 kHz (+6 to +26 dB) and hollower at 400 Hz–1 kHz (−7 to −12)**: the bridge pickup at full and the B-15 blend. The upper partials' bloom (FluidR3's recording) is still "Not yet". Possibly too bright: worth a listen.
+- **Brighter above 2.5 kHz (+6 to +26 dB) and hollower at 400 Hz–1 kHz (−7 to −12)**: the bridge pickup at full and the fliptop blend. The upper partials' bloom (FluidR3's recording) is still "Not yet". Possibly too bright: worth a listen.
 - **Smoother legato (dip 13.6 vs 18–21 dB)**: deliberate (one voice). The release comes from the room.
 
 Largest differences, by weighted score (pajupilli | FluidR3 | TimGM6mb | Jnsgm2 | SGM):

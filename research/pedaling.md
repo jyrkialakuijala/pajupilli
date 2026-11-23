@@ -98,14 +98,14 @@ Marks: each claim carries its evidence. [paper] means a paper, thesis or primary
 ### 2.7 Pedal at rests
 
 - Chopin's pedal marks often run over rests and leave gaps of about a sixteenth-note value before the next "Ped." [32] [paper].
-- Poli, playing on an 1840 Pleyel, found that the post-release blur on period pianos was slight. He often chose to make the rests audible on the modern piano [32] [paper].
+- Poli, playing on an 1840 a period maker, found that the post-release blur on period pianos was slight. He often chose to make the rests audible on the modern piano [32] [paper].
 - MAESTRO [calc]: at onsets after ≥ 0.5 s with no key held, the pedal was already up just before the onset in only 36 % of the cases. Pianists keep the pedal through most short silences, so the silence is filled by the resonance. When the pedal was up, it went down a median 97 ms after the onset (IQR 34–283 ms, n = 8918).
 
 ### 2.8 Soft pedal (una corda) and sostenuto in combination
 
 - **Una corda on a grand** shifts the whole action so the hammers strike two of three strings, with a less-used part of the felt, which gives a duller tone [42] [web]. On most uprights it moves the hammers closer to the strings instead.
 - Hofmann [29] [paper] warns against using either pedal to make up for touch: "the left pedal does not soften the tone without" changing its colour.
-- **Combination with the sustain pedal is common.** Bernays and Traube (Bösendorfer CEUS, four pianists, five timbres) found:
+- **Combination with the sustain pedal is common.** Bernays and Traube (a reproducing grand, four pianists, five timbres) found:
   - sustain-pedal use differed between timbres: "dark", "round" and "velvety" got more of it (p < 0.01);
   - "velvety" combined heavy soft pedal with part-soft-pedalling;
   - one pianist never used the soft pedal [19] [paper].
@@ -148,8 +148,8 @@ Marks: each claim carries its evidence. [paper] means a paper, thesis or primary
 
 - **Notation.** Chopin wrote "Ped." for down and a crossed-circle sign for up, and closely followed each release by a new "Ped." [32] [paper]. Poli: "Accuracy seems not to have been one of Chopin's greatest concerns when it came to notating pedal". The marks vary between manuscripts with space, handwriting and figuration [32] [paper].
 - **The Rosenblum debate.** Rosenblum ("Some Enigmas of Chopin's Pedal Indications", *Journal of Musicological Research*, 1996) suggests that the visual gaps between release and the next "Ped." reflect pianos of the 1830s–40s whose resonance did not stop at once on release [33] via [32] [paper].
-  - Poli counters with his Pleyel experiments and with Czerny's 1839 instruction for gapless changes [32] [paper].
-  - Eigeldinger reads irregular marks in the D-flat Prelude, Op. 28/15, as deliberate variety. Poli shows that on an 1840 Pleyel "the sound clears more rapidly", while on the modern piano the same pedal "blurs the harmony" [32] [paper].
+  - Poli counters with his a period maker experiments and with Czerny's 1839 instruction for gapless changes [32] [paper].
+  - Eigeldinger reads irregular marks in the D-flat Prelude, Op. 28/15, as deliberate variety. Poli shows that on an 1840 a period maker "the sound clears more rapidly", while on the modern piano the same pedal "blurs the harmony" [32] [paper].
 - **Discretion.** Marmontel: Chopin "used the pedals with marvelous discretion". Chopin: "The correct employment of the pedal remains a study for life" [46] [web, secondary].
 - **How literal.** The modern consensus in these sources: the marks show where Chopin wanted resonance and the harmonic span of a pedal. On a modern piano with longer sustain, pianists keep the starts and change more often inside long marks [32] [paper] [memory].
 - **MAESTRO Chopin** (201 performances, 26.2 h) [calc]:
@@ -172,7 +172,7 @@ Marks: each claim carries its evidence. [paper] means a paper, thesis or primary
 - Debussy said pedalling "cannot be written down" because "it varies from one instrument to another, from one room, or one hall, to another" [35] [paper, quoting Long].
 - **Implicit marks.** Long bass notes, ties over bar lines and notes that the fingers cannot hold are the usual implicit pedal indications. Pedal points appear in "almost half" of the bars of *La cathédrale engloutie* [35] [paper].
 - **Welte rolls.** In Debussy's own Welte-Mignon roll of *La cathédrale engloutie*, "out of the total of 89 bars, there is not a single bar that is not pedalled". Metaxaki explains this partly by the Welte's inability to record fractional pedalling, which it registers as continuous pedal [35] [paper]. Roll data therefore overstate continuous pedal.
-- **Instruments.** Debussy's pianos (Blüthner, Bechstein, Pleyel, Érard) had less sustain and a lighter bass than a modern Steinway, so "long pedals must be understood as half" pedals. Small pedal changes "clear up the sound without loosing the long-held bass" [35] [paper].
+- **Instruments.** Debussy's pianos (period German, another maker, a period maker, Érard) had less sustain and a lighter bass than a modern concert grand, so "long pedals must be understood as half" pedals. Small pedal changes "clear up the sound without loosing the long-held bass" [35] [paper].
 - **Gieseking.** Dean Elder's chapter "Gieseking's Pedalling in Debussy and Ravel" is in the Banowetz book [38] [web, table of contents]; it was not read.
 - MAESTRO Debussy [calc]: pedal down 81 %; the longest segments of the core composers (median 0.79 s, 90th percentile 3.1 s).
   - With an unchanged bass, the change probability is only 0.19 (same bass) and 0.23–0.30 (treble-only motion). This is the "wash".
@@ -213,13 +213,13 @@ Marks: each claim carries its evidence. [paper] means a paper, thesis or primary
   - pedal timing "is sensitive to local and global tempo changes in varying degrees, yet exhibits consistency across repeated performances by the same pianist";
   - "striking differences in pedal timing between the two pianists, who differed in level of skill".
 - **Repp 1997**, *Psychological Research* 60:164–172 [2] [paper, abstract]:
-  - ten pianists, two excerpts "that required repeated use of the damper pedal to connect successive chords", three tempi, Yamaha Disklavier;
+  - ten pianists, two excerpts "that required repeated use of the damper pedal to connect successive chords", three tempi, one maker Disklavier;
   - "As the tempo increases, both pedal releases and depressions usually occur a little sooner and pedal changes (release-depression sequences) are executed a little more quickly, but these effects are proportionally smaller than the changes in manual (and pedal) period duration."
 - **The ms values in Repp's papers could not be obtained.** Both journals are paywalled, and no Haskins preprint was found. The MAESTRO analysis below replaces them for the planner. It agrees with Repp's qualitative result: lag and gap grow with IOI, but by less than proportionally.
 
 ### 4.3 MAESTRO v3.0.0: analysis done for this note [calc]
 
-**Data.** MAESTRO v3.0.0 [5]: 1276 performances, 198.5 h, from the International Piano-e-Competition, recorded on Yamaha Disklavier grands with key and CC64 pedal capture. The MIDI files were parsed with a small parser of our own.
+**Data.** MAESTRO v3.0.0 [5]: 1276 performances, 198.5 h, from the International Piano-e-Competition, recorded on one maker Disklavier grands with key and CC64 pedal capture. The MIDI files were parsed with a small parser of our own.
 
 **Method:**
 - **Pedal state:** CC64 ≥ 64 counts as down (the General MIDI convention; Kong et al. [7] and Liang et al. [9] [10] use the same threshold).
@@ -313,7 +313,7 @@ The segment lengths agree with Liang et al., who cut pedalled segments from 1392
 - **Partial-depth time by composer** (fraction of total time at CC 16–63, including transitions) [calc]: Bach 0.22, Mozart 0.20, Haydn 0.17, Beethoven 0.17, Schubert 0.14, Brahms 0.11, Schumann 0.10, Chopin 0.08, Liszt 0.085, Rachmaninoff 0.07, Debussy 0.067, Scriabin 0.06.
   - Shallow pedal, relative to the total pedal use, is most frequent in Baroque and Classical repertoire: light "colour" pedal.
   - This partly contradicts the textbook picture of Debussy as the half-pedal composer. The Debussy players in MAESTRO use the full pedal most of the time and change it less often.
-- **Sound-off points** (Hu et al. [14] [paper]): Vienna 4×22 at CC 76 (Bösendorfer, which rests at about CC 15), Batik at 75, Magaloff at 60. Each is estimated as the mode of the smoothed CC histogram in 50–100, the value where "Performers briefly hold the pedal at the damping point before re-pressing it". The damper meets the strings in the upper half of the MIDI range, not at 64 exactly.
+- **Sound-off points** (Hu et al. [14] [paper]): Vienna 4×22 at CC 76 (another maker, which rests at about CC 15), Batik at 75, Magaloff at 60. Each is estimated as the mode of the smoothed CC histogram in 50–100, the value where "Performers briefly hold the pedal at the damping point before re-pressing it". The damper meets the strings in the upper half of the MIDI range, not at 64 exactly.
 - **Gesture shapes** (Zhang et al. [15] [paper], MAESTRO):
   - pinnacle: short, peaked; brief accents or catch pedal;
   - hill: short, partial;
@@ -447,8 +447,8 @@ The segment lengths agree with Liang et al., who cut pedalled segments from 1392
   - a staccato note lasted about 100 ms.
 - So a key-driven damper cycle takes tens of ms. The pedal lifts all dampers through the damper tray, and its re-engagement time depends on the foot.
 - **Release time.** At the MAESTRO median, the foot keeps the pedal below CC 64 for about 120 ms per change. The 10th percentile, 59 ms, is about the shortest change that still damps [calc].
-- **Pedal travel.** About 21–25 mm at the pedal (13/16" on one Steinway B; 29/32" on another piano), as measured by a technician on 9 pianos [49] [web, forum].
-- **Half-pedal point.** On a Disklavier this is about CC 60–76 [14] [paper]. Yamaha's patents define a "half pedal point" stroke but do not give a value [web, snippet].
+- **Pedal travel.** About 21–25 mm at the pedal (13/16" on one 211 cm grand; 29/32" on another piano), as measured by a technician on 9 pianos [49] [web, forum].
+- **Half-pedal point.** On a Disklavier this is about CC 60–76 [14] [paper]. One maker's patents define a "half pedal point" stroke but do not give a value [web, snippet].
 
 ## 6. Rules for a planner working from MIDI notes
 

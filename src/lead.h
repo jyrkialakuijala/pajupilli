@@ -20,7 +20,7 @@
 // SPICE netlist (tools/circuit.py saw): the same frequency law, the same
 // thresholds, the dead time (0.36 us; -2 c at A7).
 //
-// Then a 4-pole transistor ladder low-pass (Moog 1969; the nonlinear model of
+// Then a 4-pole transistor ladder low-pass (the 1969 transistor ladder; the nonlinear model of
 // Huovilainen 2004: each stage a differential pair, tanh at 2 VT), its cutoff
 // an exponential current (keyboard, envelope, knob), resonance by feedback;
 // an OTA amplifier (CA3080-like: tanh of the input, gain by its bias current);

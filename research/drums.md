@@ -20,7 +20,7 @@ recordings are only measured. No audio from them goes into the instruments or th
    snare, 42 closed hi-hat, 46 open hi-hat, 49 crash, 51 ride, ...), so a standard drum track
    plays them. The brush kit follows GM2's Brush Set: 38 brush tap, 39 brush slap, 40 brush swirl
    (sounding for as long as the key is held). The drum channel is 10 (General MIDI); channel 16, a
-   common older practice, can be chosen instead (an option). The MPK's pads (channel 10) play
+   common older practice, can be chosen instead (an option). The controller's pads (channel 10) play
    them live; the ensemble, room and live loop work as for the other instruments.
 4. **Real time.** A full kit (several drums ringing at once, cymbals included) on one core.
 

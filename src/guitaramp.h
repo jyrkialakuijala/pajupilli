@@ -9,29 +9,29 @@
 //     The noise a high-gain amp makes audible comes in here: the pickup's winding and the grid
 //     stopper hiss (a few microvolts), and the coils pick up the mains' hum, a humbucker little
 //     of it (research/distortion_guitar.md 4).
-//   - A compressor pedal, if the preset has one (an OTA compressor, the MXR Dyna Comp's kind):
+//   - A compressor pedal, if the preset has one (an OTA compressor, the one pedal maker Dyna Comp's kind):
 //     above a threshold the level grows a quarter as fast, quick to clamp (3 ms) and slow to let
 //     go (0.2 s): a muted note's thud and a funk strum's attack brought closer together.
-//   - A Tube Screamer in front, if the preset has one (distortion_guitar.md 3.1, 10.3): the clean
+//   - A mid-hump overdrive in front, if the preset has one (distortion_guitar.md 3.1, 10.3): the clean
 //     signal passes, and to it is added its part above 720 Hz, amplified (12x at drive 0) and
 //     clipped by two diodes: into a high-gain amp it lifts the pick's attack and the upper
 //     partials into the clipping stages, not the low E's bass (a "tighter" chug).
 //   - The preamp: up to five triode stages (11.2). Each nearly straight until its grid conducts
 //     (+1.4 V from its bias), cut off more softly below (-2.8 V), its curve a little steeper on
-//     the way up (an even harmonic); a stage biased cold (the Marshall's second, the Soldano's
+//     the way up (an even harmonic); a stage biased cold (the British stack's second, the high-gain amp's
 //     third: its bias nearer cut-off) clips its lower half early, unevenly. Its coupling
 //     capacitor (a high-pass), the Miller capacitance (a low-pass), a partly bypassed cathode (a
 //     low shelf: the bass amplified a few dB less than the treble), a divider into the next
 //     stage. Driven past its grid's conduction, the grid draws current and charges the coupling
 //     capacitor: the bias slides cold for tens of milliseconds after a hard attack (the "bloom"
 //     and, overdone, the "blocking" of a cranked amp: PY09). A cathode follower after the last
-//     stage (DC coupled: Marshall, Soldano) squashes the stage's cut-off swing when its own grid
+//     stage (DC coupled: British stack, high-gain amp) squashes the stage's cut-off swing when its own grid
 //     conducts. A high-gain preset cascades four: what is kept out of them (the bass, by small
 //     coupling capacitors and partial bypasses) is what makes it tight (distortion_guitar.md 2).
-//   - The tone stack (the passive three-knob network of Fender and Marshall: exact, from its
+//   - The tone stack (the passive three-knob network of classic American and British amps: exact, from its
 //     parts, closed form: Yeh and Smith 2006, checked against a nodal solve): after the first
-//     stage (Fender), after the second (Marshall: what is clipped is then shaped), or after all
-//     of them (Soldano). A volume pot between the first two stages (with the Marshall's bright
+//     stage (American amp), after the second (British stack: what is clipped is then shaped), or after all
+//     of them (high-gain amp). A volume pot between the first two stages (with the British stack's bright
 //     capacitor across it: the lower the gain, the more of the treble passes it), a master after.
 //   - A noise gate (high gain: distortion_guitar.md 4), as the ISP Decimator does it: it listens
 //     to the guitar itself, before the amp, and opens and closes the preamp's output: open on the
@@ -48,13 +48,13 @@
 //     high-gain preset runs them at 2x and averages each stage's curve over the sample
 //     (first-order antiderivative antialiasing, PZL16): a held A5's aliases -79 dB, where 2x
 //     alone leaves -48 and 4x alone would cost a third more.
-//   - The speaker in its cabinet, as a filter: a 2x12 open back (Fender), a closed 4x12 of
-//     Greenbacks (Marshall: the low thump of the closed box, the forward upper mids), or a closed
-//     4x12 of Vintage 30s with an SM57 just off the dust cap (Celestion's plot: the presence pair
+//   - The speaker in its cabinet, as a filter: a 2x12 open back (American amp), a closed 4x12 of
+//     25 W British speakers (British stack: the low thump of the closed box, the forward upper mids), or a closed
+//     4x12 of 60 W British speakers with a dynamic microphone just off the dust cap (British speaker's plot: the presence pair
 //     at 2.3 and 3.2 kHz, the fall of ~25 dB an octave above 4 kHz).
-// Presets: "twin" (a Fender Twin Reverb, clean: GM 28); "twin-comp" (the same with the compressor
-// in front: GM 29); "jcm800" (a Marshall JCM800 2203 at crunch, a compressor in front: GM 30);
-// "slo" (a Soldano SLO-100's overdrive channel into a V30 4x12, gated: GM 31).
+// Presets: "clean-combo" (a clean 2x12 combo, clean: GM 28); "clean-combo-comp" (the same with the compressor
+// in front: GM 29); "crunch-stack" (a British stack British crunch stack 2203 at crunch, a compressor in front: GM 30);
+// "slo" (a high-gain amp's overdrive channel into a 60 W British 4x12, gated: GM 31).
 //
 // The same module for the electric bass (research/bass_amps.md 9-10), where the record is a DI
 // blended with a miked amp and compressed after:
@@ -62,22 +62,22 @@
 //   - Bass stages: 6SL7s and 12AU7s with their cathodes unbypassed swing several times as far as
 //     a 12AX7 before they clip (a stage's swing); coupling corners of a few Hz and the output's
 //     at 8 Hz: the E1's 41 Hz kept whole.
-//   - The James (passive Baxandall) tone stack of Ampeg's B-15 and SVT, exact from its parts: an
+//   - The James (passive Baxandall) tone stack of the bass amp's fliptop and bass stack, exact from its parts: an
 //     admittance matrix solved at eight points of s, its two fourth-order polynomials read off
 //     (a DFT: the solve is exact for degree < 8), their roots taken over by the bilinear transform
-//     one by one (two biquads). Flat at noon (no built-in scoop, unlike the Fender stack), 22-23
-//     dB lower. After the stages fixed filters (the SVT's mid at its switch's frequencies, Ultra Lo/Hi).
-//   - Bass cabinets with their microphones (4.3): an 8x10 with a D112, a 1x15 with an RE20, a 4x10
+//     one by one (two biquads). Flat at noon (no built-in scoop, unlike the American amp stack), 22-23
+//     dB lower. After the stages fixed filters (the bass stack's mid at its switch's frequencies, Ultra Lo/Hi).
+//   - Bass cabinets with their microphones (4.3): an 8x10 with a kick-drum microphone, a 1x15 with an broadcast dynamic microphone, a 4x10
 //     with a horn; or none.
-//   - The DI: the pickup's own signal, a filter or two, a SansAmp-like drive if the preset has
+//   - The DI: the pickup's own signal, a filter or two, a tube-emulation drive if the preset has
 //     one, blended with the amp's (level-matched at 200 Hz). Its polarity and its phase below a
 //     few hundred Hz turned to the mic's (an allpass: what an engineer's phase-alignment box does;
 //     the cabinet's high-pass would otherwise cancel the E1's fundamental against the DI's); the
 //     mic's distance as a delay.
 //   - After the blend a studio compressor: an RMS detector (two 10 ms poles: it does not follow a
-//     41 Hz wave), a 6 dB soft knee; an LA-2A's opto cell (half its gain reduction quick, half a
-//     slow charge that lets go over seconds) or an 1176's FET (attack under a millisecond).
-// Bass presets: "b15-di" (GM 34), "svt" (GM 35), "slap-di" (GM 37), "slap-squash" (GM 38).
+//     41 Hz wave), a 6 dB soft knee; an optical compressor's opto cell (half its gain reduction quick, half a
+//     slow charge that lets go over seconds) or a FET compressor's FET (attack under a millisecond).
+// Bass presets: "fliptop-di" (GM 34), "bass-stack" (GM 35), "slap-di" (GM 37), "slap-squash" (GM 38).
 #pragma once
 
 #include <complex>
@@ -96,7 +96,7 @@ class GuitarAmp {
   // capacitor's corner and its Miller roll-off (Hz; 0: none). Optionally: its cathode partly
   // bypassed (the bass shelfDb under the treble below about shelfHz: a first-order shelf, its
   // corners shelfHz -+ half the shelf), a divider's shelf in front of it (the same form: the
-  // Soldano's 470 k with 2000 pF across it, before the second stage), a divider after it (into
+  // high-gain amp's 470 k with 2000 pF across it, before the second stage), a divider after it (into
   // the next stage), a cathode follower after it (its grid conducting: the stage's cut-off swing
   // squashed above this many volts at the stage's grid; 0: none); how fast its grid's current
   // charges the coupling capacitor (a grid stopper or a large capacitor: slower).
@@ -125,7 +125,7 @@ class GuitarAmp {
     double volume, bright;                // the pot after the first stage (its share), the capacitor across it (F; 0: none)
     double master;                        // before the power stage
     double clip;                          // the power stage's limit, at its input (V)
-    int cabinet;                          // 0: 2x12 open back, 1: closed 4x12 Greenbacks, 2: closed 4x12 V30s, SM57
+    int cabinet;                          // 0: 2x12 open back, 1: closed 4x12 25 W British speakers, 2: closed 4x12 V30s, dynamic microphone
     int oversample;                       // 1, 2 or 4
     double compRatio = 0, compAt = 0.05;  // the compressor pedal (0: none) and its threshold (V)
     double compRef = 0.2;                 // a peak it leaves where it was (V: its make-up)
@@ -136,12 +136,12 @@ class GuitarAmp {
     double hiss = 0, hum = 0, humHz = 50; // the noise at the input: V rms; the hum's peak (V); its mains
     double gateAt = 0, gateRelease = 0.08, gateHold = 0.015;  // the gate's threshold (V at the input; 0: none), its fade, its hold (s)
     double gateDrop = 0;                  // dB: it also closes on a quick fall this far under the last peak (0: not)
-    double tsLevel = 0, tsDrive = 0, tsTone = 0.55;  // the Tube Screamer (level 0: none)
+    double tsLevel = 0, tsDrive = 0, tsTone = 0.55;  // the mid-hump overdrive (level 0: none)
     // Bass (research/bass_amps.md 9). As the guitars have it by default.
     double inputR = 1e6;                  // the input's resistance (Ohm)
     double hpOut = 30;                    // the output's high-pass (Hz)
     double sagDepth = 0.15;               // how far the supply gives way under a loud passage (of the swing)
-    int stackType = 0;                    // 0: Fender/Marshall (Yeh-Smith); 1: James
+    int stackType = 0;                    // 0: classic three-knob (Yeh-Smith); 1: James
     James james{};
     Eq voice[6]{};                        // fixed filters after the last stage (a mid, Ultra Lo/Hi, a solid-state head's EQ)
     int voices = 0;
@@ -151,8 +151,8 @@ class GuitarAmp {
     int diPolarity = 0;                   // the DI against the mic: +1, -1, 0: the one that keeps more low end
     bool diAlign = false;                 // the DI's phase turned to the mic's at the low end (an allpass)
     double micDelay = 0;                  // the mic's distance (samples at the base rate; 0: aligned)
-    double driveAt = 0, driveMix = 0;     // a SansAmp-like drive on the DI: its knee (V at the pickup; 0: none), its share
-    int studio = 0;                       // the studio compressor after the blend: 0 none, 1 opto (LA-2A), 2 FET (1176)
+    double driveAt = 0, driveMix = 0;     // a tube-emulation drive on the DI: its knee (V at the pickup; 0: none), its share
+    int studio = 0;                       // the studio compressor after the blend: 0 none, 1 opto (optical compressor), 2 FET (FET compressor)
     double stRatio = 3, stAt = 0.1;       // its ratio, its threshold (V rms at the pickup, as the DI has it)
     double stAttack = 0.01, stRelease = 0.06, stTail = 1.0, stMakeup = 0;  // s, s (opto: to half), s (opto's slow part), dB
     // The jazz guitar's "speaking" strip (research/jazz_guitar.md 12.3), after the speaker (an
@@ -168,17 +168,17 @@ class GuitarAmp {
     double presAttack = 0.001, presRelease = 0.08;
     double scRatio = 1, scAt = -30, scKnee = 10, scAttack = 0.01, scRelease = 0.25;
   };
-  static Preset twin();
-  static Preset twinComp();
-  static Preset jcm800();
+  static Preset cleanCombo();
+  static Preset cleanComboComp();
+  static Preset crunchStack();
   static Preset slo();
-  static Preset b15Di();       // GM 34: a Jazz Bass's DI and an Ampeg B-15N, LA-2A
-  static Preset svt();         // GM 35: a Precision with a pick, an SVT and an 8x10, the DI, 1176
-  static Preset slapDi();      // GM 37: the DI first, a clean solid-state head and a 4x10, 1176
-  static Preset slapSquash();  // GM 38: as 37, the DI 80 %, the 1176 4:1 with a slower attack (no squash)
-  static Preset fretlessDi();  // GM 36: the DI 70 % with a mid push (+3 dB at 800 Hz), the B-15 30 %, LA-2A
+  static Preset fliptopDi();       // GM 34: a two-pickup bass's DI and an fliptop bass amp, optical compressor
+  static Preset bassStack();         // GM 35: a Precision with a pick, an bass stack and an 8x10, the DI, FET compressor
+  static Preset slapDi();      // GM 37: the DI first, a clean solid-state head and a 4x10, FET compressor
+  static Preset slapSquash();  // GM 38: as 37, the DI 80 %, the FET compressor 4:1 with a slower attack (no squash)
+  static Preset fretlessDi();  // GM 36: the DI 70 % with a mid push (+3 dB at 800 Hz), the fliptop 30 %, optical compressor
   // GM 27: a clean solid-state jazz amp (Polytone-like: research/jazz_guitar.md 5, 9.2): no tube
-  // stage driven, an active EQ instead of the Fender stack, a closed 1x15, and the speaking strip.
+  // stage driven, an active EQ instead of the American amp stack, a closed 1x15, and the speaking strip.
   static Preset jazz();
 
   GuitarAmp(double fs, const Preset& p);
@@ -278,7 +278,7 @@ class GuitarAmp {
   double gatePeak_ = 0, gatePeakFall_ = 1, gateReopen_ = 0, gateReopenFall_ = 1, gateDropTo_ = 0;  // (the quick close)
   bool gateOpen_ = false, gateQuick_ = false, gateDebug_ = false;  // (PJ_AMP_GATEDEBUG: each open and close on stderr)
   long gateT_ = 0;
-  // The Tube Screamer: its input's high-pass, the 720 Hz leg, the 51 pF, its tone.
+  // The mid-hump overdrive: its input's high-pass, the 720 Hz leg, the 51 pF, its tone.
   OnePole tsIn_, tsLeg_, tsCap_, tsTone_;
   double tsGain_ = 0;
   // The input with a tone control: third order, direct form (transposed).

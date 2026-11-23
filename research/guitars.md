@@ -21,11 +21,11 @@ Marks:
   - a guitar body: a top plate and a Helmholtz cavity, or a solid body for electrics;
   - nail and pick plucks;
   - palm muting;
-  - for electrics, magnetic pickups and an amp. The pickups are the clavinet's (`src/clavinet.cc`); the
+  - for electrics, magnetic pickups and an amp. The pickups are the clavi's (`src/clavi.cc`); the
     amp's tone stack is an exact filter as in `tools/clavtone.py`, and its tubes are circuits in the
     style of `src/lead.cc`.
 - **Cost is not the problem.** Six strings × 2 × 48–64 modes ≈ the double bass (four strings)
-  plus 50 %. That is about 3–6 % of a core per guitar [calc, from the bass and the clavinet's 5.5 % for 60
+  plus 50 %. That is about 3–6 % of a core per guitar [calc, from the bass and the clavi's 5.5 % for 60
   strings]. A finite-difference guitar with fret collisions runs at 11–18 % of a core *per string*
   without a body [paper, BRWD24]: the modal route is ~10× cheaper.
 - **Most of the realism is in the player, not the string.** Every guitar part in the user's files writes its
@@ -264,14 +264,14 @@ it.
   [calc, f0 = 1/(2π√(LC))]
   - Turning the volume pot down damps the resonance. The tone pot (~0.022–0.047 µF) rolls off the highs.
   - 95 % of a P-90 single coil's output energy is under 2.5 kHz [paper, PLC14].
-- **Already built:** the clavinet's pickups (`src/clavinet.cc`), velocity at a point with the magnet's
+- **Already built:** the clavi's pickups (`src/clavi.cc`), velocity at a point with the magnet's
   nonlinearity, selector in or out of phase. The guitar reuses that, plus the L–C–R resonance as a biquad.
 
 ### 4.2 Amp
 
-- **Tone stack.** The '59 Bassman tone stack (Fender, Marshall and Vox are the same circuit with other
+- **Tone stack.** The late-1950s tweed tone stack (American amp, British stack and Vox are the same circuit with other
   values) has closed-form digital coefficients as functions of the three knobs [paper, YS06]. That fits
-  the way `tools/clavtone.py` turns the clavinet's switches into exact SOS filters.
+  the way `tools/clavtone.py` turns the clavi's switches into exact SOS filters.
 - **Clean (GM 27, 28, 29):** two 12AX7 gain stages with a mild asymmetric soft clip, a tone stack, a
   push-pull power stage with its output transformer, and a 12" speaker [memory; Pakarinen & Yeh 2009]. The
   speaker in its cabinet: a resonance near 80–120 Hz, a roll-off above ~4–6 kHz, and cone breakup peaks at
@@ -360,7 +360,7 @@ it.
   - Muted electric (GM 29): the palm mute on every stroke; note-off barely matters.
 - **Pitch bend:** a bend on the sounding strings (tension), or a slide (`setLength`) if larger than a whole
   tone.
-- **Live (MPK):** the same, plus:
+- **Live (controller):** the same, plus:
   - a pad for palm mute;
   - the joystick for bends and vibrato;
   - a knob for the pluck position.
@@ -377,7 +377,7 @@ it.
     guitar body table; nail and pick plucks (narrow, fast slip); palm mute (a lossy patch near the bridge);
     strings without a tailpiece and afterlength (a classical's tie block; a steel guitar's pins; the
     archtop's tailpiece, which does have afterlength).
-- **`src/clavinet.cc`:** modal strings plus *pickups* (velocity at a point, the magnet's nonlinearity, the
+- **`src/clavi.cc`:** modal strings plus *pickups* (velocity at a point, the magnet's nonlinearity, the
   selector) and tone networks as exact SOS filters from a circuit (`tools/clavtone.py`). Reuse it for the
   electric guitars' pickups and for the tone pot and tone stack.
 - **`src/lead.cc`:** the analog circuits: diodes, transistors, a shared board. Add a triode stage for the

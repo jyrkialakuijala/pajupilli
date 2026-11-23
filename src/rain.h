@@ -102,7 +102,7 @@ class RainModel : public Tube {
 };
 
 // Velocity is the rain's rate (and the first drop's size); the sustain pedal holds the keys; the
-// pitch bend is +-2 semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"): K1 the drops' density,
+// pitch bend is +-2 semitones. Knobs (the controller's K1-K4, -seq's "knob K X"): K1 the drops' density,
 // K2 the water (bubbles and ticks), K3 the bowls' ring, K4 bowls per key.
 class RainPlayer : public Performer {
  public:

@@ -248,7 +248,7 @@ Each feature: definition, how to measure it in numpy/scipy, its unit, its JND (s
   ("MFCC distance"). Compact but not in perceptual units: use for clustering notes ("these notes
   sound alike in A but not in B"), not for scoring.
 - **Roughness:** Daniel & Weber or Vassilakis' model on partial pairs **[M]** (mosqito has
-  Daniel & Weber, validated **[T]** [MOSQITO]). Relevant for a chorus or detuned unisons (organ, Hammond, pads).
+  Daniel & Weber, validated **[T]** [MOSQITO]). Relevant for a chorus or detuned unisons (organ, tonewheel organ, pads).
 - **Inharmonicity:** fit fn = n·f0·√(1 + B·n²) to the measured partials of a note (piano, bass,
   bells); compare B. The partial frequencies come from parabolic interpolation on a zero-padded
   FFT (appendix A's f0 code).
@@ -392,7 +392,7 @@ for this use, so their scale comes from the references' spread **[E]**.
   a real string). A physical model and a looped sample differ here.
 - **Modulation spectrum distance:** per ERB band, the spectrum of the envelope's fluctuations at
   0.5–64 Hz; the distance between the two synths' modulation spectra catches vibrato, tremolo,
-  beating, bow noise and the Leslie in one measure **[M]**.
+  beating, bow noise and the rotary speaker in one measure **[M]**.
 - **Spectral flux:** frame-to-frame change of the ERB spectrum; its mean over the sustain is how
   much the sound lives once it has started.
 

@@ -21,7 +21,7 @@ namespace pajupilli {
 // instrument's transposition); {nullptr, -1}: not built, silent.
 struct Drum { const char* inst; int key; };
 // Which drummer plays. kBrush: the file's drum channel selects a Brush kit
-// (its program, as sent: 40 .. 47; Yamaha XG uses the same numbers), or
+// (its program, as sent: 40 .. 47; XG uses the same numbers), or
 // PJ_KIT=brush asks for it: brushes, and key 40 is the held swirl. kJazz: a
 // jazz group (-play: the file has a piano and an upright bass): the brushed
 // snare. kStandard: the usual file: the stick snare.
@@ -30,8 +30,8 @@ inline Kit kitFor(int program) {
   return program >= 40 && program <= 47 ? Kit::kBrush : program >= 32 && program <= 39 ? Kit::kJazz : Kit::kStandard;
 }
 bool brushKitWanted();
-// gs: the file says it is Roland GS or General MIDI 2 (what the keys below 35
-// mean; else they are read as Yamaha XG's).
+// gs: the file says it is GS or General MIDI 2 (what the keys below 35
+// mean; else they are read as XG's).
 Drum drumFor(int gmKey, Kit kit = brushKitWanted() ? Kit::kBrush : Kit::kStandard, bool gs = false);
 // The stroke that sounds a key at the SoundFonts' level for this velocity, and the instrument's
 // gain (dB) that goes with it (drumkit.cc; tools/gmcompare.py kits --emit).

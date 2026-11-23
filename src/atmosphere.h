@@ -1,7 +1,7 @@
 // General MIDI 100, "FX 4 (atmosphere)" (-inst fx-atmosphere): a keyed psaltery with magnetic
 // resonators (research/fx_sounds.md).
 //
-// The classic patch (Roland's D-50 "Nylon Atmosphere", kept by every General MIDI set) is a
+// The classic patch (a classic digital synth's "Nylon Atmosphere", kept by every General MIDI set) is a
 // plucked string with a pad behind it: FluidR3, TimGM6mb and Jnsgm2 all layer a nylon guitar
 // over synth strings. Here the pad is the plucked string itself, kept singing by feedback. Each
 // key plucks a course of three steel strings, a few cents apart, with a soft leather plectrum
@@ -111,7 +111,7 @@ class AtmosphereModel : public Tube {
 };
 
 // Velocity is the pluck and the amplifiers' limit; the sustain pedal holds the keys (and their
-// magnets); the pitch bend is +-2 semitones. Knobs (the MPK's K1-K4, -seq's "knob K X"): K1 the
+// magnets); the pitch bend is +-2 semitones. Knobs (the controller's K1-K4, -seq's "knob K X"): K1 the
 // sustain (the magnets' strength: 0 a plain psaltery), K2 the harmonic (the octave held too), K3
 // the plectrum's hardness, K4 the chorus (the course's spread).
 class AtmospherePlayer : public Performer {

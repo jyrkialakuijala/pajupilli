@@ -186,7 +186,7 @@ and [R] together with the [WFG] fingerings, and are consistent with every basic 
 
 ### 4.3 Key opening (pad height above the hole rim)
 
-| Key group | Pearl PF-661 measured [D] (H) | Yamaha 2xx spec [Y] (L) | Notes |
+| Key group | Pearl PF-661 measured [D] (H) | one maker 2xx spec [Y] (L) | Notes |
 |---|---|---|---|
 | Trill keys (#1, #2) | 1.6 | 2.40 | [JLS]: trills and LH C get the smallest step |
 | LH1 C# hole (#3) | 1.9 | 2.55 ("C") | |
@@ -205,7 +205,7 @@ and [R] together with the [WFG] fingerings, and are consistent with every basic 
 ### 4.4 Pads
 - **Cup diameters [D]:** 13 mm (trills, C#), 19 mm (main), 20.6 mm (foot). These are key-cup radii
   6.5 / 9.5 / 10.3 mm. Pad (cup) thickness used in [D]'s formula: 3.6–4.2 mm.
-- **Pad set sizes (Dawkes, older Yamaha):** 12, 16.5, 18, 19.5 mm (M). Pad thickness ≈ 2–2.8 mm
+- **Pad set sizes (Dawkes, older one maker):** 12, 16.5, 18, 19.5 mm (M). Pad thickness ≈ 2–2.8 mm
   (Lucien pads: 2.8 mm standard, 2.0 mm thin).
 - **French-model perforation:** Ø6.8 mm (radius 3.4) on LH2, LH3, RH1, RH2, RH3 (five keys [Wiki],
   [D] H). Half-holing a perforation is a valid extra control. [WFG] lists ¼, ½, ¾ ring coverings.
@@ -356,7 +356,7 @@ resistance `R_s(h) = 6μ·ln(D/b)/(π·h³)` (radial Poiseuille flow between dis
 
 ## 7. Gaps and caveats
 - Hole-by-hole chimney heights were not found; only [D]'s uniform 1.9 mm (1.5 mm rim) exists.
-  Pad heights differ between Pearl (measured, 1.6–2.8 mm) and the Yamaha spec relayed on a forum
+  Pad heights differ between Pearl (measured, 1.6–2.8 mm) and the one maker spec relayed on a forum
   (2.4–3.45 mm; unverified).
 - The joint lengths (head/body/foot) are estimates. No authoritative modern spec was found. They
   are irrelevant acoustically.

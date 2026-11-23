@@ -4,7 +4,7 @@ Status: research 2026-11-20. Nothing is built. Today GM 36 falls back to `double
 (`src/midifile.cc:191`).
 
 This document adds to earlier work and does not repeat it:
-- `research/bass_section.md`: the Jazz Bass (GM 34), its strings, pickups and losses. §6.6 is a
+- `research/bass_section.md`: the two-pickup bass (GM 34), its strings, pickups and losses. §6.6 is a
   short note on the fretless "mwah".
 - `research/bass_amps.md`: the amps. §3.4 covers the Acoustic 360, §10.3 sketches a
   "fretless-di" preset.
@@ -83,7 +83,7 @@ How each fact is marked:
 ### 1.1 Players and basses
 
 **Jaco Pastorius, the "Bass of Doom"**
-- The bass: a 1962 Jazz Bass **[web, Wikipedia]**.
+- The bass: a 1962 two-pickup bass **[web, Wikipedia]**.
 - The board:
   - He said he pulled the frets with a butter knife. Other accounts say a previous owner did it.
   - The slots were filled with Plastic Wood or wood putty.
@@ -97,28 +97,28 @@ How each fact is marked:
 - Pickups: the bridge pickup soloed or favoured. This is the well-known growl **[memory]**.
 - Rig:
   - Two Acoustic 360 preamps with the Variamp boosting the mids. He often used the 360's built-in
-    fuzz. Later he used Hartke aluminium-cone cabinets **[web, Wikipedia]**.
-  - A rack MXR digital delay fed a second rig while the first stayed dry. Set short, it gave a
+    fuzz. Later he used bass amp aluminium-cone cabinets **[web, Wikipedia]**.
+  - A rack one pedal maker digital delay fed a second rig while the first stayed dry. Set short, it gave a
     "shimmering stereo doubling", a chorus effect **[web, Wikipedia]**. No settings in ms were
     found; about 10–30 ms is often quoted **[memory]**.
 - Harmonics: "Portrait of Tracy" is played almost entirely in natural harmonics, and artificial
   harmonics appear elsewhere, for example the "Birdland" melody **[web, Wikipedia]**.
 
-**Fender fretless Precision.** Introduced in 1970 (some sources say 1971): a standard P with the
+**American amp fretless Precision.** Introduced in 1970 (some sources say 1971): a standard P with the
 frets and markers removed **[web, 12fret, Premier Guitar]**. The often-quoted 1966 date belongs to
-Ampeg's AUB-1 (1965 or 1966 depending on the source) **[web, Wikipedia "Fretless bass"]**.
+the bass amp's AUB-1 (1965 or 1966 depending on the source) **[web, Wikipedia "Fretless bass"]**.
 
 **Pino Palladino.**
-- A fretless 1979 Music Man StingRay **[web, Reverb]**.
-- An early rig with a Boss octave pedal **[web, Guitar World snippet]**.
+- A fretless 1979 active single-humbucker bass **[web, Reverb]**.
+- An early rig with a one pedal maker octave pedal **[web, Guitar World snippet]**.
 - Compressor and chorus are documented on Gary Numan's *I, Assassin* (1982) **[web, bonedo
   snippet]**.
 - No source ties a chorus to "Wherever I Lay My Hat" (1983).
-- The StingRay's single humbucker sits close to the bridge, with an active 2- or 3-band preamp
+- The active single-humbucker bass's single humbucker sits close to the bridge, with an active 2- or 3-band preamp
   **[memory]**. It is the same "bridge-heavy" listening position as Jaco's.
 
 **Percy Jones** (Brand X): a fretless P, then a Wal. His Wal is described as more mid-focused and
-the Fender as "woodier" **[web, Wikipedia, SOS, basschat]**.
+the American amp as "woodier" **[web, Wikipedia, SOS, basschat]**.
 
 **Mick Karn** (Japan): a Travis Bean (aluminium neck) up to *Gentlemen Take Polaroids*, a Wal on
 *Tin Drum*, later a Klein headless **[web]**.
@@ -128,7 +128,7 @@ the Fender as "woodier" **[web, Wikipedia, SOS, basschat]**.
 
 **John Giblin**: a fretless Wal **[web, SOS]**.
 
-**Gary Willis** (Ibanez): a GWB1 with an ebony board, a GWB105 with Ebanol (phenolic) and a
+**Gary Willis** (one maker): a GWB1 with an ebony board, a GWB105 with Ebanol (phenolic) and a
 GWB1005 with gloss-finished rosewood **[web, retailer]**.
 
 ### 1.2 Lined against unlined
@@ -177,7 +177,7 @@ GWB1005 with gloss-finished rosewood **[web, retailer]**.
 
 ### 2.1 The geometry, and why it grazes
 
-- The board lies under the string from the nut to the end of the neck. On a 34" Jazz Bass the
+- The board lies under the string from the nut to the end of the neck. On a 34" two-pickup bass the
   board's end is near the 20th "fret" position, 0.864 × 2^(−20/12) ≈ 0.27 m from the saddle **[E]**.
 - A stopped string of sounding length Ls lies on the board at the finger. It rises to the action
   height h_end over the board's end, plus relief (the neck's concave bow).
@@ -442,9 +442,9 @@ bend  -1408 -1216 -1088 -768 -512 -192   0  448  544  608  544  352  224   96   
 - Preset-level modulators from CC21–24 (filter, envelope, LFO) and velocity to filter cutoff.
   TiMidity ignores modulators.
 
-**Roland** (SC-88Pro owner's manual) **[paper, read]**:
+**one maker** (SC-88Pro owner's manual) **[paper, read]**:
 
-| Variation | SC-88Pro map | SC-88 map | SC-55 map |
+| Variation | SC-88Pro map | later GS module map | early GS module map |
 |---|---|---|---|
 | 000 | Fretless Bs. | FretlessBs. | Fretless Bs |
 | 001 | Fretless Bs2 | FretlessBs2 | none |
@@ -458,7 +458,7 @@ bend  -1408 -1216 -1088 -768 -512 -192   0  448  544  608  544  352  224   96   
 - GS part defaults: reverb send (CC91) 40, chorus send (CC93) 0. So **the GM-mode fretless has no
   chorus** on a Sound Canvas unless the file sends CC93.
 
-**Yamaha XG** (MSB 0, program 36) **[web, Yamaha lists]**:
+**XG** (MSB 0, program 36) **[web, Yamaha lists]**:
 - LSB 0 Fretless, 32 Fretless2, 33 Fretless3, 34 Fretless4, 96 SynFretless, 97 SmthFretless.
 - Element counts 1, 2, 2, 2, 2, 2.
 - No sound descriptions were found for either maker.
@@ -537,7 +537,7 @@ explicit `%font` line. With a bare `soundfont` line, TiMidity silently kept Flui
 - **Records 1975–90** (bass_amps.md §2.2): a J or P fretless, bridge pickup favoured, DI-heavy,
   often chorus and reverb.
 - **Chorus:**
-  - Boss CE-2 (MN3007 bucket brigade, 5–51 ms chip range; a triangle LFO; rate and depth only)
+  - one pedal maker CE-2 (MN3007 bucket brigade, 5–51 ms chip range; a triangle LFO; rate and depth only)
     **[web]**.
   - Typical settings: rate 0.3–1 Hz, centre delay 5–8 ms, depth ±1–3 ms **[memory]**.
   - The CE-2B keeps the lows dry **[memory]**.
@@ -546,11 +546,11 @@ explicit `%font` line. With a bare `soundfont` line, TiMidity silently kept Flui
   1. Pickups: bridge 1.0, neck 0.5 (`PJ_FRETLESS_PICKUP`); the J network as in `ebass.cc`.
   2. An active DI into 1 MΩ.
   3. A mid peak of +3 dB at 800 Hz, Q 0.8: the Variamp's push.
-  4. Optional: the B-15 path blended at 30 % for warmth.
-  5. A chorus, off for GM 36 by default, as on the SC-88. `PJ_FRETLESS_CHORUS` 0–1 adds a BBD-like
+  4. Optional: the fliptop path blended at 30 % for warmth.
+  5. A chorus, off for GM 36 by default, as on the later GS module. `PJ_FRETLESS_CHORUS` 0–1 adds a BBD-like
      modulated delay: 7 ms ± 2 ms at 0.6 Hz, mix 35 %, the lows below 150 Hz kept dry, stereo by
      inverting the LFO on the right.
-  6. LA-2A at 3:1.
+  6. optical compressor at 3:1.
 - The chorus is the only new block. It is a modulated fractional delay, about 100 lines of code.
   The amp module has none yet.
 
@@ -643,7 +643,7 @@ All three users solve a small least-squares problem over the sounding notes.
   - they bend into notes.
 - **Recommendation:** the bass is a **follower** of the fixed-pitch instruments and an **equal
   participant** with the adaptive ones.
-  - Against a piano, guitar, Rhodes, vibes or any keyboard (fixed in equal temperament), only the
+  - Against a piano, guitar, tine piano, vibes or any keyboard (fixed in equal temperament), only the
     bass can move. Its root against the piano's root is pulled to 0 by strong octave
     coincidences, and it shades only when it plays a chord tone other than the root over a sparse
     voicing.
@@ -686,7 +686,7 @@ All three users solve a small least-squares problem over the sounding notes.
   - **On:** note-on adds an entry, with level from velocity.
   - **Off:** note-off marks it released. With CC64 down, or for a family that rings (piano,
     guitar, vibes, harp), it stays with a level decaying at the family's rate: piano about
-    −8 dB/s, Rhodes −6, vibes with the motor off −3. It is dropped below −40 dB. An organ or choir
+    −8 dB/s, tine piano −6, vibes with the motor off −3. It is dropped below −40 dB. An organ or choir
     note drops at once.
   - **Templates per family** (a 24-entry level table each, built once): piano 1/k with stretch
     (B from the piano model); organ from `OrganModel`'s cached spectra if present, else 1/k;
@@ -840,7 +840,7 @@ byte-identical renders of a brass-section file and a four-wind file).
 | `ebass.h/.cc` (`jazzBass`) | the strings, losses, neck dead spots, pickups (bridge favoured), the DI biquad, the player's string choice, the fingers alternating, the pad pluck (`pluckPad`), damping at note-off |
 | `guitar.h/.cc` (`Guitar`) | the modal string (to 128 modes, two tilted directions), `bend` (retune), `touch` (harmonics), the pickups' ears, `mute`, the asleep logic |
 | `bass.h/.cc` (`Bass`) | the board-contact loop (penalty, step limiter, `boardOn` clock), the stopped-string fingertip loss, `setLength`'s glide, `kBoardEnd`, `setAction` |
-| `guitaramp.h/.cc` | the DI, B-15 and LA-2A; a new "fretless-di" preset (§6) |
+| `guitaramp.h/.cc` | the DI, fliptop and optical compressor; a new "fretless-di" preset (§6) |
 | `organ.cc` / `choir.cc` | the spectral pair weights, the 3 c-per-change and glide limits (§7) |
 
 ### 8.2 Changes to `Guitar` (they are general; the fretted bass loses nothing)
@@ -959,7 +959,7 @@ byte-identical renders of a brass-section file and a four-wind file).
 - **Any measurement of the fretless mwah**, of fingertip termination losses, or of fretless
   intonation and slide statistics.
 - Issanchou's thesis; Mandal & Wahi's full text.
-- Acoustic 360 circuit values; CE-2 sweep and LFO ranges; any Roland or Yamaha GM 36 sound
+- Acoustic 360 circuit values; CE-2 sweep and LFO ranges; any one maker or one maker GM 36 sound
   description.
 - Jaco's delay settings in ms.
 - Whether "pluck nearer the neck gives more mwah" (lore) contradicts the A/x_p argument (§2.1).

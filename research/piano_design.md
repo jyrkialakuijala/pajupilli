@@ -2,8 +2,8 @@
 
 Status: 2026-11-15, a proposal only; nothing in `src/piano.*` is changed. Written for the session
 that owns the grand (`src/piano.*`), at its request, to plan the refactor after the grand's tone is
-settled. Targets: the concert grand (the default, bit-identical), the Yamaha CP-80
-(`research/cp80.md`), the upright and the honky-tonk, the bright piano (`research/piano_variants.md`).
+settled. Targets: the concert grand (the default, bit-identical), the electric grand
+(`research/electricgrand.md`), the upright and the honky-tonk, the bright piano (`research/piano_variants.md`).
 
 The idea: everything `Piano::build()` takes from `scaleOf()`, `pianoboard::*` and the `PJ_PIANO_*`
 knobs today becomes data in one struct, filled by a function per instrument. The knobs stay, as
@@ -34,7 +34,7 @@ struct PianoKey {
 
 struct PianoDesign {
   const char* name = "grand-piano";
-  int keys = 88, lowMidi = 21;               // CP-70: 73 keys from E1
+  int keys = 88, lowMidi = 21;               // smaller electric grand: 73 keys from E1
   std::vector<PianoKey> key;                 // [keys]
 
   // Tuning.
@@ -65,7 +65,7 @@ struct PianoDesign {
     const float *freq, *loss, *phi /*[keys][n]*/, *patchVol /*[n][patches]*/, *patchPos /*[patches][2]*/;
   } board;
   double stringLoad = 1.0;
-  // kRigid (CP-80 stage 1): no board. Each string's end on a heavy, lossy
+  // kRigid (electric grand stage 1): no board. Each string's end on a heavy, lossy
   // support: a resistance R (kg/s) folded into every mode's decay, as the
   // energy a mode loses through its end per period (sigma_n = R * 2 / (mu L)
   // to first order; fit R to recordings, start 2e4). Optional later: a 1-D
@@ -78,13 +78,13 @@ struct PianoDesign {
   enum class Output { kMics, kPickup } output = Output::kMics;
   struct Mic { double x, y, z, angleDeg, pattern; };   // today: two crossed figure-of-eights
   Mic mic[2] = {{0.75, 0.70 - 0.085, 0.65, -45, 1}, {0.75, 0.70 + 0.085, 0.65, 45, 1}};
-  // kPickup (CP-80): the vertical force of each key's strings on the bridge
+  // kPickup (electric grand): the vertical force of each key's strings on the bridge
   // (the in_/out_ exchange's force, summed over the key's strings, y only;
   // the sideways swing reaches it by `pickupSide`, ~0.05), times a per-key
   // gain (the 88 piezos in parallel on one bus: equal, except the top six
   // keys about -3.5 dB through the 0.022 uF capacitor), summed: one mono
   // signal (side() = 0). The circuit after it is the instrument's own
-  // (src/cp80*.cc: tone stack, brilliance, opto tremolo: research/cp80.md 3.3).
+  // (src/electricgrand*.cc: tone stack, brilliance, opto tremolo: research/electricgrand.md 3.3).
   std::vector<float> pickupGain;             // [keys]
   double pickupSide = 0.05;
 };
@@ -93,7 +93,7 @@ PianoDesign grandDesign();     // today's grand: scaleOf(), pianoboard::*, the k
 PianoDesign uprightDesign();   // later: U1/U3 scale, an upright board (tools/pianoboard.py run on it)
 PianoDesign honkyDesign();     // uprightDesign() + honkyCents 4..8, flatShare, harder worn hammers
 PianoDesign brightDesign();    // grandDesign() + felt x2.5 from key 30, mics 0.25 m over the hammers
-PianoDesign cp80Design();      // 88 keys, rigid bridge, pickup (below)
+PianoDesign electricGrandDesign();      // 88 keys, rigid bridge, pickup (below)
 
 class Piano {
  public:
@@ -124,17 +124,17 @@ class Piano {
 layout: these become sized by `d.keys` at build (a vector, or `kMaxKeys = 88` with `keys <= 88`,
 which is simpler and keeps the arrays fixed).
 
-## 3. The CP-80 design, as data (from research/cp80.md)
+## 3. The electric grand design, as data (from research/electricgrand.md)
 
 - `keys = 88`, `lowMidi = 21`; `strings = 1` for MIDI 21–42 (22 wound), 2 from G2 (MIDI 43) up.
-- Lengths: CP-70 bass string 0.679 m (the only published one); the treble as the grand's plain
+- Lengths: smaller electric grand bass string 0.679 m (the only published one); the treble as the grand's plain
   strings (the CP's top is a grand's top); in between a smooth scale from 0.68 m at the bottom to
   meet the grand's length near key 40. B from the lengths and diameters (~1–2e-3 in the bass;
-  the open-source cp80-model's fit: 2.07e-3 at the bottom). Gauges unknown: scale from the grand's,
+  the open-source electricgrand-model's fit: 2.07e-3 at the bottom). Gauges unknown: scale from the grand's,
   fit B per key from a recording.
 - Hammers: urethane plus leather (manual) or felt (a technician): start with the grand's felt law
   ×1.5 stiffer, `colour` as the grand; fit brightness against velocity.
-- Unisons: `unisonCents = {2.0, 0.4}` (cp80-model fit 0.4–2.0 c), `tuning = kGrandStretch` (fit
+- Unisons: `unisonCents = {2.0, 0.4}` (electricgrand-model fit 0.4–2.0 c), `tuning = kGrandStretch` (fit
   later), `sideTuneCents` as the grand.
 - `bridge = kRigid`, `supportR = 2e4` (fit); the sideways swing's share at the pickup `pickupSide
   0.05`.
@@ -149,6 +149,6 @@ which is simpler and keeps the arrays fixed).
    `scaleOf()` + today's knobs; `Piano(fs, grandDesign())` must render bit-identically to today
    (a `-note` diff at −300 dB, as the choir check did).
 2. `Bridge::kRigid` and `Output::kPickup` (small: two branches at build, one in `sample()`).
-3. `cp80Design()` and the CP's circuit in its own file (`src/cp80.*`, owned by the CP-80 work),
+3. `electricGrandDesign()` and the CP's circuit in its own file (`src/electricgrand.*`, owned by the electric grand work),
    wired in `pianoinst.cc` as `-inst electric-grand`.
 4. Upright/honky-tonk/bright designs as their research settles.

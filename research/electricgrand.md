@@ -1,4 +1,4 @@
-# The Yamaha CP-80 electric grand: research and model plan
+# The electric grand: research and model plan
 
 Status: 2026-11-15. Research only; nothing is built. GM program 3, "Electric Grand Piano".
 SI units. This file extends `research/piano.md` (strings as banks of modes, the hammer, dampers,
@@ -11,16 +11,16 @@ literature as remembered, not looked up for this document, to be checked before 
 
 ## 1. Short answer
 
-- **Which instrument.** The CP-80 is the **88-key (A0–C8)** model, 1978–1985. The 73-key model
-  is the CP-70/CP-70B, **E1–E7**. "73 keys E1–E7" is right for the CP-70, wrong for the CP-80.
+- **Which instrument.** The electric grand is the **88-key (A0–C8)** model, 1978–1985. The 73-key model
+  is the smaller electric grand, **E1–E7**. "73 keys E1–E7" is right for the smaller electric grand, wrong for the electric grand.
   The CP-60M is a 76-key upright. All of them have the same idea: a real grand action, hammers
   and steel strings on a small cast-iron harp, **no soundboard**, and a **piezo-electric element
-  under every note** (88 on the CP-80) summed into a FET preamp with a 3-band tone control,
-  a brilliance switch (CP-80), and a stereo antiphase tremolo.
-- **Stringing.** CP-80: one wound string per key from A0 to F#2 (MIDI 21–42: 22 keys), two strings
-  per key from G2 (MIDI 43) to C8: **154 strings [calc]**, against 243 on a concert grand. CP-70:
+  under every note** (88 on the electric grand) summed into a FET preamp with a 3-band tone control,
+  a brilliance switch (electric grand), and a stereo antiphase tremolo.
+- **Stringing.** electric grand: one wound string per key from A0 to F#2 (MIDI 21–42: 22 keys), two strings
+  per key from G2 (MIDI 43) to C8: **154 strings [calc]**, against 243 on a concert grand. smaller electric grand:
   15 single + 58 double = **131 strings**, which is exactly the number one emulation maker gives
-  **[web, GSi; calc]**. Longest (bass) string 67.9 cm on the CP-70 against about 2 m on a concert
+  **[web, GSi; calc]**. Longest (bass) string 67.9 cm on the smaller electric grand against about 2 m on a concert
   grand **[web, Wikipedia]**.
 - **Why it sounds as it does** (section 4, mostly **[calc]**):
   1. The pickup reads the **force on the bridge**, not the motion of a radiating board. That force
@@ -33,7 +33,7 @@ literature as remembered, not looked up for this document, to be checked before 
      an impedance thousands of times a string's, not on a board of ~1000 kg/s. So the two strings
      hardly couple: they beat as two separate tones, with no locking and no aftersound. Each
      string also keeps its energy longer (bass notes ring for over a minute **[web, Hollow Sun]**).
-  4. **Hard hammers.** The CP-80 operating manual's spec sheet lists the hammers as
+  4. **Hard hammers.** The electric grand operating manual's spec sheet lists the hammers as
      "rubber (urethane) + artificial leather" (OCR of the scan; see 2.2): shorter contact and more
      high partials than felt.
   5. **Wide, drifting unisons** (a hobby fit to samples: 0.4–2 cents; a fitted concert grand:
@@ -57,47 +57,47 @@ literature as remembered, not looked up for this document, to be checked before 
 
 | Model | Years | Keys | Notes |
 |---|---|---|---|
-| CP-70 | 1976– | 73, E1–E7 | first model; tuning problems; unbalanced ¼" outputs only **[web, Wikipedia; forum]** |
-| CP-70B | 1978– | 73 | revised action and electronics, balanced XLR outputs, stable tuning **[web, Wikipedia]** |
-| CP-80 | 1978–1985 | 88, A0–C8 | balanced XLR + ¼" outputs, adds a 3-way Brilliance switch **[web, manual; forum]** |
-| CP-70D / CP-80D | early 1980s **[memory]** | 73 / 88 | 7-band graphic EQ instead of bass/mid/treble **[web, Wikipedia]** |
-| CP-70M / CP-80M | end of 1985 | 73 / 88 | MIDI out **[web, Wikipedia]** |
+| smaller electric grand | 1976– | 73, E1–E7 | first model; tuning problems; unbalanced ¼" outputs only **[web, Wikipedia; forum]** |
+| smaller electric grand | 1978– | 73 | revised action and electronics, balanced XLR outputs, stable tuning **[web, Wikipedia]** |
+| electric grand | 1978–1985 | 88, A0–C8 | balanced XLR + ¼" outputs, adds a 3-way Brilliance switch **[web, manual; forum]** |
+| smaller electric grand / electric grand | early 1980s **[memory]** | 73 / 88 | 7-band graphic EQ instead of bass/mid/treble **[web, Wikipedia]** |
+| smaller electric grand / electric grand | end of 1985 | 73 / 88 | MIDI out **[web, Wikipedia]** |
 | CP-60M | mid-1980s **[memory]** | 76 | upright variant with MIDI **[web, Wikipedia]** |
 
-- CP-70 price at launch: $4 000 **[web, Wikipedia]**.
-- **CP-70 compass.** One collector page says "F1 to E7", but that is 72 keys, so it cannot be
-  right. E1–E7 rests on four pieces of evidence: Yamaha calls the CP73's E-to-E layout "similar
-  to the Rhodes and CP-70"; an encyclopaedia page gives E1–E7; an owner says "single string up to
+- smaller electric grand price at launch: $4 000 **[web, Wikipedia]**.
+- **smaller electric grand compass.** One collector page says "F1 to E7", but that is 72 keys, so it cannot be
+  right. E1–E7 rests on four pieces of evidence: one maker calls the CP73's E-to-E layout "similar
+  to the tine piano and smaller electric grand"; an encyclopaedia page gives E1–E7; an owner says "single string up to
   the second F#" (E1..F#2 = 15 keys); and a Swiss dealer says "one string on each of the first 15
   keys". 15 single + 58 double = 131, GSi's string count **[web; calc]**.
-- **Note names.** Modartt writes the CP-80's single-string limit as "F#1 (midi 42)". That is
-  Yamaha's octave numbering (C3 = MIDI 60). In scientific pitch (C4 = 60, as in this project)
+- **Note names.** the piano-modelling forum writes the electric grand's single-string limit as "F#1 (midi 42)". That is
+  one maker's octave numbering (C3 = MIDI 60). In scientific pitch (C4 = 60, as in this project)
   it is **F#2**.
 
 ### 2.2 Action and hammers
 
-- Real grand action ("GP action" in the CP-80 spec), wooden keys, a damper pedal. The keyboard
+- Real grand action ("GP action" in the electric grand spec), wooden keys, a damper pedal. The keyboard
   and action box is one half, the harp, strings and dampers the other **[web, manual; dealer]**.
-- **Hammers: "Rubber (urethane) + artificial leather"** (CP-80 operating manual, spec item 3, as
-  read from the OCR text of the scan by two independent readers: this page and the cp80-model
+- **Hammers: "Rubber (urethane) + artificial leather"** (electric grand operating manual, spec item 3, as
+  read from the OCR text of the scan by two independent readers: this page and the electricgrand-model
   project) **[web, manual OCR]**. One piano technician mentions keeping a hammer voicing
-  fluid (Escaine) for "this model's hammers" (a CP-70) **[web, forum]**: not settled. Either way the
+  fluid (Escaine) for "this model's hammers" (a smaller electric grand) **[web, forum]**: not settled. Either way the
   hammers are harder and lighter than a concert grand's felt **[memory]**.
 - Hammer masses and strike points are not published. A baby-grand action suggests 8–9 g in the
-  bass to 4–5 g in the treble **[memory]**. The cp80-model project uses 4.6 g at C4 **[web, hobby
+  bass to 4–5 g in the treble **[memory]**. The electricgrand-model project uses 4.6 g at C4 **[web, hobby
   code]**.
 
 ### 2.3 Strings and scale
 
-- **Single/bichord:** see section 1. No trichords anywhere **[web, Modartt, Hollow Sun, forum,
+- **Single/bichord:** see section 1. No trichords anywhere **[web, the piano-modelling forum, Hollow Sun, forum,
   dealer]**.
 - **Bass string length:** "26¾ inches (67.9 cm)", against about 7 ft (213 cm) on an acoustic
-  grand **[web, Wikipedia; it says CP-70]**. The CP-80 also has to reach A0 and its harp is wider
+  grand **[web, Wikipedia; it says CP-70]**. The electric grand also has to reach A0 and its harp is wider
   (1460 mm); its longest length is not published. 0.7–0.9 m is my guess **[calc from the
   dimensions]**.
 - The strings are special: "each iteration used a different type of string, although some of
   the treble strings can be replaced with standard ones" **[web, Wikipedia]**. Two US makers
-  supplied them as of 2019. The 15 singles of the CP-70 are "large round-wound strings"
+  supplied them as of 2019. The 15 singles of the smaller electric grand are "large round-wound strings"
   **[web, GSi]**. No published gauge table was found (the service manual and parts list exist as
   scans, see 5.2).
 - **What a 68 cm bass string has to be [calc]** (μ = T/(2Lf)², copper winding at 0.8 fill,
@@ -105,15 +105,15 @@ literature as remembered, not looked up for this document, to be checked before 
 
 | String | L (m) | T (N) | μ (kg/m) | Outer Ø (mm) | B | f_L (Hz) | Z = √(Tμ) (kg/s) |
 |---|---|---|---|---|---|---|---|
-| CP-70 E1, core 1.5 mm | 0.679 | 600 | 0.19 | 5.8 | 1.8·10⁻³ | 1000 (24 f0) | 10.7 |
-| CP-80 A0, L 0.68 | 0.68 | 500 | 0.36 | 8.0 | 2.1·10⁻³ | 730 (27 f0) | 13.4 |
-| CP-80 A0, L 0.80 | 0.80 | 600 | 0.31 | 7.4 | 1.3·10⁻³ | 670 (24 f0) | 13.6 |
-| CP-80 F#2 (last single) | 0.66 | 700 | 0.047 | 2.9 | 9·10⁻⁴ | 1800 (19 f0) | 5.7 |
+| smaller electric grand E1, core 1.5 mm | 0.679 | 600 | 0.19 | 5.8 | 1.8·10⁻³ | 1000 (24 f0) | 10.7 |
+| electric grand A0, L 0.68 | 0.68 | 500 | 0.36 | 8.0 | 2.1·10⁻³ | 730 (27 f0) | 13.4 |
+| electric grand A0, L 0.80 | 0.80 | 600 | 0.31 | 7.4 | 1.3·10⁻³ | 670 (24 f0) | 13.6 |
+| electric grand F#2 (last single) | 0.66 | 700 | 0.047 | 2.9 | 9·10⁻⁴ | 1800 (19 f0) | 5.7 |
 | concert grand A0 | 2.0 | 1300 | 0.11 | 4.4 | 5·10⁻⁵ | 390 (14 f0) | 11.8 |
 
   The same impedance as a grand's bass string, at half the tension and three times the mass per
-  length. An 8 mm A0 string is near the practical limit, hence the CP-80's probably longer A0.
-  The hobby cp80-model fit to recorded samples lands at **B = 2.07·10⁻³** at its lowest anchor
+  length. An 8 mm A0 string is near the practical limit, hence the electric grand's probably longer A0.
+  The hobby electricgrand-model fit to recorded samples lands at **B = 2.07·10⁻³** at its lowest anchor
   **[web, hobby code]**, which agrees.
 - **The tenor is the awkward part [calc].** A plain G2 at 0.66 m and 1.15 mm carries only 136 N at
   131 MPa, a weak, floppy string with B ≈ 3·10⁻³. So the bichords just above F#2 are almost
@@ -123,11 +123,11 @@ literature as remembered, not looked up for this document, to be checked before 
   grand's: 1.6·10⁻³ at C5, 2–3.5·10⁻² at C8. Between C3 and C4 the shortened plain strings
   (C4 at 0.50–0.55 m against 0.70 m) have **2–3× a grand's B** (6–8·10⁻⁴ at C4 against
   2.7–2.9·10⁻⁴) **[calc]**.
-- **Tuning stretch.** The CP-80 manual prints a "Tuning curve of the CP-80", a Railsback-type
+- **Tuning stretch.** The electric grand manual prints a "Tuning curve of the electric grand", a Railsback-type
   stretch **[web, manual OCR; values not legible in the text]**. From B [calc]: an octave tuned
   4:2 over a bass note with B = 1·10⁻³ is 12 c wide; with 2·10⁻³, 23 c; tuned 6:3, 26 and 51 c. Expect a
   much bigger bass stretch than a grand's: tens of cents per octave in the lowest octave.
-- **Unisons:** "measured 0.4–2.0 cent" split per bichord (cp80-model, from a commercial sample
+- **Unisons:** "measured 0.4–2.0 cent" split per bichord (electricgrand-model, from a commercial sample
   set) **[web, hobby code]**. The grands in piano.md fit to 0.03–0.08 c. Touring instruments went
   out of tune enough to earn a "honky-tonk" reputation **[web, Hollow Sun]**.
 
@@ -137,19 +137,19 @@ literature as remembered, not looked up for this document, to be checked before 
   instead **[web, collector page; forum]**. Wikipedia: "piezo-electric pickups mounted on the harp
   casting". Repair and forum posts: "individual piezos embedded in the bridge", "under each
   string" **[web, forum, Hollow Sun]**.
-- Charles Helpinstill (who made pickups for pianos and fitted his own to one CP-70, "with no real
-  improvement"): "The fact that the CP-70 has no soundboard pretty much confines it to a unique
+- Charles Helpinstill (who made pickups for pianos and fitted his own to one smaller electric grand, "with no real
+  improvement"): "The fact that the smaller electric grand has no soundboard pretty much confines it to a unique
   sound" **[web, Hollow Sun]**.
 - Unamplified it "sounds like a muffled traditional piano" **[web, forum]**. Some acoustic output
   comes from the bridge, harp and case; it is quiet.
-- **Tuning stability:** the CP-70B and later are "very stable"; with no soundboard, humidity
-  and transport hardly move the pitch. The first CP-70 had tuning problems **[web, Wikipedia]**.
-- **Mass and size (CP-80 manual):** width about 1460 mm; two weights printed, 76 kg and 66 kg,
+- **Tuning stability:** the smaller electric grand and later are "very stable"; with no soundboard, humidity
+  and transport hardly move the pitch. The first smaller electric grand had tuning problems **[web, Wikipedia]**.
+- **Mass and size (electric grand manual):** width about 1460 mm; two weights printed, 76 kg and 66 kg,
   presumably the two halves: about 142 kg in all **[web, manual OCR; calc]**. Wikipedia: about
-  140 kg for an electric grand; Hollow Sun: up to 313 lb (142 kg). CP-70: about 75 kg
+  140 kg for an electric grand; Hollow Sun: up to 313 lb (142 kg). smaller electric grand: about 75 kg
   (165 lb) **[web, collector page]**.
-- **Dampers:** a normal grand damper system. On the CP-70 the top 8 keys (16 strings) have no
-  dampers **[web, GSi]**. CP-80: not found. A grand leaves 18 keys undamped; the top 8–18 is a
+- **Dampers:** a normal grand damper system. On the smaller electric grand the top 8 keys (16 strings) have no
+  dampers **[web, GSi]**. electric grand: not found. A grand leaves 18 keys undamped; the top 8–18 is a
   reasonable assumption **[memory]**.
 
 ## 3. Pickups and electronics
@@ -157,26 +157,26 @@ literature as remembered, not looked up for this document, to be checked before 
 ### 3.1 The pickups
 
 - **One piezo element per note: "Piezo-electric elements 88 nos. Independent pickup system"**
-  (CP-80 owner's manual spec, quoted in a search result) **[web, manual]**. The CP-80 block
+  (electric grand owner's manual spec, quoted in a search result) **[web, manual]**. The electric grand block
   diagram reads "88P (SIGNAL OUTPUTS) → BUFFER AMPLIFIER" **[web, manual OCR]**. The bichord's two
   strings share one element.
 - **All in parallel into a FET preamp:** "73 piezoelectric crystals in parallel which are fed into
-  a discrete FET preamp" (CP-70 owner on a recording forum; seen only as a search snippet)
-  **[web, forum]**. FETs appear in the CP-70B schematic **[web, repair blog]**. The pickups' signal
+  a discrete FET preamp" (smaller electric grand owner on a recording forum; seen only as a search snippet)
+  **[web, forum]**. FETs appear in the smaller electric grand schematic **[web, repair blog]**. The pickups' signal
   is "about the same strength as a guitar pickup" **[web, repair blog comment]**.
 - **What they sense [calc, from the construction].** A ceramic element in thickness mode under a
   string bearing reads the **vertical force** of the string(s) on that bearing: the string's slope
   times tension, T·∂y/∂x, plus the static downbearing load. It barely reads the horizontal
   polarisation. Longitudinal force (the tension change ΔT) reaches it through the downbearing
   angle (ΔT·sin α, with α about 1–2° **[memory]**) and through the bridge rocking.
-- **Where.** Yamaha's own patents show two arrangements (section 5.1):
+- **Where.** One maker's own patents show two arrangements (section 5.1):
   - US 4,189,969 (1976): a sealed per-string resin block whose crest carries the string, set near
     the hitch pins, with the string "in pressure contact with a bridge and the crest". This is
     the form that matches "88 independent elements".
   - US 4,211,139 (1977): the bridge on a duralumin plate held by urethane strips, one element per
     5–6 notes, built to make the decay "very close to that of the natural piano".
 
-  Which one each CP model uses is not stated anywhere I found. The CP-80's 88 elements point to
+  Which one each CP model uses is not stated anywhere I found. The electric grand's 88 elements point to
   the first.
 - **Why piezo:** magnetic pickups sit at one point on the string and carry its harmonic notches
   (and do not work on wound copper). The bridge piezo sees all partials, and with no board it
@@ -188,7 +188,7 @@ literature as remembered, not looked up for this document, to be checked before 
   dynamic force gives about 2–3 mV. The element's own mechanical resonance (a 10 mm × 1 mm disc
   under a 20 g bridge segment) is near 80 kHz, far above audio.
 
-### 3.2 The preamp and panel (CP-80 operating manual)
+### 3.2 The preamp and panel (electric grand operating manual)
 
 | Item | Value | Tag |
 |---|---|---|
@@ -204,16 +204,16 @@ literature as remembered, not looked up for this document, to be checked before 
 - The **stereo is the tremolo**: without it the two outputs carry the same mono sum **[calc,
   from the description]**. No stereo split by register was found.
 - The tone-stack and brilliance corner frequencies are on the circuit diagram (a scan) and not
-  in any text I found. cp80-model's guesses: shelves at 150 Hz and 3 kHz, a peak at 800 Hz;
+  in any text I found. electricgrand-model's guesses: shelves at 150 Hz and 3 kHz, a peak at 800 Hz;
   brilliance corners 3.3 / 4.4 / 8.0 kHz, "not a transcription" **[web, hobby code: guesses]**.
 - **The preamp colours the bass.** Owners who bypassed it (piezos straight to the output) report
   the bass "much clearer and more natural", "less bass boom", "less CP bass growl, more punch,
   brighter midrange" **[web, repair blog and comments]**. So the stock chain (tone stack at
   centre) adds low and low-mid weight.
 
-### 3.3 The circuit (the CP-80 overall circuit diagram, 1978, read from the user's scan)
+### 3.3 The circuit (the electric grand overall circuit diagram, 1978, read from the user's scan)
 
-Source: "CP-80 OVERALL CIRCUIT DIAGRAM 006806", one sheet (the user's
+Source: "electric grand OVERALL CIRCUIT DIAGRAM 006806", one sheet (the user's
 ~/Documents/yamaha_cp-80_overal_circuit.pdf). Values below are read off the scan **[schematic]**;
 the corner frequencies are computed from them **[calc]**. The tone network's exact topology is
 partly hard to read at the scan's resolution; where a reading is uncertain it says so.
@@ -313,7 +313,7 @@ VR3's lower end) picks pin 6 or 7 in two positions and nothing in the third. **N
 whether the line from "M" runs on to VR2's lower end and VR4 (it crosses them on the drawing
 with no clear dots), and so how the three branches are summed; with VR3's wiper grounded
 the reading as drawn would mute the middle branch, so something here is misread. The
-network's response therefore cannot be computed. **In the model** (`Cp80Circuit`): the
+network's response therefore cannot be computed. **In the model** (`ElectricGrandCircuit`): the
 controls as the manual gives them (flat at the centre detent), first order, at the corners
 the legible parts give: bass a low shelf at ~100 Hz (assumed), middle a peak/dip at
 1/(2π·1 k·0.47 µF) = 340 Hz, 1.5 octaves wide, treble a high shelf at
@@ -323,7 +323,7 @@ divider only bounds them).
 
 ### 3.4 Fitted to recordings (2026-11-15)
 
-Six recordings of CP-80s in the user's music folder (four dry, two with the tremolo on), about
+Six recordings of electric grands in the user's music folder (four dry, two with the tremolo on), about
 120 separately measurable notes (`tools/pianofit.py`; the model's notes measured the same way):
 
 - **Tremolo** (two recordings, the L/R balance folded over a cycle): 0.92 Hz, the channels in
@@ -334,7 +334,7 @@ Six recordings of CP-80s in the user's music folder (four dry, two with the trem
 - **Bass brightness** (share of the note's energy per band): A0–D2 nearly all below 1 kHz
   (MIDI 27–32: 1–2 kHz −16 dB, 2–4 kHz −27 dB; the grand's felt gave −8, −15). Fitted: the bass
   hammers ×0.03 in stiffness up to D1, back to the rest by D#2 (−17, −30). From D#2 up the
-  model matched within 1–3 dB. Pianoteq's note that its "restored" CP-80 renewed wound strings
+  model matched within 1–3 dB. a commercial piano model's note that its "restored" electric grand renewed wound strings
   "which lacked brilliance" fits.
 - **Bass decay**: the wound strings' partials at 0.5–4 kHz die at 10–18 dB/s (2–4 kHz faster),
   twice the model's, their lowest ones as the model's. Fitted: the wire's loss rising with
@@ -372,7 +372,7 @@ Six recordings of CP-80s in the user's music folder (four dry, two with the trem
   **[calc]**. Air drag and the support's real losses shorten the low end. That fits "over a
   minute" for recorded bass notes **[web, Hollow Sun]**. The upper partials die at the wire's own
   rate, as on a grand; only the low partials last far longer.
-- Yamaha's 1977 patent states the problem from the other side: a pickup coupled straight to the
+- one maker's 1977 patent states the problem from the other side: a pickup coupled straight to the
   bridge gives a damping envelope unlike a piano's and "does not allow sufficient mixing of
   vibrations from different strings". Hence their urethane-sprung plate, explicitly "a kind of
   spring and dash pot" that stands in for the soundboard **[web, US 4,211,139]**. So the real
@@ -380,7 +380,7 @@ Six recordings of CP-80s in the user's music folder (four dry, two with the trem
 - **Unisons hardly couple.** Weinreich's coupled decay needs a bridge admittance comparable to
   the strings' (piano.md §3) **[memory]**. On a stiff bridge the two strings beat as independent
   tones: deep, regular beats at Δf, with no locking and no slow aftersound. Sympathetic resonance
-  with the pedal down is still audible: the CP-70 emulation sells it as a feature **[web, GSi]**.
+  with the pedal down is still audible: the smaller electric grand emulation sells it as a feature **[web, GSi]**.
   It is much weaker than through a board.
 - **The horizontal polarisation is nearly unheard**, since the piezo reads vertical force. A grand's
   aftersound is partly the slow horizontal swing reaching the board. On the CP that path is
@@ -410,7 +410,7 @@ Six recordings of CP-80s in the user's music folder (four dry, two with the trem
 - Free longitudinal modes of the bass strings: f_L ≈ 0.7–1.0 kHz (22–27 × f0) on the CP, against
   0.4 kHz (14 × f0) on a grand A0 **[calc, table in 2.3]**. Plain tenor strings: 3.6–5 kHz.
 - **Tension modulation per mm of amplitude** scales as EA/L²: about 9–12 times a grand's in the
-  bass (CP-70 E1: ΔT ≈ 1.9 N per mm² of fundamental amplitude, against 0.16 N on a 2 m A0)
+  bass (smaller electric grand E1: ΔT ≈ 1.9 N per mm² of fundamental amplitude, against 0.16 N on a 2 m A0)
   **[calc]**. Hence stronger phantom partials (sums of transverse partials) and a larger initial
   pitch glide on loud low notes: ΔT_mean/(2T) ≈ 0.16 % ≈ 2.7 c per mm² on E1 **[calc]**.
 - The piezo senses force directly at the bearing, where the longitudinal force acts. It hears
@@ -423,7 +423,7 @@ Six recordings of CP-80s in the user's music folder (four dry, two with the trem
   exponent p (leather ≈ 1.5–2.5 against felt 2.2–3.5 **[memory]**). Short contact everywhere, so a
   strong high-partial attack that grows less with velocity than felt's: brightness at pp is high.
 - The hammer meets 10–14 kg/s of string in the bass, as on a grand **[calc]**, so contact times
-  are set by mass against string much as on a grand. cp80-model reports 5.0 ms at D#1, 3.5 ms at
+  are set by mass against string much as on a grand. electricgrand-model reports 5.0 ms at D#1, 3.5 ms at
   F#2 and 1.9 ms at C4, on its own fitted law **[web, hobby code]**.
 - The attack dominates more on the CP than on a grand. The sum is direct: no board delay, no
   build-up of radiation in the hall. The attack transient comes through the flat pickup in full.
@@ -441,7 +441,7 @@ Separated **[calc, from 4.1–4.5]**:
   near-sine sustain, and players hear that as a short note. The real CP's support damping (the
   urethane springs, if present) shortens the low partials too: to be measured.
 - *Chorus-like:* free beating of detuned bichords, n-dependent beating from B mismatch, and a
-  chorus pedal on the records: Peter Gabriel ran his CP-70 through one **[web, forum]**.
+  chorus pedal on the records: Peter Gabriel ran his smaller electric grand through one **[web, forum]**.
 
 ## 5. What is published
 
@@ -449,21 +449,21 @@ Separated **[calc, from 4.1–4.5]**:
 
 | Patent | Assignee, date | What it says |
 |---|---|---|
-| US 4,189,969 | Nippon Gakki (Yamaha); Katayama & Murakami; priority 1976-07, granted 1980 | Pickup unit for an electric piano: piezo between electrodes, sealed in a hard epoxy block; the string rests on its crest; units at uniform spacing near the hitch pins, snapped into a board with soft urethane inserts. Prior art: a C-shaped metal channel with the crest as one electrode |
+| US 4,189,969 | Nippon Gakki (one maker); Katayama & Murakami; priority 1976-07, granted 1980 | Pickup unit for an electric piano: piezo between electrodes, sealed in a hard epoxy block; the string rests on its crest; units at uniform spacing near the hitch pins, snapped into a board with soft urethane inserts. Prior art: a C-shaped metal channel with the crest as one electrode |
 | US 4,211,139 | Nippon Gakki; Murakami; priority 1977-04, granted 1980 | Bridge (beech, 24 × 12 mm, or resin with metal crest) on a duralumin plate (3–4 mm thick, 80–100 mm wide in the bass, 50–60 mm treble) over a slot in the iron plate, held by urethane strips 3–4 mm thick "as a kind of spring and dash pot". A ring/bimorph piezo under the plate, **one per 5–6 notes**. Aim: decay like a natural piano, mixing between strings, no static strain on the piezo |
-| US 4,084,473 | Kawai; priority 1975 | Kawai's electric piano (EP-308 family): bridge on small wood bars on rubber, metal weight to 7–10 kg "like a soundboard", 5 piezo pickups in all |
-| US 3,519,721 / 3,685,384 | Baldwin; Martin & Stein; 1968–72 | Electropiano: one aluminium transducer rail near the anchor pins, 20–25 ceramic elements for 88 notes, rail on felt |
+| US 4,084,473 | its maker; priority 1975 | its maker's electric piano (EP-308 family): bridge on small wood bars on rubber, metal weight to 7–10 kg "like a soundboard", 5 piezo pickups in all |
+| US 3,519,721 / 3,685,384 | another maker; Martin & Stein; 1968–72 | Electropiano: one aluminium transducer rail near the anchor pins, 20–25 ceramic elements for 88 notes, rail on felt |
 | US 4,044,644 | C. E. Mussulman; 1975 | 64-key soundboard-less piano, floating laminated bridge, magnetic pickups at L/8 (bass) to L/2 (top) |
 
-No patent found that names the CP-70/80 directly. The papers on pianos without boards are
+No patent found that names the smaller electric grand/80 directly. The papers on pianos without boards are
 spinet-era decay studies (an electrical spinet in a decay study cited by search results) and the
 general soundboard literature. No measurement paper on the CP itself was found.
 
 ### 5.2 Manuals
 
-- CP-80 operating manual (12–13 pp.) and CP-80 service manual (56 pp.); CP-70B operating manual
+- electric grand operating manual (12–13 pp.) and electric grand service manual (56 pp.); smaller electric grand operating manual
   (19 pp.; tuning, string replacement, voicing, regulation, overall circuit and block diagram);
-  a combined parts list CP-70/70B/80. All are on ManualsLib/Audiofanzine/elektrotanya as
+  a combined parts list smaller electric grand/70B/80. All are on ManualsLib/Audiofanzine/elektrotanya as
   **image scans**. The specs quoted here come from ManualsLib's OCR text. **The string schedule
   ("designated key and string numbers"), the tuning curve and the tone-stack values are in those
   scans, not in any text found.** Reading the scans is the single best next step for exact
@@ -473,24 +473,24 @@ general soundboard literature. No measurement paper on the CP itself was found.
 
 | Product | Method | What it says about the instrument |
 |---|---|---|
-| Pianoteq CP-80 (Modartt, 2007) | physical model | "Line output" (no mics), tremolo, amped, recording; a "Soundboarded" variant "with no real counterpart". An "original" and a "restored" version: the restored one renews the wound strings "which lacked brilliance". Users: "quite mellow, as was the original instrument we recorded" |
+| a commercial piano model electric grand (the piano-modelling forum, 2007) | physical model | "Line output" (no mics), tremolo, amped, recording; a "Soundboarded" variant "with no real counterpart". An "original" and a "restored" version: the restored one renews the wound strings "which lacked brilliance". Users: "quite mellow, as was the original instrument we recorded" |
 | GSi EG70 (2008, also in the Crumar Seven) | physical model | 131 strings, top 8 keys undamped, sympathetic resonance with the pedal, decay and release controls, 3-band EQ, tremolo/auto-pan; one voice per key |
-| Arturia CP-70 V | 8-layer samples + "modelled EQ, tremolo and output stage" | an "age" detune control |
-| Spectrasonics Keyscape, Hollow Sun CP70 | samples from the DI | "every note recorded, over a minute at lower registers" (Hollow Sun) |
-| cp80-model (GitHub, AGPL) | modal strings, nonlinear hammer, "piezo bridge-force readout", 2× oversampled | B = 2.07·10⁻³ at the bottom; unison split 0.4–2.0 c; frame resonators at 32, 38, 80, 170 Hz (fitted, not measured); tone stack and brilliance guessed; hammer felt law scaled 0.7 for "urethane/leather" |
+| a software maker smaller electric grand V | 8-layer samples + "modelled EQ, tremolo and output stage" | an "age" detune control |
+| a sample-library maker Keyscape, Hollow Sun smaller electric grand | samples from the DI | "every note recorded, over a minute at lower registers" (Hollow Sun) |
+| electricgrand-model (GitHub, AGPL) | modal strings, nonlinear hammer, "piezo bridge-force readout", 2× oversampled | B = 2.07·10⁻³ at the bottom; unison split 0.4–2.0 c; frame resonators at 32, 38, 80, 170 Hz (fitted, not measured); tone stack and brilliance guessed; hammer felt law scaled 0.7 for "urethane/leather" |
 
-All **[web]**. The cp80-model readme and specs were read as published; their numbers are fits to
+All **[web]**. The electricgrand-model readme and specs were read as published; their numbers are fits to
 samples, not measurements of an instrument. It is a useful second opinion, not a source.
 
 ## 6. What carries over from the grand model
 
-| `Piano` part (src/piano.h, research/piano.md §10–11) | CP-80 |
+| `Piano` part (src/piano.h, research/piano.md §10–11) | electric grand |
 |---|---|
 | Strings as banks of modes in registers of 16, two directions, `cs_/sn_` rotation, per-mode loss b2·f + b3·f² | **Keep.** Rebuild the scale table: 22 single + 66 double, short lengths, wound tenor bichords, B 1–2·10⁻³ in the bass |
 | `kMaxStr = 3`, unison spread 0.03–0.08 c | 2 strings max; spread 0.4–2 c, plus a small per-string B mismatch (±3–5 %) |
 | Horizontal direction (`x_[1]`, `tanH`) | The piezo reads it weakly: keep at a cross-sensitivity of 0.05–0.2, or drop for half the string cost |
 | Hammer: mass on K·δ^p with a rate term, implicit solve | **Keep**, refit: harder at small δ, lower p (leather), lighter masses |
-| Dampers, `engage`, top keys undamped (k ≥ 70) | Keep; undamped from about key 80 (CP-70: top 8) |
+| Dampers, `engage`, top keys undamped (k ≥ 70) | Keep; undamped from about key 80 (smaller electric grand: top 8) |
 | Tuning by partial matching (2:1 up, 6:3 down) | Keep the mechanism; the higher B gives the stretch by itself. Check against the manual's printed curve |
 | Bridge exchange in two exact halves (`in_`, `out_`) | **Keep the mechanism**, change what is on the other side |
 | Soundboard: 256 + 96 resonances, `phi_`, `loadR_/loadX_`, `tools/pianoboard.py` | **Remove** |
@@ -565,9 +565,9 @@ samples, not measurements of an instrument. It is a useful second opinion, not a
    keys; tuning curve against the manual's printed curve (once read).
 2. **Against DI recordings.** The CP's line output is the target: no room, no mic.
    `tools/pianofit.py` already measures per-note B, partial levels, decays and tuning from
-   isolated notes. Use it unchanged on CP-70/80 tracks where the piano is exposed. John Cale's
-   *Songs for Drella* (CP-80, mostly solo with guitar) **[web, Wikipedia]**; Genesis and Peter
-   Gabriel tracks with the CP-70 **[web, forum; which tracks: memory]**. Use only recordings the
+   isolated notes. Use it unchanged on smaller electric grand/80 tracks where the piano is exposed. John Cale's
+   *Songs for Drella* (electric grand, mostly solo with guitar) **[web, Wikipedia]**; Genesis and Peter
+   Gabriel tracks with the smaller electric grand **[web, forum; which tracks: memory]**. Use only recordings the
    user owns, measured for parameters only, as with the grand.
 3. **Targets:**
    - B per key (expect 1–2·10⁻³ in the bass, versus 4–8·10⁻⁵ on the recorded grands: a factor
@@ -583,13 +583,13 @@ samples, not measurements of an instrument. It is a useful second opinion, not a
 
 ## 8. Open questions
 
-- The CP-80 string schedule (lengths, wire and core diameters, where the wound bichords end) and
+- The electric grand string schedule (lengths, wire and core diameters, where the wound bichords end) and
   hammer data: in the service manual and parts list scans.
-- The pickup mount: does the CP-80's bridge sit on 88 bare elements on the iron (stiff, long
+- The pickup mount: does the electric grand's bridge sit on 88 bare elements on the iron (stiff, long
   sustain), or on a sprung plate as in US 4,211,139 (lossy, grand-like decay)? The measured
   decay of low partials on a DI recording decides it.
 - The tone-stack and brilliance frequencies, the preamp's own low-mid colour, and whether the
-  preamp clips softly at high levels: in the CP-70B/CP-80 circuit diagrams.
+  preamp clips softly at high levels: in the smaller electric grand circuit diagrams.
 - Felt or urethane/leather hammers on each model (the manual OCR and a technician disagree).
 - How strongly the horizontal polarisation and the longitudinal force reach the piezo.
 

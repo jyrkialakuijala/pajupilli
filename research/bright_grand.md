@@ -1,4 +1,4 @@
-# The Shigeru Kawai SK-7 as General MIDI 2 (Bright Acoustic Piano)
+# The semi-concert grand as General MIDI 2 (Bright Acoustic Piano)
 
 Status: 2026-11-20. Research first (sections 1-6), then the build plan (section 7) and what was
 built (section 8). Adds to `research/piano.md` (the concert grand, the model's base),
@@ -13,20 +13,20 @@ for the model, not claims about the instrument.
 
 ## 1. Short answers
 
-- **What it is.** Kawai's 7'6" semi-concert grand of the hand-built Shigeru line: 229 cm long,
-  157 cm wide, 102 cm high, 400 kg **[web, Kawai SK-7 page]**. Built at Kawai's Ryuyo grand
+- **What it is.** Its maker's 7'6" semi-concert grand of the hand-built line: 229 cm long,
+  157 cm wide, 102 cm high, 400 kg **[web, Kawai SK-7 page]**. Built at its maker's Ryuyo grand
   factory and finished (regulated, voiced) by its Master Piano Artisans **[web, Kawai]**. The
-  size of a Yamaha C7 (227 cm) and a Steinway C (227 cm), between a Steinway B (211 cm) and a D
+  size of a 227 cm grand (227 cm) and a 227 cm grand (227 cm), between a 211 cm grand (211 cm) and a D
   (274 cm) **[web, Steinway; memory for the C7]**.
-- **Why it fits "bright acoustic piano".** Kawai's own words are "brilliant treble, resounding
-  bass" and "second only to the SK-EX in full-bodied tone and exceptional dynamic range"
-  **[web, Kawai]**. A dealer who owns the 7' SK-6 says it "can sound as bright as a Yamaha or
-  Bechstein" when wanted, its clarity "more even across the scale" than a Steinway B's, and
+- **Why it fits "bright acoustic piano".** Its maker's own words are "brilliant treble, resounding
+  bass" and "second only to the large concert grand in full-bodied tone and exceptional dynamic range"
+  **[web, Kawai]**. A dealer who owns the 7' smaller semi-concert grand says it "can sound as bright as a one maker or
+  another maker" when wanted, its clarity "more even across the scale" than a 211 cm grand's, and
   "dynamically even throughout the range" where the B's "projection and sustain dip in the 4th
   and 5th octaves" **[web, Merriam Music]**. That is the timbre GM 2 names: a grand that is
-  clear and singing in the treble, brighter than a concert Steinway, not the glassy edge of a
+  clear and singing in the treble, brighter than a concert grand, not the glassy edge of a
   worn or lacquered hammer.
-- **Where the brightness comes from, physically.** (1) The hammers: Kawai presses its felt to a
+- **Where the brightness comes from, physically.** (1) The hammers: its maker presses its felt to a
   high compression and needles it down at the factory **[web, Kawai voicing bulletin 71-211]**:
   a firm core under a worked shoulder. Shiko Seion hammers use no heat and no chemical
   hardeners **[web, Kawai; Alamo Music]**: the firmness is in the felt itself, so it grows with
@@ -35,38 +35,38 @@ for the model, not claims about the instrument.
   ~1.5x stiffer and the low tenor ~2-3x, so their upper partials stand sharper and stronger
   against the fundamental. (3) A smaller, stiffer board: higher lowest resonances, a little less
   low fundamental from the bass; the treble's share rises. (4) How it is recorded: close.
-- **What it is not.** No measured decays, inharmonicity or spectra of an SK-7 were found (nor of
-  any Kawai grand: the literature measures Steinways and Yamahas). Its tone is described only by
+- **What it is not.** No measured decays, inharmonicity or spectra of an semi-concert grand were found (nor of
+  any its maker grand: the literature measures concert grands and other grands). Its tone is described only by
   the maker, dealers and players; the model's numbers are therefore derived from the concert
   grand's fitted ones by the physics of the differences.
 
 ## 2. The instrument as built (what is known)
 
-| Part | SK-7 | Tag |
+| Part | semi-concert grand | Tag |
 |---|---|---|
 | Size | 229 x 157 x 102 cm, 400 kg | [web, Kawai SK-7 page] |
-| Action | Millennium III ABS-Carbon: carbon-fibre-reinforced ABS parts in place of wooden ones (wippens, jacks, flanges); extended keysticks, lengthened to match those of the 9' SK-EX; concert-length key buttons; dual-pivot damper action for graded half-pedal | [web, Kawai technology page] |
+| Action | Millennium III ABS-Carbon: carbon-fibre-reinforced ABS parts in place of wooden ones (wippens, jacks, flanges); extended keysticks, lengthened to match those of the 9' large concert grand; concert-length key buttons; dual-pivot damper action for graded half-pedal | [web, Kawai technology page] |
 | Hammers | Shiko Seion ("ultimate voicing"): New Zealand and Australian long-fibre wool, hand-pressed, no heat, no artificial hardeners; double-felted on mahogany moldings; voiced by hand by Master Piano Artisans | [web, Kawai; Alamo Music; Merriam Music] |
 | Hammer pressing | "pressed for high compression of the felt", "premium high density felt", deep needling of the shoulders in two stages at the factory (the first by machine before hanging) | [web, Kawai voicing bulletin 71-211] |
-| Soundboard | solid spruce, tapered (thicker in the middle, thinner at the rim), "Kigarashi" naturally aged (no kiln, no chemicals); SK-5/6/7 only. Ezo spruce on the SK-7 and SK-EX from a small remaining stock (one dealer); Sitka on the SK-EX (another dealer): sources disagree | [web, Kawai; Alamo Music; Merriam Music] |
-| Ribs and crown | not published. Kawai crowns by rib shape on its K uprights (full-length ribs notched into the liner) | [web, Kawai K series]; [memory] that grands crown mostly by curved ribs |
-| Rim | "Konsei Katagi": a blend of small-pore hardwoods (brightness, projection) and dense large-pore ones (warmth); the SK-5 page names rock maple and mahogany. The SK-7's species are not listed | [web, Kawai; Alamo Music] |
+| Soundboard | solid spruce, tapered (thicker in the middle, thinner at the rim), "Kigarashi" naturally aged (no kiln, no chemicals); SK-5/6/7 only. Ezo spruce on the semi-concert grand and large concert grand from a small remaining stock (one dealer); Sitka on the large concert grand (another dealer): sources disagree | [web, Kawai; Alamo Music; Merriam Music] |
+| Ribs and crown | not published. Its maker crowns by rib shape on its K uprights (full-length ribs notched into the liner) | [web, Kawai K series]; [memory] that grands crown mostly by curved ribs |
+| Rim | "Konsei Katagi": a blend of small-pore hardwoods (brightness, projection) and dense large-pore ones (warmth); the SK-5 page names rock maple and mahogany. The semi-concert grand's species are not listed | [web, Kawai; Alamo Music] |
 | Beams | four, aged spruce (Sitka) | [web, Kawai SK-7 page; Kawai technology] |
 | Bridges | boxwood caps | [web, Kawai technology] |
 | Agraffes | concert agraffes machined from solid billet brass, keys 1-54; a capo bar from key 55 (G4) up | [web, Kawai SK-7 page] |
 | Duplex | front and aliquot (back) duplex scaling | [web, Kawai SK-7/SK-6 pages] |
 | Bass strings | "Temaki": copper-wound by hand | [web, Kawai] |
-| Treble wire | not published. Neither Röslau nor Mapes is named anywhere; Japanese makers commonly use Japanese wire (Suzuki) | [web: nothing found]; [memory] |
+| Treble wire | not published. Neither one wire maker nor one wire maker is named anywhere; Japanese makers commonly use Japanese wire (another maker) | [web: nothing found]; [memory] |
 | Pedals | three: damper, sostenuto, soft | [web, Kawai] |
 
 ## 3. Scale and strings (derived)
 
-Nothing of the SK-7's scale is published. Derived **[calc]** from the case lengths of grands whose
-longest string is known: Steinway S (155 cm) 116 cm **[web, forum]**; the model's D (274 cm)
+Nothing of the semi-concert grand's scale is published. Derived **[calc]** from the case lengths of grands whose
+longest string is known: 155 cm grand (155 cm) 116 cm **[web, forum]**; the model's concert grand (274 cm)
 2.01 m. A line through them (L = 0.706 x case + 0.07 m) gives **1.68 m** for 229 cm, and
 1.36 m for a 183 cm A1 (forum owners report 1.27-1.42 m). Taken: **A0 1.66 m**.
 
-| | Model grand (D-like) | SK-7 (model) | Why |
+| | Model grand (D-like) | semi-concert grand (model) | Why |
 |---|---|---|---|
 | Wound strings | keys 1-20 (A0-E2) | keys 1-20 | a 7'6" grand's break is near the D's **[memory]** |
 | A0 length | 2.01 m | 1.66 m | above |
@@ -75,25 +75,25 @@ longest string is known: Steinway S (155 cm) 116 cm **[web, forum]**; the model'
 | C3 / C4 / C5 | 1.31 / 0.695 / 0.368 m | 1.06 / 0.625 / 0.368 m | from C5 up all grands' scales nearly agree **[memory]** (piano_variants.md §3.1) |
 | B, wound (same core and tension) | 8e-5 (A0), 4.5e-5 (key 13) | x (L_D / L)^2: 1.17e-4, 6.0e-5 | B ∝ d^2 / (L^4 f^2) and T ∝ L^2 [calc] |
 | B, plain (the grand's gauge, 0.96 of it at F2 thinning less up to C5) | 5.8e-5 (F2), 3.0e-4 (C4) | 1.4e-4 (F2), 3.5e-4 (C4) | B ∝ d^2 / L^4 [calc] |
-| Strike | 0.122 to C5, to 0.07 at C8 | the same | the strike line is a hammer-line on every grand; no SK-7 figure found |
+| Strike | 0.122 to C5, to 0.07 at C8 | the same | the strike line is a hammer-line on every grand; no semi-concert grand figure found |
 
 - The duplex (front and aliquot) lengths are not modelled (as on the grand, piano.md §10).
 - The agraffes to key 54 and the capo above it: the capo bar's V-shape gives a slightly harder
   termination than an agraffe **[memory]**; not modelled.
 - Tuning: the shorter scale's higher B stretches the tuning by itself through `tuneByPartials`
   (2:1 octaves up, 6:3 down): **[calc, in the build]** the bass about 2-4 c lower and the top
-  about 3-6 c higher than the model D.
+  about 3-6 c higher than the 274 cm concert grand.
 
 ## 4. Soundboard
 
-- Kawai's board is tapered solid spruce **[web]**, as the model's (9 mm in the middle to 6 mm at
-  the rim). Whether Ezo or Sitka on a given SK-7 is not settled **[web, sources disagree]**:
-  Ezo is described as very reactive and long-sustaining ("next to Fazioli's red spruce, some of
+- its maker's board is tapered solid spruce **[web]**, as the model's (9 mm in the middle to 6 mm at
+  the rim). Whether Ezo or Sitka on a given semi-concert grand is not settled **[web, sources disagree]**:
+  Ezo is described as very reactive and long-sustaining ("next to one maker's red spruce, some of
   the longest sustain times") **[web, Merriam]**. The model keeps the grand's spruce constants.
 - Size: the case 45 cm shorter, as wide. The model board: the grand's outline kept for the first
   1.5 m from the belly rail (the treble end of all grands is alike), the tail drawn in to end at
   1.70 m instead of 2.12: **1.77 m^2, 11.4 kg** (the grand's 1.98 m^2, 12.8 kg) **[calc,
-  tools/sk7board.py]**. (First tried: the whole outline x 0.80, 1.58 m^2: the treble bridge then
+  tools/brightboard.py]**. (First tried: the whole outline x 0.80, 1.58 m^2: the treble bridge then
   ran near the bent side and single keys of the top two octaves fell 10-15 dB into dead spots,
   4.5-5 dB rms off their neighbours against the grand's 2.3.)
 - Resonances: lowest 78, 128, 174 Hz (the grand's 80, 126, 170); 256 resonances reach 2.42 kHz
@@ -104,59 +104,59 @@ longest string is known: Steinway S (155 cm) 116 cm **[web, forum]**; the model'
 
 ## 5. Hammers and action
 
-- **Hardness relative to a Steinway D.** No published hardness numbers for any maker. What is
-  documented: Kawai presses for high compression and needles down **[web, Kawai bulletin]**;
-  Steinway (New York) hangs soft hammers and brings them up with lacquer or hardener; Hamburg
-  hammers are firmer, needled down **[memory, technicians' common knowledge]**. Kawai without
+- **Hardness relative to a 274 cm concert grand.** No published hardness numbers for any maker. What is
+  documented: its maker presses for high compression and needles down **[web, Kawai bulletin]**;
+  One New York maker hangs soft hammers and brings them up with lacquer or hardener; Hamburg
+  hammers are firmer, needled down **[memory, technicians' common knowledge]**. Its maker without
   hardeners means: hard at depth, worked soft at the surface (the shoulders needled): soft blows
   stay round, loud ones bloom brighter. In the model that is a stiffer felt `K` from the middle
   up with the same nap (the needled surface) and the same hardening exponent (`colour`).
 - **Mass.** The Millennium III action replaces wooden parts with ABS-carbon but the hammers are
   felt on mahogany as on any grand: 11 g bass to ~4-5 g treble **[paper, KTH/Conklin; memory]**.
-  The SK-7's keys are long (SK-EX length) for even leverage **[web, Kawai]**: no change to the
+  The semi-concert grand's keys are long (large concert grand length) for even leverage **[web, Kawai]**: no change to the
   hammer's mass; its speed per velocity as the grand's player gives.
 - **Voicing target.** The bulletin's advice for a too-bright treble is fewer, shallower needles
-  in the high treble **[web]**: Kawai's own treble is voiced to be brilliant and is softened by
+  in the high treble **[web]**: its maker's own treble is voiced to be brilliant and is softened by
   the technician to taste: the model's treble hammers stiffer by a larger factor than the bass.
 
 ## 6. The tone as described
 
-| Quality | Said of the SK-7 / Shigeru line | Against | Source |
+| Quality | Said of the semi-concert grand / hand-built line | Against | Source |
 |---|---|---|---|
-| Brilliance | "brilliant treble"; "can sound as bright as a Yamaha or Bechstein", but also "some of the darkest tones" (the SK-6: wide palette) | Yamaha C7: bright by reputation and "heavily recorded on pop records"; CFX "on the brighter end" | [web, Kawai; Merriam; piano_variants.md] |
-| Clarity | "clean, clear tone" (credited to the billet agraffes); clarity even across the scale | Steinway B less even | [web, Kawai; Merriam] |
-| Evenness | "dynamically even throughout the range"; the treble "consistent with the rest" | B dips in octaves 4-5; Mason & Hamlin's treble less consistent | [web, Merriam] |
+| Brilliance | "brilliant treble"; "can sound as bright as a one maker or another maker", but also "some of the darkest tones" (the smaller semi-concert grand: wide palette) | 227 cm grand: bright by reputation and "heavily recorded on pop records"; large concert grand "on the brighter end" | [web, Kawai; Merriam; piano_variants.md] |
+| Clarity | "clean, clear tone" (credited to the billet agraffes); clarity even across the scale | 211 cm grand less even | [web, Kawai; Merriam] |
+| Evenness | "dynamically even throughout the range"; the treble "consistent with the rest" | B dips in octaves 4-5; another maker's treble less consistent | [web, Merriam] |
 | Sustain | "a sustain matched by only one or two other makes in the world" (Ezo board) | | [web, Merriam] (a dealer's claim) |
 | Bass | "resounding bass" | | [web, Kawai] |
-| Warmth | "very warm but also very colorful" (SK-EX); "not as clear and defined as a Bechstein or Bösendorfer" (SK-EX) | Hamburg D more blended; CFX brighter | [web, Merriam, CFX/D/SK-EX] |
-| General | Kawai "warm, even tone"; Steinway "richer, more complex, more variable" | | [web, Mark Goodwin Pianos] |
+| Warmth | "very warm but also very colorful" (large concert grand); "not as clear and defined as a another maker or another maker" (large concert grand) | Hamburg D more blended; large concert grand brighter | [web, Merriam, CFX/D/SK-EX] |
+| General | its maker "warm, even tone"; concert-grand maker "richer, more complex, more variable" | | [web, Mark Goodwin Pianos] |
 
 Reading for the model: brighter and clearer than the concert grand from the tenor up, even from
 key to key, a sustaining treble; a full but not boomy bass; not harsh (the upper partials grow
 with the blow, the soft notes stay round).
 
-**Measured numbers.** None found for the SK-7 (searches for Kawai inharmonicity, spectra, decay
-and strike-line data gave only Steinway D and Yamaha measurements) **[web: nothing]**. The model
+**Measured numbers.** None found for the semi-concert grand (searches for its maker inharmonicity, spectra, decay
+and strike-line data gave only 274 cm concert grand and one maker measurements) **[web: nothing]**. The model
 keeps the concert grand's fitted losses (piano.md §11) and changes only what the physical
 differences change.
 
-## 7. Build plan: PianoDesign, SK-7 against the concert grand
+## 7. Build plan: PianoDesign, semi-concert grand against the concert grand
 
-| Field | Grand | SK-7 | Reason |
+| Field | Grand | semi-concert grand | Reason |
 |---|---|---|---|
 | `key[].len` | 2.01 m (A0) .. 1.33 (E2); 1.90 (F2) .. 0.368 (C5) | 1.66 .. 1.16; 1.44 .. 0.368 | §3: a 229 cm case |
 | `key[].B` | stiffness(key) | wound x (L_D/L)^2; plain from the wire (gauge x 0.96 at F2 to x 1 at C5) | §3 |
 | `key[].tension, mu` | | wound: the grand's tension, mu for the pitch; plain: from the wire | |
-| `key[].K` | fitted | x 1.0 (A0) rising to x `PJ_SK7_HARD` (2.0) at key 40 and x `PJ_SK7_HARDTOP` (2.5) from key 64 | §5: high-compression felt; the treble brilliant |
-| `key[].nap` | 0.9 mm (C4) | x `PJ_SK7_NAP` (0.5; first planned 0.8) | a dense pressing, only the shoulders needled: a thinner loose layer. Measured to be the main lever (section 8) |
+| `key[].K` | fitted | x 1.0 (A0) rising to x `PJ_BRIGHTGRAND_HARD` (2.0) at key 40 and x `PJ_BRIGHTGRAND_HARDTOP` (2.5) from key 64 | §5: high-compression felt; the treble brilliant |
+| `key[].nap` | 0.9 mm (C4) | x `PJ_BRIGHTGRAND_NAP` (0.5; first planned 0.8) | a dense pressing, only the shoulders needled: a thinner loose layer. Measured to be the main lever (section 8) |
 | `key[].colour, pivot, p, mh` | | the same | no hardener: the felt's law as the grand's |
 | `key[].loss, b2, b3` | | the same | the wire is wire |
 | `strike` | | the same | no data |
-| `unisonCents` | 0.08 .. 0.03 c | the same | a Shigeru is tuned by its artisans as finely as a concert D |
+| `unisonCents` | 0.08 .. 0.03 c | the same | this grand is tuned by its artisans as finely as a concert grand |
 | `tuneByPartials` | 2:1 up, 6:3 down | the same rule, on the new B: more stretch | §3 |
-| `board` | pianoboard_data.h, 1.98 m^2 | sk7board_data.h, 1.58 m^2 | §4 (tools/sk7board.py) |
-| `boardLoss` | 1.0 | `PJ_SK7_ETA` 0.7 (planned 0.85) | the long-sustaining board and the hard rim (§4, §6): a dealer's claim, a small step |
-| `mic[]` | crossed figure-of-eights 0.65 m over the strings, 0.5 m from the belly rail | 0.30 m over the strings (`PJ_SK7_MICZ`; planned 0.35), 0.40 m from the belly rail (`PJ_SK7_MICX`), the same angle and pattern | a studio/pop grand miked close over the hammers' half of the board |
+| `board` | pianoboard_data.h, 1.98 m^2 | brightboard_data.h, 1.58 m^2 | §4 (tools/brightboard.py) |
+| `boardLoss` | 1.0 | `PJ_BRIGHTGRAND_ETA` 0.7 (planned 0.85) | the long-sustaining board and the hard rim (§4, §6): a dealer's claim, a small step |
+| `mic[]` | crossed figure-of-eights 0.65 m over the strings, 0.5 m from the belly rail | 0.30 m over the strings (`PJ_BRIGHTGRAND_MICZ`; planned 0.35), 0.40 m from the belly rail (`PJ_BRIGHTGRAND_MICX`), the same angle and pattern | a studio/pop grand miked close over the hammers' half of the board |
 | reverb send (src/ensemble.cc) | +1 dB (`PJ_PIANO_REVERB`) | the others' (0 dB) | close mics: a drier picture |
 | `seed` | 4242 | 7007 | its own unisons and tilts |
 
@@ -164,7 +164,7 @@ No EQ: the brightness is the hammers', the scale's and the board's, and the clos
 
 ## 8. As built (2026-11-20)
 
-Files: `src/sk7.h/.cc` (`sk7Design()`), `tools/sk7board.py` -> `src/sk7board_data.h`,
+Files: `src/brightgrand.h/.cc` (`brightGrandDesign()`), `tools/brightboard.py` -> `src/brightboard_data.h`,
 `src/pianoinst.cc` (`-inst bright-piano` is a `PianoModel`), `src/bassinst.cc` (the table),
 `src/midifile.cc` (GM 2 -> bright-piano, else grand-piano), `src/levels_data.h` (+4.6 dB),
 `src/velgain_data.h`, `tools/test.py` (`bright_piano()`). The concert grand renders
@@ -207,9 +207,9 @@ it at 4-8 kHz (FluidR3 -21 .. -30 dB: its samples' hammer noise and close miking
 curves (with `src/velgain_data.h`'s row) agree within 1.5 dB from 16 to 127. FluidR3's treble
 dies sooner (C5 -20 dB in 0.57 s, here 1.2 s).
 
-**Still open:** nothing of the SK-7 is measured, so its scale, felt and board are derived (sections
+**Still open:** nothing of the semi-concert grand is measured, so its scale, felt and board are derived (sections
 3-5) and the brightness is set against the grand and FluidR3, not against a recording of an
-SK-7. The duplex scale, the capo's termination, the strings' own radiation near the close
+semi-concert grand. The duplex scale, the capo's termination, the strings' own radiation near the close
 microphones and the hammers' knock are not modelled. C5 and C6 sustain a little less than the
 grand's (the shorter board's bridge), against the makers' claims of a long-singing treble.
 

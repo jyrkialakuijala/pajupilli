@@ -1,5 +1,5 @@
 // The frets as obstacles in Guitar (GuitarSpec::fretContact; research/slap_bass_1.md 5.2, 5.8;
-// slap_bass_2.md 7), on the Jazz Bass's strings: tools/test.py builds and runs this with
+// slap_bass_2.md 7), on the two-pickup bass's strings: tools/test.py builds and runs this with
 // src/guitar.cc and src/bassspec.cc and reads its "ok  " / "FAIL" lines.
 //   - stable: 2000 random thumbs, pops and plucks (every string, frets 0-17, soft to hard),
 //     every sample finite;
@@ -30,7 +30,7 @@ double ur() {
   return (rng >> 8) * (1.0 / 16777216.0);
 }
 GuitarSpec slapSpec(bool lossless) {
-  GuitarSpec g = jazzBass();
+  GuitarSpec g = twoPickupBass();
   g.fretContact = true;
   g.topHz = 10000;
   g.lossByFrequency = true;
@@ -139,7 +139,7 @@ int main() {
     check(n < 30, "frets: a gentle pop hardly touches", d);
   }
   {
-    GuitarSpec g = jazzBass();
+    GuitarSpec g = twoPickupBass();
     Guitar b(fs, g);
     b.thump(0, 4.0, 0.265, 1.3);
     int n = 0;

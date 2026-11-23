@@ -3,12 +3,12 @@
 Status: research 2026-11-19. Built (2026-11-19): the blocks of section 9 in `src/guitaramp.cc`
 (the input's resistance, the James stack exact from its parts, fixed filters after the stages, a
 per-stage swing, the output's corner, cabinets 3-5 and none, the DI with its filters, polarity, an
-allpass lining it up with the mic, the mic's delay, a SansAmp-like drive, the studio compressor
-with opto and FET modes) and the presets "b15-di" (GM 34, played by `-inst electric-bass`), "svt",
+allpass lining it up with the mic, the mic's delay, a tube-emulation drive, the studio compressor
+with opto and FET modes) and the presets "fliptop-di" (GM 34, played by `-inst electric-bass`), "bass-stack",
 "slap-di" and "slap-squash" (prepared; their basses are not built). The checks of 10.6 that need no
 P bass or slap are in `tools/bassamp.cc` and `tools/test.py` (`electric_bass_amp`); the 4.3
 cabinets' low-passes are 5-6 % higher than written (the table's numbers are the analog filters').
-Not built: the solid-state clip (6), the B-15's Ultra Low/Hi switches, the Bassman. This document covers what comes
+Not built: the solid-state clip (6), the fliptop's Ultra Low/Hi switches, the tweed 4x10 amp. This document covers what comes
 after the bass's jack. The bass itself (strings, P and J pickups, the coil and pot values, the
 techniques) is `research/bass_section.md`. The guitar amp module, its triode stages, the
 Yeh–Smith tone stack, the power stage, oversampling and the pedals are `research/electric_guitars.md`
@@ -36,21 +36,21 @@ is in section 11.
   polarity between the two, and pick the setting with the most low end **[T, Owsinski13]**. Almost
   everyone compresses bass **[T, White99]**.
 - **The amps.**
-  - **Ampeg B-15 (1x15, about 30 W).** A 1960s studio amp: two 6SL7 gain stages, then a passive
+  - **bass amp fliptop (1x15, about 30 W).** A 1960s studio amp: two 6SL7 gain stages, then a passive
     James/Baxandall bass/treble network. Its bass control gives ±10–11 dB at 40 Hz and its treble
     +18/−18…−30 dB at 5 kHz **[T, B15N-OM]**.
-  - **Ampeg SVT (300 W, 6×6550).** The rock amp. Its James stack gives bass ±12 dB at 40 Hz. It has
+  - **bass stack (300 W, 6×6550).** The rock amp. Its James stack gives bass ±12 dB at 40 Hz. It has
     an LC "midrange" control at 220/450/800/1600/3000 Hz (+10/−20 dB) and two switches: Ultra Lo
     (+2…3 dB at 40 Hz, −10…−12 dB at 500 Hz) and Ultra Hi (+8…9 dB at 8 kHz). Total gain is 67 dB
     **[T, SVT-CL; SVP-PRO]**.
-  - **Solid-state and class-D heads (GK 800RB, Markbass).** Their preamps are near-flat, with
+  - **Solid-state and class-D heads (GK 800RB, bass amp).** Their preamps are near-flat, with
     active EQ and voicing filters: a 500 Hz notch, a 200 Hz low cut and a >1 kHz shelf on the GK
-    **[T, GK800-UA]**; a +35 Hz/−380 Hz/+10 kHz "VPF" scoop on the Markbass **[S, MB-TA503]**.
+    **[T, GK800-UA]**; a +35 Hz/−380 Hz/+10 kHz "VPF" scoop on the bass amp **[S, MB-TA503]**.
 - **Headroom.** A bass amp is built to stay clean: several times a guitar amp's power, little
   preamp gain, unbypassed cathodes. When pushed, it distorts in the power stage on the attacks (the
-  SVT "growl"). It is not a preamp fuzz on every note **[L; E]**.
+  bass stack "growl"). It is not a preamp fuzz on every note **[L; E]**.
 - **The cabinet is a low-pass.**
-  - SVT-810E: ±3 dB from 58 Hz to 5 kHz, −10 dB at 40 Hz **[T, 810E]**.
+  - 8x10 bass cabinet: ±3 dB from 58 Hz to 5 kHz, −10 dB at 40 Hz **[T, 810E]**.
   - A 10" bass driver on a baffle is flat from 150 Hz to 2 kHz, rises 2–3 dB at 1–2.2 kHz, then
     falls by 30 dB by 6 kHz **[T, measured, BP102]**. A 15" falls by 30 dB by 4.5–5 kHz **[T,
     measured, CB15]**.
@@ -71,8 +71,8 @@ is in section 11.
   - a DI branch with a blend and a configurable input resistance;
   - a James/Baxandall tone stack type;
   - a peaking "mid" and fixed voicing filters;
-  - three bass cabinets (8×10 + D112, 1×15 + RE20, 4×10 + horn);
-  - a studio compressor after the blend (LA-2A-like and 1176-like);
+  - three bass cabinets (8×10 + kick-drum microphone, 1×15 + broadcast dynamic microphone, 4×10 + horn);
+  - a studio compressor after the blend (optical compressor-like and FET-like);
   - coupling corners ≤ 10 Hz for bass.
 
   Then one preset per GM program (section 10).
@@ -86,11 +86,11 @@ is in section 11.
 | Pickup + cable + pots + amp input solved as one 2nd-order section (`connect`) | `guitaramp.cc` `connect()` | Reusable. But the amp's input is hard-coded to 1 MΩ: a DI preset needs it as a parameter (140 kΩ, 1 MΩ, 10 MΩ) |
 | Compressor pedal (ratio, threshold, make-up; fixed 3 ms attack / 0.2 s release), before the preamp | `process()` | Good for a stomp compressor. Studio bass compression sits after the DI/mic blend and needs its own attack/release (section 6) |
 | Triode stages (generic 12AX7 curve: knee at +1.4 V, cut-off at −2.8 V) with HP corners, Miller LP and cathode shelves | `stage()` | Usable. Bass stages need: coupling corners ≤ 10 Hz (presets now use 10–72 Hz); a per-stage swing scale (a 12AU7 or 6SL7 with an unbypassed cathode clips far later than a 12AX7) |
-| Yeh–Smith FMV stack (Fender/Marshall) | `setTone()` | The Bassman's stack only. Ampeg uses a **James/Baxandall** passive network (section 3.1), a different circuit |
-| Power stage: soft clip with knee 2 or 3, sag 0.1 s, resonance/presence | `chain()` | Usable. The SVT: 6550s, silicon rectifier (little sag). The B-15: 5AR4 tube rectifier (more sag) **[T, B15N-OM; M for the SVT]** |
+| Yeh–Smith FMV stack (classic three-knob) | `setTone()` | The tweed 4x10 amp's stack only. bass amp uses a **James/Baxandall** passive network (section 3.1), a different circuit |
+| Power stage: soft clip with knee 2 or 3, sag 0.1 s, resonance/presence | `chain()` | Usable. The bass stack: 6550s, silicon rectifier (little sag). The fliptop: 5AR4 tube rectifier (more sag) **[T, B15N-OM; M for the SVT]** |
 | Output high-pass at 30 Hz (`hpOut_`) | `chain()` | Too high for bass: −3 dB at 30 Hz and about −1.6 dB at 41 Hz (E1) per pole. Use ≤ 10 Hz |
 | Cabinets 0–2 (12" guitar speakers) | constructor | Bass needs its own (section 4) and a "none" (DI) |
-| 4x oversampling, ADAA | | Needed only when a preset drives the stages (SVT growl, Slap 2 grit) |
+| 4x oversampling, ADAA | | Needed only when a preset drives the stages (bass stack growl, Slap 2 grit) |
 
 ---
 
@@ -111,7 +111,7 @@ is in section 11.
 - **Polarity and time.** "ALWAYS check the phase relationship between the amp and DI". Flip the
   polarity of one and keep the setting with the most low end **[T, Owsinski13; T, White99]**. Or
   slide the mic track to line up with the DI **[S, SOS/Anderton]**.
-- **Mic choice.** Large-diaphragm dynamics: AKG D112, Electro-Voice RE20, Shure Beta 52 **[T,
+- **Mic choice.** Large-diaphragm dynamics: kick-drum dynamic microphone, broadcast dynamic microphone, supercardioid kick microphone **[T,
   Owsinski13]**. Avoid vocal dynamics with a low roll-off unless they touch the grille **[T,
   White99]**.
 - **Position.** Pick the best-sounding speaker of the cabinet. Start a couple of inches from the
@@ -124,29 +124,29 @@ is in section 11.
 
 | GM | Typical record sound | Chain |
 |---|---|---|
-| 34 Fingered | 1960s–70s soul/pop: DI (Motown: "the vast majority of Motown recordings were DIed", into a custom tube DI **[S, Jamerson]**); 70s–90s pop/rock: DI + B-15 or SVT, blended | Jazz or Precision → DI ± B-15 → compressor (often an LA-2A or a Fairchild **[S, Jamerson: Fairchild + Pultec]**) |
-| 35 Picked | Rock: a P with a pick into an SVT and an 8×10, miked, plus a DI | P → SVT → 8×10 + D112/RE20; DI blended; 1176 |
+| 34 Fingered | 1960s–70s soul/pop: DI (Motown: "the vast majority of Motown recordings were DIed", into a custom tube DI **[S, Jamerson]**); 70s–90s pop/rock: DI + fliptop or bass stack, blended | Jazz or Precision → DI ± fliptop → compressor (often an optical compressor or a Fairchild **[S, Jamerson: Fairchild + Pultec]**) |
+| 35 Picked | Rock: a P with a pick into a bass stack and an 8×10, miked, plus a DI | P → bass stack → 8×10 + kick-drum microphone/RE20; DI blended; FET compressor |
 | 36 Fretless | 1970s–80s jazz-fusion and pop: a J fretless with the bridge pickup, DI-heavy, often chorus and reverb; Jaco's Acoustic 360/361 **[S, Wiki-Acoustic for the rig]** | In this project GM 36 stays on the double bass (`bass_section.md` §10) |
-| 37 Slap 1 | Funk/fusion 1975–90: a J with both pickups, DI-dominant (the clank must survive), bright, scooped | J → active DI (often a bass with an active preamp) ± a solid-state head (GK) with a 4×10 + horn; 1176 |
-| 38 Slap 2 | "More compressed, squashed" **[S, Soundhouse, via bass_section.md §6.4]** | as 37, heavier compression, brighter, a little SansAmp-style grit |
+| 37 Slap 1 | Funk/fusion 1975–90: a J with both pickups, DI-dominant (the clank must survive), bright, scooped | J → active DI (often a bass with an active preamp) ± a solid-state head (GK) with a 4×10 + horn; FET compressor |
+| 38 Slap 2 | "More compressed, squashed" **[S, Soundhouse, via bass_section.md §6.4]** | as 37, heavier compression, brighter, a little tube-emulation DI-style grit |
 
 ### 2.3 Live (for completeness)
 
 - **The DI is taken before or after the amp's preamp** (the "pre/post EQ" DI out on most heads). A
-  SansAmp Bass Driver DI is used as an "amp-in-a-box" straight into the desk **[T, BSDR]**.
+  tube-emulation DI Bass Driver DI is used as an "amp-in-a-box" straight into the desk **[T, BSDR]**.
 - Compression live: lower ratios and less gain reduction than in the studio **[L]**.
 
 ---
 
 ## 3. Classic bass amps, with circuit values
 
-### 3.1 The Ampeg B-15N Portaflex (flip-top), 1960s
+### 3.1 The fliptop bass amp Portaflex (flip-top), 1960s
 
-- **Schematic** (B-15-N, 1968, drawn by J. Piazza **[T, Piazza-B15N68]**; channel one):
+- **Schematic** (fliptop-N, 1968, drawn by J. Piazza **[T, Piazza-B15N68]**; channel one):
   - **Input:** "Bright" jack through 100 kΩ ‖ 5000 pF (0.005 µF), "Normal" through 47 kΩ; a grid
     leak of 5.6 MΩ.
-  - **V1a (6SL7):** plate 470 kΩ, cathode 5.6 kΩ *unbypassed*. Ampeg's 470 kΩ plate resistor and
-    higher voltages, against Fender's usual 100 kΩ, are what set it apart **[S, forum via search]**.
+  - **V1a (6SL7):** plate 470 kΩ, cathode 5.6 kΩ *unbypassed*. the bass amp's 470 kΩ plate resistor and
+    higher voltages, against the American amp's usual 100 kΩ, are what set it apart **[S, forum via search]**.
   - **Coupling and Ultra Low:** 0.1 µF from the plate, then 0.01 µF in series into the 1 MΩ volume
     pot. A shunt leg of 0.02 µF + 39 kΩ + 1 MΩ to ground; the **Ultra Low** switch shorts the 1 MΩ.
   - **Ultra Hi:** 500 pF across the volume pot (a bright cap).
@@ -159,7 +159,7 @@ is in section 11.
     transformer; a 5AR4 rectifier.
   - The Heritage reissue has three 12AX7s, two 6L6GCs and a 5AR4. Its "1964" channel is cathode
     bias, 25 W; its "1966" channel is fixed bias, 30 W **[T, B15N-OM]**.
-- **Published control ranges** (Heritage B-15N) **[T, B15N-OM]**:
+- **Published control ranges** (Heritage fliptop bass amp) **[T, B15N-OM]**:
   - 1964 channel: bass ±10 dB at 40 Hz, treble ±18 dB at 5 kHz;
   - 1966 channel: bass ±11 dB at 40 Hz, treble +18/−30 dB at 5 kHz;
   - both: "flattest at the centre position".
@@ -178,20 +178,20 @@ is in section 11.
     the noon setting. That agrees with the manual's ±10–11 dB and +18 dB.
   - The stack costs 23 dB "flat", against the FMV stack's 10–20 dB (electric_guitars.md §11.3).
   - Unlike the FMV, the Baxandall is flat at noon: no built-in mid scoop. That is the main tonal
-    difference from a Fender bass channel.
+    difference from an American amp bass channel.
 - **Ultra Low** (0.02 µF + 39 kΩ to ground when switched) **[E]**: above about 200 Hz the
   0.01 µF series cap is a short. The 39 kΩ then forms a divider with the plate's ~40 kΩ source:
   about −6 dB for everything above ~200 Hz, the bass untouched. A +6 dB low shelf, relative.
 - **Where it distorts:** a 6SL7 with an unbypassed 5.6 kΩ cathode has volts of grid swing before
-  it conducts. The 30 W power stage (with a tube rectifier) is where a B-15 breaks up when played
+  it conducts. The 30 W power stage (with a tube rectifier) is where a fliptop breaks up when played
   loud **[E; L]**.
 - **Cabinet:** a 1x15 in a closed, double-baffle Portaflex box. From 1965 a single baffle, which
   changed the response "slightly" **[S, TalkBass; Premier Guitar via search]**. No measured
   response was found (section 4.3).
 
-### 3.2 The Ampeg SVT (1969–)
+### 3.2 The bass stack (1969–)
 
-- **Specifications, SVT-CL** **[T, SVT-CL]**:
+- **Specifications, bass stack-CL** **[T, SVT-CL]**:
   - Bass ±12 dB at 40 Hz.
   - Midrange +10/−20 dB at 220 Hz, 450 Hz, 800 Hz, 1.6 kHz or 3 kHz (a five-position selector).
   - Treble +15/−20 dB at 4 kHz.
@@ -201,11 +201,11 @@ is in section 11.
   - Total system gain 67 dB at 1 kHz "with levels up and tones flat"; −3 dB at 40 Hz and 15 kHz.
   - 300 W RMS minimum at < 3 % THD into 2 or 4 Ω, with 0.4 V rms at the power amp input.
   - Tubes: 12AX7 (3), 12AU7 (2), 6550 (6). A −15 dB input for active basses.
-- **The SVP-PRO/SVT-2PRO preamps** **[T, SVP-PRO; SVT2PRO]**: bass ±12 dB at 40 Hz; mid
+- **The rack bass preamps** **[T, SVP-PRO; SVT2PRO]**: bass ±12 dB at 40 Hz; mid
   +12/−15 dB at the same five frequencies; treble ±12 dB at 4 kHz; Ultra Low +3 dB at 40 Hz and
   −12 dB at 500 Hz; Ultra High +8 dB at 8 kHz; Bright +7 dB at 2 kHz; a 9-band graphic (40, 90,
   180, 300, 500, 1k, 2k, 4k, 10 kHz, ±12 dB). Total gain 76 dB; −3 dB at 30 Hz and 15 kHz.
-- **The 1972 SVT preamp** (Piazza's drawing **[T, Piazza-SVT72]**; channel one):
+- **The 1972 bass stack preamp** (Piazza's drawing **[T, Piazza-SVT72]**; channel one):
   - **Input:** "Bright" through 100 kΩ ‖ 470 pF, "Normal" through 47 kΩ; a 5.6 MΩ grid leak.
   - **V1 (12DW7):** one triode as a gain stage (plate 220 kΩ, cathode 3.3 kΩ unbypassed),
     DC-coupled into the other as a cathode follower (47 kΩ).
@@ -236,7 +236,7 @@ is in section 11.
 | treble zero | | | | | −21.2 | −20.6 | −21.4 | −24.7 | −27.5 |
 
   - So bass +18/−13 dB at 30–40 Hz, and treble +4.8 dB at 4 kHz, +9.5 at 8 kHz and +12.5 at 12 kHz.
-    The 1972 treble is a higher shelf than the SVT-CL's "4 kHz" one, and the two circuits differ.
+    The 1972 treble is a higher shelf than the bass stack-CL's "4 kHz" one, and the two circuits differ.
   - With **linear** pots at mid-rotation (the drawing marks only the volume "lin.") the same
     network would scoop 11 dB at 700 Hz. A builder must use the audio taper or the design ratio
     (9 % at noon) to get "flat at the centre".
@@ -251,12 +251,12 @@ is in section 11.
   target.
 - **Where it distorts:**
   - Very little preamp gain before the volume: one 12AU7-like stage, ~13× **[E]**.
-  - The six 6550s are where an SVT "growls" when the master is up **[L]**.
+  - The six 6550s are where a bass stack "growls" when the master is up **[L]**.
   - Total gain 67 dB **[T]**, against 300 W into 4 Ω = 34.6 V rms. Full power then needs about
     15 mV rms at the input with everything up **[E]**. Normal settings keep a passive bass's
     0.1–1 V peaks **[M]** well inside the clean range until the master is high.
 
-### 3.3 The Fender Bassman, blackface/silverface (AB165, AA864…), bass channel
+### 3.3 The American amp tweed 4x10 amp, blackface/silverface (AB165, AA864…), bass channel
 
 - **What is known:**
   - Two 12AX7 gain stages in the bass channel, sharing a 25 µF / 1.5 kΩ cathode network; a 12AT7
@@ -267,7 +267,7 @@ is in section 11.
     capacitors are disputed on forums: 0.1 µF, 0.047 µF or 0.25 µF **[S]**.
 - **So:** the module's FMV stack with blackface-like values, a fixed mid (R3 = 6.8 kΩ, m = 1),
   larger bass caps (0.1 µF) and a Deep switch as a low shelf. This is [E] and not verified.
-- The '59 Bassman (4×10) is in electric_guitars.md §11.3; it was a bass amp first.
+- The late-1950s tweed (4×10) is in electric_guitars.md §11.3; it was a bass amp first.
 
 ### 3.4 Acoustic 360/361 (1968–)
 
@@ -279,7 +279,7 @@ is in section 11.
 - **Not found:** the 360's tone controls, their frequencies, and the "Variamp" and fuzz circuits.
   A preset would be guesswork; skip it (GM 36 stays on the double bass anyway).
 
-### 3.5 Solid state: Gallien-Krueger 800RB (1980s–)
+### 3.5 Solid state: bass amp 800RB (1980s–)
 
 - **Controls** (from the licensed emulation's manual **[T, GK800-UA]**; the hardware's own manual
   was not read):
@@ -296,7 +296,7 @@ is in section 11.
   - Its distortion is solid-state (op-amp and transistor clipping). It is harder-kneed than the
     triode curve **[M]**.
 
-### 3.6 Modern class-D heads (Markbass and kin)
+### 3.6 Modern class-D heads (bass amp and kin)
 
 - **What they are:** a near-flat preamp and a 4-band EQ **[L]**, with two filters **[S,
   MB-TA503]**:
@@ -309,13 +309,13 @@ is in section 11.
 
 ### 3.7 Bass amp against guitar amp: what to carry into the presets
 
-| | Guitar amp (Twin, JCM800) | Bass amp (B-15, SVT, GK) |
+| | Guitar amp (Twin, British crunch stack) | Bass amp (fliptop, bass stack, GK) |
 |---|---|---|
 | Preamp gain before the stack | 2 × 12AX7 at ~40× each; a cascade of four in high gain | One or two stages at ~13–37× with unbypassed cathodes; or op amps **[E, from the values]** |
-| Stack | FMV: a built-in mid scoop | Baxandall (flat at noon) plus a separate tuned mid (SVT, GK); or the FMV with a fixed mid (Bassman) |
-| Power | 20–100 W | 30 W (B-15) to 300 W (SVT) and more (solid state) |
+| Stack | FMV: a built-in mid scoop | Baxandall (flat at noon) plus a separate tuned mid (bass stack, GK); or the FMV with a fixed mid (tweed 4x10 amp) |
+| Power | 20–100 W | 30 W (fliptop) to 300 W (bass stack) and more (solid state) |
 | Low corners | coupling caps keep the bass *out* (a tight chug) | coupling corners of 1.6–16 Hz (0.1 µF/1 MΩ … 0.01 µF/1 MΩ) **[E, from the values]** |
-| Where it distorts | preamp stages | power stage, on attacks; or a dedicated drive (SansAmp, Darkglass, the GK's boost) |
+| Where it distorts | preamp stages | power stage, on attacks; or a dedicated drive (tube-emulation DI, bass preamp, the GK's boost) |
 | Speaker | 12", passes to 5 kHz, presence peaks 2–3 kHz | 10" or 15", falls by 30 dB by 5–6 kHz (section 4) |
 
 ---
@@ -333,22 +333,22 @@ is in section 11.
   - a rise to 94 dB at 1–2 kHz with a peak of 95.5 dB at 2.2 kHz;
   - then a steep fall: 85 dB at 2.8 kHz, 78 dB at 3.5–4 kHz, ~60 dB at 6–7 kHz (−32 dB);
   - breakup peaks of ~66 dB at 8–12 kHz.
-- **SVT-810E (8×10, sealed, two chambers)** **[T, 810E manual]**: ±3 dB from 58 Hz to 5 kHz;
+- **8x10 bass cabinet (8×10, sealed, two chambers)** **[T, 810E manual]**: ±3 dB from 58 Hz to 5 kHz;
   "usable low frequency (−10 dB) 40 Hz"; 4 Ω mono; 800 W; 2" voice coils; 100 dB sensitivity
   **[S]**. The Heritage version uses Eminence drivers **[S]**.
-- **SVT-410HLF (4×10 + horn, ported)** **[S, retailer spec sheets]**: −3 dB from 48 Hz to 18 kHz;
+- **bass stack-410HLF (4×10 + horn, ported)** **[S, retailer spec sheets]**: −3 dB from 48 Hz to 18 kHz;
   a 1" horn crossed over at 4 kHz, with an L-pad; 500 W, 4 Ω.
 
-### 4.2 The 15" driver (as in the B-15)
+### 4.2 The 15" driver (as in the fliptop)
 
-- **Eminence Legend CB15 (a 15" bass driver, for scale)** **[T, CB15 data sheet]**: Fs 34 Hz,
+- **A typical 15-inch driver (a 15" bass driver, for scale)** **[T, CB15 data sheet]**: Fs 34 Hz,
   Qts 0.34, 98 dB, "usable 47 Hz – 3 kHz". Its curve **[T, measured; E reading]**:
   - flat at 98 dB from 150 to 400 Hz;
   - a small dip of −1.5 dB at ~600 Hz;
   - +2 dB at 1–1.5 kHz and a peak of +5.5 dB at ~2 kHz;
   - −10 dB at 3 kHz and a cliff of −30 dB at 4.5–5 kHz.
-- **Ampeg's modern Portaflex 1x15s** **[S]**: PF-115HE 44 Hz–17 kHz (with a horn), 99 dB; PF-115LF
-  57 Hz–3.7 kHz. The 1960s B-15's own speaker (CTS, Jensen, Eminence, Altec in various years
+- **the bass amp's modern Portaflex 1x15s** **[S]**: PF-115HE 44 Hz–17 kHz (with a horn), 99 dB; PF-115LF
+  57 Hz–3.7 kHz. The 1960s fliptop's own speaker (CTS, Jensen, Eminence, Altec in various years
   **[S, Reverb listing]**): no data.
 
 ### 4.3 Proposed cabinet filters (base rate, RBJ biquads as in `guitaramp.cc`)
@@ -358,8 +358,8 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 
 | Cabinet | Biquads (type, f, Q, dB) | Result: 40 Hz / 58 / 100 / 450 / 2 k / 3 k / 4 k / 5 k / 6 k / 8 k |
 |---|---|---|
-| **3: SVT 8×10 sealed, D112 at ~5 cm off-centre** | HP 60/0.8; HP 40/0.6; peak 95/1.0/+3; peak 470/1.4/−3; peak 2000/2.5/+5; LP 2300/1.0; LP 2900/0.7; peak 4000/2.0/+3 (the mic's presence) | −11.4 / −3.3 / +1.9 / −3.1 / +4.9 / −4.7 / −11.7 / −20.4 / −27.1 / −35.7 |
-| **4: B-15 1×15 ported, RE20 at ~15 cm** | HP 44/1.0; HP 38/0.7; peak 600/1.5/−2; peak 1900/3.0/+7; LP 2200/1.1; LP 2800/0.7 | −3.8 / +0.3 / +0.5 / −1.0 / +6.8 / −6.2 / −15.4 / −22.9 / −28.8 / −38.1 |
+| **3: bass stack 8×10 sealed, kick-drum microphone at ~5 cm off-centre** | HP 60/0.8; HP 40/0.6; peak 95/1.0/+3; peak 470/1.4/−3; peak 2000/2.5/+5; LP 2300/1.0; LP 2900/0.7; peak 4000/2.0/+3 (the mic's presence) | −11.4 / −3.3 / +1.9 / −3.1 / +4.9 / −4.7 / −11.7 / −20.4 / −27.1 / −35.7 |
+| **4: fliptop 1×15 ported, broadcast dynamic microphone at ~15 cm** | HP 44/1.0; HP 38/0.7; peak 600/1.5/−2; peak 1900/3.0/+7; LP 2200/1.1; LP 2800/0.7 | −3.8 / +0.3 / +0.5 / −1.0 / +6.8 / −6.2 / −15.4 / −22.9 / −28.8 / −38.1 |
 | **5: 4×10 + horn ported, mic between cone and horn** | HP 48/1.0; HP 35/0.6; peak 500/1.4/−2; peak 1800/2.0/+2.5; LP 2600/0.8 (the woofers); high shelf 3800/0.9/+12 (the horn, L-pad mid); LP 14000/0.7 | −5.5 / −0.4 / +0.4 / −1.7 / +1.6 / −0.4 / −0.7 / −1.6 / −3.5 / −8.6 |
 | **−1: none (DI only)** | — | flat |
 
@@ -367,16 +367,16 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
   it would matter only for a pick's click through a miked amp. A designed 30–50 ms minimum-phase
   FIR could add it later (electric_guitars.md §11.5).
 - **The low end of the miked path is the cabinet, not the amp:** the 810's −10 dB at 40 Hz means
-  the miked SVT has little E1 fundamental. On record the low fundamental comes from the DI. This is
+  the miked bass stack has little E1 fundamental. On record the low fundamental comes from the DI. This is
   why blends are standard.
 
 ### 4.4 Microphones
 
 | Mic | Published | Use on bass cabinet |
 |---|---|---|
-| Electro-Voice RE20 | 45 Hz–18 kHz; **Variable-D: proximity effect eliminated** **[T, RE20]** | the flat choice; little change with distance **[E]** |
-| AKG D112 | 20 Hz–20 kHz ±10 dB, 40 Hz–17 kHz ±3 dB **[S, D112 spec sheet]**; a presence lift near 4 kHz and a low-mid bump **[M]** | close, off-centre |
-| Shure Beta 52A | 20 Hz–10 kHz, supercardioid **[S, Beta52]**; a presence peak near 4 kHz and a strong proximity bump at a few cm **[M]** | close |
+| broadcast dynamic microphone | 45 Hz–18 kHz; **Variable-D: proximity effect eliminated** **[T, RE20]** | the flat choice; little change with distance **[E]** |
+| kick-drum dynamic microphone | 20 Hz–20 kHz ±10 dB, 40 Hz–17 kHz ±3 dB **[S, D112 spec sheet]**; a presence lift near 4 kHz and a low-mid bump **[M]** | close, off-centre |
+| supercardioid kick microphone | 20 Hz–10 kHz, supercardioid **[S, Beta52]**; a presence peak near 4 kHz and a strong proximity bump at a few cm **[M]** | close |
 
 - **Proximity effect** of a cardioid dynamic at 2–5 cm: +6…+12 dB at 100 Hz relative to 1 kHz
   **[M]**. It partly undoes the sealed box's low cut. Moving the mic away trades it for room.
@@ -399,7 +399,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 | Jensen JT-DB-E (the transformer) | 140 kΩ **[T, JT-DB-E via search]**; 200k:1.5k in Jensen's selector guide **[S]** | Bessel-tailored HF **[S]** | 12:1 step-down |
 | Active DI (Countryman, Radial J48, Avalon…) | ~1–10 MΩ **[M]** | flat | |
 | Radial PZ-DI | switchable 220 k / 1 M / 10 MΩ **[S, PZDI-bonedo]** | | a bonedo test found 220 k and 1 M thinner in the bass, more upper mid and top, and 10 MΩ "noticeably more balanced" on a passive bass; little difference on an active bass **[S]** |
-| Tech 21 SansAmp Bass Driver DI | 1 MΩ **[T, BSDR]** | | see 5.3 |
+| Tech 21 tube-emulation DI Bass Driver DI | 1 MΩ **[T, BSDR]** | | see 5.3 |
 | Bass amps' inputs | 1 MΩ (GK **[S]**; tube amps' 1–5.6 MΩ grid leaks **[T, the drawings]**) | | |
 | A mixer's line or mic input | 1.5–10 kΩ **[M]** | | White: "an impedance mismatch and poor results" **[T, White99]** |
 
@@ -431,10 +431,10 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 - **Into a line input:** −6 dB at 1 kHz on the P. The classic mistake, and a recognisably dull and
   weak sound.
 - **For the model:** `connect()` takes the input resistance as a parameter. Presets use 10 MΩ
-  (active DI), 1 MΩ (amp, SansAmp) or 140 kΩ (JDI). With an active DI *and* an amp on a splitter,
+  (active DI), 1 MΩ (amp, tube-emulation DI) or 140 kΩ (JDI). With an active DI *and* an amp on a splitter,
   the pickup sees both in parallel (1 MΩ ‖ 10 MΩ ≈ 0.9 MΩ) **[E]**.
 
-### 5.3 The SansAmp Bass Driver DI (1994–), the common "amp in a box"
+### 5.3 The tube-emulation DI Bass Driver DI (1994–), the common "amp in a box"
 
 - **Controls and input** (v1 **[T, BSDR]**):
   - 1 MΩ input.
@@ -448,7 +448,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 - **v2** **[T, BSDRv2]**: adds Mid (±12 dB, shift 500 Hz / 1000 Hz). The bass shifts 40 Hz /
   80 Hz.
 - **Not found:** the treble's frequency, and the shape of its clipper.
-- **In this project:** a SansAmp is a drive block, i.e. a pre-EQ, a soft clipper and a speaker-like
+- **In this project:** a tube-emulation DI is a drive block, i.e. a pre-EQ, a soft clipper and a speaker-like
   post-EQ, with a dry/wet blend **[E]**. Build it from the existing blocks:
   - one triode-like or diode stage with a high-pass before it (so the lows stay cleaner);
   - a post low-pass ~5 kHz;
@@ -456,7 +456,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 
 ### 5.4 Overdrive pedals, briefly
 
-- **Darkglass B3K/B7K:**
+- **bass preamp B3K/B7K:**
   - A blend of a clean path with a clipped path. A "Grunt" switch sets how much low end goes into
     the clipper, an "Attack" switch the same for treble **[S, PG review; retailers]**.
   - The B7K Ultra has a 4-band EQ, ±12 dB, with three selectable frequencies for each of the two
@@ -481,17 +481,17 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 
 | Unit | Attack | Release | Ratio | Use on bass |
 |---|---|---|---|---|
-| UREI/UA 1176LN (FET) | 20–800 µs | 50 ms–1.1 s | 4, 8, 12, 20:1 **[S, UA manual via search]** | 4:1, slow attack (the 800 µs end), fast release **[S, MF hub]**; 8:1 driven hard for a passive bass **[S]**; 1176 then LA-2A in series "the most common" **[S, forum]** |
-| Teletronix LA-2A (optical) | ~10 ms | ~60 ms to 50 %, then 0.5–5 s (program-dependent; "1–15 s" elsewhere in the original manual) **[S, UA; VintageKing]** | ~3:1 in Compress **[S]** | smoothing, 3–6 dB |
+| FET compressor | 20–800 µs | 50 ms–1.1 s | 4, 8, 12, 20:1 **[S, UA manual via search]** | 4:1, slow attack (the 800 µs end), fast release **[S, MF hub]**; 8:1 driven hard for a passive bass **[S]**; FET compressor then optical compressor in series "the most common" **[S, forum]** |
+| optical optical compressor (optical) | ~10 ms | ~60 ms to 50 %, then 0.5–5 s (program-dependent; "1–15 s" elsewhere in the original manual) **[S, UA; VintageKing]** | ~3:1 in Compress **[S]** | smoothing, 3–6 dB |
 | General starting point | medium-fast | medium | 2:1–5:1 **[S, MF hub]**; "usually 3:1" **[S]** | |
 
 - **Physics that limits the settings** **[E]**:
   - E1's period is 24 ms and B0's (5-string) 32 ms.
   - A gain that moves within one period modulates the waveform, which is audible distortion of
     the low note.
-  - So the release should be ≳ 50 ms (the 1176's fastest), and the detector must not follow the
+  - So the release should be ≳ 50 ms (the FET compressor's fastest), and the detector must not follow the
     waveform: an RMS or a smoothed peak detector, with ≥ 10 ms of smoothing.
-  - The fast 1176 attack is safe because it acts on the attack and then holds.
+  - The fast FET compressor attack is safe because it acts on the attack and then holds.
 - **The existing pedal compressor** (3 ms attack, 0.2 s release, before the preamp) is an OTA
   stomp box. It suits Slap 2's "squashed" sound in front of the amp. The studio compressor belongs
   after the DI/amp blend.
@@ -527,14 +527,14 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 - Each program decays 3–7 dB/s through the 2 s hold; no note-to-note decay structure (sample
   splits only).
 
-### 7.2 SC-55/88 and XG
+### 7.2 early GS module/88 and XG
 
 - **Not measured** (no hardware or ROM here).
-- **Names:** SC-55: "Fingered Bs.", "Picked Bs.", "Fretless Bs.", "Slap Bass 1", "Slap Bass 2"
+- **Names:** early GS module: "Fingered Bs.", "Picked Bs.", "Fretless Bs.", "Slap Bass 1", "Slap Bass 2"
   **[M]**. GS adds variations under program 37 (counting from 0): "Slap Pop", "Reso Slap",
   "Unison Slap" **[S, via bass_section.md]**.
 - **How Slap 2 differs:** "more compressed, squashed", with velocity driving the filter **[S,
-  Soundhouse snippet]**. That is the only primary-ish description found. So on Roland sets velocity
+  Soundhouse snippet]**. That is the only primary-ish description found. So on one maker sets velocity
   may open a filter, unlike FluidR3.
 
 ---
@@ -544,7 +544,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
 1. **Too much top in the miked path.** A 10" or 15" cabinet is −20 dB at 5 kHz (4.3). A bass amp
    without its cabinet, or with a 12" guitar cabinet, sounds fizzy and buzzy on every note. The
    pick click and fret noise turn harsh.
-2. **No click at all in a slap.** If everything goes through a B-15 or 8×10 and nothing direct,
+2. **No click at all in a slap.** If everything goes through a fliptop or 8×10 and nothing direct,
    the 4–5 kHz fret clatter (bass_section.md §6.3) is gone and the slap turns into a thud. Slap
    needs the DI, or a horn.
 3. **Thin bottom.** Stacked high-pass corners: the guitar presets' 18–35 Hz couplings plus the
@@ -558,7 +558,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
    near equal **[E]**.
 6. **Distortion in the wrong place.** Preamp clipping on every note (a guitar amp's behaviour)
    puts intermodulation on the fundamental: "farting" lows, dirty double stops. A bass amp should
-   be clean at moderate levels and growl only on hard attacks, from the power stage (SVT) or a
+   be clean at moderate levels and growl only on hard attacks, from the power stage (bass stack) or a
    dedicated drive with the lows kept clean.
 7. **Pumping or a warbling low note.** A compressor release under ~50 ms, or a detector that
    follows the waveform, modulates a 41 Hz note. Too slow a release on a staccato line ducks the
@@ -570,7 +570,7 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
    (−6…−12 dB at 1–2 kHz) sounds dull and weak. A pickup simulated without its pots and cable
    rings unnaturally at 5–10 kHz.
 10. **Hum and noise.** A single J pickup alone hums (mains and harmonics); both up cancels
-    (bass_section.md §3.1). An SVT at volume hisses. Their absence is not noticed; a wrong presence
+    (bass_section.md §3.1). A bass stack at volume hisses. Their absence is not noticed; a wrong presence
     is.
 
 ---
@@ -593,21 +593,21 @@ targets come from 4.1 and 4.2, plus a close dynamic mic's proximity bump and pre
      - derive the closed-form rational once (sympy) as `tools/clavtone.py` did for its stack, and
        emit it as code.
    - **A cheaper approximation** (the shelves' corners from 3.1 and 3.2's tables) **[E]**:
-     - SVT: bass = low shelf, half its boost at ~230 Hz, +18/−13 dB at the extremes;
-     - SVT: treble = high shelf, half at ~6 kHz, +12.5/−6 dB at 12 kHz;
-     - B-15: treble half at ~1.5 kHz, +19/−25 dB at 12 kHz.
+     - bass stack: bass = low shelf, half its boost at ~230 Hz, +18/−13 dB at the extremes;
+     - bass stack: treble = high shelf, half at ~6 kHz, +12.5/−6 dB at 12 kHz;
+     - fliptop: treble half at ~1.5 kHz, +19/−25 dB at 12 kHz.
 4. **Peaking mid and fixed voicings.**
-   - SVT mid: 220/450/800/1600/3000 Hz, +10/−20 dB, Q ≈ 1 **[E]**.
-   - SVT Ultra Lo: low shelf +2…3 dB at 40 Hz and a −10…−12 dB peak at 500 Hz, Q ≈ 0.7.
-   - SVT Ultra Hi: high shelf, +8…9 dB at 8 kHz.
-   - B-15 Ultra Low: +6 dB low shelf below ~200 Hz.
+   - bass stack mid: 220/450/800/1600/3000 Hz, +10/−20 dB, Q ≈ 1 **[E]**.
+   - bass stack Ultra Lo: low shelf +2…3 dB at 40 Hz and a −10…−12 dB peak at 500 Hz, Q ≈ 0.7.
+   - bass stack Ultra Hi: high shelf, +8…9 dB at 8 kHz.
+   - fliptop Ultra Low: +6 dB low shelf below ~200 Hz.
    - GK: Lo Cut (HP 200 Hz), Mid Contour (notch ~500 Hz), Hi Boost (shelf above 1 kHz), and four
      bands at 60/250/1k/4k Hz.
-   - Markbass VPF: +35 Hz shelf, −380 Hz peak, +10 kHz shelf, scaled by one knob.
+   - bass amp VPF: +35 Hz shelf, −380 Hz peak, +10 kHz shelf, scaled by one knob.
 5. **A per-stage swing.** A stage's grid range scaled (12AU7 or 6SL7 with an unbypassed cathode:
    ×3–5 the 12AX7's), so bass presets clip where their tubes do **[E]**. And corners: `hp` ≤ 10 Hz,
    `hpOut_` ≤ 10 Hz for bass presets.
-6. **A solid-state clip** (for the GK boost and the SansAmp-like drive): symmetric, harder knee
+6. **A solid-state clip** (for the GK boost and the tube-emulation drive): symmetric, harder knee
    (`knee` = 6 or a tanh) **[E]**.
 7. **Cabinets 3, 4, 5 and −1** as in 4.3.
 8. **The studio compressor**, after the blend:
@@ -633,13 +633,13 @@ Common to all:
 Levels are written as the existing presets do: stage gains, the volume pot's share, the master,
 the clip voltage. All numbers are **[E]** unless marked.
 
-### 10.1 GM 34 Electric Bass (finger): "b15-di"
+### 10.1 GM 34 Electric Bass (finger): "fliptop-di"
 
 - **Bass:** J, both pickups (neck a little stronger), fingerstyle (bass_section.md §10).
-- **Splitter:** an active DI (10 MΩ) and the B-15's input in parallel: `inputR` 0.9 MΩ.
+- **Splitter:** an active DI (10 MΩ) and the fliptop's input in parallel: `inputR` 0.9 MΩ.
 - **DI path:** flat; a gentle high shelf −2 dB above 5 kHz (the engineers' "roll off the top"
   **[T, White99]**).
-- **Amp path: the B-15N 1966 channel.**
+- **Amp path: the fliptop bass amp 1966 channel.**
   - Stage 1: 6SL7, gain 30, hp 3 Hz, swing ×4.
   - Volume share 0.15.
   - Stage 2: gain 30, hp 16 Hz, swing ×4.
@@ -647,18 +647,18 @@ the clip voltage. All numbers are **[E]** unless marked.
     as a third stage of gain 10.
   - Power: 6L6 knee 2, sag 0.25 of swing (5AR4) over 0.1 s, clip set so that a v127 open E
     reaches the knee.
-  - Cabinet 4 (1×15 + RE20).
+  - Cabinet 4 (1×15 + broadcast dynamic microphone).
 - **Blend:** DI 50 %, amp 50 %; aligned; polarity matched.
 - **Compressor:** opto, 3:1, threshold so that mf gives 3 dB of gain reduction and ff 6 dB;
   attack 10 ms; release 60 ms to half, 1 s tail.
 - **Expected:** much brighter than FluidR3's Fingered (7.1). If the user wants the FluidR3/SC
   darkness, set the treble to 0.25 and the blend to 35 % DI.
 
-### 10.2 GM 35 Electric Bass (pick): "svt"
+### 10.2 GM 35 Electric Bass (pick): "bass-stack"
 
 - **Bass:** P, pick, roundwounds, tone open.
-- **Input:** the SVT's 1 MΩ, plus a DI (10 MΩ): 0.9 MΩ.
-- **Amp path: SVT, Normal input.**
+- **Input:** the bass stack's 1 MΩ, plus a DI (10 MΩ): 0.9 MΩ.
+- **Amp path: bass stack, Normal input.**
   - Stage 1: gain 13 (12AU7-like, swing ×3), hp 2 Hz.
   - Ultra Lo off.
   - Volume share 0.35.
@@ -670,10 +670,10 @@ the clip voltage. All numbers are **[E]** unless marked.
   - Power: 6550 knee 2.5, sag 0.08 (silicon rectifier), clip set so that the hardest pick
     attacks reach 3–5 % THD for 30–100 ms, mf notes < 1 %.
   - 4× oversampling (the growl).
-  - Cabinet 3 (8×10 + D112).
+  - Cabinet 3 (8×10 + kick-drum microphone).
 - **Blend:** DI 35 %, amp 65 %; aligned.
 - **Compressor:** 4:1, attack 0.8 ms, release 150 ms, 4–6 dB of gain reduction at f.
-- **Variant "svt-flat"** (a cleaner 1970s P-with-pick-and-mute session sound): master 0.3, blend
+- **Variant "bass-stack-flat"** (a cleaner 1970s P-with-pick-and-mute session sound): master 0.3, blend
   DI 60 %.
 
 ### 10.3 GM 36 Fretless Bass: stays on the double bass
@@ -706,7 +706,7 @@ the clip voltage. All numbers are **[E]** unless marked.
 - As 37, with the differences below.
 - **The pedal compressor in front** (the existing OTA one, 4:1, 3 ms / 0.2 s), about 6 dB of gain
   reduction (bass_section.md §6.4).
-- **A SansAmp-like drive on the DI path, blended 25 %:**
+- **A tube-emulation drive on the DI path, blended 25 %:**
   - high-pass 150 Hz before the clipper;
   - soft clip at 6–10 dB over a mf note;
   - low-pass 5 kHz after.
@@ -722,10 +722,10 @@ the clip voltage. All numbers are **[E]** unless marked.
 2. **Low end through the amp path, cabinet off:** with the stack at noon, −1 dB or better at
    41 Hz relative to 200 Hz. No corner above 10 Hz except the cabinet's.
 3. **James stacks** (with the nodal solve or the closed form):
-   - SVT at noon: flat ±1 dB from 30 Hz to 12 kHz, insertion −22 dB;
-   - SVT bass full: +18 dB at 30 Hz, +14.8 dB at 100 Hz; treble full +9.5 dB at 8 kHz, +12.5 dB
+   - bass stack at noon: flat ±1 dB from 30 Hz to 12 kHz, insertion −22 dB;
+   - bass stack bass full: +18 dB at 30 Hz, +14.8 dB at 100 Hz; treble full +9.5 dB at 8 kHz, +12.5 dB
      at 12 kHz;
-   - B-15: bass full +15 dB at 40 Hz; treble full +18.8 dB at 5 kHz, treble zero −17.4 dB at
+   - fliptop: bass full +15 dB at 40 Hz; treble full +18.8 dB at 5 kHz, treble zero −17.4 dB at
      5 kHz (3.1, 3.2).
 4. **Cabinets** (relative to 200 Hz, ±1 dB):
    - 8×10: −11 dB at 40 Hz, −3 dB at 58 Hz, −20 dB at 5 kHz;
@@ -751,33 +751,33 @@ the clip voltage. All numbers are **[E]** unless marked.
 10. **Spectral envelope sanity**, E1 at v120, first 100 ms, octave bands (7.1): 34 brighter than
     FluidR3's but its 2–4 kHz band still ≥ 25 dB under its strongest; 35's 2–4 kHz within 25–35 dB;
     37/38's 1–4 kHz within 15 dB of the strongest.
-11. **Cost:** a DI-heavy clean preset ≤ 0.3 % of a core; "svt" with 4× oversampling ≤ 1 %
+11. **Cost:** a DI-heavy clean preset ≤ 0.3 % of a core; "bass-stack" with 4× oversampling ≤ 1 %
     (electric_guitars.md §11.6's estimate).
 
 ---
 
 ## 11. Not found, or uncertain
 
-- **The SVT midrange inductor** (320821-1): its inductance and taps, hence the 1972 mid's exact
+- **The bass stack midrange inductor** (320821-1): its inductance and taps, hence the 1972 mid's exact
   frequencies and Q. The 1972 three-position frequencies (220 Hz / 800 Hz / 3 kHz) are lore.
-- **The SVT Ultra Low network:** read from a 800×600 drawing. The topology (a bridged-T) is my
+- **The bass stack Ultra Low network:** read from a 800×600 drawing. The topology (a bridged-T) is my
   reading and gives ~1 kHz, not the later spec's 500 Hz. The original service manual was not read.
 - **Which half of the 12DW7** is the gain stage in V1/V3: from the standard pinout [M], not
   checked against the drawing's pin numbers in a data sheet.
-- **The Bassman AB165 bass channel's stack values** (forum reports conflict) and its Deep switch.
+- **The tweed 4x10 amp AB165 bass channel's stack values** (forum reports conflict) and its Deep switch.
 - **The Acoustic 360's tone controls** and its "Variamp"/fuzz circuits: nothing primary found.
 - **GK 800RB:** the hardware manual (control ranges in dB, the crossover range, the boost
   circuit). Only an emulation's manual was read.
-- **Markbass VPF/VLE:** curves and depths. Only a description (35 Hz, 380 Hz, 10 kHz).
-- **SansAmp Bass Driver:** the treble's and presence's frequencies, the clipper.
-- **Measured responses of whole bass cabinets** (8×10, 4×10, B-15) with a microphone. Only the
+- **bass amp VPF/VLE:** curves and depths. Only a description (35 Hz, 380 Hz, 10 kHz).
+- **tube-emulation DI Bass Driver:** the treble's and presence's frequencies, the clipper.
+- **Measured responses of whole bass cabinets** (8×10, 4×10, fliptop) with a microphone. Only the
   manufacturers' ±3 dB figures and bare-driver curves were found. The biquad sets of 4.3 are fits
   to those, not to cabinet measurements.
-- **The original B-15 speaker's response**, and the double baffle's effect.
-- **Microphone response curves** (D112, Beta 52A): only the headline ranges were read. The
+- **The original fliptop speaker's response**, and the double baffle's effect.
+- **Microphone response curves** (kick-drum microphone, supercardioid kick microphone): only the headline ranges were read. The
   presence peaks and proximity numbers are [M].
 - **Measured DI-loading differences on a passive bass:** only a review's listening impression.
-- **SC-55/88 and XG renderings** of 34–38: not measured. Whether their velocity opens a filter is
+- **early GS module/88 and XG renderings** of 34–38: not measured. Whether their velocity opens a filter is
   a snippet.
 - **Blend ratios and compressor settings on famous records:** only lore. No engineer's documented
   settings for a specific GM-style record were found.

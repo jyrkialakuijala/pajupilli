@@ -7,7 +7,7 @@ the digitised bore), **[U]** taken from a secondary source or an abstract that I
 References are at the end.
 
 Short answer:
-1. **A real, validated bore exists:** the Conn 8H (Bilbao & Chick 2013 [BC13], Fig. 7) is stored as vector
+1. **A real, validated bore exists:** the large-bore tenor trombone (Bilbao & Chick 2013 [BC13], Fig. 7) is stored as vector
    paths in their preprint. I extracted the 55 vertices exactly (§1.1). The extracted mouthpiece matches the maker's
    Denis Wick 5AL figures (rim 25.6 vs 25.7 mm, throat 7.23 vs 7.30 mm). The transfer-matrix impedance of the extracted bore lands within
    ~1 % of the **measured** peaks of the same instrument (§3.1). Use it as is.
@@ -15,8 +15,8 @@ Short answer:
    = **0, 85, 174, 269, 370, 474, 583 mm** (tube added = 2×). Gaps grow from 85 to 109 mm, matching players' "3 in to
    just over 4 in" (§2.2). F rotor loop **≈ 966 mm** of tube. Bass trombone G♭ loop **≈ 770 mm**; F + G♭ together give a D
    about 15 cents flat (§2.4).
-3. **Impedance (1st position, Conn 8H, 19 °C, measured):** 38.3 (false), 113.2, 174.0, 233.2, 296.0, 350.9, 410.1, 471, 529,
-   594, 655, 709 Hz… The UNSW data set (Yamaha, 26 °C) adds magnitudes: **24, 20, 21, 23, 19, 13, 12, 10, 6 MΩ** for
+3. **Impedance (1st position, large-bore tenor trombone, 19 °C, measured):** 38.3 (false), 113.2, 174.0, 233.2, 296.0, 350.9, 410.1, 471, 529,
+   594, 655, 709 Hz… The UNSW data set (one maker, 26 °C) adds magnitudes: **24, 20, 21, 23, 19, 13, 12, 10, 6 MΩ** for
    peaks 2–10 (§3).
 4. **New physics vs. the horn:** the slide (a smoothly variable-length cylinder, §2.5), the highest brassiness
    (B ≈ 0.71 computed for the 8H, §6), a big cup (≈ 9.6 cm³ from the rim plane, popping ≈ 520 Hz, §5), and the
@@ -26,7 +26,7 @@ Short answer:
 
 ## 1. The bore
 
-### 1.1 Conn 8H tenor trombone, 1st position, with a Denis Wick 5AL mouthpiece (Bilbao & Chick 2013)
+### 1.1 large-bore tenor trombone tenor trombone, 1st position, with a Denis Wick 5AL mouthpiece (Bilbao & Chick 2013)
 
 **Source and method [D].** [BC13] Fig. 7 (middle panel) plots the measured bore radius against the axial coordinate,
 with a log radius axis. The preprint's PDF has the curve as a 55-vertex polyline, and I converted it with the panel's
@@ -98,7 +98,7 @@ Ready to paste, in the `BorePoint` format of `src/brass.cc` (x from the rim plan
 horn, so the list starts at the throat entry:
 
 ```
-// Conn 8H tenor trombone, 1st position, Denis Wick 5AL (Bilbao & Chick 2013, Fig. 7, read from the
+// large-bore tenor trombone tenor trombone, 1st position, Denis Wick 5AL (Bilbao & Chick 2013, Fig. 7, read from the
 // preprint's vector paths). Cup 0..26.9 mm lumped: 9.56 cm^3 from the rim plane.
 {26.9, 8.00}, {29.4, 7.23}, {44.4, 7.69}, {49.4, 8.08}, {54.4, 8.37}, {59.4, 8.89}, {69.4, 9.87},
 {74.4, 10.63}, {79.5, 12.72}, {84.5, 12.76}, {89.5, 13.60}, {689.4, 13.60}, {764.6, 14.79},
@@ -187,7 +187,7 @@ instrument's own tuning offsets stay). Partial 2 drops a little faster (bell eff
 Checks: an ideal equal-tempered extension of an equivalent cylinder L_eq gives travel_k = L_eq(2^{k/12}−1)/2. These numbers fit
 **L_eq ≈ 2.74–2.83 m**, i.e. about the *physical* length, not L_ecl = 2.94–2.97 m [D]. Pedagogy: gaps "from 3 in for 1st to 2nd to just over 4 in for
 6th to 7th" [PB] (76 → ~105 mm). The 7th is "about 23 in" (584 mm) from closed [IEM]. **Discrepancy:** Boutin et al.
-[BFSW15] extended a Yamaha YBL-321's slide by **22.7 cm** for "4th position" (G2 series), vs. 269 mm here. Players do not
+[BFSW15] extended a one maker YBL-321's slide by **22.7 cm** for "4th position" (G2 series), vs. 269 mm here. Players do not
 pull a full nominal 4th, the YBL-321 is a smaller student bore, and their notes were ±lipped. The model needs the
 position → length map anyway; make it a per-instrument table and let the calibration trim it.
 
@@ -242,7 +242,7 @@ B♭ side, and the short positions give D2, D♭2, C2, B1 [D]. This fills the F 
 
 ## 3. Input impedance (1st position)
 
-### 3.1 Conn 8H [BC13]: measured, and our TMM of the extracted bore
+### 3.1 large-bore tenor trombone [BC13]: measured, and our TMM of the extracted bore
 
 Measured frequencies are from [BC13] Table I (19 °C); peaks 8–16 and heights are read from the vector curve of Fig. 9 (middle panel) **[D]**. The height
 axis there reads "dB" without an unambiguous reference: the plotted *differences* are almost exactly half of 20·log₁₀ ratios
@@ -273,7 +273,7 @@ waveguide (horns.md §9.3), and the profile needs no fitting. At pajupilli's c =
 The B♭ series is f₀ = 58.27 Hz; peaks 3–8 sit at ≈ 58–59 Hz per n, so the instrument is in tune with warm breath plus a
 slightly pushed-in tuning slide.
 
-### 3.2 UNSW data set (Henri Boutin): Yamaha trombone, dry air 26.3 °C [UNSWZ]
+### 3.2 UNSW data set (Henri Boutin): one maker trombone, dry air 26.3 °C [UNSWZ]
 
 The spreadsheet gives |Z|, phase, 50–1800 Hz, 0.67 Hz steps. It is the impedance of the trombone in the lipping/warming
 studies (probably the YBL-321 of [BFSW15] **[U]**). My peak-picking **[D]** (no data below 50 Hz, so no first peak):

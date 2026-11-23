@@ -1,4 +1,4 @@
-// The jazz guitarist (GM 27, -inst jazz-guitar; research/jazz_guitar.md 6, 9.3, 12): the ES-175
+// The jazz guitarist (GM 27, -inst jazz-guitar; research/jazz_guitar.md 6, 9.3, 12): the laminated archtop
 // (guitar.h jazzGuitar()) into the jazz amp (guitaramp.h "jazz"), played as a jazz player plays it.
 //
 // The touch "speaks" (12.1): each stroke is a heavy, round-edged pick held by a hand

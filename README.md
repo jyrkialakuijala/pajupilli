@@ -1,7 +1,7 @@
 # pajupilli
 
 A real-time physical model of a Boehm concert flute (B foot), played from an
-Akai MPK mini mk3. Also the piccolo, alto flute and bass flute, and other woodwinds
+25-key MIDI controller. Also the piccolo, alto flute and bass flute, and other woodwinds
 on the same air column: recorder, ocarina, shakuhachi, pan flute, clarinet, the
 saxophones (soprano, alto, tenor, baritone), oboe, bassoon, duduk and shawm, and the
 brass: horn in F, trumpet (open and with a Harmon mute), trombone and tuba (`-inst`).
@@ -24,20 +24,20 @@ See `REQUIREMENTS.md` and `research/` for the physics and the numbers.
 
 ## Play
 
-    ./pajupilli -live           # finds the MPK mini, plays through PipeWire/ALSA
+    ./pajupilli -live           # finds the 25-key MIDI controller, plays through PipeWire/ALSA
     ./pajupilli -live -v        # also prints the MIDI events
     ./pajupilli -selftest       # a short arpeggio without a keyboard
     ./pajupilli -live -inst piccolo   # or alto, bass (default: flute)
 
 Options: `-dev hw:1` (another ALSA device), `-period 64 -periods 3` (buffer),
-`-transpose 12` (keys to sounding pitch; default: the MPK's lowest C plays the
+`-transpose 12` (keys to sounding pitch; default: the controller's lowest C plays the
 instrument's lowest octave, notes outside its range fold in by octaves),
 `-midi NAME` (another MIDI controller).
 
 Latency, key to first sound: ≈ 10–15 ms (1.3 ms periods; PipeWire is asked
 for the same quantum).
 
-### Controls (MPK mini mk3, default program)
+### Controls (25-key MIDI controller, default program)
 
 | Control | Does |
 |---|---|
@@ -148,7 +148,7 @@ is the old behaviour (no room, silent flutes not computed).
 
 The flute has a B foot by default (the "H-Fuß"): one more key, the C hole at 592 mm, and
 the tube on to 633 mm from the embouchure; it adds low B3 and changes the high resonances.
-Players drop it for the weight; here it costs nothing. The MPK's octave-down button reaches
+Players drop it for the weight; here it costs nothing. The controller's octave-down button reaches
 the B. C7 is played without the gizmo (in the model the gizmo makes it 50 cents sharp, 29
 without; the C foot's C7 is 36). `-cfoot` gives the C-foot flute.
 
@@ -283,7 +283,7 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
   the bore's last cells. That gives a parasitic resonance near 160 Hz below the trumpet's own,
   the low notes pulled sharp and the high ones flat (the lips take it up), a chamber formant
   near 2 kHz and 16–25 dB less below 1 kHz.
-- **Trombone**: the Conn 8H Bilbao & Chick measured (peaks 1–16 within ~1 %), with an F
+- **Trombone**: the large-bore tenor trombone Bilbao & Chick measured (peaks 1–16 within ~1 %), with an F
   attachment (966 mm loop). **The slide moves**: its 134 cells (both legs and the crook) stretch
   together. Each cell's mass, volume and losses scale with the extension; the grid stays, and
   the Courant number only falls. Positions 1–7 add 172–1184 mm of tube (travel 86–592 mm),
@@ -294,7 +294,7 @@ The trumpet, trombone and tuba were added on the same machinery, each researched
   so the chart lowers those positions ("+75": mm of tube more), as players shade them.
 - **Tuba**: no published tuba bore was found, so the shape (throat, cone to a 19.5 mm valve
   cylinder, two-part cone, Bessel bell to 470 mm; 5.05 m) is fitted to the resonances measured
-  on a Besson BE994 (Mattéoli et al. 2022), transposed to C. Four non-compensating valves; the
+  on a one brass maker BE994 (Mattéoli et al. 2022), transposed to C. Four non-compensating valves; the
   combinations and some single valves are 40–120 cents sharp on this bore, so the chart pulls
   the last pressed valve's slide for those notes ("+613" mm of tube for E1 on 2-3-4).
 - **Brassiness** (all but the horn): at ff the outgoing wave steepens towards a shock in the
@@ -599,7 +599,7 @@ right:
   from D5 to G5, as sopranos do when a rounded [u] cannot keep R1 up with f0.
 - **Softer** than the aahs and a little slower: lower pressures, the lungs rising with τ ≈ 75 ms at
   mf, a soft onset (half level at ~75 ms against the aahs' ~65, within 2–3 dB of full in ~0.2 s),
-  breathier (×1.3), less vibrato (×0.8). Firmer keys start with a soft "d", as Roland's "dooh" does.
+  breathier (×1.3), less vibrato (×0.8). Firmer keys start with a soft "d", as one maker's "dooh" does.
 - **Dark:** the band 1.5–5 kHz is ~28 dB under the lows on A4, against ~10 dB for the aahs. Before
   its level trim it is ~6 dB quieter than the aahs.
 - **Hum:** `src/hum.h` closes the lips into a hum ("mmm", GM2 Humming). It is a nasal pole (270 Hz)
@@ -656,10 +656,10 @@ right:
 - **Cost:** about 9 % of a core for a single note, 32 % with the pedal down (the stretching
   adds ~0.75 % of a core per loud bass key while it lasts; the dampers' landing only its 8 ms).
 
-### Bright piano (Shigeru Kawai SK-7)
+### Bright piano (semi-concert grand)
 
-`-inst bright-piano` (GM 2, Bright Acoustic Piano; `src/sk7.cc`, research/shigeru_kawai_sk7.md),
-A0 to C8: the grand's strings, hammers and dampers built as a Shigeru Kawai SK-7, Kawai's 229 cm
+`-inst bright-piano` (GM 2, Bright Acoustic Piano; `src/brightgrand.cc`, research/bright_grand.md),
+A0 to C8: the grand's strings, hammers and dampers built as a semi-concert grand, its maker's 229 cm
 semi-concert grand, and miked close as a studio or pop grand is. The brightness comes from the
 instrument, not from an EQ:
 
@@ -667,16 +667,16 @@ instrument, not from an EQ:
   1.44 m at F2 reaching the grand's own lengths at C5. The shorter bass and low tenor are stiffer
   (B 1.0e-4 at C1, 2.3e-4 at C3, against the grand's 7e-5 and 1.1e-4): their upper partials stand
   sharper and stronger, and the tuning stretches further (C1 about 15 c flat, the grand's 7).
-- **Hammers:** Kawai presses its felt dense and needles only the shoulders, with no hardeners:
-  the felt twice as stiff as the grand's at C4 and 2.5 times from C6 (`PJ_SK7_HARD`, `_HARDTOP`),
-  its loose outer nap half as thick (`PJ_SK7_NAP`). A middling blow is already bright (above
+- **Hammers:** Its maker presses its felt dense and needles only the shoulders, with no hardeners:
+  the felt twice as stiff as the grand's at C4 and 2.5 times from C6 (`PJ_BRIGHTGRAND_HARD`, `_HARDTOP`),
+  its loose outer nap half as thick (`PJ_BRIGHTGRAND_NAP`). A middling blow is already bright (above
   2 kHz C4 at velocity 64: −35 dB, the grand's −61); the softest notes stay round (under −50 dB).
-- **Board:** the grand's board drawn in at the tail to the shorter case, 1.77 m² (`tools/sk7board.py`
-  → `src/sk7board_data.h`), its own loss ×0.7 (`PJ_SK7_ETA`: the aged spruce and hard rim the
+- **Board:** the grand's board drawn in at the tail to the shorter case, 1.77 m² (`tools/brightboard.py`
+  → `src/brightboard_data.h`), its own loss ×0.7 (`PJ_BRIGHTGRAND_ETA`: the aged spruce and hard rim the
   makers credit with a long sustain). Middle C falls 40 dB in 9.6 s (the grand 5.7), C5 in 3.6 s
   (4.7); the bass a little shorter than the concert grand's, as a smaller grand's is.
 - **Sound:** the grand's crossed figure-of-eight pair 30 cm over the strings and 40 cm from the
-  belly rail (`PJ_SK7_MICZ`, `_MICX`), placed for evenness from key to key (as even as the
+  belly rail (`PJ_BRIGHTGRAND_MICZ`, `_MICX`), placed for evenness from key to key (as even as the
   grand: 0.8 / 1.1 / 2.7 dB rms off the neighbours, bass / middle / top); the room hears it
   without the grand's extra reverb send.
 - **Against the grand,** on a solo piano file (the first 75 s of a jazz ballad): 7.8 dB more
@@ -691,7 +691,7 @@ instrument, not from an EQ:
 ### Upright piano
 
 `-inst upright-piano`, A0 to C8: the same strings, hammers and dampers on a 121 cm upright's
-scale and board (Yamaha U1 class; research/piano_variants.md section 3):
+scale and board (121 cm upright class; research/piano_variants.md section 3):
 
 - **Scale:** the bass shorter: wound strings 1.19 m at A0 to 0.98 m at B2, plain strings from
   C3 at 1.03 m reaching the grand's lengths at C5. The grand's wire on shorter strings is
@@ -743,16 +743,16 @@ out of tune as its recipe says.
 A held A4 beats at about 2-3 Hz, its level wobbling ~10 dB, at its pitch. The strings meet
 at the bridge, so past ~4 c the unisons no longer lock: every note beats and the aftersound
 goes.
-### Electric grand (Yamaha CP-80)
+### Electric grand (electric grand)
 
-`-inst electric-grand` (GM 3), A0 to C8: the CP-80 on the grand's machinery (`src/cp80.*`,
-research/cp80.md), a different piano as data (`PianoDesign`):
+`-inst electric-grand` (GM 3), A0 to C8: the electric grand on the grand's machinery (`src/electricgrand.*`,
+research/electricgrand.md), a different piano as data (`PianoDesign`):
 
 - **Strings:** 154 on a short scale (single wound strings A0–F#2, two a key above), about 0.68 m
   through the bass and tenor: stiff, the partials sharp (B ~ 2e-3 at A0: the clank); unisons
   0.4–2 cents apart (a stiff bridge does not pull them together: they beat). Tuned as a small
   piano is, the bass octaves between 2 : 1 and 4 : 2.
-- **No soundboard:** the bridge on a heavy plate over urethane strips (Yamaha's patent: a spring
+- **No soundboard:** the bridge on a heavy plate over urethane strips (one maker's patent: a spring
   and a dashpot: `supportR` 4000 kg/s above a 150 Hz corner): the fundamentals ring long (50 s at
   A0), the treble about as on a grand. Read by a piezo per key: the strings' force on the bridge, the 88 in parallel on one bus
   (the top six through a 0.022 uF mixing capacitor, a few dB down).
@@ -765,7 +765,7 @@ research/cp80.md), a different piano as data (`PianoDesign`):
   (0.69–12.9 Hz) switching an LED on for about half of each cycle, the LED a light-dependent
   resistor shunting the signal, the other channel from the inverted sine: an auto-pan that flips
   rather than swings, as recorded (0.92 Hz, each channel dipping 8.5 dB, nearly square).
-- **Fitted to recordings** (about 120 notes from six recordings of CP-80s, `tools/pianofit.py`):
+- **Fitted to recordings** (about 120 notes from six recordings of electric grands, `tools/pianofit.py`):
   the low bass far darker than a grand's (A0–D2 nearly all below 1 kHz: a softer bass hammer),
   the wound strings' upper partials dying twice as fast as a grand's (wire loss x 3); the tremolo
   above. Still estimates: string gauges, the treble hammers; the recordings' 2–4 kHz in the
@@ -773,9 +773,9 @@ research/cp80.md), a different piano as data (`PianoDesign`):
   reaches (perhaps the recordings' EQ, perhaps a resonance of the pickup's mount).
 - **Cost:** about 0.5 % of a core for a note; with the pedal down about 0.45 of the grand's work.
 
-### Electric piano 1 (the Fender Rhodes)
+### Electric piano 1 (the tine electric piano)
 
-`-inst electric-piano-1` (GM 5), A0 to C8 (`src/rhodes.*`, research/rhodes.md): the Rhodes as its
+`-inst electric-piano-1` (GM 5), A0 to C8 (`src/tinepiano.*`, research/tinepiano.md): the tine piano as its
 parts, key by key, then its electronics.
 
 - **Tines:** lengths from the factory's cutting sheet, the swaged tine's mode ratios with its
@@ -795,40 +795,40 @@ parts, key by key, then its electronics.
   factory voiced them; every key's gap, offset, strike, tuning and Q a little its own.
 - **Electronics:** the harp (1.4 kOhm, 0.65 H, the cable) into its load; the Peterson Suitcase by
   default (preamp, the stereo vibrato's lamps and CdS cells, the power amplifier's sagging rails,
-  the 4 x 12 in cabinet), or the Stage straight out (`PJ_RHODES_SUITCASE=0`); a trace of hum.
-- **Knobs:** `PJ_RHODES_VIB` (0.5; 0: off), `PJ_RHODES_VIB_HZ` (4.5), `PJ_RHODES_GAP`,
-  `PJ_RHODES_VOICING` (x the offsets: smaller is more bell), `PJ_RHODES_WEAR` (1; 0: as the tables, 3:
-  road-worn), `PJ_RHODES_HUM`, `PJ_MAINS_HZ` (50). Live: K3 the vibrato's speed, K4 its intensity.
+  the 4 x 12 in cabinet), or the Stage straight out (`PJ_TINEPIANO_SUITCASE=0`); a trace of hum.
+- **Knobs:** `PJ_TINEPIANO_VIB` (0.5; 0: off), `PJ_TINEPIANO_VIB_HZ` (4.5), `PJ_TINEPIANO_GAP`,
+  `PJ_TINEPIANO_VOICING` (x the offsets: smaller is more bell), `PJ_TINEPIANO_WEAR` (1; 0: as the tables, 3:
+  road-worn), `PJ_TINEPIANO_HUM`, `PJ_MAINS_HZ` (50). Live: K3 the vibrato's speed, K4 its intensity.
 - **Not yet:** sympathetic ringing through the rail, the pickups' crosstalk, the tine against the
-  pole or the damper at ff, the Mark I/II damper snap-back, a near-tuned tonebar (Moog's picture),
+  pole or the damper at ff, the Mark I/II damper snap-back, a near-tuned tonebar (the classic ladder's picture),
   the Stage's amplifiers. About 1.3 % of a core for a held note.
 
-### Electric piano 2 (the DX7's E.PIANO 1)
+### Electric piano 2 (the FM synth's E.PIANO 1)
 
-`-inst electric-piano-2` (GM 6), A0 to C8 (`src/dx7.*`, research/electric_pianos.md section 6):
-the Yamaha DX7's factory voice E.PIANO 1 (ROM1A voice 11), its 128 bytes from the factory bank,
-played by the reverse-engineered DX7 engine's arithmetic (MSFA, as in Dexed): six operators in
+`-inst electric-piano-2` (GM 6), A0 to C8 (`src/fmsynth.*`, research/electric_pianos.md section 6):
+the six-operator FM synth's factory voice E.PIANO 1 (ROM1A voice 11), its 128 bytes from the factory bank,
+played by the reverse-engineered FM synth engine's arithmetic (MSFA, as in Dexed): six operators in
 algorithm 5 (1 <- 2 at 14:1, the tine's clank; 3 <- 4 and 5 <- 6 at 1:1, the bark, 6 feeding
 back), the integer envelopes stepping every 64 samples, the output-level, velocity, rate- and
 level-scaling tables, the measured detune, free-running phases (key sync off). Velocity works as
-on a DX7: mostly the timbre (a soft key nearly a sine, a hard one barking), the level only a few dB.
+on an FM synth: mostly the timbre (a soft key nearly a sine, a hard one barking), the level only a few dB.
 
-Unlike a DX7, each key is a piano's unison: three whole DX7 voices from C3 up, two from C2, one
-below (that one exactly the DX7's), 1/7 Hz apart, each with its own output levels (+-0.4 dB) and
+Unlike an FM synth, each key is a piano's unison: three whole FM synth voices from C3 up, two from C2, one
+below (that one exactly the FM synth's), 1/7 Hz apart, each with its own output levels (+-0.4 dB) and
 envelope speeds (+-3 %). Knobs: `PJ_DX_ONE`/`PJ_DX_TWO` (36, 48: the lowest key with two, three),
 `PJ_DX_SPREAD` (1: x 1/7 Hz), `PJ_DX_VARY` (1; 0: the generators alike), `PJ_DX_POLY` (32 notes).
 The sustain pedal holds; pitch bend +-2 semitones.
 
-### Clavinet (Hohner D6, E7, C)
+### clavi (one maker D6, E7, C)
 
-`-inst clavinet` (the D6, GM 8), `clavinet-e7`, `clavinet-c`, F1 to E6: the 60 strings of a
-Hohner Clavinet, its pickups, its electronics and the pedals it was played through
-(research/clavinet.md):
+`-inst clavi` (the D6, GM 8), `clavi-late`, `clavi-early`, F1 to E6: the 60 strings of a
+clavi, its pickups, its electronics and the pedals it was played through
+(research/clavi.md):
 
 - **The tangent:** a key's rubber tip strikes its string against an anvil and holds it there.
   The string's end moves 1 mm in the time the key's speed takes (0.7–3 ms) and stays; each
   speaking mode is driven by that end's motion. The low partials come out the same at any
-  velocity (a sawtooth); above about 1/(π·τ) a faster key is brighter: the Clavinet's dynamics
+  velocity (a sawtooth); above about 1/(π·τ) a faster key is brighter: the clavi's dynamics
   are mostly its brightness.
 - **The knock:** the tip landing on the anvil strikes the frame (five resonances, 180 Hz to
   1.15 kHz); the frame moves the sounding strings' ends, and the knock is heard through them,
@@ -938,7 +938,7 @@ key is held; a pair (A2, A3) sits ~6 dB under the chanter (`PJ_DRONE_GAIN`).
 
 ### Vibraphone
 
-`-inst vibraphone` (GM 12), F3 to F6: a Musser M55 on the modal engine (research/vibraphone.md).
+`-inst vibraphone` (GM 12), F3 to F6: a one mallet maker M55 on the modal engine (research/vibraphone.md).
 
 - **Bars:** 37 aluminium bars, each its bending modes (tuned 1 : 4 : 10 in the low register by the
   arch underneath; only the fundamental tuned from G#5 up), a torsion and a lateral mode. Alone, a
@@ -1048,11 +1048,11 @@ Not built yet: fingerstyle, the up stroke leaving out the lowest strings, the 12
 
 `-inst clean-guitar` (GM 28), `-inst muted-guitar` (GM 29), `-inst overdriven-guitar` (GM 30) and
 `-inst distortion-guitar` (GM 31; `research/electric_guitars.md`, `research/distortion_guitar.md`,
-`src/guitar.cc`, `src/guitaramp.cc`): a Stratocaster played with a pick into a clean Fender Twin;
+`src/guitar.cc`, `src/guitaramp.cc`): a three-pickup solid-body played with a pick into a clean clean 2x12 combo;
 the muted one is the same guitar with the picking hand's palm on the strings and a compressor in
-front of the amp; the overdriven one a Les Paul's bridge humbucker through a compressor into a
-Marshall JCM800 at crunch; the distortion one the same Les Paul into a Soldano SLO-100's
-overdrive channel, gated, and a closed 4×12 of Vintage 30s. The same six strings and guitarist as the
+front of the amp; the overdriven one a twin-humbucker solid-body's bridge humbucker through a compressor into a
+British crunch stack at crunch; the distortion one the same twin-humbucker solid-body into a high-gain amp's
+overdrive channel, gated, and a closed 4×12 of 60 W British speakers. The same six strings and guitarist as the
 classical guitar, in steel, heard through pickups; the amp is a module of its own after the jack.
 - **The strings:** 10–46 on 648 mm, tensions from the maker's chart, the plain G the most
   inharmonic; up to 96 modes (8 kHz on the low E). They ring 14 s on the low E, 5 s on the high
@@ -1069,7 +1069,7 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   are picked down and up in turn while they come within 0.3 s, down after a rest; an up stroke a
   little lighter, the other way across the string. Chords are one sweep (6 ms a string,
   `PJ_EGTR_STRUMSPEED`), down or up as the strumming hand swings.
-- **The pickups:** measured positions on a Stratocaster (the bridge pickup slanted, 38–49 mm from
+- **The pickups:** measured positions on a three-pickup solid-body (the bridge pickup slanted, 38–49 mm from
   the saddle; middle ~100; neck ~158): each hears the string where it stands, so each has its
   comb (on the open low E the neck pickup is deaf to the 4th harmonic, the bridge one to the
   13th), over the field's width (`PJ_EGTR_WIDTH`, a 6 mm Gaussian), through the magnet's field
@@ -1097,7 +1097,7 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   one: the single coil's resonance at 4–6 kHz. For GM 29 a compressor pedal next (the Dyna Comp's
   kind: ratio 4 above 50 mV, 3 ms to clamp, 0.2 s to let go; `PJ_AMP_COMP`, `PJ_AMP_COMPAT`).
   Then a triode (nearly straight until its grid
-  conducts at +1.4 V, cut-off softer at −2.8 V, a slight even curve), the Fender blackface tone
+  conducts at +1.4 V, cut-off softer at −2.8 V, a slight even curve), the American amp blackface tone
   stack, exact from its parts (Yeh and Smith's closed form, checked against a nodal solve to 0.01
   dB; `PJ_AMP_TREBLE` 0.6, `PJ_AMP_MID` 0.5, `PJ_AMP_BASS` 0.4), the volume (`PJ_AMP_VOLUME`,
   0.2), the second triode, a push-pull power stage whose supply sags under a loud passage
@@ -1105,11 +1105,11 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   2–4 kHz, breakup, nothing above ~7 kHz; `PJ_AMP_CAB`). Clean: a hard strum compresses about 1 %.
   The overdriven and high-gain amps (GM 30, 31) are these blocks driven harder, oversampled
   (below).
-- **The Les Paul** (GM 30): 628 mm, 22 frets (the same strings 6 % slacker, 13 % more
+- **The twin-humbucker solid-body** (GM 30): 628 mm, 22 frets (the same strings 6 % slacker, 13 % more
   inharmonic); two humbuckers, each two coils 18 mm apart in series (twice a coil's signal, and
   the pair's own comb), the bridge one hot (8 H, 13.5 kΩ: its resonance near 2 kHz), 500 k pots;
   the three-way switch (`PJ_EGTR_PICKUP` 1 bridge, 2 both, 3 neck; GM 30: the bridge). A single
-  note gives ~0.5 V, a hard power chord 1.3 V. Its overtones ring twice as long as the Strat's
+  note gives ~0.5 V, a hard power chord 1.3 V. Its overtones ring twice as long as the three-pickup solid-body's
   (`PJ_EGTR_LPRING`, 0.5 of the loss). The pick over the bridge pickup (~6 cm).
 - **Feedback** (GM 30): loud and driven, a held note sings as long as it is held. The player
   stands where the amp's sound comes back in phase with the note: from 0.12 s every mode of the
@@ -1122,20 +1122,20 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   then falls 20-30 dB in 2-4 s). An acoustic loop through the air (the speaker's sound shaking
   the body, 2 m away) was tried first: at most distances it squealed at the speaker's 2 kHz or
   fought the note, as it does for a player who has not found the spot.
-- **The Marshall** (GM 30; `jcm800` in `src/guitaramp.cc`): a compressor pedal first (ratio 2.5
+- **The British stack** (GM 30; `crunchStack` in `src/guitaramp.cc`): a compressor pedal first (ratio 2.5
   above 0.2 V: a held note keeps driving the amp, 5 dB stronger 2 s on; `PJ_AMP_COMP=1`: none),
   then V1A (gain 50), the preamp gain with its 470 pF bright capacitor (`PJ_AMP_GAIN`, 0.08: the
   lower the gain, the more of the treble passes it), V1B biased cold (it clips its lower half
-  first; the Miller roll-off from 7 kHz), the Marshall tone stack after the clipping
+  first; the Miller roll-off from 7 kHz), the British stack tone stack after the clipping
   (`PJ_AMP_TREBLE` 0.7, `PJ_AMP_MID` 0.6, `PJ_AMP_BASS` 0.5), the master (`PJ_AMP_MASTER`, 0.6),
-  the EL34s, a closed 4×12 of Greenbacks (the closed box's thump, forward upper mids, nothing
+  the EL34s, a closed 4×12 of 25 W British speakers (the closed box's thump, forward upper mids, nothing
   above ~6 kHz). A stage driven past its grid's conduction draws grid current and its bias
   slides cold for ~20 ms (the bloom of a cranked amp). Crunch: soft picking comes through
   nearly clean, a hard stroke drives the cold stage well past its knee; from velocity 30 to 120
   the pickup's 17 dB come out as 6 dB, the rest goes into distortion. The stages run 4×
   oversampled (an 8th-order elliptic up and down, `tools/oversample.py`; `PJ_AMP_OS=1` to
   compare: at crunch the soft knees alias little). 2.4–3.7 % of a core.
-- **The high-gain amp** (GM 31; `slo` in `src/guitaramp.cc`): a Soldano SLO-100's overdrive
+- **The high-gain amp** (GM 31; `slo` in `src/guitaramp.cc`): a high-gain amp's overdrive
   channel, four triode stages in a row (the stages are a list of up to five, each with its
   coupling capacitor, Miller roll-off, a partly bypassed cathode as a low shelf, a divider into
   the next, a cathode follower after). V1A (gain 60, its bass 3 dB under the treble below
@@ -1143,14 +1143,14 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   `PJ_AMP_GAIN`, 0.1: about 4 of 10), V1B (40, its bass 4.5 dB under), V2A the cold clipper
   (biased near cut-off, gain 2.4, its plate rolled off from 1.6 kHz), V2B (75, its coupling
   capacitor small: 72 Hz, the bass kept out) into the DC-coupled cathode follower (it squashes
-  V2B's cut-off swing: `PJ_AMP_FOLLOWER`), then the Marshall stack after all of it
+  V2B's cut-off swing: `PJ_AMP_FOLLOWER`), then the British stack after all of it
   (`PJ_AMP_TREBLE` 0.6, `PJ_AMP_MID` 0.5, `PJ_AMP_BASS` 0.6), the master low (`PJ_AMP_MASTER`,
   0.4), 6L6s with a softer knee than the EL34s, resonance (+4 dB at 100 Hz, `PJ_AMP_RESONANCE`)
   and presence (+3 dB from 3 kHz, `PJ_AMP_PRESENCE`). A humbucker's note is some 35 dB past the
   last stage's knee, a soft one 20: everything distorts fully; from velocity 40 to 127 the level
   grows 2 dB and the attack brightens (its first 30 ms' centroid +14 to +73 % on E2, A2, A3).
-  Grid current charges the coupling capacitors five times slower than in the Marshall (the
-  Soldano's grid stoppers; `PJ_AMP_GRID`, 0.2): faster, every hard attack pushed the stages cold,
+  Grid current charges the coupling capacitors five times slower than in the British stack (the
+  high-gain amp's grid stoppers; `PJ_AMP_GRID`, 0.2): faster, every hard attack pushed the stages cold,
   thin pulses and a dark, blocked attack. A power chord comes out as loud as one note (+0.4 dB;
   FluidR3's samples add up, +3.8), a triad with more lines between the harmonics than a power
   chord. A held note stays within 1 dB for 2 s (without feedback −3.5 dB at 4 s).
@@ -1169,11 +1169,11 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   `PJ_AMP_GATEDROP`) closes it at once, four times as fast, and only a new attack opens it again;
   a string decaying by itself keeps it open (a 6 s note: one close, at its release).
   `PJ_AMP_GATEDEBUG=1` prints each open and close.
-- **A Tube Screamer** in front, if wanted (`PJ_AMP_TS`, its level; `PJ_AMP_TSDRIVE`,
+- **A mid-hump overdrive** in front, if wanted (`PJ_AMP_TS`, its level; `PJ_AMP_TSDRIVE`,
   `PJ_AMP_TSTONE`): the clean signal and, added to it, its part above 720 Hz amplified and clipped
   by two diodes. Off: with the gate it did not tighten the chugs further.
-- **The V30 cabinet:** a closed 4×12 of Vintage 30s, an SM57 close: nine filters, started from
-  Celestion's plot and fitted to FluidR3's distortion-guitar samples (their pooled harmonic
+- **The 60 W British cabinet:** a closed 4×12 of 60 W British speakers, a dynamic microphone close: nine filters, started from
+  British speaker's plot and fitted to FluidR3's distortion-guitar samples (their pooled harmonic
   envelope within 5.5 dB from 200 Hz to 8 kHz: the presence pair at 2.6 and 3.25 kHz, +5 dB over
   1 kHz; −9 dB at 5 kHz, −25 at 8, −39 at 10). The strong low mids at 350 Hz and the wide hollow at
   900 Hz are the recording's, not the bare speaker's (`PJ_AMP_CAB`, `PJ_AMP_BREAKUP`).
@@ -1192,14 +1192,14 @@ classical guitar, in steel, heard through pickups; the amp is a module of its ow
   highest fretted string of what was last picked, up to two semitones; the rest of the chord stays.
 - Not yet: the dead strokes of funk (the fretting hand's scratch), the archtop (27), pinch
   harmonics, drop tunings (notes under E2 are folded up), the other high-gain
-  presets (a Rectifier, a boosted JCM800, distortion pedals), fret buzz, string squeak, slides
+  presets (a Rectifier, a boosted British crunch stack, distortion pedals), fret buzz, string squeak, slides
   over frets, chorus and spring reverb, hum on the clean amps; a bass line on GM 29 (louisiana's channel 6) is folded up into the guitar's range, where
   an electric bass belongs. 2.6 % of a core.
 
 ### Guitar harmonics
 
 `-inst guitar-harmonics` (GM 32; `research/electric_guitars.md` 2.6, 9; `src/guitarinst.cc`
-`HarmonicsPlayer`, `Guitar::touch`): the clean Stratocaster and Twin of GM 28, every note played as
+`HarmonicsPlayer`, `Guitar::touch`): the clean three-pickup solid-body and Twin of GM 28, every note played as
 a harmonic, at the pitch written (E3 .. G#7; below an octave up, above an octave down).
 - **The pickup:** the middle one alone. The neck pickup lies on the open strings' 4th-harmonic
   node (the 5th fret's harmonic would be nearly gone); the middle one has no node near harmonics
@@ -1237,7 +1237,7 @@ a harmonic, at the pitch written (E3 .. G#7; below an octave up, above an octave
 ### Jazz guitar
 
 `-inst jazz-guitar` (GM 27; `research/jazz_guitar.md` 9–12; `src/guitar.cc` `jazzGuitar()`,
-`src/jazzguitar.cc` `JazzGuitarPlayer`, `src/guitaramp.cc` `jazz()`): a Gibson ES-175 played by a
+`src/jazzguitar.cc` `JazzGuitarPlayer`, `src/guitaramp.cc` `jazz()`): a laminated archtop played by a
 jazz guitarist into a clean jazz amp.
 - **The guitar:** 628 mm, 20 frets, flatwounds 12–52 (95–103 N each, the G wound: its 10th
   partial +0.6 c). The wound strings lose above the fundamental as k² (the ribbon's turns
@@ -1253,7 +1253,7 @@ jazz guitarist into a clean jazz amp.
   across the pickup, a 600 pF cable: the amp's input as an exact third-order network (35 kΩ:
   −3 dB at 1.38 kHz, no peak; 0: the "woman tone", +3.8 dB at 467 Hz).
 - **The amp ("jazz"):** a Polytone-like clean solid-state amp: no tube stage driven, an active EQ
-  (+3 dB under 150 Hz, +2 at 500, −2 above 2.5 kHz) instead of the Fender stack's scoop, a closed
+  (+3 dB under 150 Hz, +2 at 500, −2 above 2.5 kHz) instead of the American amp stack's scoop, a closed
   1×15 (85 Hz, −3 dB at 2.5 kHz, 24 dB an octave above 3.5).
 - **The touch speaks.** Every stroke is a heavy, round-edged pick held by a hand
   (`Guitar::pickContact`, now with the tip's width): 1.5 mm (17 kN/m), a 0.25 ms edge, 2.5 mm of
@@ -1308,9 +1308,9 @@ jazz guitarist into a clean jazz amp.
 ### Electric bass
 
 `-inst electric-bass` (GM 34, Electric Bass (finger); `research/bass_section.md`, `src/ebass.cc`):
-a Fender Jazz Bass played fingerstyle, on the electric guitar's string and pickup model with four
+a two-pickup bass played fingerstyle, on the electric guitar's string and pickup model with four
 strings.
-- **The strings:** 34 in. (864 mm), 20 frets, D'Addario EXL170 (45-65-80-100) roundwounds, 155-216
+- **The strings:** 34 in. (864 mm), 20 frets, standard EXL170 (45-65-80-100) roundwounds, 155-216
   N; stiffness from the measured G (B 3.5e-5) to ~2e-4 on the E. Each partial's loss from the
   string's internal damping (Fleischer's fitted values) and the neck's support: the open strings'
   fundamentals ring 17-27 s, the partials die about in proportion to their frequency
@@ -1323,9 +1323,9 @@ strings.
   coils (3.3 H, 7.4 kΩ, 90 pF; two in parallel), the pots (two volumes, one tone) and the cable
   (`PJ_EBASS_CABLE`, 700 pF) into the input: a resonance near 4.4 kHz.
 - **The amp, the DI and the compressor** (`research/bass_amps.md` 10.1, the amp module's preset
-  "b15-di" in `src/guitaramp.cc`), as 1970s-90s records have a fingered bass: the pickups on a
-  splitter into an active DI and an Ampeg B-15N (0.9 MΩ between them).
-  - The B-15N's 1966 channel from Piazza's drawing: two 6SL7 stages (~30x each, their cathodes
+  "fliptop-di" in `src/guitaramp.cc`), as 1970s-90s records have a fingered bass: the pickups on a
+  splitter into an active DI and an fliptop bass amp (0.9 MΩ between them).
+  - The fliptop bass amp's 1966 channel from Piazza's drawing: two 6SL7 stages (~30x each, their cathodes
     unbypassed: a grid swing four times a 12AX7's), the volume, the **James (passive Baxandall)
     stack** exact from its parts (an admittance matrix solved at eight points of s, its fourth-order
     numerator and denominator read off and taken to z root by root; bass 1 MΩ with 220 k / 22 k and
@@ -1335,14 +1335,14 @@ strings.
     fundamental loses 0.8 dB to them. Clean: what its curves add to a v100 open E is -43 dB; at v127
     no stage passes 0.4 of its knee (`PJ_AMP_PEAKS=1` prints them; `PJ_AMP_LINEAR` 1 straightens
     every curve, 2 the power stage's).
-  - Its 1x15 miked with an RE20 at ~15 cm: -4 dB at 40 Hz, +7 dB near 1.9 kHz, -23 dB at 5 kHz.
+  - Its 1x15 miked with an broadcast dynamic microphone at ~15 cm: -4 dB at 40 Hz, +7 dB near 1.9 kHz, -23 dB at 5 kHz.
   - The DI with its top 2 dB down above 5 kHz, blended half and half with the mic
     (`PJ_BAMP_BLEND`), level-matched at 200 Hz and lined up as an engineer does it: the polarity
     and a second-order allpass on the DI that turn its phase to the mic's at the low end (the
     cabinet's high-pass turns the mic's by up to half a turn near 40 Hz: unaligned, the blend
     would lose 13 dB there; aligned it is nowhere under 30 Hz-2 kHz more than 0.7 dB below the
     louder of the two alone; `PJ_BAMP_ALIGN`, `PJ_BAMP_POLARITY`, `PJ_BAMP_MICDELAY` in samples).
-  - An LA-2A after the blend: RMS over two 10 ms poles (it does not follow a 41 Hz wave: a held E1
+  - An optical compressor after the blend: RMS over two 10 ms poles (it does not follow a 41 Hz wave: a held E1
     sine gains 0.013 % THD), 3:1, a 6 dB soft knee, attack 10 ms, half the gain reduction let go in
     60 ms and half over a second (the opto cell's tail after a long hold); about 3.5 dB of gain
     reduction on a mf line, 6 on a ff one (`PJ_BAMP_THRESHOLD` 0.023 V rms, `PJ_BAMP_RATIO`,
@@ -1357,9 +1357,9 @@ strings.
     hears the string's velocity); FluidR3's is a boomier, P-like or tone-rolled-off sample. Ours
     brightens with velocity (the first 100 ms's centroid 141 / 154 / 173 Hz at v40 / 80 / 120),
     FluidR3's does not move.
-  - Prepared in the module, not yet played ("svt" is GM 35's: Pick bass, below): "slap-di"
+  - Prepared in the module, not yet played ("bass-stack" is GM 35's: Pick bass, below): "slap-di"
     (GM 37: the DI 75 % with the VPF scoop, a clean solid-state head's EQ into a 4x10 with a horn,
-    an 1176) and "slap-squash" (GM 38: a stomp compressor, a SansAmp-like drive on the DI, the 1176
+    a FET compressor) and "slap-squash" (GM 38: a stomp compressor, a tube-emulation drive on the DI, the FET compressor
     at 8:1). `tools/bassamp.cc` checks the module's bass blocks on their own.
 - **The bassist:** each note to a string and fret near the hand, low on the neck, open strings
   welcome; index and middle fingers in turn while notes come within 0.4 s (the middle a little
@@ -1374,15 +1374,15 @@ strings.
 - Not yet: slap (37, 38; the pick is GM 35's, below), fret buzz, slides, hammer-ons, ghost notes
   as their own stroke; bass lines written on guitar programs (louisiana's channel 6) still go to the
   guitar. The bassist's velocity is narrower than a sample set's (E1 v40 to v120: 10 dB at the DI,
-  6 after the LA-2A; FluidR3 16): `-play`'s velocity gain makes up the difference. 2.2 % of a core
+  6 after the optical compressor; FluidR3 16): `-play`'s velocity gain makes up the difference. 2.2 % of a core
   with the amp (the bare DI 1.5 %).
 
 ### Pick bass
 
 `-inst pick-bass` (GM 35, Electric Bass (pick); `research/pick_bass.md`, `src/ebass.cc`,
-`src/bassspec.cc`): a Fender Precision played with a pick into an Ampeg SVT, as 1970s rock records
+`src/bassspec.cc`): a split-coil bass played with a pick into a bass stack, as 1970s rock records
 have it. The finger bass's strings, neck and fretting hand; a new pickup, a new right hand and the
-amp module's "svt".
+amp module's "bass-stack".
 - **The Precision** (`precisionBass()`): one split coil, the E/A half 149 mm from the saddle and the
   D/G half 124 mm, each string under one half; 6.4 H, 10.5 kΩ, 30 pF, wound hotter than a J coil
   (`PJ_PBASS_VOLTS`); its field along the string a Gaussian of 5 mm (`PJ_PBASS_WIDTH`: what a pick's
@@ -1416,25 +1416,25 @@ amp module's "svt".
     E's 4th harmonic gone in 0.11 s, its fundamental thudding on to -30 dB at 0.46 s. Carol Kaye's
     felt (`PJ_PICK_FELT=1`, depth 2 at 10 mm under all four strings): 20 dB/s;
   - `PJ_PICK_CHORDS=1`: strings ring into each other (drones, Lemmy's chords).
-- **The amp:** "svt" (`research/bass_amps.md` 10.2; `src/guitaramp.cc`): the SVT's 12AU7-like and
-  12AX7 stages with its James stack, +3 dB at 800 Hz, six 6550s at 4x into an 8x10 with a D112,
-  the DI 35 % lined up, an 1176 at 4:1 (its threshold now 0.04 V: a mf line hardly touched, a ff one
+- **The amp:** "bass-stack" (`research/bass_amps.md` 10.2; `src/guitaramp.cc`): the bass stack's 12AU7-like and
+  12AX7 stages with its James stack, +3 dB at 800 Hz, six 6550s at 4x into an 8x10 with a kick-drum microphone,
+  the DI 35 % lined up, a FET compressor at 4:1 (its threshold now 0.04 V: a mf line hardly touched, a ff one
   ~2.5 dB; E1 v40 to v120 11 dB after it). The hardest attack (E1 v127) is at 4 % distortion in its
   first 100 ms, a mf note under 1 %: the preamp's triodes, not the power stage.
 - **Against FluidR3's Picked Bass** (a real P-like bass sampled string by string): E1 v120, the first
   100 ms in octave bands from 20-60 Hz to 4-8 kHz, ours -19 -2 0 -10 -19 -21 -30 -66, FluidR3's -9
   -4 0 -14 -12 -21 -29 -42. Alike from 120 Hz to 4 kHz (the pick's bark at 1-4 kHz within 1 dB);
   above 4 kHz ours is far darker (the P's coil resonance into the cable, the 8x10); A2's centroid
-  344 Hz (FluidR3 373). Decays 1.3-4.1 dB/s on E1-A3 (FluidR3 1.9-5.4; the open A1 rings longest, its fall slowed by the 1176). FluidR3's samples change
+  344 Hz (FluidR3 373). Decays 1.3-4.1 dB/s on E1-A3 (FluidR3 1.9-5.4; the open A1 rings longest, its fall slowed by the FET compressor). FluidR3's samples change
   only in level with velocity; ours brightens.
 - Not yet: fret clank on hard strokes (the string against the frets: much of a real pick bass's
-  growl), the Rickenbacker and the StingRay, the "svt-flat" session chain, XG's muted pick bass on
+  growl), the through-neck bass and the active single-humbucker bass, the "bass-stack-flat" session chain, XG's muted pick bass on
   bank 28 (the files' bank select is not passed on), a click of the pick itself (through a pickup
-  there is none to speak of). 0.6 % of a core for the strings and the DI, 2.4 % with the SVT at 4x.
+  there is none to speak of). 0.6 % of a core for the strings and the DI, 2.4 % with the bass stack at 4x.
 
 `-inst slap-bass-1` (GM 37, Slap Bass 1) and `-inst slap-bass-2` (GM 38, Slap Bass 2;
 `research/slap_bass_1.md`, `research/slap_bass_2.md`, `src/ebass.cc` `SlapBassPlayer`, `src/guitar.cc`
-the frets and the thumb, `tools/slapfret.cc`): the finger bass's Jazz Bass slapped and popped, its
+the frets and the thumb, `tools/slapfret.cc`): the finger bass's two-pickup bass slapped and popped, its
 frets struck. 37 thumb-led and passive, 38 pop-forward, active, on stainless strings.
 - **The frets as obstacles** (`GuitarSpec::fretContact`, off for every other guitar): 20 crowns on a
   plane with 0.3 mm of relief (a parabola, `PJ_SLAP_RELIEF`), each its own ±0.03 mm; the open string
@@ -1496,16 +1496,16 @@ frets struck. 37 thumb-led and passive, 38 pop-forward, active, on stainless str
   stainless strings losing 15 % less above the fundamental (`PJ_SLAP2_LOSS1` 0.85; the research's
   0.65 and +6 dB came out 3-6 dB brighter at 0.3-0.8 s than every reference set).
 - **The chain**: 37 "slap-di" (the DI 75 % with the VPF at noon, a GK-like head into a 4x10 and
-  horn, an 1176 at 4:1, 0.8 ms / 150 ms: 3-4 dB of gain reduction on a v100 line); 38
+  horn, a FET compressor at 4:1, 0.8 ms / 150 ms: 3-4 dB of gain reduction on a v100 line); 38
   "slap-squash", revised after `research/slap_bass_2.md` 4: every SoundFont's 38 is brighter than
   its 37 and rings longer but is no more squashed, so the same chain with the DI at 80 % and the
-  1176's attack at 1.5 ms (the snap kept), release 120 ms; the stomp compressor (`PJ_BAMP_STOMP`)
+  FET compressor's attack at 1.5 ms (the snap kept), release 120 ms; the stomp compressor (`PJ_BAMP_STOMP`)
   and the drive (`PJ_BAMP_DRIVEMIX`) off unless asked. In -play the velocity is a gain on the voice
   as well (a GM curve; the frets cap how loud a slap rings: E1 v40 to v120 +14 dB at the DI, +10
   after the chain; a pop's own rise is ~5 dB).
 - **Against the references:** thumb against pop on the same note (D2 G2 C3), the share above 2 kHz
   at 30-100 ms +4 / +10 / +5 dB for the pop (FluidR3's two recordings: +4..+9), the two within
-  4.4 dB after the 1176 (K-weighted); 38 against 37 from E2 up: the first 100 ms 2.4-4.4 times as
+  4.4 dB after the FET compressor (K-weighted); 38 against 37 from E2 up: the first 100 ms 2.4-4.4 times as
   bright (the references 1.2-5.1), above 2 kHz at 0.3-0.8 s +4..+12 dB (refs +7..+15), more than
   in the first 30 ms (not an EQ), decaying as fast or faster, its E3 above 2 kHz +23 dB from v32 to
   v127 (Jnsgm2 +24). The thumb's first 10 ms are its loudest, but its crest factor is ~19-22 dB
@@ -1513,7 +1513,7 @@ frets struck. 37 thumb-led and passive, 38 pop-forward, active, on stainless str
 - GM 34 is untouched (bit for bit); `PJ_EBASS_FRETS=1` gives the finger bass the same frets: no
   contact at v40, a light buzz from v80 (2-4 kHz up 15-30 dB from a very low floor, the first
   100 ms's centroid +3 to +50 %).
-- Not yet: a left-hand slap, slides, the StingRay (`PJ_SLAP2_BASS=stingray` of the research), the
+- Not yet: a left-hand slap, slides, the active single-humbucker bass (`PJ_SLAP2_BASS=humbucker-bass` of the research), the
   thumb's measured mass and speed (assumed); fretted notes buzz on the next fret for 0.2-0.3 s
   after a hard stroke. ~2 % of a core for the strings and the frets (2.1× the finger bass), 3 %
   with the chain.
@@ -1521,7 +1521,7 @@ frets struck. 37 thumb-led and passive, 38 pop-forward, active, on stainless str
 ### Fretless bass
 
 `-inst fretless-bass` (GM 36, Fretless Bass; `research/fretless_bass.md`, `src/fretless.cc`,
-`src/fretlessspec.cc`, `src/band.h`, `tools/fretlessboard.cc`): the finger bass's Jazz Bass with its
+`src/fretlessspec.cc`, `src/band.h`, `tools/fretlessboard.cc`): the finger bass's two-pickup bass with its
 frets pulled, played by a fretless player who tunes by ear to the band.
 - **The board under the finger** (`GuitarSpec::board`, off for every other guitar): behind the
   stopping finger the string rises from the board to 2.5 mm over its end (27 cm from the saddle;
@@ -1547,8 +1547,8 @@ frets pulled, played by a fretless player who tunes by ear to the band.
   x1.15: above 1 kHz a stopped note dies ~3x as fast as fretted, the fundamental 4.8 dB/s against
   3.4 (FluidR3's recorded fretless -4 to -7).
 - **The pickups and the chain:** the bridge pickup full, the neck at half (`PJ_FRETLESS_PICKUP`); the
-  amp module's "fretless-di": the DI 70 % and the B-15 30 % (`PJ_FRETLESS_BLEND`), both with the
-  Acoustic 360's mid push (+3 dB at 800 Hz, `PJ_FRETLESS_MIDDB`), the LA-2A at 3:1.
+  amp module's "fretless-di": the DI 70 % and the fliptop 30 % (`PJ_FRETLESS_BLEND`), both with the
+  Acoustic 360's mid push (+3 dB at 800 Hz, `PJ_FRETLESS_MIDDB`), the optical compressor at 3:1.
   `PJ_FRETLESS_CHORUS` 0..1: a bucket-brigade chorus (7 ± 2 ms at 0.6 Hz, the lows under 150 Hz
   dry, stereo by the inverted sweep), off as on a Sound Canvas. `PJ_FRETLESS_FLATS=1` flatwounds.
 - **The player** (`FretlessBassPlayer`): every stopped note is the stopping finger's place in cents:
@@ -2109,11 +2109,11 @@ Mustel / Schiedmayer kind, C2-C7, A = 440. The reeds are blown by the wind, not 
 
     ./pajupilli -inst reed-organ -seq "on 48 70 on 64 70 on 67 70 on 72 70 wait 2 off 48 off 64 off 67 off 72 wait 0.5"
 
-### Hammond B-3 and Leslie
+### tonewheel organ and rotary speaker
 
-`-inst hammond` and GM 17-19 (`drawbar-organ`, `percussive-organ`, `rock-organ`): a tonewheel organ
-through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
-`research/hammond_b3.md`, `research/leslie.md`, `research/hammond_character.md`).
+`-inst tonewheel` and GM 17-19 (`drawbar-organ`, `percussive-organ`, `rock-organ`): a tonewheel organ
+through its rotary speaker (`src/tonewheel.cc`, `src/rotary.cc`, `src/tonewheelplan.cc`;
+`research/tonewheel_organ.md`, `research/rotary.md`, `research/tonewheel_character.md`).
 
 - **The generator:** all 91 wheels turn all the time, geared to one shaft through the 12 gear
   pairs. A is exactly 440 and C is −0.58 c, as built. The wheels are phase-locked, so a chord sounds
@@ -2127,7 +2127,7 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     level. Sidebands at the rotation rate, ~−30 dB;
   - **its own subharmonics:** the wheel's rotation rate (16.35-30.86 Hz by its gear) and that
     rate's harmonics up to 3 × its teeth (8-48 of them), its own levels (~1/k, ±3 dB) and phases,
-    ~−40 dB under the tone together (`PJ_HAMMOND_SUBS`, dB); the tone's own harmonics left out,
+    ~−40 dB under the tone together (`PJ_TONEWHEEL_SUBS`, dB); the tone's own harmonics left out,
     the wheel's filter (49-91) on them as on the rest. C3's wheel (8 teeth): lines at 16.35,
     32.7 ... 114.5 Hz, −38 to −59 dB; the filtered wheels keep little of them. Those next to the
     tone (the tone ± the rotation rate) also read as a slight pitch wobble of the wheel's own;
@@ -2135,46 +2135,46 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - each tooth a little off in place and depth, and the wheel's own level.
   - **its machined teeth's overtones:** never a perfect sine, each wheel's tooth profile its own,
     up to the 7th harmonic: the 2nd and 3rd ~−30 dB, the 5th ~−34, the 4th, 6th and 7th lower,
-    ±4 dB per wheel (`PJ_HAMMOND_WHEELHARM`, dB). The tuned filters of wheels 49-91 take most of
+    ±4 dB per wheel (`PJ_TONEWHEEL_WHEELHARM`, dB). The tuned filters of wheels 49-91 take most of
     them off the high wheels (C5: −46 to −72 dB). Being exact multiples of their wheel, they beat
     against the tempered wheels of the drawbars above: the 1⅗' wheel ~14 c sharp of the 5th, the
     2⅔' ~2 c narrow of the 3rd. Middle C on 008000800 beats at 10.4 Hz (±2.8 % of the 1⅗' band's
     level), C3 at 5.2 Hz: the full registrations' slightly dissonant brilliance. Measured on C3's
     unfiltered wheel: 2nd −34, 3rd −36, 4th −41, 5th −31, 6th −48, 7th −43 dB (were ≤ −68).
-  - **the valve preamp:** a single-ended triode's 2nd-order curve (`PJ_HAMMOND_VALVE`): even
+  - **the valve preamp:** a single-ended triode's 2nd-order curve (`PJ_TONEWHEEL_VALVE`): even
     harmonics and difference tones growing with the level (C4 + E4 on the 8': their 68 Hz
     difference tone −34 dB, −50 without). Its **microphonics:** the console's valves hear the
-    Leslies (~2 m, 6 ms); the electrodes (a mass on a spring, resonant at ~3.3 kHz, Q 8) shaken by
-    the swirling sound modulate the stage's gain (~0.5 %, `PJ_HAMMOND_MICROMOD`) and add a little
-    of it (~40 dB under the signal, `PJ_HAMMOND_MICRO`): a faint loop through the turning
+    rotary speakers (~2 m, 6 ms); the electrodes (a mass on a spring, resonant at ~3.3 kHz, Q 8) shaken by
+    the swirling sound modulate the stage's gain (~0.5 %, `PJ_TONEWHEEL_MICROMOD`) and add a little
+    of it (~40 dB under the signal, `PJ_TONEWHEEL_MICRO`): a faint loop through the turning
     speakers. At these settings the brightness changes little (+0.5 dB at 1-2 kHz on a 888
-    chord); `PJ_HAMMOND_VALVE=3` gives +3.5 dB, at the cost of the key clicks on full
+    chord); `PJ_TONEWHEEL_VALVE=3` gives +3.5 dB, at the cost of the key clicks on full
     registrations (the distortion's highs mask them);
   - **its shaft's, shared with exactly one other wheel:** the generator's 48 assemblies each carry
     two wheels four octaves apart (1-36 with 49-84, 42-48 with 85-91; 37-41 ride alone). A
     bent shaft swells both wheels' levels together once a turn. Its driven gear's runout and
     ovality sway its speed once and twice a turn (its angle up to ~1e-3 rad off: ~1 c of
-    vibrato at the rotation rate, `PJ_HAMMOND_SHAFT`). Its torsional flutter on its coupling and
+    vibrato at the rotation rate, `PJ_TONEWHEEL_SHAFT`). Its torsional flutter on its coupling and
     its starting angle are shared too, while each wheel keeps its own eccentricity, teeth and
     filter. Measured: C2 and C6 (wheels 13 and 61, one shaft) swell together (correlation 0.93),
     their pitch wobbles 0.30 (each wheel's own overtones breathing too); C2 and C3 (two shafts of
     the C ratio) 0.12 and 0.19.
 
-  The organ's serial number (`PJ_HAMMOND_SERIAL`) draws the flaws, and `PJ_HAMMOND_AGE` scales them
+  The organ's serial number (`PJ_TONEWHEEL_SERIAL`) draws the flaws, and `PJ_TONEWHEEL_AGE` scales them
   (1: a used organ). The shaft's 20 Hz wobble and the motor's 120 Hz pulses ripple every wheel
   together. The organic rest, all running in absolute time, so chords stay phase-locked:
   - **Flutter:** each wheel sits on its own spring coupling, a torsional resonance of 3-8 Hz
     excited by the motor's pulses (all wheels alike) and its bearing (its own). Each wheel's speed
-    wobbles ~0.4 c rms (`PJ_HAMMOND_FLUTTER`), each its own way, so a chord shimmers.
+    wobbles ~0.4 c rms (`PJ_TONEWHEEL_FLUTTER`), each its own way, so a chord shimmers.
   - **Mains drift:** the synchronous motor and the scanner follow the grid's slow drift, ±0.5 c over
-    tens of seconds (`PJ_HAMMOND_MAINS`).
+    tens of seconds (`PJ_TONEWHEEL_MAINS`).
   - **Breathing colour:** where the off-centre wheel runs closer, its harmonics swell more than its
     fundamental, so its colour breathes once a revolution, not only its level.
   - **Loading:** a wheel's voltage sags ~3 % for each contact it feeds beyond the first, so big
     chords and full drawbars compress a little.
-  - **Hum and ripple:** the power supply's 60/120/180 Hz hum (`PJ_HAMMOND_HUM`) and its 120 Hz
+  - **Hum and ripple:** the power supply's 60/120/180 Hz hum (`PJ_TONEWHEEL_HUM`) and its 120 Hz
     ripple on the preamp's gain. With the leakage, the idle floor is ~−53 dB under a note.
-  - **Dirty contacts:** a held contact breaks for 0.1-2 ms now and then (`PJ_HAMMOND_DIRT`, 0.3:
+  - **Dirty contacts:** a held contact breaks for 0.1-2 ms now and then (`PJ_TONEWHEEL_DIRT`, 0.3:
     about one crackle in 10 s under a held full-drawbar chord). Each wheel's shaft partner leaks in at −45 dB, and the whole generator whispers behind
   everything at ~−70 dB per wheel.
 - **Keys:** upper and lower manuals (C2-C7, nine drawbars with the foldback) and pedals (C1-C3,
@@ -2188,16 +2188,16 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   its resistance gone in ~0.12 ms, bouncing up to 3 times): a sharp click. A soft key lays them on
   (spread over ~3 ms, the resistance falling over ~1 ms, hardly bouncing): a soft one. With all
   drawbars out the click runs from ~3 dB over the tone (velocity 30) to ~21 dB (127). The
-  percussion is touch-sensitive as on the modern Hammonds: its ping from ~−5 dB under a soft key
-  to full (`PJ_HAMMOND_PERCTOUCH`). In `-play` the velocities also ride the expression pedal where
+  percussion is touch-sensitive as on the modern tonewheel organs: its ping from ~−5 dB under a soft key
+  to full (`PJ_TONEWHEEL_PERCTOUCH`). In `-play` the velocities also ride the expression pedal where
   the file has none.
 - **Percussion** (upper): the 2nd or 3rd harmonic, fast (−20 dB in ~0.17 s) or slow, normal or
   soft. It is single-trigger: legato does not strike it again, and a short gap re-arms it only
   part way. The 1' drawbar is silent while it is on.
 - **Vibrato and chorus:** V1-V3 and C1-C3, a delay line read back and forth at 6.87 Hz.
 - **Preamp:** the expression pedal (CC11, ~35 dB, the bass held up as it closes) and the tube's
-  soft knee, into the Leslie's amp.
-- **The Leslie:**
+  soft knee, into the the rotary speaker's amp.
+- **The rotary speaker:**
   - an asymmetric soft clip with supply sag (the drive per program: the rock organ hot), then the
     800 Hz crossover;
   - the horn on a 0.17 m arm: to each of two microphones its direct path and two wall images,
@@ -2210,28 +2210,28 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - the acceleration is the speed error and its integral, limited to what the motor can give
     (horn 6 Hz a second, drum 1.2), with no windup against the limit;
   - gentler going down (friction and coasting) than up;
-  - damped at 1.8 (`PJ_LESLIE_ZETA`): it eases in and barely passes its speed.
+  - damped at 1.8 (`PJ_ROTARY_ZETA`): it eases in and barely passes its speed.
 
   The horn, lighter on its own motor, reacts faster: it reaches its fast speed in ~0.9 s and its
   slow one in ~1 s; the drum takes ~2.8 and ~3.1 s. The speeds are 0.8/6.7 Hz (horn) and the drum
-  1.6 × slower, 0.5/4.2 Hz (`PJ_LESLIE_RATIO`; the published 122 measurements give ~1.17 ×,
-  0.67/5.7 Hz: `PJ_LESLIE_RATIO=1.17`), each cabinet ±3 %. The two rotors turn opposite ways, the
+  1.6 × slower, 0.5/4.2 Hz (`PJ_ROTARY_RATIO`; the published 122 measurements give ~1.17 ×,
+  0.67/5.7 Hz: `PJ_ROTARY_RATIO=1.17`), each cabinet ±3 %. The two rotors turn opposite ways, the
   horn counter-clockwise seen from above, the drum clockwise, so their Doppler swings and beams
   sweep against each other (measured: the drum's left/right phase flips, +160° → −164°, the
-  horn's unchanged; `PJ_LESLIE_SAMEWAY=1` turns both one way).
+  horn's unchanged; `PJ_ROTARY_SAMEWAY=1` turns both one way).
 
-  **Four Leslies** by default (`PJ_LESLIE_COUNT`, 1-4), each its own:
-  - its parts off nominal, each up to ±7 % (`PJ_LESLIE_SPREAD`): the motors' strength, the
+  **Four rotary speakers** by default (`PJ_ROTARY_COUNT`, 1-4), each its own:
+  - its parts off nominal, each up to ±7 % (`PJ_ROTARY_SPREAD`): the motors' strength, the
     crossover, the horn's and the drum's radii, the cabinet's inner reverberation; its own
     flaws (eccentricities, belts, rattle) from its own serial;
   - its speeds, exactly (the ±3 % of a lone cabinet's pulleys would undo the choice): four
     factors whose every cross ratio stays furthest from the fractions up to N/11
-    (`tools/leslie_ratios.py --four --q 11`): none within 1.2 % of a fraction over 1-5 (1.230
+    (`tools/rotary_ratios.py --four --q 11`): none within 1.2 % of a fraction over 1-5 (1.230
     is 1.6 % from 5/4, 1.307 2.0 % from 4/3, 1.418 1.2 % from 7/5), the closest misses
     0.6-0.9 % from 8/7, 10/7, 11/9, 13/10, 12/11; scaled to centre on the usual speeds (the
-    cross ratios unchanged) (`PJ_LESLIE_SPEEDS`);
-  - its manuals, its place and its speed (`PJ_LESLIE_MIX`, shares of upper, lower, pedals):
-    | Leslie | place | upper | lower | pedals | speed |
+    cross ratios unchanged) (`PJ_ROTARY_SPEEDS`);
+  - its manuals, its place and its speed (`PJ_ROTARY_MIX`, shares of upper, lower, pedals):
+    | rotary speaker | place | upper | lower | pedals | speed |
     |---|---|---|---|---|---|
     | centre | in front | 75 % | 12.5 % | 12.5 % | × 1.172 (the fastest), horn/drum 1.6 |
     | left | 2 m left, turned 25° | 12.5 % | 75 % | 12.5 % | × 1.081 |
@@ -2240,7 +2240,7 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
 
     (the three others with the published 122's horn/drum ratios, 1.20 on slow, 1.17 on fast).
     Each manual's shares are scaled so its whole power over the four is as before: the balance
-    kept. Each Leslie has its own channel of the console's amplification (the expression's bass,
+    kept. Each rotary speaker has its own channel of the console's amplification (the expression's bass,
     the tone, the valve stage, its overload): each amplifier distorts its own mix. The back wall
     stands 1.5 m behind the rearmost cabinet. Measured (each cabinet's input): an upper note
     −19 dB in the centre, −34 in the others; a lower one −20 left and right, −36 in the others;
@@ -2250,31 +2250,31 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
 
   Each is fed down (two: ~5 dB, four: ~8 dB), so that together they are as loud as one
   (measured: −20.1 to −20.2 LUFS for one, two or four). Four cost ~20 % of a core (one: 8 %).
-  `tools/leslie_ratios.py` searches speed sets whose every cross ratio stays away from small
+  `tools/rotary_ratios.py` searches speed sets whose every cross ratio stays away from small
   whole-number ratios (up to N/17, the simpler the fraction the wider the berth; the closest miss
   decides). The mod wheel (CC1 ≥ 64) or the
-  sustain pedal switches fast/slow, and CC82 (as the Leslie 2101's default) switches stop / slow /
+  sustain pedal switches fast/slow, and CC82 (as the digital rotary speaker's default) switches stop / slow /
   fast (0-42 / 43-85 / 86-127). Measured at the microphones on a fast C6:
   - the Doppler: −39..+44 c;
   - the tremolo: 15-16 dB;
   - the reflections: a chord's partials each swinging 9-22 dB their own way (correlation 0.30).
 
-  `PJ_LESLIE_*` knobs set the speeds, ramps and mic distance.
+  `PJ_ROTARY_*` knobs set the speeds, ramps and mic distance.
 
-  **In a room** (the default; `PJ_LESLIE_MICS=close` for the close microphones), the cabinet
+  **In a room** (the default; `PJ_ROTARY_MICS=close` for the close microphones), the cabinet
   radiates into it rather than being close-miked:
   - six rays leave it at 0°, ±60°, ±120° and 180°, each with its own Doppler (the horn's distance
     along it) and the horn's beam toward it, plus the dummy bell, the drum's scoop, the fixed bass
     and the cabinet's tail;
-  - the room's microphones, a pair 2 m apart and 4 m away (`PJ_LESLIE_LISTENER`), hear each ray
+  - the room's microphones, a pair 2 m apart and 4 m away (`PJ_ROTARY_LISTENER`), hear each ray
     by its own path: the front ray directly and off the floor, the side rays off the side walls,
     the rear rays off the back wall and corners, each with its delay and 1/r;
-  - the room's late field is fed the rays' mean: what the Leslie sprays all round, its level
+  - the room's late field is fed the rays' mean: what the rotary speaker sprays all round, its level
     steady, its Doppler from every direction.
 
   Against close microphones in the hall, the tail is 3 dB fuller and the left-right correlation
-  0.6 instead of the microphones' fixed pattern. The Hammond's own output is +14 dB (its trims
-  lowered 10.9 dB; the rest makes up being heard from 4 m), so the room hears a loud Leslie as
+  0.6 instead of the microphones' fixed pattern. The the tonewheel organ's own output is +14 dB (its trims
+  lowered 10.9 dB; the rest makes up being heard from 4 m), so the room hears a loud rotary speaker as
   it is.
 
   **Inside the horn compartment** (the 122, 41 × 29 × 21 in, height first: 737 × 533 mm; the
@@ -2289,24 +2289,24 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     board the same way, later. Each image is its own delay line read, so the overtones meet their
     own oppositely shifted copies: a comb moving with the turn. Against the horn alone, the
     partials' levels change ~33 % faster.
-  - **Off-centre:** the horn's axis is off the middle (3 cm back, 4 cm left: `PJ_LESLIE_OFFX`,
+  - **Off-centre:** the horn's axis is off the middle (3 cm back, 4 cm left: `PJ_ROTARY_OFFX`,
     `_OFFY`), so each side has its own delays and response.
-  - **The slots as a grating:** 5 cm apart one over another (`PJ_LESLIE_SLOT`), they send the highs
+  - **The slots as a grating:** 5 cm apart one over another (`PJ_ROTARY_SLOT`), they send the highs
     out as a vertical row of sources. The close microphones, one a little above the horn and one
     below, hear the row at slightly different times: a comb above 4 kHz, different left and right.
   - **The close microphones** are at the compartment's sides (±80°, 0.65 m), in front of the
     louvres, as players mike it.
-  - Knobs: `PJ_LESLIE_INSIDE` (the reflections), `_POST`, `_MIDPOST` (the posts' reach).
+  - Knobs: `PJ_ROTARY_INSIDE` (the reflections), `_POST`, `_MIDPOST` (the posts' reach).
   - **The horn's own response** on its axis, a fixed filter (the driver is driven: nothing in its
     bell plays back on the organ, so no wave is simulated there, only its effect): the flare's
     cutoff (~650 Hz, 12 dB an octave, a little hump at it), the mouth's reflection's ripple
     (+3 dB at 1 kHz, −2.5 at 1.45, +2 at 1.95, −1.5 at 2.6 kHz, fading as the mouth radiates
-    better), the driver's top from ~7 kHz; each cabinet ±4 % in frequency. Through the slow Leslie
-    a B5 +3 dB, an F6 −0.6 dB, a C5 unchanged (the drum's). `PJ_LESLIE_HORNEQ` scales the ripple
+    better), the driver's top from ~7 kHz; each cabinet ±4 % in frequency. Through the slow rotary speaker
+    a B5 +3 dB, an F6 −0.6 dB, a C5 unchanged (the drum's). `PJ_ROTARY_HORNEQ` scales the ripple
     (0: flat).
 
-  **Each cabinet's own flaws** (seeded by the organ's serial; `PJ_LESLIE_AGE` scales them,
-  `PJ_LESLIE_NOISE` the machinery's sounds):
+  **Each cabinet's own flaws** (seeded by the organ's serial; `PJ_ROTARY_AGE` scales them,
+  `PJ_ROTARY_NOISE` the machinery's sounds):
   - **Uneven rotation:** an off-centre pulley and an unbalanced horn make each rotor run a few %
     faster on one side of its turn (horn ~3 %, drum ~1 %). Each belt adds its own wobble at a rate
     unrelated to the turn.
@@ -2317,26 +2317,26 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
   - **The horn's wind:** air swished off the spinning horn, a 1.5-5 kHz hiss growing with the square
     of its speed and swirling with it (idle at fast: +9 dB over slow).
   - **A loose panel:** a 150-220 Hz resonance driven by the deep bass, which buzzes past its
-    clearance (`PJ_LESLIE_RATTLEGAP`) under a loud bass: ~33 dB under the chord's own highs.
+    clearance (`PJ_ROTARY_RATTLEGAP`) under a loud bass: ~33 dB under the chord's own highs.
   - **The machinery:** the running motor's 120 Hz hum and its 28.75 Hz rumble, the amp's hum, and
     the speed relay's click when the switch moves (40 dB under its measured level, practically
-    silent; `PJ_LESLIE_RELAY`, dB over that, brings it back).
+    silent; `PJ_ROTARY_RELAY`, dB over that, brings it back).
   - **The crossover** a few % off 800 Hz (aged capacitors). **The microphones** never quite
     symmetric (±4°, ±3 cm).
 - **Registrations:**
-  - GM 17: upper 888000000, C3, Leslie slow.
+  - GM 17: upper 888000000, C3, rotary speaker slow.
   - GM 18: with the 3rd percussion, fast.
-  - GM 19: 888800000, the Leslie fast, the amp driven.
+  - GM 19: 888800000, the rotary speaker fast, the amp driven.
   - Lower 838000000 and pedals 8/3 throughout.
-  - Overrides: `PJ_HAMMOND_UPPER`, `_LOWER`, `_PEDAL` (digits), `_PERC` (`off`, `3f`, `2s`,
-    `3fs`), `_VIB` (`off`, `V1`..`C3`), `_LESLIE` (`slow`, `fast`, `off`: dry).
-- **`-play` plans the part from the file** (`src/hammondplan.cc`), printed under the channel list:
+  - Overrides: `PJ_TONEWHEEL_UPPER`, `_LOWER`, `_PEDAL` (digits), `_PERC` (`off`, `3f`, `2s`,
+    `3fs`), `_VIB` (`off`, `V1`..`C3`), `_ROTARY` (`slow`, `fast`, `off`: dry).
+- **`-play` plans the part from the file** (`src/tonewheelplan.cc`), printed under the channel list:
   - **Pedals and manuals:**
     - a low, one-note-at-a-time track takes the pedals, the highest track the upper manual, the
       others the lower;
     - with three tracks (an organist's three staves), the lowest is the pedals and the other two
       the manuals;
-    - every channel on one Hammond program joins one organ and one Leslie, its channels as lines;
+    - every channel on one tonewheel organ program joins one organ and one rotary speaker, its channels as lines;
     - one track holding both hands is split moment by moment: the top note and a block chord
       moving with it go to the upper manual, held chords under a moving tune to the lower, and a
       low note a fifth or more under the rest to the pedals;
@@ -2358,7 +2358,7 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     whatever its register: all of it on the upper manual.
   - **The file's own balance:** an accompaniment written quieter than the tune (by velocity and
     its channels' expression, on General MIDI's square law) gets a lower manual that much softer,
-    3 dB a step. At most ~6 dB (`PJ_HAMMOND_BALANCEGAP`): an accompaniment written much
+    3 dB a step. At most ~6 dB (`PJ_TONEWHEEL_BALANCEGAP`): an accompaniment written much
     softer (say 11 dB) would be left a whisper under the tune, so past that it is set apart by
     colour instead: the hollow 8' (008060400's shape: the 8' with its odd harmonics, the
     clarinet) at 6 dB under, its vibrato off under the tune's C3, as a trio organist sets two lines
@@ -2369,9 +2369,9 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     more, one more drawbar is pulled out (the 4', the 2', the 2⅔', the 1', the 1⅓', the 1⅗').
     At most four; with more pauses, the ones nearest 35, 55, 75 and 90 % of the piece, so the
     organ grows toward the end. The lower manual and pedals follow, the sliders gliding.
-  - **Routing:** `hammond-upper-manual`, `hammond-lower-manual` and `hammond-pedal` are the same one
-    Hammond and Leslie, their notes kept on that division whatever the plan says, e.g.
-    `-reinstrument grand-piano=hammond-upper-manual,double-bass=hammond-pedal`.
+  - **Routing:** `tonewheel-upper-manual`, `tonewheel-lower-manual` and `tonewheel-pedal` are the same one
+    tonewheel organ and rotary speaker, their notes kept on that division whatever the plan says, e.g.
+    `-reinstrument grand-piano=tonewheel-upper-manual,double-bass=tonewheel-pedal`.
   - **The harmonic percussion** (3rd, fast) where the upper manual's line is mostly single notes,
     detached and moving (≥ 60 % single, < 45 % legato, ≥ 1.5 notes a second): the jazz line.
     - Not in legato, chordal, slow or rock playing.
@@ -2385,7 +2385,7 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       been up (~35 ms to charge). Where it is on, a legato move into a bar's first note (4/4
       assumed) or a clearly louder note (+12) is detached: the note before let go 45 ms early, at
       most one every 1.5 s, never while another upper key is held. The other legato moves stay as
-      written, without the ping (`PJ_HAMMOND_DETACH=0`: none).
+      written, without the ping (`PJ_TONEWHEEL_DETACH=0`: none).
     - **The jazz upper with the percussion is 888000008:** the 1' is silent while the percussion
       is on (its busbar taken for the ping) and comes in where the percussion is switched off.
     - **The lower manual as the percussion's stand-in:** an organist's trick: "if you are not
@@ -2393,9 +2393,9 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       manual drawbars to 008880080". With the percussion on (3rd, fast) for the whole piece and
       the left hand comping (mostly chords) above the bass (the pedals carry it, or the lower's
       notes average above G3), the lower manual gets 008880080's shape at its planned level,
-      e.g. 005550050 (`PJ_HAMMOND_LOWERPERC=0`: never). With the left hand's own bass it keeps
+      e.g. 005550050 (`PJ_TONEWHEEL_LOWERPERC=0`: never). With the left hand's own bass it keeps
       its derived registration (jazz: ~748, the classic 838/848).
-    - **The lower's vibrato off under a fast Leslie:** C3 on the lower manual under fast rotors
+    - **The lower's vibrato off under a fast rotary speaker:** C3 on the lower manual under fast rotors
       smears the accompaniment. Through each planned fast phrase its vibrato tab is off (dry,
       tight comping under the upper's C3) and back on after.
   - **The vibrato tabs:** C3 on both manuals by default. Counterpoint (a moving pedal line, the
@@ -2403,21 +2403,21 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     both tabs off, the lines clear as on a pipe organ (BWV 525, 537, 541). A lower manual carrying the
     bass itself (no pedal line, its single notes under F3) has its tab off, the bass tight, as trio
     organists play the left hand's line. The plan prints `vibrato C3 upper only` / `(tabs off)`.
-  - **Preset keys:** a re-registration at a pause shorter than 0.7 s (`PJ_HAMMOND_PRESETKEY`, s) is
+  - **Preset keys:** a re-registration at a pause shorter than 0.7 s (`PJ_TONEWHEEL_PRESETKEY`, s) is
     made by the B preset key, the upper manual's new registration at once; at longer pauses the
     drawbars are pulled and glide as before.
   - **The ending,** on a final chord (the notes sounding at the end, from the last of them begun; its
-    length by the tempo map, a ritardando included) of 1.5 s or more (`PJ_HAMMOND_ENDING=0`: none):
-    - the Leslie (when planned), on four in five such chords of 2 s or more
-      (`PJ_HAMMOND_ENDLESLIE`): fast at 12 % of it, slow again at 80 %, the rotors still winding
+    length by the tempo map, a ritardando included) of 1.5 s or more (`PJ_TONEWHEEL_ENDING=0`: none):
+    - the rotary speaker (when planned), on four in five such chords of 2 s or more
+      (`PJ_TONEWHEEL_ENDROTARY`): fast at 12 % of it, slow again at 80 %, the rotors still winding
       down when it is let go; already fast, slow at 35 %;
     - the expression pedal (when the file has no CC11): a ballad's closing from 30 % of the chord to
       the end (to 0.6 of the pedal, ~−12 dB); otherwise the swell, the chord struck, eased back to
       0.85 and opened past where it was (1.2) by 75 %;
     - two more drawbars pulled out through it (the next of the pauses' order), the chord opening up:
       not a ballad, not on harmony thinned to one foundation;
-    - the rock organ, on one ending in two (`PJ_HAMMOND_DIVE`): **the run switch off** half way
-      through it. The generator coasts down on its inertia (`PJ_HAMMOND_COAST`, 4 s), its pitch
+    - the rock organ, on one ending in two (`PJ_TONEWHEEL_DIVE`): **the run switch off** half way
+      through it. The generator coasts down on its inertia (`PJ_TONEWHEEL_COAST`, 4 s), its pitch
       sinking and its voltage falling with its speed, the scanner slowing with it: a held C4 falls
       ~750 c in 1.6 s.
   - **Glissandos:** the palm swept up the white keys from an octave and a bit under the note into it
@@ -2425,10 +2425,10 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     the note). Into the first note of a planned fast phrase (jazz, rock, full, percussive), and on
     the rock organ or a full chordal piece into the music resuming after a re-registering pause (the
     later ones first) or into the final chord. Only where the upper manual is free for the sweep, not
-    on complex harmony (0.3 or more) nor in a ballad; at most two (`PJ_HAMMOND_GLISS`).
+    on complex harmony (0.3 or more) nor in a ballad; at most two (`PJ_TONEWHEEL_GLISS`).
   - **The expression:** with no CC11 in the file it follows the velocities (slowly, as a foot).
-  - **The Leslie:** the file's own if it sends CC82, or CC1 or CC64 on a channel it wrote for a
-    Hammond (a reinstrumented piano's sustain pedal is its damper, not the Leslie's switch: ignored
+  - **The rotary speaker:** the file's own if it sends CC82, or CC1 or CC64 on a channel it wrote for a
+    tonewheel organ (a reinstrumented piano's sustain pedal is its damper, not the the rotary speaker's switch: ignored
     on the organ). Otherwise it is planned:
     - most pieces stay slow throughout;
     - about one in four (one in two on the rock organ) goes fast in its strongest phrase (the most,
@@ -2439,27 +2439,27 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       beginning in its middle 60 %, the slow rotors are asked a little faster, 1.6-2.4 x the slow
       speed (drawn from the notes), from ~45 % of it to ~70 %. Through their slow PI control the
       horn swells and settles (0.8 → ~1.8 Hz and back) while the drum barely stirs. Only where
-      the plan has the Leslie slow, at most one every 8 s.
+      the plan has the rotary speaker slow, at most one every 8 s.
     - **Trills with a rising touch:** a line alternating between two neighbouring notes (a
       semitone or a tone), six notes or more each within 0.2 s (or four within 0.1 s), is played
       from about half its velocity up to 1.3 × (at most 127): the contacts struck ever harder, the
-      key clicks sharpening through it (`PJ_HAMMOND_TRILL`; BWV 537 and 525 have seven each).
+      key clicks sharpening through it (`PJ_TONEWHEEL_TRILL`; BWV 537 and 525 have seven each).
     - **Harmonic complexity:** at every onset, over what sounds then: the pitch classes beyond a
       triad, a semitone or tritone among them, a second or third under C4 (0..1; Bach's chorales
       ~0.2, jazz standards 0.3-0.45). From 0.25 the 16' and 5 1/3' fade, from 0.4 the upper is a
       single foundation, 008300000 (or 000800000 when its tune is low): complex harmony on the
-      888's sub-octave and fifth is mud (`PJ_HAMMOND_COMPLEX`).
+      888's sub-octave and fifth is mud (`PJ_TONEWHEEL_COMPLEX`).
     - **Clarity for the lower manual and pedals:** a pedal line (more for a busy, walking or
       contrapuntal one) and rich harmony ease the lower's 16' and 5 1/3' back and put the pedals on
-      less 16', more 8' (`PJ_HAMMOND_CLARITY`). BWV 537 (`-reinstrument organ=hammond`): lower
+      less 16', more 8' (`PJ_TONEWHEEL_CLARITY`). BWV 537 (`-reinstrument organ=tonewheel`): lower
       637000000 → 428000000, pedals 82 → 63.
     - **Trills thinned:** from a planned trill's start the manuals' drawbars other than the 8' and
-      4' glide down by up to 80 % (888000000 → ~228000000), back after it (`PJ_HAMMOND_TRILLTHIN`):
+      4' glide down by up to 80 % (888000000 → ~228000000), back after it (`PJ_TONEWHEEL_TRILLTHIN`):
       a trill on a thick registration is a blur.
     - **The lower manual crowding the pedals:** its held notes low (under C4) and close above the
       pedal note (within an octave and a half), where its 16' doubles its line into the pedals'
       register: its 16' and 5 1/3' eased back (up to 75 / 70 %), followed over ~0.8 s rising,
-      ~3 s falling, slight and gradual (`PJ_HAMMOND_CROWD`). BWV 537 at 1:45-1:51: the lower's 16'
+      ~3 s falling, slight and gradual (`PJ_TONEWHEEL_CROWD`). BWV 537 at 1:45-1:51: the lower's 16'
       ~4 → ~2.3.
     - **The upper manual low over the others:** its notes under G4 and close above the lower's or
       the pedals' (within an octave), where its 16' doubles its line onto theirs: its 16' and
@@ -2467,13 +2467,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       1:40-1:53: the upper's 16' and 5 1/3' 8 → ~4.5.
     - **The lower manual carrying the bass line:** the pedals resting over a second and its low
       notes moving (over ~1.5 a second): its 4', 2 2/3' and 2' drawn out (up to 3, 2, 2 steps) for
-      the line's definition, over ~0.8 s, back over ~2 s (`PJ_HAMMOND_BASSLINE`). BWV 537
-      4:17-4:30. `PJ_HAMMOND_MUDLOG=1` prints all these corrections every second.
+      the line's definition, over ~0.8 s, back over ~2 s (`PJ_TONEWHEEL_BASSLINE`). BWV 537
+      4:17-4:30. `PJ_TONEWHEEL_MUDLOG=1` prints all these corrections every second.
     - **Muddiness corrected online:** while playing, close intervals held low on the manuals (a
       second under C4, a third under C3) and a pedal note with manual notes close above it under
       C3 ease the manuals' 16' and 5 1/3' back (up to 70 / 80 %), the pedal's 16' (up to 50 %), and
       give the 4' a little more; the sliders glide there in ~0.3 s and back in ~1.5 s when it
-      clears (`PJ_HAMMOND_MUD`). A held C3-D3-E♭3 on 888: its sub-bass −5 → −13 dB of the sound.
+      clears (`PJ_TONEWHEEL_MUD`). A held C3-D3-E♭3 on 888: its sub-bass −5 → −13 dB of the sound.
     - **The fast switch on a long held chord:** where three notes or more are held unchanged for
       2.5 s or more (nothing begins or ends). Where the chord is struck there, an organist's way:
       "I switch to fast just before I hit the note and switch back to slow in the middle of the
@@ -2481,17 +2481,17 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       the horn swells up to speed and settles, the drum half way. A chord whose notes began at
       different times gets the short flick inside it instead: fast for 0.35-0.75 s in its first
       half, back before the rotors get there. About two in three such chords
-      (`PJ_HAMMOND_FLICK` 0.65), half as many in a slow part (under a moment a second over the
+      (`PJ_TONEWHEEL_FLICK` 0.65), half as many in a slow part (under a moment a second over the
       10 s around it: "sometimes I leave it on slow over a slow part or a long note just to have
-      that clear sound"). 10 s apart at least, only where the plan has the Leslie slow; such a
+      that clear sound"). 10 s apart at least, only where the plan has the rotary speaker slow; such a
       chord is not nudged too. Measured on a struck 6 s chord: the horn 0.8 → 7.9 Hz and back to
       0.9 Hz before it ends. The plan's speed changes are applied
       by the clock, as the nudges are: a held chord has no events to carry them.
-      `PJ_HAMMOND_FASTSHARE` sets the share of pieces with a fast phrase.
+      `PJ_TONEWHEEL_FASTSHARE` sets the share of pieces with a fast phrase.
 
     Played live, the player rides it by the music's intensity instead.
-  - The `PJ_HAMMOND_*` overrides apply over the plan.
-- **Live, the MPK's knobs (K1-K6):**
+  - The `PJ_TONEWHEEL_*` overrides apply over the plan.
+- **Live, the controller's knobs (K1-K6):**
   - **K1-K4 draw the upper manual** along the tradition's own paths (not a linear map):
     - **K1, soft to hard:** 16 of the most used registrations in the order an organist pulls them as
       a tune grows, piecewise linear between them, in whole steps:
@@ -2500,13 +2500,13 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
       continuously between them. Its last third also drives the 122 harder (to 2.5x).
     - **The lower manual follows the upper**, as organists derive the accompaniment's
       registration from the melody's: of the same family, softer and darker. Each drawbar keeps a
-      share of the upper's, then a step less (`PJ_HAMMOND_LOWER_SOFTER`, 1 ≈ 3 dB). The shares are
+      share of the upper's, then a step less (`PJ_TONEWHEEL_LOWER_SOFTER`, 1 ≈ 3 dB). The shares are
       16' 0.85, 5⅓' 0.45, 8' 1, 4' 0.55, 2⅔' 0.45, and the top 0.3 down to 0.15. So the jazz
       888000000 gets ~637000000 below it, close to the classic 838, and full organ a mellow
       tapering 6.3.7.3.3.1.1.1.0. `-play`'s plans derive their lower manual the same way. Under
       a pedal bass (the plan's clarity) the 5⅓' eases further, toward another organist's
       favourite, 888000000 over 808000000 with pedals 80. A lower or pedal set by hand
-      (`PJ_HAMMOND_LOWER`, `_PEDAL`) is kept through the plan's re-registrations.
+      (`PJ_TONEWHEEL_LOWER`, `_PEDAL`) is kept through the plan's re-registrations.
     - **The pedals follow too** (their two drawbars): the 16' by the upper's loudness, the 8' by
       its brightness (the share of its 4' and above). Round registrations get the simple pedal,
       bright ones a brighter one: whisper 5.7/1.5, ballad 7/1.5, jazz 8/1.5, gospel 8/3.5, full
@@ -2518,19 +2518,19 @@ through its Leslie 122 (`src/hammond.cc`, `src/leslie.cc`, `src/hammondplan.cc`;
     - The middles of K2-K4 change nothing, so K1 alone walks the classics.
     - **The drawbars are continuous**, between the steps too (3 dB a step, below the first fading to
       silence). Each is a slider pulled by a hand: a PI control of its speed toward its goal
-      (`PJ_HAMMOND_DRAWBAR_KP` 8, `_KI` 20, top speed `_SPEED` 16 steps a second, stopped at its
+      (`PJ_TONEWHEEL_DRAWBAR_KP` 8, `_KI` 20, top speed `_SPEED` 16 steps a second, stopped at its
       ends, no windup against them). It glides there in a few tenths of a second, a touch past
       sometimes, never in steps: the 16' pulled in from 8 fades 20 dB in ~0.4 s. A plan's
       registration changes glide too.
     - The registration is printed as it changes, with the station's name when it is one.
-      `PJ_HAMMOND_KNOBS=k1,k2,k3,k4` sets them offline.
-  - **K5 is the overdrive:** the Leslie 122's amplifier driven harder, from as registered (left)
+      `PJ_TONEWHEEL_KNOBS=k1,k2,k3,k4` sets them offline.
+  - **K5 is the overdrive:** the rotary speaker's amplifier driven harder, from as registered (left)
     to 8 x (right): its valves' grit, the level kept near (the amp's output falls as its drive^0.3).
-  - **K6 is the Leslie's half-moon:** stop (brake) to the left, slow in the middle, fast to the
+  - **K6 is the the rotary speaker's half-moon:** stop (brake) to the left, slow in the middle, fast to the
     right.
-- 2.8 % of a core for a five-note chord with the Leslie.
+- 2.8 % of a core for a five-note chord with the rotary speaker.
 
-    ./pajupilli -inst hammond -seq "on 48 100 on 60 100 on 64 100 on 67 100 wait 3 off 48 off 60 off 64 off 67 wait 1"
+    ./pajupilli -inst tonewheel -seq "on 48 100 on 60 100 on 64 100 on 67 100 wait 3 off 48 off 60 off 64 off 67 wait 1"
 
 ### Harpsichord
 
@@ -2678,7 +2678,7 @@ little darker when played harder (large drops strike longer).
 
 `-inst fx-soundtrack` (GM 98), A0 to C8 (`src/soundtrack.*`; research in
 `research/fx_sounds.md`): a keyed aeolian harp, strings sung by the wind. The classic patch is
-Roland's D-50 "Soundtrack": a dark, chorused pad of the note and its fifth. Every GM set keeps
+a classic digital synth's "Soundtrack": a dark, chorused pad of the note and its fifth. Every GM set keeps
 it as a string pad layered with a copy a fifth up.
 
 - **The strings:** each key has a course of four nylon strings. Three are on the note, a few
@@ -2732,7 +2732,7 @@ as the references):
 
 `-inst fx-atmosphere` (GM 100), A0 to C8 (`src/atmosphere.*`; research in
 `research/fx_sounds.md`): a keyed psaltery with magnetic resonators. The classic patch goes back
-to the D-50's "Nylon Atmosphere": a plucked string with a pad behind it. FluidR3, TimGM6mb and
+to the classic digital synth's "Nylon Atmosphere": a plucked string with a pad behind it. FluidR3, TimGM6mb and
 Jnsgm2 all layer a nylon guitar over synth strings. Here one physical system is both layers: a
 plucked string that feedback keeps singing, as an EBow or McPherson's Magnetic Resonator Piano
 does.
@@ -2796,8 +2796,8 @@ the references):
 ### FX 5 (brightness)
 
 `-inst fx-brightness` (GM 101), A0 to C8 (`src/brightness.*`; research in
-`research/fx_sounds.md`): a keyboard of singing arcs. The classic patch (Roland's "Brightness",
-"a Fairlight type of sound") is a bright, held tone whose octave is as strong as the note and
+`research/fx_sounds.md`): a keyboard of singing arcs. The classic patch (one maker's "Brightness",
+"an early sampler type of sound") is a bright, held tone whose octave is as strong as the note and
 whose partials fall steadily, speaking at once. FluidR3 layers a chorused "Bright" sample over
 synth strings; TimGM6mb and Jnsgm2 a "Solo Vox" over synth strings. Here the tone comes from
 William Duddell's singing arc (1900), which Duddell played from a keyboard.
@@ -2956,13 +2956,13 @@ references here are the unswept samples.
 ### FX 7 (echoes)
 
 `-inst fx-echoes` (GM 103), A0 to C8 (`src/echoes.*`; research in `research/fx_sounds.md`): a
-dulcitone (a keyboard of tuning forks) played into a tape echo. The classic patch (Roland's "Echo
-Drops", Yamaha's "Echoes") turns out not to echo at all: in the three SoundFonts it is a choir
+dulcitone (a keyboard of tuning forks) played into a tape echo. The classic patch (one maker's "Echo
+Drops", one maker's "Echoes") turns out not to echo at all: in the three SoundFonts it is a choir
 "aah" and a near-sine synth voice held as a pad, whose looped samples swell and dip every
 0.5–1.2 s (the loop's period, which moves with the key), with a 5 s release and a stereo pair in
-FluidR3. Roland's is described as sweeping chorus-like tones that burst into "drops" at the key-up.
-Here the echoes are real, made by the machine that made echoes in the 1970s (the Echoplex,
-Roland's RE-201 Space Echo).
+FluidR3. One maker's is described as sweeping chorus-like tones that burst into "drops" at the key-up.
+Here the echoes are real, made by the machine that made echoes in the 1970s (the tape echo,
+the tape echo).
 
 - **The forks:** each key strikes a tuning fork with a felt hammer; the fork's stem stands on a
   resonance box tuned to it, and a microphone picks it up. Three bending modes (1, 6.267, 17.55 ×
@@ -3113,7 +3113,7 @@ Lead-saw's circuit:
     ./pajupilli -play song.mid -o song.wav   # or write it
     ./pajupilli -play song.mid -room church  # in another room
     ./pajupilli -reinstrument grand-piano=organ -play song.mid   # the piano's part on the church organ
-    ./pajupilli -reinstrument piano=hammond,*=organ -play song.mid
+    ./pajupilli -reinstrument piano=tonewheel,*=organ -play song.mid
     ./pajupilli -pianist -play song.mid      # the piano's sustain pedal planned anew
 
 - **`-pianist`** (`src/pianoplan.h`, `research/pedaling.md`): each channel played by a piano with
@@ -3127,13 +3127,13 @@ Lead-saw's circuit:
   own changes within 150 ms (Don't Explain: 80 %), 63 % of its changes theirs.
 
 `-transpose N` with `-play` moves every note but the drums N semitones (12: an octave up, -12 down)
-as the file is read, so the organ's and the Hammond's plans are made for the transposed piece.
+as the file is read, so the organ's and the the tonewheel organ's plans are made for the transposed piece.
 
 `-reinstrument FROM=TO[,FROM=TO]` plays a channel on another instrument: FROM is the instrument its
 program picks (`grand-piano`, `electric-grand`), its family (`piano`) or `*` (every channel but the
 drums); the first rule that matches wins; `organ` is the church organ by its plan (pedal, manuals,
-registration, articulation). A channel remapped onto any Hammond (`hammond`, `drawbar-organ`, ...) joins the
-file's Hammond, one instrument and one plan.
+registration, articulation). A channel remapped onto any tonewheel organ (`tonewheel`, `drawbar-organ`, ...) joins the
+file's tonewheel organ, one instrument and one plan.
 
 **The winds tune by ear to the band** (`src/windear.cc`, `src/band.h`; `research/fretless_bass.md`
 7.6): every brass part (trumpet, muted trumpet, trombone, horn, tuba, the brass section) and every
@@ -3161,11 +3161,11 @@ The drum kit, live (`src/drumkit.h`): the same drum keys from the keyboard.
     ./pajupilli -live -inst drums                    # the kit on the keys and the pads
     ./pajupilli -live -inst grand-piano -pads drums  # the piano on the keys, the kit on the pads
 
-The MPK's pads send General MIDI's drum keys on channel 10 as they come (bank A 36..43: bass
+The controller's pads send General MIDI's drum keys on channel 10 as they come (bank A 36..43: bass
 drum, side stick, snare, clap, snare 2, low tom, closed hi-hat, tom; bank B 44..51: pedal
 hi-hat, tom, open hi-hat, tom, tom, crash, tom, ride); with `-pads drums` they play the kit
 instead of the breath and the flutter. With `-inst drums` the keys are drum keys too, the
-MPK's lowest C (48) the bass drum (36; `-transpose N` moves them, the octave buttons reach the
+controller's lowest C (48) the bass drum (36; `-transpose N` moves them, the octave buttons reach the
 rest). Velocity is the stroke. At the start it lists which key plays what, and which are
 silent: the cymbals and hi-hats are not built yet (`research/cymbal_plan.md`), so until then
 five of the sixteen pads make no sound. About 12 % of a core, busy.
@@ -3278,13 +3278,13 @@ peaks near 1.5). About 7 % of a core (the drum's wires the most of it).
 The small sounds below the drum map's 35 (`-inst perc-extras`; `src/percextras.cc`,
 `research/gm2_extras.md`), by GS/GM2's keys: 26 finger snap, 27 High Q, 28 slap (the whip's two
 boards), 29/30 scratch push and pull, 31 sticks, 32 square click, 33/34 the metronome's click and
-bell; and Yamaha XG's own on free keys: 20 click noise, 21 castanets, 23/24 sequencer clicks. The
+bell; and XG's own on free keys: 20 click noise, 21 castanets, 23/24 sequencer clicks. The
 struck ones are physical: two hickory sticks' free-free bending modes (330, 910, 1780, 2950 Hz),
 damped by the hands, under the click's own crack; the whip's air burst and boards; the finger's
 blow on the palm and the cupped hand's air; the castanets' shells and the air between them. The
 electronic ones and the turntable's scratch (the record read at a swept speed) are simple
 synthesis. Velocity gives about 30 dB from 16 to 127; they sit 12 dB under the common level (small
-sounds). The user's files with these keys are Yamaha XG sequences, where 25-28 are brushes, 31 a
+sounds). The user's files with these keys are XG sequences, where 25-28 are brushes, 31 a
 snare, 33 a bass drum and 34 an open rim shot (research/gm2_extras.md §1, §6).
 
     ./pajupilli -inst perc-extras -seq "on 31 70 wait 0.5 on 31 70 wait 0.5 on 33 60 wait 0.5 on 34 60 wait 1"
@@ -3412,8 +3412,8 @@ GM2's 86/87 (XG's 13/14) and 84.
     ./pajupilli -inst wood-blocks -seq "on 76 90 wait 0.25 on 76 70 wait 0.25 on 77 90 wait 0.25 on 76 80 wait 0.5"
 
 Each channel's General MIDI program plays on its instrument, or, where that is not built yet,
-on the nearest one that is: the harpsichord and clavinet fall back to the upright and the
-CP-80, guitars to the koto and banjo, cello to the contrabass, string
+on the nearest one that is: the harpsichord and clavi fall back to the upright and the
+electric grand, guitars to the koto and banjo, cello to the contrabass, string
 sections to the synth strings, choirs to the pads. Channel 10's drums go to the percussion
 built (bass drum: the jazz kick; snare and side stick: the brushed snare; hi-hats: the hi-hat; toms, bongos, congas: melodic tom; cowbell,
 agogo; claves, wood blocks); cymbals and hi-hats are not built and stay silent. Each channel
@@ -3430,7 +3430,7 @@ the median curve of TiMidity++ with FluidR3, 33 log10(v/127) dB, less what the i
 physics already gives, measured per instrument (`tools/velcurve.py -emit`,
 `src/velgain_data.h`; 0 dB at velocity 90, at most +6 dB; `PJ_NOVELGAIN` turns it off). A
 wind or a synth gets it as its voice's gain (a slur moves there in 60 ms); one voice that
-sounds every key (the CP-80, the plucks) gets the stroke that sounds that loud instead. A
+sounds every key (the electric grand, the plucks) gets the stroke that sounds that loud instead. A
 file played hot throughout (its median velocity over 96: a sequencer's default) is scaled
 down together until the median is 96 (`PJ_PLAY_VELMEDIAN`). Playing starts once 10 s are rendered
 (`PJ_PLAY_LEAD`, s), and should the rendering fall behind (a song heavier than real time), it

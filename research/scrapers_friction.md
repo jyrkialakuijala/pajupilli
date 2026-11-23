@@ -63,7 +63,7 @@ knowledge, to be checked; **[design]** a choice of this plan.
   stick moves in a sawtooth, which pulls the head's centre: "a primitive saw-toothed excitation,
   similar to a bowed violin string". **The body contributes little** **[paper, W02, abstract]**.
 - **The head:**
-  - Statsenko et al. modelled a 15 cm Meinl cuica: goat skin 0.3 mm, a pre-tension of 4470 N/m,
+  - Statsenko et al. modelled a 15 cm one cymbal maker cuica: goat skin 0.3 mm, a pre-tension of 4470 N/m,
     the stick 5 mm across, 1.4 mm off centre **[paper, SCK15]**.
   - Their measured operating shapes are near the clamped membrane's modes: 220, 820 and 942 Hz
     are shown.

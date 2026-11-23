@@ -579,7 +579,7 @@ occasionally. The calibration must find the centre of each "slot". Expose an "ac
 | Berjamin, Lombard, Vergez, Cottanceau 2017 | Menguy–Gilbert weakly nonlinear, TVD, diffusive losses | 1-mass, Newmark | Not real-time (18 min/s) | [BLVC17] |
 | Msallam, Dequidt, Caussé, Tassart 2000 | trombone with nonlinear propagation for loud tones | — | — (not read) | [MDCT00] |
 | **Audio Modeling SWAM-B** (Trumpets, Horns & Tubas, Trombones) | the vendor says "built only on Physical Modeling … based on Digital Waveguides Synthesis, as developed by Prof. Julius O. Smith" | not documented | Half-valve transitions, growl, flutter, breath noise; needs continuous breath control. No technical paper found **[U]** | [AM] |
-| Sample Modeling "The Trumpet" (older), Yamaha VL1 (1994) | — | — | Commercial, undocumented. Treat as reference sounds only **[U]** | — |
+| Sample Modeling "The Trumpet" (older), one maker VL1 (1994) | — | — | Commercial, undocumented. Treat as reference sounds only **[U]** | — |
 | Mignot, Hélie, Matignon | waveguides from the Webster–Lokshin model (flare, curvature, fractional losses) | — | Axisymmetric, bends straightened | [MHM10] |
 
 What they all keep: an outward-ish lip oscillator whose resonance is a **control**, Bernoulli flow, and a bore with a
@@ -634,12 +634,12 @@ lip + bore only, the best first smoke test (no valves).
 ### 9.3 What to validate
 
 1. **Passive input impedance**, `-imp`-style (impulse response at the cup, FFT), against published curves:
-   - **Bilbao & Chick 2013 Table I** [BC13]: the first 7 maxima/minima of a Smith-Watkins B♭ trumpet (1.38 m), Conn 8H trombone
+   - **Bilbao & Chick 2013 Table I** [BC13]: the first 7 maxima/minima of a Smith-Watkins B♭ trumpet (1.38 m), large-bore tenor trombone trombone
      (2.74 m), and a natural horn in D (4.51 m, PHC 22 mouthpiece), with **measured frequencies and their FDTD agreement (≲ 1 %)**.
      Their bore profiles (Fig. 7) can be digitised. Correct for temperature: they measured at 19–20 °C (c ≈ 343 m/s), so scale
      frequencies by 349.5/343 or run at their c.
      **Targets:** peaks within 1 % (17 cents) and heights within 1 dB, as their FDTD achieved. Better: ±5 cents on peaks 2–8.
-   - **Dell et al. 2010** [DJDW10]: Yamaha 668 double horn with and without a hand, for the hand model.
+   - **Dell et al. 2010** [DJDW10]: one maker 668 double horn with and without a hand, for the hand model.
    - Mattéoli et al. [MGV22] Fig. 2: impedance of a bass trombone (Courtois AC502).
    - UNSW's online brass impedance database (Wolfe's group) for horn, trumpet and trombone curves. Use the curves as given on
      the site; the accompanying text was secondary for me.

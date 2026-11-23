@@ -1,14 +1,14 @@
 # pajupilli — requirements
 
 A real-time physical model of a modern concert flute (Boehm system, C foot), played live
-from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked **(Q)**.
+from a 25-key MIDI controller. Status: draft, 2026-11-11. Open questions are marked **(Q)**.
 
 ## 1. Goals
 
 1. Sound comes from physics: an air jet driving a waveguide bore with tone holes, not samples
    and not additive synthesis. Pitch, timbre, attack, overblowing and breath noise should come
    out of the model, not be painted on.
-2. Interactive and streaming: play it live from the MPK mini mk3 with low latency.
+2. Interactive and streaming: play it live from the 25-key MIDI controller with low latency.
 3. Fast and simple: the bore is 128 pressure points at 48 kHz, stored as 8 × 16 float32 so the
    inner loops compile to AVX-512 (one zmm register per block of 16).
 
@@ -75,7 +75,7 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
   sees what comes next and can choose slur vs. tongued attack, prepare the fingering before the
   breath, shape the release, and pre-set the embouchure (W, pressure) for an upcoming register
   jump, as a flutist anticipates.
-- R17. Reads MIDI from the MPK mini mk3 (ALSA sequencer, auto-connect by name). Proposed map
+- R17. Reads MIDI from the 25-key MIDI controller (ALSA sequencer, auto-connect by name). Proposed map
   **(Q)**:
   - Keys: note → fingering. Velocity → attack (tonguing strength, initial pressure overshoot).
     Held legato (overlapping) notes → slur without re-tonguing. Monophonic, last-note priority.
@@ -122,4 +122,4 @@ from an Akai MPK mini mk3. Status: draft, 2026-11-11. Open questions are marked 
    What do the published measurements (e.g. Coltman; Wolfe and colleagues at UNSW) say? Decide what
    to model.
 4. Losses: viscothermal losses in a 19 mm bore; radiation from open holes and the foot.
-5. MPK mini mk3 default MIDI map (knob CCs, joystick, pads, aftertouch).
+5. 25-key MIDI controller default MIDI map (knob CCs, joystick, pads, aftertouch).

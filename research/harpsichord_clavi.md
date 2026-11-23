@@ -1,4 +1,4 @@
-# The harpsichord (GM 7) and the Hohner Clavinet D6 (GM 8): research and model plan
+# The harpsichord (GM 7) and the clavi D6 (GM 8): research and model plan
 
 Status: 2026-11-15, research only; nothing is built. SI units. Pitches by MIDI-style names (C4 =
 middle C); the harpsichord at A4 = 415 Hz unless stated.
@@ -6,7 +6,7 @@ middle C); the harpsichord at A4 = 415 Hz unless stated.
 Both are strings struck or plucked near one end. They should reuse the concert grand's string
 banks (`src/piano.h`, `research/piano.md`): modes in two directions, an exact exchange with a
 bridge, per-mode dampers, strings asleep when quiet. The harpsichord keeps the board too, made
-lighter. The Clavinet swaps the board for two magnetic pickups and a small amplifier.
+lighter. The clavi swaps the board for two magnetic pickups and a small amplifier.
 
 Tags: **[web]** read in a source in section 7 (the key follows in brackets); **[calc]** worked out
 here from those numbers (the working is given or obvious); **[memory]** from the general
@@ -41,7 +41,7 @@ literature as remembered, not checked for this file.
   - Cost: like the piano when everything rings. In normal playing, with most strings damped and
     asleep, about 5–15 % of a core **[calc]**.
 
-**Clavinet D6.**
+**clavi.**
 - 60 keys F1–E6, one steel string each, the 23 lowest wound **[web, Gabrielli 2013]**. A rubber
   tangent strikes the string and holds it against a metal anvil for as long as the key is down. The
   tangent's end of the string becomes the speaking length's end.
@@ -276,11 +276,11 @@ Table **[calc]**, built as follows:
 | Smith, PASP | waveguide | spring plectrum with f_max release, one-filter scattering junction | — | one biquad |
 | arXiv 2511.09037 (2025) | — | — | FDTD board on a 1 cm grid, 72 × 178, measured thickness | offline |
 
-## 3. The Clavinet D6
+## 3. The clavi
 
 ### 3.1 The instrument
 
-- **Keys and strings:** 1971–1982 (Clavinets 1964–1982) **[web, Wikipedia]**. 60 keys F1–E6, one
+- **Keys and strings:** 1971–1982 (clavis 1964–1982) **[web, Wikipedia]**. 60 keys F1–E6, one
   steel string per key, the first 23 wound, a small timbre break at the change **[web, Gabrielli
   2013]**. The harp lies diagonally under the keys **[web, Wikipedia]**.
 - **Mechanism [web, Gabrielli 2013]:**
@@ -301,7 +301,7 @@ Table **[calc]**, built as follows:
     **[calc]**.
   - Gabrielli's B = 8e-5 at E6 with a .009" string gives L ≈ 0.19 m, using B = π²Ed²/(64ρL⁴f²)
     **[calc]**.
-  - The E3 string runs at only about 0.37 GPa if plain .011" (T ≈ 23 N) **[calc]**. Clavinet
+  - The E3 string runs at only about 0.37 GPa if plain .011" (T ≈ 23 N) **[calc]**. clavi
     strings are slack compared with a harpsichord's, and the mid-range wound/plain split is
     uncertain.
 - **Inharmonicity used in the model [web, Gabrielli 2013, table 1]:** F1 5e-4, A#1 2e-4, D3 9e-5,
@@ -420,7 +420,7 @@ Table **[calc]**, built as follows:
     stack, shelves.
   - Cost: 82 multiplications and 64 additions per string-sample (the tone stack 21, the dispersion
     20). At most 923 delay samples. Ten voices on a BeagleBoard at 97 % CPU, 5.8 ms latency.
-  - Listening tests: discrimination d = 53 % on average (58 % for Clavinet-savvy musicians; 50 % is
+  - Listening tests: discrimination d = 53 % on average (58 % for clavi-savvy musicians; 50 % is
     chance).
 - **Remaggi et al. 2012:** the pickup model above.
 
@@ -519,7 +519,7 @@ Factor it rather than copy it:
 4. Listening: 8' back, 8' front, 4', buff, and the combinations against recordings. Välimäki's
    d-factor listening test is the reference method.
 
-## 5. Model plan: Clavinet D6 (`-inst clavinet`)
+## 5. Model plan: clavi (`-inst clavi`)
 
 **Strings.** 60 modal banks, two directions, modes to about 12–16 kHz. The velocity pickup lifts
 the highs, so 16 kHz is worth it here.
@@ -599,7 +599,7 @@ lower than Gabrielli's waveguide in absolute terms only because the machine is f
   - Measured plectrum force at release on quill against Delrin. Giordano & Winans have
     measurements, not read here (paywalled).
   - The board's modal data for a Franco-Flemish instrument: none found; model it.
-- **Clavinet:**
+- **clavi:**
   - String lengths, the tangent gap d, the tangent rubber's stiffness and loss.
   - The yarn's decay time.
   - Which pickup is above the strings.

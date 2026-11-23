@@ -32,7 +32,7 @@ position, a faster and narrower vibrato, far more agile bowing.
 - **Range for the model:** C2 to about A5–C6 in ordinary playing **[M]**; the TU Berlin database
   recorded a modern cello from C2 to G6 **[T]** [Shabtai17]. MIDI 36–84 (to 91 with harmonics).
   GM program 43 (Cello).
-- **One measured modern set**, D'Addario Kaplan Solutions, L = 690 mm **[T]** [Mansour1]:
+- **One measured modern set**, standard Kaplan Solutions, L = 690 mm **[T]** [Mansour1]:
 
 | | A3 | D3 | G2 | C2 |
 |---|---|---|---|---|

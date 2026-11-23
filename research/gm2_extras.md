@@ -1,4 +1,4 @@
-# The drum keys below 35: GS/GM2 extras and Yamaha XG's map
+# The drum keys below 35: GS/GM2 extras and XG's map
 
 Status: 2026-11-15. Research, plan (§6) and what was built (§7). Marks: **[files]** measured in the
 user's MIDI files (`~/Music/midi`); **[web]** a source in §8; **[calc]** worked out here; **[memory]**
@@ -7,16 +7,16 @@ general knowledge, to be checked; **[design]** a choice of this plan.
 ## 1. Short answer
 
 - **Two maps disagree below 35.**
-  - Roland GS (and GM2, which took GS's): 25 Snare Roll, 26 Finger Snap, 27 High Q, 28 Slap,
+  - GS (and GM2, which took GS's): 25 Snare Roll, 26 Finger Snap, 27 High Q, 28 Slap,
     29/30 Scratch Push/Pull, 31 Sticks, 32 Square Click, 33 Metronome Click, 34 Metronome Bell
     **[web, GS]**.
-  - Yamaha XG (MU modules, PSR/Tyros keyboards) uses the same range for kit voices **[web, PSR]**:
+  - XG (MU modules, PSR/Tyros keyboards) uses the same range for kit voices **[web, PSR]**:
     - 13/14 Surdo mute/open, 15 Hi Q, 16 Whip Slap, 17/18 Scratch Push/Pull, 19 Finger Snap;
     - 20 Click Noise, 21 Metronome Click, 22 Metronome Bell, 23/24 Seq Click L/H;
     - **25 Brush Tap, 26 Brush Swirl L, 27 Brush Slap, 28 Brush Swirl H, 29 Snare Roll**;
     - 30 Castanet, 31 Snare L, 32 Sticks, 33 Bass Drum L, 34 Open Rim Shot.
 - **The user's files are XG.** All of the files that use these keys are Doug McKenzie's
-  sequences (bushgrafts). Their texts say "YAMAHA DOU 10" and "Set to GenMidiBRUSH SET", several
+  sequences (bushgrafts). Their texts say a keyboard model and "Set to GenMidiBRUSH SET", several
   have the XG system-on SysEx, and channel 10 uses bank 127 (XG drums). Only 2 of the 52 files
   with keys below 35 carry a GS reset **[files]**.
 - **The use fits XG, not GS** **[files]**:

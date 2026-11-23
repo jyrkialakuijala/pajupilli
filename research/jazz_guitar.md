@@ -2,10 +2,10 @@
 
 Status: research 2026-11-19; built 2026-11-20 (section 12, as built). This goes deeper than `research/electric_guitars.md`
 §2.1, §4.1, §5, §6, §12–13 (the sketch) and does not repeat it. It builds on what is in the code:
-`src/guitar.h/.cc` (`GuitarSpec`, `electricGuitar()`: the Strat and the Les Paul, two-coil
+`src/guitar.h/.cc` (`GuitarSpec`, `electricGuitar()`: the three-pickup solid-body and the twin-humbucker solid-body, two-coil
 humbuckers, the pick, the palm, the pickups' comb, aperture and magnet nonlinearity),
 `src/guitaramp.h/.cc` (the amp module: the pickup's L–R–C input, compressor, triode stages, the
-Yeh–Smith stack, the power stage, cabinets as biquads; presets twin, twinComp, jcm800, slo) and
+Yeh–Smith stack, the power stage, cabinets as biquads; presets twin, twinComp, crunchStack, slo) and
 `src/guitarinst.h/.cc` (the guitarist).
 
 How each number is marked (as in `research/electric_guitars.md`):
@@ -21,7 +21,7 @@ References are short keys in brackets; the list is section 11.
 
 **Short answer.** The jazz guitar is the electric guitar already built with five things changed.
 (1) **Strings:** flatwounds 12–52 at 95–142 N each, ~680 N in all at 628 mm. That is 1.6 times the
-Strat set's tension. The wound strings are as dense as a solid steel rod of their diameter (fill
+three-pickup solid-body set's tension. The wound strings are as dense as a solid steel rod of their diameter (fill
 0.9–1.0, against 0.8 for roundwounds), and the G is wound. The plain-G set's most inharmonic
 string becomes one of the least inharmonic: B drops from ~1.2e-4 to ~1e-5 **[E from T/S
 tensions]**. (2) **Body:** a hollow archtop with a floating bridge. Measured on a hollow body with
@@ -66,7 +66,7 @@ the first half second **[F]**.
 
 ### 2.1 The three guitars
 
-| | Gibson ES-175 | Gibson L-5 CES / Super 400 CES | Gibson ES-335 (for comparison) |
+| | laminated archtop | humbucker guitar L-5 CES / Super 400 CES | humbucker guitar ES-335 (for comparison) |
 |---|---|---|---|
 | Body | 16" lower bout, ~3 3/8" (86 mm) deep, **laminated** maple top, back and sides; pressed arch **[M]** | 17" / 18", **carved** solid spruce top, carved maple back **[M]** | 16", ~1 5/8" thin, laminated maple, **solid maple centre block** under the bridge and pickups **[M]** |
 | Scale | 24.75" (628 mm), 20 frets **[M]** | 25.5" (648 mm) **[M]** | 24.75", 22 frets **[M]** |
@@ -75,7 +75,7 @@ the first half second **[F]**.
 | Pickups | P-90 (1949), PAF humbuckers from 1957 **[M]**, mounted in the top | two humbuckers in the top (Charlie Christian bar pickup on early L-5 CES) **[M]** | two humbuckers |
 | What it does to the string | the bridge sits on a top that gives: the string loses energy into it quickly | the same, a stiffer and lighter top that radiates more | like a solid body: the bridge is on the block |
 
-GM 27's usual reading is the ES-175 **[L; electric_guitars.md §2.1]**. It has the laminated top,
+GM 27's usual reading is the laminated archtop **[L; electric_guitars.md §2.1]**. It has the laminated top,
 which radiates less than a carved one and feeds back less. Its 24.75" scale also puts the
 flatwounds 6 % slacker than on the L-5's 25.5".
 
@@ -93,12 +93,12 @@ flatwounds 6 % slacker than on the L-5's 25.5".
       first five harmonics to fall 15 dB: **5.45, 4.49, 0.86, 0.87, 1.12 s** (measured). Without
       body coupling, reflectances predicted 13.3, 0.68, 0.24, 0.33, 0.33 s; the authors conclude
       the boundaries are not stateless reflectances.
-    - The low E string's characteristic impedance (from D'Addario data): 0.87 N·s/m.
+    - The low E string's characteristic impedance (from standard data): 0.87 N·s/m.
     - The guitar's make is not named.
   - **Free archtop top plates (FEM from a 3-D scan of a real archtop) [S, SGAS21 abstract]:**
     the mode shapes are compared with the violin's and the classical guitar's; the study covers
     the carving of the inner surface and the f-holes. The full text is paywalled: no frequencies.
-  - **A Gibson L-5-type archtop, a parametric FEM from a laser scan [S, LGDNA25 abstract]:** the
+  - **A humbucker guitar L-5-type archtop, a parametric FEM from a laser scan [S, LGDNA25 abstract]:** the
     top's thickness changes eigenfrequencies and radiation more than its bracing does (symmetric
     or asymmetric). No numbers seen.
   - **The air resonance:** luthiers report the archtop's "main air" at about A#2–C#3 (116–138 Hz),
@@ -137,11 +137,11 @@ angle]**.
   top loses energy into the floating bridge faster than its swing along it. What the pickup hears
   is a two-stage decay: the attack and its "punch" first, then the along-swing coupling back
   through the tilt **[E; the mechanism in guitar.h]**. Set `towardsLoss` 1.5–2 for the archtop,
-  against the Strat's 1.15 **[E]**.
+  against the three-pickup solid-body's 1.15 **[E]**.
 - **"Punchy and short":** archtops are known for a strong initial attack that decays quickly,
   against a flat-top's sustain **[S, patent US 9905212's background]**.
-- **ES-175 against L-5:** for the laminated top, all `rad` ×0.5 and Q ×0.8 (laminate damping)
-  **[E]**. For the ES-335, the solid spec with the Les Paul's losses, two weak wing modes (~220,
+- **laminated archtop against L-5:** for the laminated top, all `rad` ×0.5 and Q ×0.8 (laminate damping)
+  **[E]**. For the ES-335, the solid spec with the twin-humbucker solid-body's losses, two weak wing modes (~220,
   ~380 Hz, rad 0.1) and an acoustic share of −30 dB **[E]**.
 
 ### 2.4 The tailpiece and the afterlength
@@ -158,12 +158,12 @@ angle]**.
 ### 2.5 How much of the acoustic is in the sound
 
 - **No measurement** of the acoustic-to-pickup level ratio was found.
-- **Unplugged,** an ES-175 is about as loud as a quiet flat-top; a carved L-5 is louder (it was an
+- **Unplugged,** an laminated archtop is about as loud as a quiet flat-top; a carved L-5 is louder (it was an
   acoustic orchestra guitar first) **[L]**.
 - **Amplified on a gig,** the amp is 15–25 dB above the guitar's own sound at the player's and the
   microphone's position **[E]**. Recordings often mic the amp alone, sometimes the guitar too
   **[L]**.
-- **Through the pickup:** a pickup mounted in the top (ES-175, L-5 CES) moves with the top. The
+- **Through the pickup:** a pickup mounted in the top (laminated archtop, L-5 CES) moves with the top. The
   EMF follows the gap between pole and string, so the top's motion at the pickup changes the gap
   for all six strings, sounding or not: the pickup becomes a body sensor **[E: physics of
   guitar.cc's `field(gap − y)`]**.
@@ -178,7 +178,7 @@ angle]**.
     guard, off the top) does not hear the top this way **[M]**: a purer, more electric sound.
   - Unpotted vintage coils are microphonic themselves (a tap on the cover is heard) **[M]**.
 - **Mix to use [E]:** the radiated sound (`out`, with `radiate` as for the classical guitar) at −20
-  dB under the amp's output for the ES-175 (−14 dB for an L-5). Through the pickup, a `mount`
+  dB under the amp's output for the laminated archtop (−14 dB for an L-5). Through the pickup, a `mount`
   share of 0.4 of the bridge's displacement for the top-mounted humbucker.
 - **Feedback:** a hollow archtop feeds back at its lowest modes (100–300 Hz) **[L; electric_guitars.md
   §5]**. Jazz players keep the bass and the volume moderate. GM 27 does not need it.
@@ -206,7 +206,7 @@ or 14–55 with the heavier strings at 11.8–14.2 kp. The **Bebop** sets (BB) a
 same construction, "somewhat brighter than a flatwound … a bit more of an edge"; they use a
 **plain G** (.019–.020) in the 11–12 sets and a wound .021–.022 in the 13–14 sets **[T]**.
 
-**D'Addario Chromes** (stainless steel flat ribbon) **[S, official chart via search snippet; at
+**standard Chromes** (stainless steel flat ribbon) **[S, official chart via search snippet; at
 25.5"]**:
 
 | Set | E4 | B3 | G3 (w) | D3 | A2 | E2 |
@@ -242,7 +242,7 @@ it is a lower bound for flats (below).
 - **The bending stiffness of a flatwound** is above the core's: the ribbon's turns touch, and part
   of the wrap carries bending **[M]**. Use B = 1.5–2 × the core-only value for the wound flats
   **[E]**; not measured (section 10).
-- **Total tension** ~590–680 N on a 628 mm ES-175 (12–52), 1.4–1.6 times a 10–46 set **[E]**.
+- **Total tension** ~590–680 N on a 628 mm laminated archtop (12–52), 1.4–1.6 times a 10–46 set **[E]**.
   Heavier strings need a higher action; 1.5–3 mm picks drive them **[L]**.
 
 ### 3.2 Decay and spectrum
@@ -257,17 +257,17 @@ it is a lower bound for flats (below).
     **[E]**. The 3rd (247 Hz) and 5th (412 Hz) are not on a measured mode, yet decay as fast. That
     points to the string itself: friction between the touching turns of the flat ribbon, growing
     steeply with frequency **[E; M for the mechanism]**.
-  - The Strat spec's `loss0 + loss1·k^1.2` (0.49 + 0.06·k^1.2 on the low E) gives 0.72 and 0.90 /s
+  - The three-pickup solid-body spec's `loss0 + loss1·k^1.2` (0.49 + 0.06·k^1.2 on the low E) gives 0.72 and 0.90 /s
     for k = 3 and 5. The flatwound is 2–3 times lossier there and has a longer fundamental.
 - **Fit to use [E]:** wound flats `loss0` ≈ 0.30 /s (low E) to 0.6 (G), and a steeper exponent:
   `loss1·k^2` with loss1 ≈ 0.08 (low E: k=2: 0.62, k=3: 1.0, k=5: 2.3 /s). Plain strings: loss0
-  as the Strat's, loss1 ×1.5 (heavier gauge, the archtop's bridge). Check against Rau's five
+  as the three-pickup solid-body's, loss1 ×1.5 (heavier gauge, the archtop's bridge). Check against Rau's five
   numbers with the archtop's body modes in place.
 - **Handling noise:** flats hardly squeak under a sliding finger **[L]**. The existing squeak, if
   any is added (steel_guitar.md §5), should be ×0.1 for flats **[E]**.
 - **Magnetism:** the Chromes ribbon is stainless steel; TI's is nickel **[T/S]** (pure nickel is
   ferromagnetic, but weaker than steel **[M]**). The filled section brings more metal into the
-  field: `steel[]` for the wound flats ≈ 0.9 of the diameter's area (the Strat spec uses 0.6 for
+  field: `steel[]` for the wound flats ≈ 0.9 of the diameter's area (the three-pickup solid-body spec uses 0.6 for
   roundwounds) **[E]**.
 
 ---
@@ -278,18 +278,18 @@ it is a lower bound for flats (below).
 
 | | L (H) | R (kΩ) | Note |
 |---|---|---|---|
-| Gibson PAF / '57 Classic (neck) | 4.2–4.6 | 7.2–8 | 490R measured 4.2 H **[T, Lemme13]**; PAFs 2.8–4.6 H **[S]**; '57 Classic 8 k (7.2 k underwound) **[S, Gibson]**; a Seymour Duncan 59/15-type neck 5.35 H at 100 Hz **[S]** |
-| P-90 (the 1949 ES-175's) | 4.9–6.8 | 7–9 | **[S, planetz/Mojotone]**; a wide coil: MDH17 model it 40 mm wide **[T]** |
+| humbucker guitar PAF / '57 Classic (neck) | 4.2–4.6 | 7.2–8 | 490R measured 4.2 H **[T, Lemme13]**; PAFs 2.8–4.6 H **[S]**; '57 Classic 8 k (7.2 k underwound) **[S, Gibson]**; a Seymour Duncan 59/15-type neck 5.35 H at 100 Hz **[S]** |
+| P-90 (the 1949 laminated archtop's) | 4.9–6.8 | 7–9 | **[S, planetz/Mojotone]**; a wide coil: MDH17 model it 40 mm wide **[T]** |
 | DeArmond Rhythm Chief 1000 (floating) | 5.66 | 17.0 | measured at 1 kHz, ACR 27.9 kΩ **[S, forum, measured]** |
 | DeArmond Rhythm Chief 1100 (floating) | ? | 6.3–6.9 (reissue); ~15 (vintage) | rubber magnet, 85 × 25 mm **[S, Guild, forum]** |
 | Johnny Smith mini humbucker (floating) | not found | — | — |
 
-- The ES-175 with a humbucker is the reference. Use **L = 4.4 H, R = 7.8 kΩ, C = 120 pF**, two
-  coils 18 mm apart (`apart` = 0.018), volts as the Les Paul's neck pickup **[E]**.
-- **Position on a 628 mm scale:** the ES-175's fingerboard ends near the 20th fret, 198 mm from the
+- The laminated archtop with a humbucker is the reference. Use **L = 4.4 H, R = 7.8 kΩ, C = 120 pF**, two
+  coils 18 mm apart (`apart` = 0.018), volts as the twin-humbucker solid-body's neck pickup **[E]**.
+- **Position on a 628 mm scale:** the laminated archtop's fingerboard ends near the 20th fret, 198 mm from the
   saddle; the humbucker's cover is ~38 mm along the strings **[M]**. Its centre is ~165–175 mm
   from the saddle, the two pole rows at ~160 and ~178 mm **[E]**. A floating pickup at the
-  fingerboard's end sits at ~185–195 mm **[E]**. (The Les Paul's neck humbucker in the code is at
+  fingerboard's end sits at ~185–195 mm **[E]**. (The twin-humbucker solid-body's neck humbucker in the code is at
   155 mm.)
   - The comb: the first notch at harmonic L/x = 3.5–3.9 on open strings, so the **4th harmonic is
     nearly cancelled** and the 7th–8th again. On a note fretted at the 5th fret (L = 470 mm) the
@@ -302,7 +302,7 @@ it is a lower bound for flats (below).
 
 ### 4.2 Pots and cable
 
-Gibson: 500 kΩ audio-taper volume and tone pots, 22 nF ("0.022 µF") tone capacitor **[M]**. Modern
+humbucker guitar: 500 kΩ audio-taper volume and tone pots, 22 nF ("0.022 µF") tone capacitor **[M]**. Modern
 wiring puts the tone pot (as a variable resistor) in series with the capacitor, across the pickup.
 A 3–6 m cable is 300–600 pF **[M]**. The amp's input is 1 MΩ.
 
@@ -355,9 +355,9 @@ also softens the attack **[L]**. At 7 on a 500 k audio pot (~120 k in series, ~3
 
 | Amp | What it is | Jazz settings / why | Cabinet |
 |---|---|---|---|
-| Fender Twin Reverb / Deluxe Reverb (blackface) | tube, the AB763 stack (in the code) | bass 6–7, mid 5–7, treble 3–4, little reverb **[L]** | 2×12 / 1×12 open back |
+| clean 2x12 combo / small American combo (blackface) | tube, the AB763 stack (in the code) | bass 6–7, mid 5–7, treble 3–4, little reverb **[L]** | 2×12 / 1×12 open back |
 | Polytone Mini-Brute (I–V) | solid state; Joe Pass's and Jim Hall's amp **[L]**; small, closed | warm, flat, "the" jazz sound of the 1970s–90s **[L]** | 1×12 or 1×15 closed (IV and V: 15") **[S, retail]**; III ~110 W **[S]**; the tone circuit was **not found** |
-| Roland JC-120 | solid state, 2×12, BRI/treble/middle/bass per channel, chorus **[S, Roland]**; at least 8 circuit versions **[S]** | clean, flat, a little sterile; jazz players turn the chorus off **[L]** | 2×12 open back |
+| one maker JC-120 | solid state, 2×12, BRI/treble/middle/bass per channel, chorus **[S, Roland]**; at least 8 circuit versions **[S]** | clean, flat, a little sterile; jazz players turn the chorus off **[L]** | 2×12 open back |
 | Henriksen JazzAmp (110, Ten, 112) | solid state, 80–120 W, 5-band graphic EQ, reverb **[S]** | the modern jazz club amp **[L]** | 1×10 (Eminence Beta 10) + a defeatable tweeter; closed back (110) or ported (310) **[S, retail]** |
 
 - **The blackface stack at jazz settings [E; `stack.py`, the code's own coefficients]:**
@@ -370,9 +370,9 @@ also softens the attack **[L]**. At 7 on a 500 k audio pot (~120 k in series, ~3
 
   Even at jazz settings, the blackface stack keeps its ~400 Hz scoop: 10–12 dB under 60 Hz and
   under 3 kHz. A Polytone or JC (active, Baxandall-like EQ, flat at noon **[M]**) has no scoop.
-  That is the Polytone's "fat middle" against the Fender's "sparkle" **[L]; [E] the cause**.
+  That is the Polytone's "fat middle" against the the American amp's "sparkle" **[L]; [E] the cause**.
 - **A "polytone" preset [E]:** no tube stages driven (gain as the twin's but volume 0.1: clean
-  even with a humbucker 2.6× hotter). Skip the Fender stack and use an active EQ: a low shelf +3
+  even with a humbucker 2.6× hotter). Skip the American amp stack and use an active EQ: a low shelf +3
   dB below 150 Hz, a peak +2 dB at 500 Hz (Q 0.7), a high shelf −4 dB above 2.5 kHz. Then the
   1×15 closed cabinet: closed-box resonance at 85 Hz (Q 1.0, 12 dB/oct below), flat to 1.5 kHz,
   −3 dB at 2.5 kHz, 24 dB/oct above 3.5 kHz, no break-up peaks (a 15" jazz speaker is stiff and
@@ -401,7 +401,7 @@ louisiana.mid, channel 7 (index 6), program 26 (GM 27), 133 bpm, 1693 notes, 535
 | Duration (beats) | deciles 0.31, 0.33 (×5), 0.67, 1.0, 1.33; **166 notes (10 %) have zero length** (on and off on the same tick), velocity median 31 against 46 for the long ones |
 | Velocity | deciles 22, 27, 31, 38, 45, 50, 57, 62, 72: **soft**; max 109 |
 | Inter-onset | 1.0 beat (306), 1.67 (70), 1.33 (59), 2.33 (27), 0.67 (18): comping in a swung feel; the onsets are humanised (no fixed grid position) |
-| Range | 39–85: one note under E2, **16 chords topping C#6**, over the ES-175's 20th fret (C6 = 84) |
+| Range | 39–85: one note under E2, **16 chords topping C#6**, over the laminated archtop's 20th fret (C6 = 84) |
 | Intervals between adjacent chord notes | 4 (303), 3 (210), 5 (154), 1 (137), 7 (82), 6 (68), 2 (52), 10 (45), 16 (33), 14 (22): close, piano-like voicings with seconds, plus a bass note a tenth or more under the rest |
 | Doubled pitch classes | 51 chords |
 | Playable as written (distinct strings, fretted span ≤ 5 frets, 20 frets) | **87 %** before range folding; 90 % after (482/535) |
@@ -543,7 +543,7 @@ louisiana.mid, channel 7 (index 6), program 26 (GM 27), 133 bpm, 1693 notes, 535
 - **The thumb [S, Wikipedia, PG, Guitar World]:**
   - He plucked with the fleshy pad of the thumb: down strokes for single notes, down and up for
     chords and octaves. Upstrokes are hard to articulate (he had an unusually flexible thumb).
-  - The tone is dark: he asked Gibson for guitars modified to be brighter.
+  - The tone is dark: he asked humbucker guitar for guitars modified to be brighter.
   - He played thumb-style because it was quiet to practise with, and kept it because he liked the
     tone better.
 - **Octaves:** two notes an octave apart, fretted by the index (on the 3rd or 4th string) and the
@@ -597,7 +597,7 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
 
 ## 8. What a listener would notice if it were wrong
 
-1. **Too bright:** any 3–5 kHz presence (a Strat's or a rock humbucker's with the tone up) and the
+1. **Too bright:** any 3–5 kHz presence (a three-pickup solid-body's or a rock humbucker's with the tone up) and the
    jazz guitar becomes a "clean electric". The rolled-off tone (−12 dB at 2 kHz) is the first
    thing heard.
 2. **Upper partials that sustain:** flats on an archtop lose everything above the 2nd–3rd harmonic
@@ -631,10 +631,10 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
 
 ## 9. What to build
 
-### 9.1 The guitar: `electricGuitar("jazz-guitar")` → an ES-175 [E unless marked]
+### 9.1 The guitar: `electricGuitar("jazz-guitar")` → an laminated archtop [E unless marked]
 
 - **Scale and frets:** 0.628 m, 20 frets (top note C6 = 84).
-- **Strings** (TI JS112 / D'Addario ECG25 at 628 mm). Tension from section 3.1; f0 standard.
+- **Strings** (TI JS112 / standard ECG25 at 628 mm). Tension from section 3.1; f0 standard.
 
   | | E2 | A2 | D3 | G3 (wound) | B3 | E4 |
   |---|---|---|---|---|---|---|
@@ -644,21 +644,21 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
   | loss1 (k^2) | 0.08 | 0.09 | 0.10 | 0.12 | — | — |
 
   - B for the wound strings is the core-only value ×1.75; the plain strings are exact.
-  - The plain strings use k^1.2 with loss1 = 1.5 × the Strat's.
+  - The plain strings use k^1.2 with loss1 = 1.5 × the three-pickup solid-body's.
   - This needs a per-spec exponent in `GuitarString`: today's `loss1·k^1.2` → `loss1·k^p`.
 - **Steel:** the wound flats 0.9 × d² (roundwounds 0.6), then the same ^0.8.
 - **Modes:** 64 per string; `topHz` 6000 (nothing above survives the tone control and the 15"
   speaker).
 - **Body:** the table in 2.3 (neck 85/175/332 [T], A0 125, top 240, cross-dipole 420, ~15 plate
-  modes 500–2500 Hz). The ES-175 has the laminate factors (rad ×0.5, Q ×0.8). Also:
+  modes 500–2500 Hz). The laminated archtop has the laminate factors (rad ×0.5, Q ×0.8). Also:
   - `towardsLoss` 1.7;
-  - `tilt` 0.35 (as the Strat);
+  - `tilt` 0.35 (as the three-pickup solid-body);
   - `radiate` as the classical's, then mixed at −20 dB (9.3).
 - **Pickup:**
   - the neck humbucker, two pole rows at 0.160 and 0.178 m (`at` = 0.169, `apart` = 0.018);
   - gaps 3.8 mm (low E) to 3.4 mm (high E), `width` 5 mm;
   - L 4.4 H, R 7.8 kΩ, C 120 pF;
-  - volts as the Les Paul's neck pickup (0.8 × 2.6 × 0.15).
+  - volts as the twin-humbucker solid-body's neck pickup (0.8 × 2.6 × 0.15).
   - One pickup selected.
 - **Microphonic:** a new `GuitarSpec::mount` (0.4). Each sample the pickup's displacement z =
   mount × Σ(body mode x × its shape at the pickup: for now the same `rad` sign pattern) is added
@@ -675,7 +675,7 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
 - **Preset "jazz" (default for GM 27):** the Polytone-like path of section 5:
   - clean stages;
   - an active EQ (+3 dB low shelf under 150 Hz, +2 dB at 500 Hz, −4 dB high shelf above 2.5
-    kHz) in place of the Fender stack;
+    kHz) in place of the American amp stack;
   - new cabinet 3: a 1×15 closed (85 Hz Q 1 high-pass, −3 dB at 2.5 kHz, 24 dB/oct above 3.5
     kHz).
 - **Preset "twin-jazz"** (alternative): `twin()` with treble 0.3, mid 0.65, bass 0.6, volume 0.12;
@@ -731,7 +731,7 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
 
 ### 9.5 Not found, or uncertain
 
-- **Assembled archtop modes** (ES-175, L-5): none published that could be read. The table in 2.3
+- **Assembled archtop modes** (laminated archtop, L-5): none published that could be read. The table in 2.3
   is Rau's neck modes [T] plus estimates.
 - **The archtop's bridge admittance:** Rau measured it on the hollow body, but only as plots (not
   digitised here). Digitising Rau17's Figure 2 (the bridge, vertical) would fix the masses of
@@ -742,12 +742,12 @@ Each note was held 4 s (8 beats at 120 bpm), mono mix, RMS over 10 ms (`mk.py`, 
 - **Flatwound vs roundwound:** no controlled measurement of decay or spectrum. Rau's one string is
   the only measured flatwound decay. The flat ribbon's added bending stiffness (B ×1.5–2) is an
   estimate.
-- **D'Addario's official chart PDF** did not download (an HTML stub); the Chromes numbers are from
+- **standard's official chart PDF** did not download (an HTML stub); the Chromes numbers are from
   the product page via a search snippet, and retailers disagree on the wound strings by up to 4
   lb. Thomastik's catalogue was read in full [T], but does not state its scale.
 - **Pickup inductance:** no measured value for the '57 Classic, the Johnny Smith or the DeArmond
   1100. The PAF/'57 at 4.4 H is interpolated from Lemme's 490R (4.2 H) and maker ranges.
-- **The ES-175 neck pickup's distance from the saddle:** estimated from the geometry (165–175 mm),
+- **The laminated archtop neck pickup's distance from the saddle:** estimated from the geometry (165–175 mm),
   not measured.
 - **The Polytone Mini-Brute's tone circuit:** the schematic is behind a download wall; its
   speaker per model is from retail listings. The "Polytone" EQ above is a design, not the circuit.
@@ -868,7 +868,7 @@ physical, in the string and the pick:
 ### 12.2 Deviations from section 9
 
 - **The body's masses** ×8 (box) and ×100 (the neck's three modes), **towardsLoss 2.0** (not 1.7),
-  **loss0 ×0.6** and **loss1 ×0.75** (wound: 0.036–0.054 k²; plain 1.1× the Strat's). With the
+  **loss0 ×0.6** and **loss1 ×0.75** (wound: 0.036–0.054 k²; plain 1.1× the three-pickup solid-body's). With the
   table's masses the 85 Hz neck mode beside E2 passed the fundamental into the along-swing, which
   the pickup hears little: 15 dB down in 0.4 s against Rau's 5.45. As fitted: harmonics 1–5 of the
   open low E 15 dB down in 5.7, 3.4, 0.5, 1.2, 1.0 s (Rau17 5.45, 4.49, 0.86, 0.87, 1.12; within

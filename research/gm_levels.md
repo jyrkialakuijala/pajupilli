@@ -23,7 +23,7 @@ The fonts' own spread at v96: median sd 3.0 dB. Dynamic range v40-v127: pajupill
 | 5 | Electric Piano 1 | electric-piano-1 | -0.0 | +1.9 | +0.1 | -0.3 | -1.8 | 2.0 | 13.9 / 17.6 | 3.2 / 3.6 |
 | 6 | Electric Piano 2 | electric-piano-2 | +0.5 | +8.0 | +1.4 | -3.0 | -4.4 | 2.3 | 5.2 / 17.6 | -2.3 / 0.7 |
 | 7 | Harpsichord | harpsichord | +0.5 | +11.7 | +3.2 | -5.2 | -7.6 | 1.4 | -1.8 / 17.5 | -4.5 / 0.7 |
-| 8 | Clavinet | clavinet | +0.1 | +3.4 | +0.2 | -0.7 | -2.6 | 2.6 | 11.5 / 17.5 | -0.8 / -0.1 |
+| 8 | clavi | clavi | +0.1 | +3.4 | +0.2 | -0.7 | -2.6 | 2.6 | 11.5 / 17.5 | -0.8 / -0.1 |
 
 ## Chromatic percussion
 

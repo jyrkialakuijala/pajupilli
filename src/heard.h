@@ -1,6 +1,6 @@
 // Messages timed to the listening. Under -play the rendering runs up to 10 s (PJ_PLAY_LEAD) ahead
 // of what is heard, so whatever a player or the band says about a moment (the piano's "sustain
-// pedal down", a section's "tune:", a Hammond's "Leslie: fast") is stamped with the song's time
+// pedal down", a section's "tune:", a Tonewheel's "Rotary: fast") is stamped with the song's time
 // and queued, and the playback loop prints it when that moment is heard, beside its m:ss ticks.
 // Writing a file (-o), it is printed at once, stamped. Outside -play (-inst, -seq, the tests'
 // renders) it is printed as it always was, unstamped.

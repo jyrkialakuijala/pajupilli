@@ -23,7 +23,7 @@ constexpr double kHalf = 0.0005;
 bool fretlessBassInstrument(const Instrument& inst) { return std::strcmp(inst.name, "fretless-bass") == 0; }
 
 FretlessBassModel::FretlessBassModel(const Instrument& inst) : Tube(inst), g_(inst.fs, fretlessBass()) {
-  // The DI as the Jazz Bass's (src/ebass.cc): the coils with the cable's 700 pF and the pots into
+  // The DI as the two-pickup bass's (src/ebass.cc): the coils with the cable's 700 pF and the pots into
   // 1 MOhm, a biquad; or (PJ_EBASS_DI unset) the amp, told the same.
   const GuitarSpec& s = g_.spec();
   const GuitarSpec::Pickup& p = s.pickups[s.select[0]];
@@ -122,7 +122,7 @@ float FretlessBassModel::sample() {
 }
 
 FretlessBassPlayer::FretlessBassPlayer(FretlessBassModel& m) : Performer(m), m_(m) {
-  // (The strings not played kept quiet, as the Jazz Bass's player keeps them.)
+  // (The strings not played kept quiet, as the two-pickup bass's player keeps them.)
   for (int s = 0; s < kStrings; ++s) m.bass().damp(s, 40);
   wait_ = noteLeadsApplied() ? noteLead(m.instrument()) : knob("PJ_FRETLESS_WAIT", 0);
   errSd_ = std::max(0.0, knob("PJ_FRETLESS_ERR", 8));
@@ -363,7 +363,7 @@ void FretlessBassPlayer::start(size_t k) {
   // The pluck: index and middle in turn, a rest stroke between the pickups nearer the bridge,
   // more into the board than a fretted player's (the into-board share sets the mwah), and round:
   // the fingertip's pad (18 mm, PJ_FRETLESS_PAD) rolling off the string over 3-5 ms
-  // (PJ_FRETLESS_SLIP x the Jazz Bass player's; no snap off the fingertip's edge, PJ_FRETLESS_SNAP).
+  // (PJ_FRETLESS_SLIP x the two-pickup bass player's; no snap off the fingertip's edge, PJ_FRETLESS_SNAP).
   // The stroke gives the string its low partials; the board, as it grazes, gives it the upper ones
   // a moment later: the bloom (FluidR3's recorded fretless: h3-h11 from 30-45 dB down at the attack
   // to 15-25 dB down at 0.2-0.4 s). A bright, snapping stroke leaves the board nothing to add.

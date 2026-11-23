@@ -5,7 +5,7 @@ registers; `-inst harpsichord`). What follows was the research before it (2026-1
 middle C); A4 = 415 Hz unless stated.
 
 This file adds the registers, the 16' choir, the pedal instrument and the way onto the grand's
-code to `research/harpsichord_clavinet.md`, which already holds the physics of one harpsichord
+code to `research/harpsichord_clavi.md`, which already holds the physics of one harpsichord
 string: the scale of the 8' and 4' choirs, the plectrum, the release, the board, the published
 models and their sources. What is there is not repeated here; "(hc §2.4)" points into it.
 
@@ -72,7 +72,7 @@ start from, to be fitted or heard.
 - **How the player reaches them:** hand stops on old instruments; knee levers on late French ones
   (Taskin: six); the English machine stop, one pedal taking off the front 8' and the 4' at once;
   a lid or Venetian swell on a pedal **[web, hpschd.nu]**. The revival instruments put every
-  register on a pedal: Pleyel's Landowska model has 16', 8', 8', 4', a nasal, a buff and the
+  register on a pedal: a period maker's Landowska model has 16', 8', 8', 4', a nasal, a buff and the
   coupler on seven pedals **[web, Basel museum; harpsichord.com]**.
 
 ### 2.4 The pedal instrument
@@ -92,7 +92,7 @@ start from, to be fitted or heard.
     4'), the largest instrument of Bach's Germany;
   - the modern additions, off by default: a 4' on the pedals and a buff to their 16' (Neupert),
     a lute row and buff stops on the manuals, every register on a switch or under the foot
-    (Pleyel) instead of hand stops.
+    (a period maker) instead of hand stops.
   - Plectra of quill and tuning at A = 415 in an unequal temperament for the historical
     setting; leather on the 16' and A = 440 as options.
 
@@ -226,7 +226,7 @@ are already built this way (research/piano_design.md).
 | Buff to the 16' | no | pad 7 |
 | Pedal instrument on the low keys | no | pad 8 |
 
-- Pads on the MPK send notes on channel 10 (`src/live.cc`); here each press flips a register,
+- Pads on the controller send notes on channel 10 (`src/live.cc`); here each press flips a register,
   and the change takes hold at the next pluck, as a slide does.
 - The same switches as options for rendering (`-stops 8,8,4,16`, `-buff`, `-lute`) and as MIDI
   controllers (CC 80–87, on at 64 and over) for a sequencer.
@@ -237,12 +237,12 @@ are already built this way (research/piano_design.md).
 ### 5.2 Pedals
 
 A harpsichord has no sustain pedal. Two uses for the foot, both real:
-- **The sustain pedal (CC 64) as a register pedal**, as on a Pleyel or with the English machine
+- **The sustain pedal (CC 64) as a register pedal**, as on a a period maker or with the English machine
   stop: pressed, it adds the 16' and the 4' to whatever is drawn (the "grand jeu" under the
   foot), released it takes them off. Which registers it moves is a setting.
 - **The pedal instrument for the bass:**
   - from a second keyboard or a sequencer: MIDI channel 2 plays the pedalboard;
-  - from the MPK's 25 keys alone: with "pedal" on (pad 8), the lowest key held is also played on
+  - from the controller's 25 keys alone: with "pedal" on (pad 8), the lowest key held is also played on
     the pedal instrument at 16' + 8', as an organist's left foot would double the bass
     **[guess: to be tried]**; or the keyboard's lowest octave is the pedalboard.
   - Its swell door on the joystick or a knob.
@@ -273,11 +273,11 @@ tuning already); A = 415 or 440 (Neupert's transposing keyboard **[web]**).
 - Plectrum numbers for leather and quill (only Delrin is measured, hc §2.4).
 - How the pedal instrument's jacks were driven and how fast (rods or cords from the pedals
   **[web]**): its touch is heavier and slower than a manual's.
-- What "pedaling for the bass strings" should mean at the MPK (section 5.2 offers both readings).
+- What "pedaling for the bass strings" should mean at the controller (section 5.2 offers both readings).
 
 ## 8. Sources
 
-Besides those of `research/harpsichord_clavinet.md` §7:
+Besides those of `research/harpsichord_clavi.md` §7:
 - Wikipedia, "Hieronymus Albrecht Hass". https://en.wikipedia.org/wiki/Hieronymus_Albrecht_Hass
 - Yale Collection of Musical Instruments, harpsichord by J. A. Hass, no. 4879.1960.
   https://music.yale.edu/browse-collection/harpsichord-48791960

@@ -23,7 +23,7 @@
 //     deep, at what angle, how much nail.
 //   - Damping: a hand or a lifting finger laid on a string.
 //
-// The electric guitars (research/electric_guitars.md; electricGuitar(): the Stratocaster for
+// The electric guitars (research/electric_guitars.md; electricGuitar(): the three-pickup solid-body for
 // GM 28) are the same strings in steel, on a solid body that hardly moves, heard not through a
 // body but through magnetic pickups (below), and picked:
 //   - Steel strings, 10-46 (4.1): they ring 10-20 s on the low E, 3-6 s on the high one; their
@@ -44,7 +44,7 @@
 //     width (the field is ~20 mm wide: the highest harmonics, fretted high, fade), through the
 //     magnet's field (stronger as the string comes nearer: on-axis field of a cylindrical
 //     magnet, Novak et al.: a hard pluck grows an even harmonic). Two pickups together (the
-//     Strat's in-between positions) are two sources in parallel: their mean, through half the coil.
+//     three-pickup solid-body's in-between positions) are two sources in parallel: their mean, through half the coil.
 //     What comes out is the coil's EMF (V); the coil itself, and what it rings with, belong to
 //     the amp's input (guitaramp.h).
 #pragma once
@@ -143,11 +143,11 @@ struct GuitarSpec {
   double fingerLoss = 0;
 };
 GuitarSpec classicalGuitar();  // with the PJ_GUITAR_* knobs
-GuitarSpec electricGuitar(const char* name);  // "clean-guitar": a Stratocaster
+GuitarSpec electricGuitar(const char* name);  // "clean-guitar": a three-pickup solid-body
 // The steel-string acoustic (GM 26, research/steel_guitar.md, steel_guitar_build.md 8.1): a
 // dreadnought, phosphor-bronze 12-53, with the PJ_STEEL_* knobs.
 GuitarSpec steelGuitar();
-// The jazz guitar (GM 27, research/jazz_guitar.md 9.1): a Gibson ES-175, a laminated archtop on a
+// The jazz guitar (GM 27, research/jazz_guitar.md 9.1): a laminated archtop, a laminated archtop on a
 // floating bridge, flatwounds 12-52, the neck humbucker mounted in the top; PJ_JAZZ_* knobs.
 GuitarSpec jazzGuitar();
 
