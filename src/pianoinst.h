@@ -5,6 +5,7 @@
 #pragma once
 
 #include <algorithm>
+#include <string>
 #include <vector>
 
 #include "performer.h"
@@ -12,6 +13,16 @@
 #include "tube.h"
 
 namespace pajupilli {
+
+// The grand's tuning (-tuning grand-piano;NAME): grand-piano-stretch (default, Precision Strobe's table),
+// stretch-variable, railsback-4-2 (a Modartt forum study's curves), octaves-by-register, partials
+// (the model's earlier 2:1 / 6:3), tet12 (no stretch), or meantone, kirnberger3, neidhardt, lehman
+// (over the partials' stretch). False: no such tuning.
+bool setPianoTuning(const std::string& name);
+const char* pianoTuningName();
+// -hammer_pos X: where the grand's hammers strike, a share of the string's length from its far end
+// from the bridge (default 0.125).
+void setPianoHammerPos(double share);
 
 bool grandPiano(const Instrument& inst);  // -inst grand-piano, upright-piano: a PianoModel (among the string instruments)
 

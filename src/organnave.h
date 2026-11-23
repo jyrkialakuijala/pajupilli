@@ -6,7 +6,7 @@
 // into the nave and acting back on the pipes in their case.
 //
 // - A feedback delay network of 32 lines (a fast Hadamard mix), the lines 0.3
-//   to 1.3 mean free paths long (4V/S: 16.7 m, 49 ms in a 50 x 20 x 20 m nave),
+//   to 1.3 mean free paths long (4V/S: 16.5 m, 48 ms in a 50 x 18.3 x 21.5 m nave),
 //   prime lengths. Each line loses per pass what the nave loses in its length,
 //   per frequency: a broadband gain and seven sections (low shelves at 70 and
 //   400 Hz, a peak at 140 Hz, high shelves at 1.5, 3.5, 7 and 13 kHz) fitted to the T60 per octave by least
@@ -78,8 +78,8 @@ class OrganNave {
   static constexpr int kLines = 32;
   static constexpr int kBands = 9;  // 63 Hz .. 16 kHz
   struct Params {
-    double volume = 20000;  // m^3 (50 x 20 x 20 m)
-    double surface = 4800;  // m^2
+    double volume = 19673;  // m^3 (50 x 18.3 x 21.5 m)
+    double surface = 4767;  // m^2
     double t60[kBands] = {7.0, 8.0, 6.5, 5.8, 5.3, 4.2, 3.0, 1.6, 0.5};
     double onsetMs = 20;     // the first late energy after the direct sound
     double latency = 0;      // samples the input already arrives late

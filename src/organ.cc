@@ -659,13 +659,14 @@ const Regulation kRegulation[] = {
     {"j_p_trommet8", 37.9f},
 };
 int gDisposition = 0;
-OrganTemperament gTemperament = kEqualTemperament;
+OrganTemperament gTemperament = kJyrkiSpectral;
 // A temperament against equal temperament, in cents, A kept at its pitch. Quarter-comma meantone: a
 // key's place on the chain of fifths from Eb to G# (PJ_ORGAN_MEANTONE_LOW, -3; -4: Ab for G#). The
 // well temperaments: each fifth of the circle from C by how far it is tempered from pure.
-double temperamentCents(int key) {
+double temperamentOf(OrganTemperament temperament, int key) {
+  if (temperament == kJyrkiSpectral || temperament == kJyrkiHeuristic || temperament == kTet12) return 0;
   const int pc = key % 12;
-  if (gTemperament == kMeantone) {
+  if (temperament == kMeantone) {
     static const int kLow = int(knob("PJ_ORGAN_MEANTONE_LOW", -3));
     const double kFifth = 1200 * std::log2(5.0) / 4;
     const int f = kLow + ((pc * 7 - kLow) % 12 + 12) % 12;
@@ -676,7 +677,7 @@ double temperamentCents(int key) {
   const double kirnberger[12] = {-S / 4, -S / 4, -S / 4, -S / 4, 0, 0, -(P - S), 0, 0, 0, 0, 0};
   const double neidhardt[12] = {-P / 6, -P / 6, -P / 6, -P / 12, 0, -P / 12, -P / 12, -P / 12, 0, -P / 12, -P / 12, 0};
   const double lehman[12] = {-P / 6, -P / 6, -P / 6, -P / 6, 0, 0, 0, -P / 12, -P / 12, -P / 12, P / 12, -P / 6};
-  const double* d = gTemperament == kKirnberger3 ? kirnberger : gTemperament == kNeidhardt ? neidhardt : lehman;
+  const double* d = temperament == kKirnberger3 ? kirnberger : temperament == kNeidhardt ? neidhardt : lehman;
   auto at = [&](int target) {  // (up the circle from C to this pitch class: against equal)
     double c = 0;
     for (int i = 0, q = 0; q != target; ++i, q = (q + 7) % 12) c += kPure + d[i] - 700;
@@ -684,6 +685,7 @@ double temperamentCents(int key) {
   };
   return at(pc) - at(9);
 }
+double temperamentCents(int key) { return temperamentOf(gTemperament, key); }
 bool ofThisOrgan(const Stop& st) { return (std::strncmp(st.token, "j_", 2) == 0) == (gDisposition == 1); }
 float regulationDb(const char* token) {
   for (const Regulation& r : kRegulation)
@@ -934,8 +936,9 @@ OrganModel::OrganModel(const Instrument& inst) : Tube(inst) {
       }
       std::fprintf(stderr, "organ: %d pipes retuned from %s\n", n, tf);
     }
-  ji_ = knob("PJ_ORGAN_JI", 1) != 0 && gTemperament == kEqualTemperament;  // (the temperament is the tuning: nothing retunes it)
+  ji_ = knob("PJ_ORGAN_JI", 1) != 0 && (gTemperament == kJyrkiSpectral || gTemperament == kJyrkiHeuristic);  // (the temperament is the tuning: nothing retunes it)
   std::fill(std::begin(jiSince_), std::end(jiSince_), -1L);
+  std::fill(std::begin(jiPlanAt_), std::end(jiPlanAt_), -1000000L);
   pitchLog_ = std::getenv("PJ_ORGAN_PITCHLOG") != nullptr;
   if (pitchLog_)
     for (Pipe& pp : pipes_) {  // (a band-pass at its pitch, Q 8)
@@ -1097,7 +1100,7 @@ void OrganModel::addRank(int stop) {
     // the others: two pipes beat at most ~0.44 Hz whatever their pitch, a slow
     // swell; pure intervals alone sound clinical)
     static const double kPipeHz = knob("PJ_ORGAN_DETUNE_HZ", 1.0 / 4.5), kRankHz = knob("PJ_ORGAN_RANK_HZ", 1.0 / 4.5);
-    const double cents = warmCents + st.cents + kDetune * rng.uniform() + (gTemperament != kEqualTemperament ? temperamentCents(m) : 0.0);
+    const double cents = warmCents + st.cents + kDetune * rng.uniform() + temperamentCents(m);
     const double hz = 440 * std::exp2((m - 69) / 12.0 + cents / 1200) * ratio(m) + rankHz * kRankHz + kPipeHz * rng.uniform();
     Pipe pp;
     // (the smallest pipes run oversampled: their jet's travel a few samples
@@ -1114,7 +1117,7 @@ void OrganModel::addRank(int stop) {
         v.noiseLp = knob("PJ_PEDAL_NOISELP", 800);
         v.breath *= 0.5;
         // (their attack's puff: PJ_PEDAL_PUFF_DB further down)
-        static const double kPedalPuff = std::pow(10.0, knob("PJ_PEDAL_PUFF_DB", 0) / 20);
+        static const double kPedalPuff = std::pow(10.0, knob("PJ_PEDAL_PUFF_DB", -3) / 20);
         v.puff *= 0.5 * kPedalPuff;
       }
       pp.p.f.setup(fs * pp.os, hz, v, randomSeed(stop, m));
@@ -1536,15 +1539,32 @@ void OrganModel::closeOn(int division, int midi) {
 void setOrganDisposition(int d) { gDisposition = d; }
 int organDisposition() { return gDisposition; }
 void setOrganTemperament(OrganTemperament t) { gTemperament = t; }
-const char* organDispositionName() {
-  if (gDisposition != 1) return "the large organ";
-  switch (gTemperament) {
-    case kMeantone: return "after Janakkala (Porthan 1993), quarter-comma meantone";
-    case kKirnberger3: return "after Janakkala (Porthan 1993), Kirnberger III";
-    case kNeidhardt: return "after Janakkala (Porthan 1993), Neidhardt 1724 for a large town";
-    case kLehman: return "after Janakkala (Porthan 1993), Lehman's Bach tuning";
-    default: return "after Janakkala (Porthan 1993)";
-  }
+double temperamentCentsOf(OrganTemperament t, int midi) { return temperamentOf(t, midi); }
+double organTuningLookAhead() { return gTemperament == kJyrkiHeuristic ? knob("PJ_JI_AHEAD_MS", 150) * 1e-3 : 0.0; }
+const char* organDispositionName() { return gDisposition == 1 ? "after Janakkala, Porthan 1993" : "the large organ"; }
+namespace {
+const struct { const char* name; OrganTemperament t; const char* shown; } kTunings[] = {
+    {"jyrki-spectral", kJyrkiSpectral, "jyrki-spectral (adaptive, by the pipes' partials)"},
+    {"jyrki-heuristic", kJyrkiHeuristic, "jyrki-heuristic (adaptive, by an interval table)"},
+    {"tet12", kTet12, "12-TET"},
+    {"meantone", kMeantone, "quarter-comma meantone"},
+    {"kirnberger3", kKirnberger3, "Kirnberger III"},
+    {"neidhardt", kNeidhardt, "Neidhardt 1724, for a large town"},
+    {"lehman", kLehman, "Lehman's Bach tuning"},
+};
+}  // namespace
+bool organTuningByName(const std::string& name, OrganTemperament& t) {
+  for (const auto& k : kTunings)
+    if (name == k.name) {
+      t = k.t;
+      return true;
+    }
+  return false;
+}
+const char* organTuningName() {
+  for (const auto& k : kTunings)
+    if (k.t == gTemperament) return k.shown;
+  return "";
 }
 
 void organSize(int& stops, int& ranks, int& pipes) {
@@ -1905,7 +1925,7 @@ void OrganModel::takeEarly(int n, float* l, float* r, float g) {
   }
 }
 
-// The organ's own nave (src/organnave.h): a 50 x 20 x 20 m stone church
+// The organ's own nave (src/organnave.h): a 50 x 18.3 x 21.5 m stone church
 // (PJ_NAVE_VOLUME, the same proportions), its T60 per octave (PJ_NAVE_T60_63
 // .. PJ_NAVE_T60_16K, s; all scaled by PJ_NAVE_T60); the late field from
 // PJ_NAVE_ONSET_MS after the direct sound. Its level is physical against the
@@ -2084,6 +2104,28 @@ void OrganModel::justSolve() {
       jiTarget_[m] = 0;
     }
   }
+  // (jyrki-heuristic in -play: a key landing now is tuned against what will sound just after it: its
+  // own and the other new keys, and the keys the score has on then. Keys about to be let go do not
+  // pull it; keys about to come do, as partners only, each tuned when it lands.)
+  bool virt[128] = {};
+  if (gTemperament == kJyrkiHeuristic && jiAheadN_ > 0 && now_ - jiAheadAt_ < long(0.04 * fs_)) {
+    bool ahead[128] = {};
+    for (int q = 0; q < jiAheadN_; ++q) ahead[jiAhead_[q] & 127] = true;
+    int k = 0, list[64];
+    for (int m = 0; m < 128 && k < 64; ++m) {
+      bool down = held_[m];
+      for (int d = 0; d < 4; ++d) down |= heldOn_[d][m];
+      const bool landing = down && now_ - jiSince_[m] < long(0.04 * fs_);
+      if (!landing && !ahead[m]) continue;
+      list[k++] = m;
+      virt[m] = !down;
+      sig = sig * 1000003 + m + 500;
+    }
+    if (k > 0) {
+      std::copy(list, list + k, note);
+      n = k;
+    }
+  }
   const bool same = sig == jiSig_;
   if (same && now_ - jiSolved_ < long(0.1 * fs_)) return;
   const double decay = same ? std::exp(-double(now_ - jiSolved_) / fs_ / 3.0) : 1.0;
@@ -2104,7 +2146,8 @@ void OrganModel::justSolve() {
   bool young[64];
   int ny = 0;
   for (int i = 0; i < n; ++i) {
-    young[i] = now_ - jiSince_[note[i]] < long(0.15 * fs_);
+    // (free to take its place only before it has spoken: a chord's keys landing together)
+    young[i] = virt[note[i]] || now_ - jiSince_[note[i]] < long(0.04 * fs_);
     ny += young[i];
   }
   for (int i = 0; i < n; ++i) {
@@ -2122,7 +2165,7 @@ void OrganModel::justSolve() {
   // pipes' modelled spectra (each harmonic's level in the pipe's own output,
   // read from the model once at calibration and cached: a Gedackt's odd partials only, a Nasard's at 3x, a Terz's at 5x,
   // a mixture's ranks). Else (or with no partials met) the interval table's.
-  static const bool kSpectral = knob("PJ_JI_SPECTRAL", 1) != 0;  // (on: by the spectra; 0: the interval table alone)
+  const bool kSpectral = knob("PJ_JI_SPECTRAL", 1) != 0 && gTemperament == kJyrkiSpectral;  // (by the spectra; else the interval table alone)
   static const double kSpecW = knob("PJ_JI_SPECTRAL_W", 1.0);
   std::vector<std::vector<std::pair<double, double>>> spec(n);  // per key: (log2 of the partial over the key's 8' pitch, strength)
   if (kSpectral)
@@ -2210,8 +2253,20 @@ void OrganModel::justSolve() {
     c[k] = std::clamp(v / A[k][k], -lim[k], lim[k]);
   }
   for (int i = 0; i < n; ++i) {
+    if (virt[note[i]]) {  // (not down yet: only a partner; the place worked out for it, for when it lands)
+      jiPlan_[note[i]] = c[i];
+      jiPlanAt_[note[i]] = now_;
+      continue;
+    }
     double t = c[i];
-    if (!young[i]) t = std::clamp(t, jiTarget_[note[i]] - 3, jiTarget_[note[i]] + 3);  // (a sounding key moves a little)
+    if (young[i] && now_ - jiPlanAt_[note[i]] < long(0.25 * fs_)) t = jiPlan_[note[i]];
+    // (a short note keeps the tuning it started with: its pitch is hard to place, a bend in it is not.
+    // Only a key held past PJ_JI_SHORT_MS, 600, moves, and a little at a time)
+    static const double kShortMs = knob("PJ_JI_SHORT_MS", 600);
+    if (!young[i]) {
+      const bool isShort = now_ - jiSince_[note[i]] < long(kShortMs * 1e-3 * fs_);
+      t = isShort ? jiTarget_[note[i]] : std::clamp(t, jiTarget_[note[i]] - 3, jiTarget_[note[i]] + 3);
+    }
     jiTarget_[note[i]] = std::clamp(t, -lim[i], lim[i]);
   }
 }

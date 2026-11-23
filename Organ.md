@@ -8,8 +8,9 @@ Working notes for reworking the organ. The model's background is in
 
 ## Two organs
 
-`-organ large` is the default. `-organ janakkala` selects the second one. `-play`
-prints the chosen organ's size.
+`-organ large` is the default. `-organ janakkala` selects the second one. The tuning
+is separate: `-tuning NAME` works on either organ. `-play` prints the organ, its
+tuning and its size.
 
 | Organ | Stops | Ranks | Modelled pipes | Divisions |
 |---|---|---|---|---|
@@ -64,12 +65,16 @@ Not done: couplers, the Nachtigall, a Janakkala-sized room.
 
 ### Temperaments
 
-`-organ janakkala-NAME` retunes every key with A kept at 440 Hz. The adaptive just
-intonation, which plain `janakkala` and the large organ use, is off in all of these.
-Mutations stay pure against their key. `temperamentCents()` holds the definitions.
+`-tuning NAME` sets the tuning on either organ, with A kept at 440 Hz. The two
+`jyrki-*` tunings are adaptive: equal temperament with held notes drawn towards just
+intervals. Every other tuning turns that off. Mutations stay pure against their key.
+`temperamentCents()` holds the definitions.
 
 | NAME | Definition (fifths of the circle from C) |
 |---|---|
+| `jyrki-spectral` | adaptive, by where the sounding pipes' partials meet (default) |
+| `jyrki-heuristic` | adaptive, by a table of how much each interval (3rds, 6ths, 7ths ...) matters |
+| `tet12` | plain 12-tone equal temperament, nothing retuned |
 | `meantone` | quarter-comma, chain Eb to G#, wolf G#-Eb |
 | `kirnberger3` | C-G-D-A-E each 1/4 syntonic comma narrow, F#-C# narrow by the schisma, the rest pure |
 | `neidhardt` | 1724 "für eine große Stadt": C-G, G-D, D-A 1/6 Pythagorean comma; A-E, B-F#, F#-C#, C#-G#, Eb-Bb, Bb-F 1/12; E-B, G#-Eb, F-C pure |
@@ -85,6 +90,36 @@ Mutations stay pure against their key. `temperamentCents()` holds the definition
 Sources: [CBH, Neidhardt große Stadt](https://www.hpschd.nu/tech/tmp/neidhardt-gs.html),
 [Wikipedia, Kirnberger temperament](https://en.wikipedia.org/wiki/Kirnberger_temperament),
 [Amiot on Bach's temperament](https://www.mtosmt.org/issues/mto.09.15.2/mto.09.15.2.amiot.php).
+
+## The church's shape
+
+The nave is 50 m long, 18.3 m wide and 21.5 m high (19 673 m^3), the user's choice. It
+replaced 50 x 20 x 20 m, whose equal width and height stacked modes and made reflections
+coincide. The volume is nearly the same, so the reverberation times are unchanged.
+
+**Side aisles** (`PJ_ORGAN_AISLES`, 1; 0 for flat walls). The side walls are arcades before
+aisles about 6 m deep. The piers return part of a side reflection at once. The rest of a
+first-order reflection comes back through the arches as two later, darker arrivals
+(about 25-40 ms later), different for each source and microphone. Second-order paths
+only lose a little at the piers.
+
+**The rear wall.** The early paths have no east wall, so there is no discrete slap-back
+from it (about 290 ms round trip). That energy is part of the diffuse late field.
+
+**Not built:** a coupled chamber behind the altar, for a double-slope decay. The organ
+should keep speaking directly into the nave, with the chamber catching and returning
+the late sound through a wide opening. A deep apse should be faceted to avoid focusing.
+
+### Janakkala's real church (not modelled yet)
+
+Notes the user supplied, not independently checked: St. Lawrence, a cruciform stone
+church of about 750 m^2 seating about 650. The medieval nave (1510-1520) is about 29 x
+10 m inside. Transepts were added in 1848-1849, when the brick vaults were replaced by a
+wooden barrel vault. The organ is in the west arm, the altar in the east, and a
+half-octagon sacristy stands outside the east wall. The height and volume are not given.
+Both organs still play in the one nave above. A real Janakkala room needs a room per
+organ, a cruciform shape, a wooden vault, and the case re-laid to fit, since the
+current case reaches 15.8 m.
 
 ## Listening and rendering pitfalls
 
@@ -110,8 +145,7 @@ moves the opening from 32.7 Hz to 65 Hz on the 16' stops. The keyboard-zone mode
 Each flue pipe's puff has its own aimed source at its own mouth
 (`PJ_ORGAN_PUFFPATH`, `PJ_ORGAN_PUFFLOBE`), yawed up to 55 degrees and pitched up to
 20 degrees by a hash of stop and key. It also feeds the nave by enclosure.
-`PJ_PEDAL_PUFF_DB` lowers the pedal flues' puffs (default 0). A -3 dB trial was
-withdrawn when the Posaune turned out to be the likely source of what was heard.
+`PJ_PEDAL_PUFF_DB` (-3) lowers the pedal flues' puffs.
 
 ## The Posaune's attack
 
@@ -187,8 +221,23 @@ square root of foot pressure, so an overshoot can excite upper partials before t
 fundamental locks, which voicers shape into chiff. If adopted, flues should get this
 too, and `organwind.h` should supply the pallet box's dip.
 
+## Adaptive tuning and short notes
+
+A key used to count as "young" for 150 ms and was re-solved freely at each neighbour's
+arrival, by up to its whole range, so a pipe already speaking could bend audibly (BWV
+549 near 4:55). Now a key takes its place in its first 40 ms, before it speaks, and
+keeps it for its first `PJ_JI_SHORT_MS` (600). Only a key held longer moves, at most
+3 cents a solve. Short notes are hard to place by pitch, but a bend in them is audible.
+
+**`jyrki-heuristic` looks ahead in `-play`.** As a key lands, it is tuned against what the
+score has sounding `PJ_JI_AHEAD_MS` (150) later. Keys about to be released no longer
+pull it, and keys about to arrive do, as partners only. Live playing cannot look ahead.
+
+**Later:** record each note's ideal tuning over its life and start it at that timed
+average, so that it need not move at all.
+
 ## Ideas
 
 - German Protestant churches tend to be drier and clearer (the user's note gives an
   occupied Thomaskirche at about 1.6 s), French ones longer and darker. A Janakkala
-  room shorter than the current 50 x 20 x 20 m nave would suit its articulate voicing.
+  room smaller than the current 50 x 18.3 x 21.5 m nave would suit its articulate voicing.

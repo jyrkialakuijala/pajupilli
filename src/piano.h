@@ -121,6 +121,21 @@ struct PianoDesign {
   // strings' own extra loss (partials above the first, the first), and how the nap gives out
   // under a blow (0: never quite, a hyperbola; else it packs down within this share of its depth).
   double topBridge = 1, topUp = 2.5, topF0 = 1.5, napPack = 0;
+  // The blow's vowel: how deep (dB) the valleys between the formants the hammer speaks through
+  // (Piano::voiceBlow; 0: none).
+  double vowelDb = 0;
+  // The bass's bloom, as a bell's: its upper partials take the blow at once but come out through
+  // the bridge each at its own later time, some much later (x how deep; 0: none).
+  double bloom = 0;
+  // From the mid-bass up (C2 to C3 gliding in) the partials over ~600 Hz, fully from ~1.7 kHz, lose
+  // their energy this much faster in the wire (x 1 + it); the lower ones keep their sustain.
+  double hiDecay = 0;
+  // The pitch's rise at a loud blow: the swing stretches the string, its tension up and every
+  // partial sharper until the swing has died (x the computed rise; 0: none).
+  double glide = 0;
+  // How much of the bridge's motion goes back into the strings (x): under 1 a stiffer, heavier
+  // bridge and board, the strings handing their energy over more slowly and singing longer.
+  double bridgeIn = 1, bridgeBass = 1;  // (bridgeBass: x more of it at C3 and under, gliding from C5)
   // The bridge: a soundboard's resonances (tools/pianoboard.py), loaded by
   // the damped strings standing on it; or a heavy lossy support that does
   // not move (each string's end gives to a resistance of supportR kg/s: a
@@ -162,7 +177,10 @@ PianoDesign harpsichordDesign();
 // [lo, hi] (numbered from 1, A4 = key 49 = 440 Hz), then octave by octave, a
 // partial of the lower note against one of the upper: 2 with 1 going up,
 // 6 with 3 going down.
-void tuneByPartials(PianoDesign* d, int lo = 43, int hi = 54);
+void tuneByPartials(PianoDesign* d, int lo = 43, int hi = 54, bool byRegister = false);
+// The concert grand's own speaking lengths, key by key (the strings to A2 keep their tension,
+// their mass following; the plain ones above their wire, their tension following).
+void concertScale(PianoDesign* d);
 
 class Piano {
  public:
@@ -238,12 +256,16 @@ class Piano {
     int nl = 0, nlx = 0, longLeft = 0;  // (nlx: its transverse modes under 5 kHz, those stretching it)
     float lx[kLong] = {}, lv[kLong] = {}, lcs[kLong] = {}, lsn[kLong] = {}, ldrive[kLong] = {}, lout[kLong] = {};
     float lrest[kLong] = {}, ltension = 0;
+    float glideK = 0, glide = 0, glideSet = 0;  // (the pitch's rise: per the swing's energy; now; as last applied)
     float longPeak = 0;       // (its swing's energy at the loudest since the blow)
   };
   struct Key {
     int s0, ns;
     double f1, B, len;
     float mh, K, p;       // the hammer: mass (kg), felt stiffness (N/m^p), exponent
+    int glideN = 0;       // (samples to the next look at its strings' tension)
+    int bloomT = -1;      // (samples since the blow while its partials are still coming out; -1: not)
+    float inBack = 1;     // (under its damper the bridge's motion reaches the strings in full: x this)
     float nap = 0, napK = 0, napPack = 0;  // the felt's nap: thickness (m), stiffness (N/m a string), packing
     float pluckK = 0, pluckLimit = 0, pluckSide = 0;  // a plectrum in the hammer's place
     float eta = 0, vh = 0, force = 0;  // its place (m, from the strings' rest) and speed
@@ -264,6 +286,8 @@ class Piano {
   void damperContact(Key& k);
   void build();
   void hammer(Key& k);
+  void bloomStep(Key& k);
+  void glideStep(Key& k);
   void pluck(Key& k);
   void wake();
   void boardNow();
@@ -277,6 +301,8 @@ class Piano {
   float dt_;
   float voicing_ = 1;
   std::vector<Str> str_;
+  std::vector<float> wdt_, cs0_, sn0_, cs10_, sn10_;  // (each mode's turn per sample at rest)
+  std::vector<float> outFull_, bloomTau_, bloomFloor_;  // (each mode: its output in full, how long it takes (samples), from what)
   Key key_[kKeys];
   int total_ = 0;
   // Per mode, all strings in a row (64-byte aligned): the state, in the two
@@ -293,6 +319,7 @@ class Piano {
   float *out_;            // the mode's share of the momentum passed to the bridge (kg)
   float *damp_;           // the damper resting on it: what is left per sample
   float *hk_;             // the hammer's force into the mode's velocity (x dt / mass)
+  float *vw_;            // what of the hammer's push reaches each mode: this blow's vowel
   float *hc_, *hs_;       // the string's place under the hammer one sample on, from x and v
   float *dk_;             // a force on the damper's felt into the mode's velocity (x dt / mass)
   // The damper's felt as kDPts contacts along its length (each a quarter of it): per contact,

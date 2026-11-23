@@ -48,9 +48,15 @@ void organSize(int& stops, int& ranks, int& pipes);  // the whole organ: its sto
 // Which organ: 0 the large one (Hauptwerk, Schwellwerk, Positiv, Pedal), 1 after Janakkala's
 // (Porthan 1993, 40/III: Rückpositiv, Hauptwerk, Brustwerk, Pedal; -organ janakkala). See Organ.md.
 void setOrganDisposition(int d);
-// The temperament (-organ janakkala-NAME; see Organ.md); kEqual: the adaptive just intonation as before.
-enum OrganTemperament { kEqualTemperament, kMeantone, kKirnberger3, kNeidhardt, kLehman };
+// The tuning (-tuning NAME, on either organ; see Organ.md). The two adaptive ones keep equal
+// temperament with held notes drawn towards just intervals: kJyrkiSpectral (the default) by where
+// the sounding pipes' partials meet, kJyrkiHeuristic by a table of the intervals (3rds, 6ths, 7ths ...).
+enum OrganTemperament { kJyrkiSpectral, kJyrkiHeuristic, kTet12, kMeantone, kKirnberger3, kNeidhardt, kLehman };
 void setOrganTemperament(OrganTemperament t);
+double temperamentCentsOf(OrganTemperament t, int midi);  // (a fixed temperament against equal, for the piano too)
+double organTuningLookAhead();  // (seconds -play should look ahead for the tuning: jyrki-heuristic's; else 0)
+bool organTuningByName(const std::string& name, OrganTemperament& t);
+const char* organTuningName();
 int organDisposition();
 const char* organDispositionName();
 
@@ -92,6 +98,13 @@ class OrganModel : public Tube {
   // touch: 0 normal .. 1 the softest finger (a long high note: its pallet
   // opened up to 2.5x slower, closed up to 2x, its attack gentler).
   void openOn(int division, int midi, double touch = 0);
+  // (-play, jyrki-heuristic) The keys that will be sounding a moment after the next key goes down:
+  // that key is tuned to them, not to what happens to be held as it lands.
+  void setLookAhead(const int* keys, int n) {
+    jiAheadN_ = std::min(n, 64);
+    std::copy(keys, keys + jiAheadN_, jiAhead_);
+    jiAheadAt_ = now_;
+  }
   void closeOn(int division, int midi);
   // The registration now: stops' tokens and presets, couplers (sw-hw, pos-hw,
   // sw-pos, hw-ped, sw-ped, pos-ped), tremulants (tremsw, trempos); every
@@ -198,6 +211,10 @@ class OrganModel : public Tube {
   long now_ = 0;                  // samples
   double jiTarget_[128] = {}, jiNow_[128] = {};
   double jiRate_[128] = {}, jiGoal_[128] = {};  // (each key's glide: c a ms, towards the goal it was set for)
+  int jiAhead_[64] = {}, jiAheadN_ = 0;
+  long jiAheadAt_ = -1000000;
+  double jiPlan_[128] = {};
+  long jiPlanAt_[128];  // (set to long ago in the constructor)
   long jiSince_[128] = {};        // when each key went down (samples; -1 up)
   long jiSolved_ = 0;
   long long jiSig_ = 0;
@@ -341,6 +358,7 @@ class OrganPlayer : public Performer {
   // A part played by manuals (a MIDI file's organ part: src/organplan.h):
   // a key on a division; a registration; the swell's opening.
   void noteOnManual(int division, int midi, double touch = 0) { m_.openOn(division, midi, touch); }
+  void lookAhead(const int* keys, int n) { m_.setLookAhead(keys, n); }
   void noteOffManual(int division, int midi) { m_.closeOn(division, midi); }
   void setRegistration(const std::string& stops) { m_.setRegistration(stops); }
   void setSwellOpening(double s) { swellFixed_ = s; }

@@ -34,6 +34,7 @@ void setPlayTranspose(int semitones);
 // notes (src/pianoplan.h), the file's own CC 64 on its channel set aside.
 void setPianist(bool on);
 void setPlayVolume(double dB);  // -volume: the whole mix, before the output's limit
+void setPlayStart(double seconds);  // -start_time: begin there in the song
 
 // -inst's list of the instruments: in General MIDI's order and groups, each with its program
 // number; then those no program reaches, by family.

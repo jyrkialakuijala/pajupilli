@@ -16,7 +16,7 @@
 // box's through its shutters, applied on its own ring set).
 //
 // The church: x across (north +, the listener's right), y up, z east from the
-// west wall; a 50 x 20 x 20 m nave, the west gallery's floor at 7 m. The
+// west wall; a nave 50 m long, 18.3 m wide and 21.5 m high, the west gallery's floor at 7 m. The
 // listener: two microphones 2 m apart, turned 55 degrees out, on the axis
 // (src/organ.cc sets them: a recording's main pair on a tall stand, 4 m high,
 // 10 m into the nave, ~10 m from the main case).
@@ -73,6 +73,7 @@ class OrganRoom {
   int addSource(V3 at, int caseId, bool facade, double occl, double dirDark, int set, double hz = 250) {
     Source s;
     s.at = at;
+    s.at.y = std::min(s.at.y, kNaveH - 0.3);  // (a pipe taller than the vault allows is mitred)
     s.hz = hz;
     s.caseId = caseId;
     if (caseId >= 0) {  // (inside its case, a little in from its walls)
@@ -187,7 +188,24 @@ class OrganRoom {
           const double aimed = s.lobe > 0 ? std::max(0.0, 1 + s.lobe * dot(p.firstDir, s.aim)) / std::sqrt(1 + s.lobe * s.lobe / 3) : 1.0;
           // (bent round the edge, its harmonics more than its fundamental: darker)
           const double o = std::clamp(s.occl + s.dirDark * 0.5 * (1 - p.firstDir.z) + 0.7 * p.shadow + p.diffDb / 15, 0.0, 1.0);
-          taps_[m][i].push_back({ringIndex(m, cls(p), int(std::lround(2 * o))), d, float(g * aimed)});
+          // The side walls are arcades before aisles ~6 m deep (PJ_ORGAN_AISLES, 1; 0: flat walls): the
+          // piers return part of the sound at once; a first-order reflection's rest goes through the
+          // arches, off the aisle's wall and back, two arrivals later and darker, their own for
+          // each source and microphone; a second-order path only loses a little at the piers.
+          static const double kAisles = std::getenv("PJ_ORGAN_AISLES") ? std::atof(std::getenv("PJ_ORGAN_AISLES")) : 1.0;
+          const int dark = int(std::lround(2 * o));
+          const bool arcade = kAisles > 0 && p.side > 0;
+          const double pier = arcade ? (p.order == 1 ? 0.75 : 0.87) : 1.0;
+          taps_[m][i].push_back({ringIndex(m, cls(p), dark), d, float(g * aimed * pier)});
+          if (arcade && p.order == 1) {
+            uint32_t h = uint32_t((s.alias >= 0 ? s.alias : int(i)) + 1) * 2654435761u ^ uint32_t(m + 1) * 40503u ^ uint32_t(std::lround(p.r * 100));
+            for (int q = 0; q < 2; ++q) {
+              h = h * 1664525u + 1013904223u;
+              const double extra = 2 * 6.0 * (0.7 + 0.6 * ((h >> 8) / 16777216.0)) / kC;
+              const int da = d + int(std::lround(extra * fs_));
+              if (da < kRingN - kBlock) taps_[m][i].push_back({ringIndex(m, cls(p), std::min(2, dark + 1)), da, float(g * aimed * 0.42)});
+            }
+          }
         }
       }
     for (RingSet& r : sets_) r.buf.assign(size_t(kRings) * kRingN, 0.0f);
@@ -285,7 +303,9 @@ class OrganRoom {
 
  private:
   static constexpr double kC = 343.2;  // (20 C)
-  static constexpr double kNaveW = 20, kNaveH = 20, kNaveL = 50, kGalleryY = 7, kGalleryZ = 5.5;
+  // (width : height : length 1 : 1.17 : 2.73, about 19 700 m^3: no two dimensions equal or simple
+  // multiples; see Organ.md)
+  static constexpr double kNaveW = 18.3, kNaveH = 21.5, kNaveL = 50, kGalleryY = 7, kGalleryZ = 5.5;
   static constexpr int kRingN = 8192, kRingMask = kRingN - 1;
   static constexpr int kCls = 5;   // direct, 1st near, 1st far, 2nd near, 2nd far
   static constexpr int kDark = 3;  // bright, half (-4 dB above 1.5 kHz), dark (-8 dB)
@@ -438,6 +458,7 @@ class OrganRoom {
     V3 firstDir, arriveFrom;
     int shadow = 0;
     double diffDb = 0;  // (bent round the gallery's front edge: its loss)
+    int side = 0;       // (how many times it met a side wall: the arcades before the aisles)
   };
   struct Tap {
     int ring, delay;
@@ -664,6 +685,7 @@ class OrganRoom {
       p.arriveFrom = mul(1 / len(back), back);
       p.shadow = shadow;
       p.diffDb = diff;
+      for (int k : seq) p.side += planes[k].axis == 0;
       out.push_back(p);
     }
     return out;

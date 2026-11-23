@@ -28,6 +28,7 @@
 #include "calibrate.h"
 #include "midifile.h"
 #include "organ.h"
+#include "pianoinst.h"
 #include "ensemble.h"
 #include "lead.h"
 #include "flute.h"
@@ -390,8 +391,13 @@ const char kUsage[] =
     "                      vibrato, a final ritardando, fermatas. auto (default): only\n"
     "                      for a file with no performance of its own; on; off\n"
     "  -volume DB          with -play: the whole mix up or down (e.g. -volume -6)\n"
-    "  -organ NAME         which church organ: large (default), janakkala (40 stops, North German baroque),\n"
-    "                      or in a historical tuning: janakkala-meantone, -kirnberger3, -neidhardt, -lehman\n"
+    "  -start_time T       with -play: begin at T in the song (seconds or m:ss, e.g. 2:35)\n"
+    "  -organ NAME         which church organ: large (default), janakkala (40 stops, North German baroque)\n"
+    "  -hammer_pos X       where the grand's hammers strike, a share of the string (default 0.125)\n"
+    "  -tuning \"grand-piano;grand-piano-stretch,organ;tet12\"   a tuning per instrument (quote it: the ; is the shell's)\n"
+    "  -tuning NAME        the organ's tuning: jyrki-spectral (default, adaptive by the pipes' partials),\n"
+    "                      jyrki-heuristic (adaptive by an interval table), tet12, meantone,\n"
+    "                      kirnberger3, neidhardt, lehman\n"
     "  -pianist            with -play: each piano part's sustain pedal planned from\n"
     "                      its notes (research/pedaling.md), the file's own set\n"
     "                      aside: changed with the harmony, sparing in a linear\n"
@@ -582,16 +588,63 @@ int main(int argc, char** argv) {
     }
     else if (a == "-pianist") setPianist(true);
     else if (a == "-volume") setPlayVolume(std::atof(next()));
+    else if (a == "-start_time") {  // (seconds, m:ss or h:mm:ss)
+      const std::string w = next();
+      double t = 0;
+      size_t at = 0;
+      bool ok = !w.empty();
+      while (ok) {
+        const size_t e = std::min(w.find(':', at), w.size());
+        char* endp = nullptr;
+        const std::string part = w.substr(at, e - at);
+        const double v = std::strtod(part.c_str(), &endp);
+        ok = !part.empty() && *endp == 0 && v >= 0;
+        t = t * 60 + v;
+        if (e >= w.size()) break;
+        at = e + 1;
+      }
+      if (!ok) { std::fprintf(stderr, "-start_time: seconds or m:ss, e.g. 2:35\n"); return 1; }
+      setPlayStart(t);
+    }
     else if (a == "-organ") {
       const std::string w = next();
-      const OrganTemperament t = w == "janakkala-meantone" ? kMeantone : w == "janakkala-kirnberger3" ? kKirnberger3
-                                 : w == "janakkala-neidhardt" ? kNeidhardt : w == "janakkala-lehman" ? kLehman : kEqualTemperament;
-      if (w != "large" && w != "janakkala" && t == kEqualTemperament) {
-        std::fprintf(stderr, "-organ: large, janakkala, janakkala-meantone, janakkala-kirnberger3, janakkala-neidhardt or janakkala-lehman\n");
+      if (w != "large" && w != "janakkala") { std::fprintf(stderr, "-organ: large or janakkala (the tuning is -tuning)\n"); return 1; }
+      setOrganDisposition(w == "janakkala");
+    }
+    else if (a == "-hammer_pos") {
+      const char* v = next();
+      char* end = nullptr;
+      const double x = std::strtod(v, &end);
+      if (end == v || *end || !(x >= 0.03 && x <= 0.5)) {
+        std::fprintf(stderr, "-hammer_pos: a share of the string's length, 0.03 to 0.5 (default 0.125)\n");
         return 1;
       }
-      setOrganDisposition(w != "large");
-      setOrganTemperament(t);
+      setPianoHammerPos(x);
+    }
+    else if (a == "-tuning") {
+      // (NAME: the organ's, as before; or per instrument: "grand-piano;grand-piano-stretch,organ;tet12")
+      const std::string spec = next();
+      const char* const kOrganNames = "jyrki-spectral, jyrki-heuristic, tet12, meantone, kirnberger3, neidhardt or lehman";
+      const char* const kPianoNames = "grand-piano-stretch, stretch-variable, railsback-4-2, octaves-by-register, partials, tet12, meantone, kirnberger3, neidhardt or lehman";
+      for (size_t at = 0; at <= spec.size();) {
+        size_t end = spec.find(',', at);
+        if (end == std::string::npos) end = spec.size();
+        const std::string item = spec.substr(at, end - at);
+        at = end + 1;
+        const size_t cut = item.find_first_of(";:=");
+        const std::string who = cut == std::string::npos ? "organ" : item.substr(0, cut);
+        const std::string name = cut == std::string::npos ? item : item.substr(cut + 1);
+        if (who == "organ") {
+          OrganTemperament t;
+          if (!organTuningByName(name, t)) { std::fprintf(stderr, "-tuning: the organ has %s\n", kOrganNames); return 1; }
+          setOrganTemperament(t);
+        } else if (who == "grand-piano") {
+          if (!setPianoTuning(name)) { std::fprintf(stderr, "-tuning: the grand-piano has %s\n", kPianoNames); return 1; }
+        } else {
+          std::fprintf(stderr, "-tuning: %s has no tuning control yet (grand-piano and organ do)\n", who.c_str());
+          return 1;
+        }
+      }
     }
     else if (a == "-ensemble") {
       ensemble = "bass,alto,flute,flute,piccolo";

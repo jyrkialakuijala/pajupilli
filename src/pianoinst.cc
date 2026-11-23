@@ -1,4 +1,6 @@
 #include "pianoinst.h"
+#include "organ.h"
+#include "songclock.h"
 
 #include "heard.h"
 
@@ -81,6 +83,55 @@ static PianoDesign honkyTonkDesign(PianoDesign d) {
   return d;
 }
 
+namespace {
+std::string gPianoTuning = "grand-piano-stretch";
+// Cents against equal temperament, A0 to C8. Precision Strobe's published stretch table for a concert grand:
+const double kConcertStretch[88] = {
+    -17, -16.8, -16.7, -13.1, -12.5, -9.4, -9.2, -8.4, -6, -4, -3.6, -3.4, -3.2, -3, -2.8, -2.4, -2.2, -2.1, -1.9, -1.7, -1.2, -1, -0.8, -0.5,
+    0, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 1.8, 2.1, 2.5, 0, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 1.8, 2.1, 2.5,
+    3, 3.2, 3.5, 0.8, 1.1, 1.4, 1.7, 2, 2.3, 2.7, 3, 3.4, 3.8, 4.2, 4.6, 4.9, 5.7, 6.2, 6.9, 7.5, 8.1, 8.7, 9.4, 10,
+    11.2, 12, 13, 14.5, 15.7, 16.8, 18, 19.6, 22, 24.5, 26.2, 28.5, 31, 33.8, 36.8, 40.1};
+// A Modartt forum study (viewtopic.php?id=12942): its physics-constrained curve and its 4:2.
+const double kVariable[88] = {
+    -22, -22, -21, -21, -20, -20, -19, -18, -18, -17, -16, -16, -15, -14, -14, -13, -12, -12, -11, -10, -10, -9, -8, -8, -7, -6, -6, -5, -5, -4,
+    -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15,
+    17, 19, 21, 23, 25, 28, 31, 34, 36, 38, 40, 42, 43, 44, 45, 46};
+const double kRailsback42[88] = {
+    -18, -18, -17, -17, -17, -16, -16, -15, -15, -14, -14, -13, -13, -12, -12, -11, -11, -10, -10, -9, -9, -8, -8, -7, -7, -6, -6, -5, -5, -4,
+    -4, -4, -3, -3, -3, -2, -2, -2, -2, -1, -1, -1, -1, -1, -2, -1, -1, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 16, 17, 19,
+    21, 23, 25, 27, 29, 32, 34, 37, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70};
+
+void tuneTheGrand(PianoDesign* d) {
+  const double* table = gPianoTuning == "grand-piano-stretch" ? kConcertStretch : gPianoTuning == "stretch-variable" ? kVariable
+                        : gPianoTuning == "railsback-4-2" ? kRailsback42 : nullptr;
+  if (table || gPianoTuning == "tet12") {
+    const double a4 = table ? table[48] : 0;  // (A4 stays 440 Hz: the orchestra's)
+    for (int key = 1; key <= 88; ++key)
+      d->key[key - 1].f1 = 440 * std::exp2((key - 49 + ((table ? table[key - 1] : 0) - a4) / 100) / 12);
+  } else if (gPianoTuning == "octaves-by-register") {
+    tuneByPartials(d, 43, 54, true);
+  } else if (gPianoTuning != "partials") {
+    OrganTemperament t;
+    if (organTuningByName(gPianoTuning, t))
+      for (int key = 1; key <= 88; ++key) d->key[key - 1].f1 *= std::exp2(temperamentCentsOf(t, key + 20) / 1200);
+  }
+}
+}  // namespace
+
+static double gHammerPos = -1;
+void setPianoHammerPos(double share) { gHammerPos = share; }
+
+bool setPianoTuning(const std::string& name) {
+  for (const char* n : {"grand-piano-stretch", "stretch-variable", "railsback-4-2", "octaves-by-register", "partials", "tet12",
+                        "meantone", "kirnberger3", "neidhardt", "lehman"})
+    if (name == n) {
+      gPianoTuning = n;
+      return true;
+    }
+  return false;
+}
+const char* pianoTuningName() { return gPianoTuning.c_str(); }
+
 static PianoDesign designFor(const Instrument& inst) {
   if (dulcimer(inst)) return dulcimerDesign();
   if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
@@ -96,6 +147,18 @@ static PianoDesign designFor(const Instrument& inst) {
   d.topUp = knob("PJ_PIANO_TOPUP", 1.5);
   d.topF0 = knob("PJ_PIANO_TOPF0", 1.0);
   d.napPack = knob("PJ_PIANO_NAPPACK", 1.0);
+  d.vowelDb = knob("PJ_PIANO_VOWEL", 12);  // (the blow's vowels, y u o a e i: 0 none)
+  d.bloom = knob("PJ_PIANO_BLOOM", 1);  // (the bass's partials coming out one after another, as a bell's: 0 none)
+  d.hiDecay = knob("PJ_PIANO_HIDECAY", 0.5);  // (the upper partials' sustain, from the mid-bass up: more, shorter)
+  d.glide = knob("PJ_PIANO_GLIDE", 1);  // (the pitch's rise at a loud blow: 0 none)
+  if (knob("PJ_PIANO_SCALE", 1) != 0) concertScale(&d);  // (the concert grand's lengths; 0: the earlier scale)
+  tuneTheGrand(&d);
+  {  // (the hammers strike every string at an eighth of its length, from its far end from the bridge)
+    const double strike = gHammerPos > 0 ? gHammerPos : knob("PJ_PIANO_STRIKE", 0.125);
+    for (int key = 0; key < 88; ++key) d.key[key].strike = strike;
+  }
+  d.bridgeIn = knob("PJ_PIANO_BRIDGEIN", 0.5);  // (the strings' sustain: lower, longer)
+  d.bridgeBass = knob("PJ_PIANO_BRIDGEBASS", 0.25);  // (... the wound and long strings' further, C3 and under)
   return d;
 }
 
@@ -370,7 +433,7 @@ void PianoPlayer::noteOff(int midi) {
 
 void PianoPlayer::setHold(bool h) {
   if (h != held_) {  // (the pedal's changes on stdout, as they are heard: src/heard.h)
-    sayAt(t_, std::string(m_.instrument().name) + ": sustain pedal " + (h ? "down" : "up"));
+    sayAt(t_ + SongClock::get().start, std::string(m_.instrument().name) + ": sustain pedal " + (h ? "down" : "up"));
     held_ = h;
   }
   hold_ = h;

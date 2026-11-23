@@ -59,6 +59,7 @@ struct Event {
   float touch = 0;     // (an organ note-on's finger: 0 normal .. 1 the softest, a long high note)
   bool trill = false;  // (an organ note-on in a trill: kept legato, not articulated)
   int cue = -1;        // (a note-on: the director's cue for it, an index into Direction::cues)
+  bool skip = false;   // (-start_time: a note over before the start)
 };
 
 struct Song {
@@ -322,6 +323,8 @@ static bool gPianist = false;
 void setPianist(bool on) { gPianist = on; }
 static double gPlayVolumeDb = 0;
 void setPlayVolume(double dB) { gPlayVolumeDb = dB; }
+static double gPlayStart = 0;
+void setPlayStart(double seconds) { gPlayStart = std::max(seconds, 0.0); }
 
 namespace {
 
@@ -944,6 +947,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       const char* why = board ? (hall > 0 ? "PJ_PIANO_HALL=1" : "with an orchestra")
                         : wanted ? "this piano has no board regions to send"
                         : hall == 0 ? "PJ_PIANO_HALL=0" : "no orchestra";
+      if (std::strcmp(p.inst->name, "grand-piano") == 0) std::fprintf(stderr, "  piano   %2d: tuning: %s\n", id / 128 + 1, pianoTuningName());
       std::fprintf(stderr, "  piano   %2d: %s: close mics %d %%, board into the room %d %%, hammers' direct sound %d %% (%s)", id / 128 + 1, p.inst->name, 100 - board, board, int(std::lround(100 * pm->actionShare())), why);
       if (const Room* rm = p.ens->mainRoom()) {
         const int direct = int(std::lround(100 * rm->directShare()));
@@ -1172,7 +1176,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     {
       int stops, ranks, pipes;
       organSize(stops, ranks, pipes);
-      std::fprintf(stderr, "  the organ (%s): %d stops, %d ranks, %d pipes\n", organDispositionName(), stops, ranks, pipes);
+      std::fprintf(stderr, "  the organ (%s; tuning: %s): %d stops, %d ranks, %d pipes\n", organDispositionName(), organTuningName(), stops, ranks, pipes);
     }
     std::string sum = p.plan->summary;
     for (size_t at = 0; (at = sum.find('\n', at)) != std::string::npos && at + 1 < sum.size(); at += 5) sum.insert(at + 1, "    ");
@@ -1430,7 +1434,45 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
   // (and the rooms' tails; PJ_PLAY_UNTIL > 0: only the first so many seconds, as for a timing)
   const double until = std::getenv("PJ_PLAY_UNTIL") ? std::atof(std::getenv("PJ_PLAY_UNTIL")) : 0.0;
   const double end = until > 0 ? std::min(until, song.ev.back().t + 3.0) : song.ev.back().t + 3.0;
-  const size_t frames = (size_t(end * kRate) / kBlock + 1) * kBlock;
+  // -start_time: the song from there. Everything before it still happens (programs, controllers, the
+  // plans' registrations), at once in the first block, but only the notes still sounding then are
+  // played; they begin at the start. (The whole piece is planned as usual, so nothing else moves.)
+  const double startT = gPlayStart;
+  if (startT >= song.ev.back().t) {
+    std::fprintf(stderr, "-start_time: the song ends at %d:%04.1f\n", int(song.ev.back().t) / 60, std::fmod(song.ev.back().t, 60.0));
+    return 1;
+  }
+  if (startT > 0) {
+    // (of the sustain pedal's moves before the start only the last counts: no flurry of dampers)
+    std::map<int, size_t> lastPedal;
+    for (size_t i = 0; i < song.ev.size() && song.ev[i].t <= startT; ++i)
+      if ((song.ev[i].status & 0xf0) == 0xb0 && song.ev[i].a == 64) {
+        const auto it = lastPedal.find(song.ev[i].status & 15);
+        if (it != lastPedal.end()) song.ev[it->second].skip = true;
+        lastPedal[song.ev[i].status & 15] = i;
+      }
+    std::map<int, std::vector<size_t>> open;
+    for (size_t i = 0; i < song.ev.size() && song.ev[i].t <= startT; ++i) {
+      Event& ev = song.ev[i];
+      const int kind = ev.status & 0xf0, c = ev.status & 15;
+      if (kind != 0x80 && kind != 0x90) continue;
+      if (c == 9) {  // (a drum's stroke is over at once)
+        ev.skip = true;
+        continue;
+      }
+      auto& o = open[c * 128 + ev.a];
+      if (kind == 0x90 && ev.b > 0) {
+        o.push_back(i);
+      } else if (!o.empty()) {
+        song.ev[o.front()].skip = true;
+        ev.skip = true;
+        o.erase(o.begin());
+      }
+    }
+    std::fprintf(stderr, "  starting at %d:%04.1f\n", int(startT) / 60, std::fmod(startT, 60.0));
+  }
+  SongClock::get().start = startT;  // (what is printed tells the song's time)
+  const size_t frames = (size_t(std::max(end - startT, 0.1) * kRate) / kBlock + 1) * kBlock;
   // The song is rendered on its own thread into this buffer; the player (or
   // the file) takes what is ready: playing starts once 10 s are ahead, and
   // waits for 10 s again should the rendering fall behind.
@@ -1533,7 +1575,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     std::map<int, int> heldNote;  // channel * 128 + key -> times down (not the drums)
     size_t dirAt[16] = {};       // where each channel's level curve is
     for (size_t n = 0; n < frames; n += kBlock) {
-      const double now = (n + kBlock) / double(kRate);
+      const double now = (n + kBlock) / double(kRate) + startT;
       {  // the beat, for those who keep time with it
         while (tk + 1 < song.tempo.size() && song.tempo[tk + 1].t <= now) ++tk;
         SongClock& c = SongClock::get();
@@ -1690,6 +1732,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
               }
               for (auto& [t, d] : c.manuals) p.manualOf[t] = d;
             }
+        if (e.skip) continue;
         if (kind == 0x90 && e.b > 0) {
           lastOn = e.t;
           if (ch != 9) SongClock::get().lastOn[e.a & 127] = e.t;
@@ -1717,6 +1760,24 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (auto* pl = dynamic_cast<OrganPlayer*>(&op.ens->player(0))) {
               auto old = op.organKey.find(ch * 128 + e.a);
               if (old != op.organKey.end()) pl->noteOffManual(old->second.first, old->second.second);
+              // (jyrki-heuristic: what the score has sounding a moment after this key)
+              if (const double ahead = organTuningLookAhead(); ahead > 0) {
+                bool on[128] = {};
+                for (const auto& [k, dk] : op.organKey) on[dk.second & 127] = true;
+                on[key & 127] = true;
+                for (size_t q = next + 1; q < song.ev.size() && song.ev[q].t <= e.t + ahead; ++q) {
+                  const Event& f = song.ev[q];
+                  const int fk = f.status & 0xf0, fc = f.status & 15;
+                  if (f.skip || (fk != 0x80 && fk != 0x90)) continue;
+                  int fp = f.a;
+                  if (fc == 9 || partOf(fc, f.a, &fp) != id) continue;
+                  on[fp & 127] = fk == 0x90 && f.b > 0;
+                }
+                int keys[64], nk = 0;
+                for (int m = 0; m < 128 && nk < 64; ++m)
+                  if (on[m]) keys[nk++] = m;
+                pl->lookAhead(keys, nk);
+              }
               pl->noteOnManual(div, key, e.touch);
               op.organKey[ch * 128 + e.a] = {div, key};
             }
@@ -1929,7 +1990,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     const size_t lead = size_t(std::max(0.1, kLead) * kRate);
     int waits = 0;
     static const double kTick = std::getenv("PJ_PLAY_TICK") ? std::atof(std::getenv("PJ_PLAY_TICK")) : 5.0;
-    double nextTick = kTick;
+    double nextTick = kTick > 0 ? (std::floor(startT / kTick + 1e-9) + 1) * kTick : 0;  // (on the song's clock)
     for (size_t i = 0; i < frames;) {
       size_t have = ready.load(std::memory_order_acquire);
       if (have <= i) {
@@ -1954,7 +2015,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       // otherwise bad moment can be named (PJ_PLAY_TICK, s; 0: none).
       snd_pcm_sframes_t queued = 0;
       if (snd_pcm_delay(pcm, &queued) < 0) queued = 0;
-      const double heard = (double(i) - std::max<snd_pcm_sframes_t>(queued, 0)) / kRate;
+      const double heard = (double(i) - std::max<snd_pcm_sframes_t>(queued, 0)) / kRate + startT;
       while (kTick > 0 && heard >= nextTick) {
         const int s = int(nextTick + 0.5);
         std::fprintf(stderr, "  %d:%02d\n", s / 60, s % 60);
