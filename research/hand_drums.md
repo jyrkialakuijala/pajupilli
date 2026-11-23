@@ -243,3 +243,23 @@ the middle, and the slap have no GM key; not built, §6.)
   coupling to the head's up-and-down mode).
 - **[paper]** BYU, udu modal patterns by scanning laser vibrometry: https://physics.byu.edu/docs/publication/1551
 - **[jd]** research/jazz_drums.md; **[toms]** research/toms.md (two-head drums, the stick, the glide).
+
+## The edge slap and the palm's bass tone (as built)
+
+Two strokes besides the open and the closed tone (src/handdrum.cc, HandDrumPlayer::noteOn):
+
+- **The slap.** Loose fingers whipped onto the head just inside the rim, at 0.06 of the radius further in than an open tone. Light (0.45 × the hand's mass), hard (2.2 × K: bone under little flesh), narrow (0.55 × the fingers' width), snapped straight off (lift 2 ×). Its crack is mostly the contact's own: the air squeezed out between the cupped fingers and the skin (the click path, × `PJ_HD_SLAPCLICK`, 8). Pressing the fingers on (the model's mute) kept them on the head and damped exactly the highs that make the crack, so the slap is left open.
+- **The bass tone.** The flat palm near the middle (0.08–0.2 of the radius): heavy (2.6 ×), soft (0.45 × K), wide (2.2 ×), lifted at once.
+
+Measured (`-inst`, dry, velocity 100, the first 30 ms attack included; `PJ_HD_STROKE` 0/1/2 forces the stroke):
+
+| | open tone | slap | palm |
+|---|---|---|---|
+| conga high (63) | 291 Hz, 0 % over 1.5 kHz | 792 Hz, 11 % | 283 Hz, 0 % |
+| conga low (64) | 229 Hz, 1 % | 780 Hz, 14 % | 209 Hz, 0 % |
+| bongo high (60) | 538 Hz, 1 % | 1003 Hz, 8 % | 674 Hz, 2 % |
+| bongo low (61) | 416 Hz, 1 % | 1022 Hz, 11 % | 462 Hz, 1 % |
+
+The palm gives a conga its bass tone (darker, its energy near the fundamental), but on a bongo's small head it gives none, so the bongo player does not use it. In the model the head's own high modes add little at a distance: a membrane's waves are far slower than sound, so its high modes mostly cancel at the microphone. Raising the heads' mode range to 5–6 kHz, or their loss knee, changed the brightness by under 1 % (it would cost 3 × the conga's CPU).
+
+Which stroke, in `-play` (General MIDI has no keys for them): an accent (12 over the drum's recent velocity, or 105 and up) on beat two or four, mostly on the high drum, becomes a slap (60 % of them on a conga, 35 % on a bongo, × 0.4 on the low drum): the tumbao's slap. A soft stroke (10 under) on beat one or three on a conga is a bass tone 40 % of the time.

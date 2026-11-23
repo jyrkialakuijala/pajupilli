@@ -209,6 +209,7 @@ void HandDrum::strike(double speed, double r, double theta, const Gesture& gs) {
   mass_ = s_.mass * gs.mass;
   K_ = s_.K * gs.K;
   lift_ = s_.returnHz * gs.lift;
+  clickG_ = gs.click;
   // Fingers left on the head after the blow: a closed tone's press (where the
   // hand struck), or a light touch of the fingertips at the edge.
   mute_ = gs.muteForce > 0;
@@ -342,7 +343,7 @@ float HandDrum::sample() {
   const float aC = float(std::exp(-2 * kPi * s_.head.top * dt_));
   hpC_ = aC * (hpC_ + F - lastC_);
   lastC_ = F;
-  const float out = float(s_.gain * (yHead + footOut + shellOut + clickK_ * hpC_));
+  const float out = float(s_.gain * (yHead + footOut + shellOut + clickK_ * clickG_ * hpC_));
   if (!std::isfinite(out)) { reset(); return 0; }
   if (std::fabs(out) < 1e-6f && !active_) {
     if (++quiet_ > int(0.3 * fs_)) asleep_ = true;
@@ -436,7 +437,59 @@ void HandDrumPlayer::noteOn(int midi, int velocity) {
       }
     }
   }
-  if (m_.kind() != 2) {
+  // Two more strokes of the hands (research/hand_drums.md):
+  //   - the slap: the fingers, loose, whipped onto the head just inside the rim, light and hard
+  //     (bone under little flesh), narrow, lifted at once, while the base of the hand lands on
+  //     the rim a moment and chokes the low modes: a high crack, the drum's own pitch held under;
+  //   - the bass tone: the flat palm near the middle, heavy, soft and wide, lifted at once: the
+  //     deep fundamental, few overtones.
+  // General MIDI has no keys for them: in -play the player chooses them as a conguero would, an
+  // accent on two or four (the tumbao's slap) mostly on the high drum, a soft stroke on one or
+  // three on a conga now and then a bass tone. Measured (velocity 100, the first 30 ms): the slap's
+  // centroid 780-1000 Hz against the open tone's 230-540, 8-14 % of it over 1.5 kHz against ~1 %;
+  // the conga's bass tone darker than its open tone, nothing over 1.5 kHz; on a bongo the palm
+  // gives no bass tone (brighter, if anything): not played there. (PJ_HD_STROKE: 1 every stroke a slap, 2 a bass tone, 0 none:
+  // for tests.)
+  enum { kTone, kSlap, kBass } stroke = kTone;
+  if (m_.kind() != 2 && !mute) {
+    static const double kForce = knob("PJ_HD_STROKE", -1);
+    const double mean = velMean_[drum];
+    velMean_[drum] += 0.15 * (velocity - velMean_[drum]);
+    if (kForce >= 0) {
+      stroke = kForce == 1 ? kSlap : kForce == 2 ? kBass : kTone;
+    } else {
+      const SongClock& clk = SongClock::get();
+      if (clk.valid && clk.playing) {
+        const double b = clk.beat - 4 * std::floor(clk.beat / 4);  // (in the bar, 0 .. 4)
+        const int on = int(std::floor(b + 0.08)) % 4;
+        const bool onBeat = std::fabs(b - std::round(b)) < 0.08;
+        const bool accent = velocity >= mean + 12 || velocity >= 105;
+        const bool soft = velocity <= mean - 10;
+        const double slapP = (m_.kind() == 0 ? 0.6 : 0.35) * (drum == 0 ? 1.0 : 0.4);
+        if (accent && onBeat && (on == 1 || on == 3) && ur() < slapP) stroke = kSlap;
+        else if (m_.kind() == 0 && soft && onBeat && (on == 0 || on == 2) && ur() < 0.4) stroke = kBass;  // (not on a bongo: its small head has no bass tone under the palm)
+      }
+    }
+  }
+  if (m_.kind() != 2 && stroke != kTone) {
+    if (stroke == kSlap) {
+      r = d.spec().where - 0.06 + 0.04 * (ur() - 0.5);
+      g.mass = 0.45 * (0.9 + 0.2 * ur());
+      g.K = 2.2;
+      g.band = 0.55;
+      g.lift = 2.0;  // (the fingertips snap off: a short, hard contact)
+      static const double kSlapClick = knob("PJ_HD_SLAPCLICK", 8);
+      g.click = kSlapClick * (0.8 + 0.4 * ur());  // (the crack: the cupped fingers' air squeezed out)
+      partnerSpeed *= 1.1;
+    } else {
+      r = 0.08 + 0.12 * ur();
+      g.mass = 2.6 * (0.9 + 0.2 * ur());
+      g.K = 0.45;
+      g.band = 2.2;
+      g.lift = 1.8;
+      partnerSpeed *= 0.9;
+    }
+  } else if (m_.kind() != 2) {
     const double open = ur();  // 0 closed, cupped fingers .. 1 a flat open hand
     g.band = 0.6 + 0.8 * open;
     g.K = 1.5 - 0.8 * open;

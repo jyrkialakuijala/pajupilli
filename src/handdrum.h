@@ -73,6 +73,7 @@ class HandDrum {
   struct Gesture {
     double mass = 1, K = 1, band = 1, lift = 1;
     double muteForce = 0, muteTime = 0, muteDamp = 1, muteR = -1;
+    double click = 1;  // (the contact's own crack: the air squeezed out between the fingers and the skin)
   };
   void strike(double speed, double r, double theta, const Gesture& g);
   float sample();
@@ -95,6 +96,7 @@ class HandDrum {
   // This stroke's hand (from its Gesture): mass, stiffness, the arm's lift,
   // the fingers left on the head and where they lie (their own shape).
   double mass_ = 0.03, K_ = 1e6, lift_ = 12, muteForce_ = 0, muteDamp_ = 0;
+  double clickG_ = 1;
   std::vector<float> phiMute_;
   double gMute_ = 0;
   // The pipe: modal pressures, their speeds; the swept volume's history.
@@ -153,6 +155,7 @@ class HandDrumPlayer : public Performer {
   double now_ = 0;
   double lastT_[2] = {-1e9, -1e9};
   int lastHand_[2] = {1, 1}, lastVel_[2] = {0, 0};
+  double velMean_[2] = {80, 80};  // (each drum's recent velocity: what is an accent here)
 };
 
 }  // namespace pajupilli
