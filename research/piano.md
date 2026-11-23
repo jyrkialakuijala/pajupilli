@@ -180,7 +180,7 @@ added stiffness and mass, the way the bass bar is done.
   piano byte for byte).** No published level found (Askenfelt & Jansson measured the action's
   timing and the key-bottom noise, not the pedal's; Schutz et al. 2008 only "a noise floor" with
   the pedal); numbers are estimates **[calc]**:
-  - Each damper (head, wire, the underlever's share: 20 g in the bass to 12 g at key 70; the
+  - Each damper (head, wire, the underlever's share: 20 g in the bass to 12 g at key 71; the
     upright's x 0.6, spring-driven) lands at the pedal's speed: 0.15 m/s x 0.75-1.25 for an
     on/off CC 64 (seeded), from the foot's speed (6 mm of damper lift over the CC's travel,
     at most 0.3 m/s) when CC 64 moves through values between; a key let go, 0.12 m/s (the

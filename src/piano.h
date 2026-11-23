@@ -18,7 +18,7 @@
 //     along it; the strings' answer shapes the blow. A harder blow presses
 //     the felt deeper, where it is stiffer: shorter, brighter.
 //   - A damper: felt on the strings beside the hammer; every mode loses by
-//     how much it moves there. The top 18 keys have none.
+//     how much it moves there. The top 17 keys (G#6 up) have none, as on a Steinway D.
 //   - The soundboard: 256 resonances of a ribbed spruce plate and 96 broad
 //     ones above them, each with its share at every key's bridge point.
 //   - The sound: the board in patches, each moving the air over it; a

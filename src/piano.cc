@@ -105,8 +105,9 @@ PianoDesign grandDesign() {
     s.damperLen = lerp(0.07, 0.025, (key - 1) / 69.0);
     // The damper: a length of felt; a mode loses by its mean square motion under it.
     // (A released note is gone in about 0.15 s in the middle, 0.3 s in the bass: from memory, not
-    // measured. A key struck again sooner meets what is left of its own sound.) The top 18 keys have none.
-    s.hasDamper = key <= 70;
+    // measured. A key struck again sooner meets what is left of its own sound.) A Steinway D has 71:
+    // A0 .. G6; the top 17 keys (G#6 .. C8) have none and ring on, with the pedal or without.
+    s.hasDamper = key <= 71;
     s.damperRate = dampRate * lerp(16, 38, (key - 1) / 69.0) / 0.2;
     // What lands: the head (felt on a wooden block, double wedges in the bass), its wire and the
     // underlever's share at the head, ~20 g in the bass to ~12 g at the last damper (the heads
