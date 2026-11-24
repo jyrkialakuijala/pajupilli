@@ -6330,6 +6330,34 @@ def organ_continuo():
         err, regs = plan(alone)
         check('organ continuo: the organ alone keeps its solo plan, in the church', 'a continuo' not in err and 'in the church' in err, f'{len(regs)} registrations')
 
+def velocity_reading():
+    """A sustained instrument's key velocities read as a line and accents (src/velline.h; the
+    owner: a higher velocity is "a stronger note from the very beginning" or "belongs to a line of
+    expansion"): a rising run is the line, gliding through each bound note to the next and no
+    accents; one note standing out is an accent and the line stays; a step that stays is a
+    terrace (no glide); a loud first note before a level line is an accent; detached notes do not
+    glide; a lighter passing note reads under the line."""
+    with tempfile.TemporaryDirectory() as d:
+        exe = os.path.join(d, 'vt')
+        c = subprocess.run(['g++', '-O1', '-std=c++17', '-o', exe, os.path.join(ROOT, 'tools', 'vellinetest.cc'),
+                            os.path.join(ROOT, 'src', 'velline.cc')], capture_output=True, text=True)
+        check('velocity reading: builds', c.returncode == 0, c.stderr[:200])
+        if c.returncode:
+            return
+        def read(vels, length=1.0):
+            out = subprocess.run([exe] + [f'{v}:{i}:{length}' for i, v in enumerate(vels)], capture_output=True, text=True).stdout.split()
+            return [tuple(float(x) for x in re.match(r'(\d+)>(\d+)([+-]\d+)', o).groups()) for o in out]
+        for name, vels, length, want in [
+                ('a crescendo is the line, gliding, no accents', [50, 60, 70, 80, 90], 1, [(50, 60, 0), (60, 70, 0), (70, 80, 0), (80, 90, 0), (90, 90, 0)]),
+                ('a diminuendo likewise', [90, 80, 70, 60, 50], 1, [(90, 80, 0), (80, 70, 0), (70, 60, 0), (60, 50, 0), (50, 50, 0)]),
+                ('one note standing out is an accent, the line stays', [60, 60, 100, 60, 60], 1, [(60, 60, 0)] * 2 + [(60, 60, 40)] + [(60, 60, 0)] * 2),
+                ('a step that stays is a terrace', [60, 60, 90, 90, 90], 1, [(60, 60, 0)] * 2 + [(90, 90, 0)] * 3),
+                ('a loud first note before a level line is an accent', [100, 60, 60, 60], 1, [(60, 60, 40)] + [(60, 60, 0)] * 3),
+                ('detached notes do not glide', [50, 60, 70, 80], 0.4, [(50, 50, 0), (60, 60, 0), (70, 70, 0), (80, 80, 0)]),
+                ('a lighter passing note reads under the line', [64, 64, 40, 64, 64], 1, [(64, 64, 0)] * 2 + [(64, 64, -24)] + [(64, 64, 0)] * 2)]:
+            got = read(vels, length)
+            check('velocity reading: ' + name, got == want, ' '.join('%d>%d%+d' % g for g in got))
+
 def plucked_nan():
     """NaN recovery of the guitars, the electric basses, the struck strings and the double bass's
     family, plucked and bowed (src/bass.cc: Bass::reset clears the bow's state too) (src/guitar.cc: a
@@ -6555,5 +6583,5 @@ def main():
 
 if __name__ == '__main__':
     GROUPS = (vectorised, nan_recovery, fuzz, tuning, slur_stability, slurs, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, piano, upright, bright_piano, clavi, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, organ_continuo, accordions, harmonica, reed_organ, tonewheel, honky_tonk, pianist, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
+              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, piano, upright, bright_piano, clavi, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, organ_continuo, velocity_reading, accordions, harmonica, reed_organ, tonewheel, honky_tonk, pianist, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
     sys.exit(main())

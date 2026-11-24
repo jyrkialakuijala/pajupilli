@@ -71,6 +71,10 @@ struct Direction {
   enum Style { kUnknown, kBaroque, kClassical, kRomantic } style = kUnknown;
   std::vector<DirTempo> tempo;                        // the song's new tempo map (if acts)
   std::vector<Cue> cues;                              // one per input note
+  // A wind part's key velocities read as a line and accents (src/velline.h; the winds' own reading
+  // only): the line goes into the part's level, the key keeps the accent. Per input note, the
+  // velocity to play its key with (0: the file's).
+  std::vector<int> keyVel;
   std::vector<std::pair<long, float>> level[16];      // per channel: (tick, level), linear between
   std::vector<std::pair<long, long>> phrases;         // (start, end) ticks
   std::vector<std::pair<long, double>> fermatas;      // (tick, hold factor)

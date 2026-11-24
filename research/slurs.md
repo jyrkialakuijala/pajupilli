@@ -296,3 +296,42 @@ things followed:
   General MIDI's 40 between keys 8 and 127, the row the rest.
 
 Also the owner, on the soft-playing pair: "lips-closer is better than old way" (already the default).
+
+## 12. Key velocities: a line of expansion, or a note strong from its start (2026-11-24)
+
+The owner: "when there is a phrase and the midi file request higher velocity notes for a
+wind/brass/string instrument, then it needs to be interpreted if it is a stronger note from the
+very beginning or if it is belongs to a line of expansion".
+
+Before, a wind part's key velocity did both things at once on every note: a louder key was a
+harder attack and a louder note, from its start, so a written crescendo came out as steps.
+
+Now (src/velline.h: readVelocities; wired into the winds' own reading, src/director.cc, used
+when the director stays out of a file with its own performance; PJ_VELLINE=0: as before):
+
+- per phrase (a beat's rest ends one) the line at a note is the middle of its velocity and its
+  neighbours'; what the note has over or under it is its accent (under 6 steps: none);
+- inside a run of three or more notes rising or falling, where the notes are bound, the line
+  glides through each note to the next one's level; a single step that stays is a terrace;
+- the line goes into the part's level curve (the breath, and the player's loudness: a unit of
+  level ~20 dB, General MIDI's velocity curve 33.3 dB a decade); the key is played at the
+  part's median line velocity plus the note's accent: an ordinary attack on a line note, a
+  strong one from its beginning on an accent.
+
+The horn's bell turn (11.1) already gives ~20 dB per unit of level, so the director's gain on
+top (PJ_DIRECTOR_WINDDB 16) is not applied to the horn; with it the line came out twice as wide.
+
+A horn test (research/gm_compare/work/velline/mk.py: a slurred scale 38 .. 112 .. 40, accents of
+110 on a line of 63, a terrace 51 -> 97), each note's level at its start, dB re the peak:
+
+  crescendo, as written keys:  -61 -24 -18 -18 -17 -17  -9 -12 | back -14 -11 -15 -19 -14 -19 -26
+  crescendo, read as a line:   -33 -24 -18 -19 -17 -17 -16 -11 | back -14 -17 -16 -21 -16 -22 -30
+
+(the first note now speaks from its start; the jump of 8 dB into the seventh note is gone). The
+accents and the terrace keep their levels within 1-2 dB.
+
+Not done: bowed strings (the director's reading covers wind lines only; a DirInput::bowed and
+the string players' level would be needed); the accent's decay back to the line inside the note
+(an accented note is louder throughout); the flat remaining lumps are the horn's own notes.
+
+Tests: tools/test.py velocity_reading.

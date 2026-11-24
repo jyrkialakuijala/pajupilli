@@ -1,4 +1,5 @@
 #include "director.h"
+#include "velline.h"
 
 #include <algorithm>
 #include <cmath>
@@ -541,6 +542,43 @@ Direction direct(const DirInput& in) {
     return float(kArc * std::clamp(v, -0.05, 0.06));
   };
 
+  // --- A wind part's own velocities (a played file's; the owner: a higher velocity is "a stronger
+  // note from the very beginning" or "belongs to a line of expansion"): read as a line and accents
+  // (src/velline.h). The line goes into the part's level, gliding through the bound notes of a
+  // crescendo (the breath, not a step and a harder tongue at each note); the key is played at
+  // the part's usual velocity plus the note's accent. PJ_VELLINE (1; 0: the keys as written).
+  // A unit of level is ~20 dB (the players' loudness, PJ_DIRECTOR_WINDDB 16, and their breath);
+  // General MIDI's velocity curve is 33.3 dB a decade (tools/velcurve.py).
+  struct LineNote { long on, off; float at, end; };
+  std::vector<LineNote> velLine[16];
+  static const double kVelLine = knob("PJ_VELLINE", 1.0);
+  int lineParts = 0, lineGlides = 0, lineAccents = 0;
+  if (self && kVelLine > 0) {
+    d.keyVel.assign(n, 0);
+    for (int ch = 0; ch < 16; ++ch) {
+      if (!speaks(ch) || chNotes[ch] < 3) continue;
+      std::vector<VelNote> part;
+      std::vector<int> idx;
+      for (int i = 0; i < n; ++i)
+        if (nt[i].ch == ch) part.push_back({nt[i].tick, nt[i].tickOff, nt[i].vel}), idx.push_back(i);
+      const std::vector<VelReading> rd = readVelocities(part, div);
+      std::vector<float> lines;
+      bool varied = false;
+      for (const VelReading& r : rd) lines.push_back(r.line), varied |= r.accent != 0 || r.line != rd[0].line;
+      if (!varied) continue;
+      std::nth_element(lines.begin(), lines.begin() + lines.size() / 2, lines.end());
+      const float ref = lines[lines.size() / 2];
+      auto levelOf = [&](float v) { return float(kVelLine * std::clamp(33.3 * std::log10(std::max(1.0f, v) / ref) / 20, -0.4, 0.4)); };
+      ++lineParts;
+      for (size_t k = 0; k < rd.size(); ++k) {
+        velLine[ch].push_back({part[k].tick, part[k].tickOff, levelOf(rd[k].line), levelOf(rd[k].lineEnd)});
+        d.keyVel[idx[k]] = std::clamp(int(std::lround(ref + rd[k].accent)), 1, 127);
+        lineGlides += rd[k].lineEnd != rd[k].line;
+        lineAccents += rd[k].accent > 0;
+      }
+    }
+  }
+
   // --- Each part's level: the arc, the melody a little over the others, its swells.
   for (int ch = 0; ch < 16; ++ch) {
     if (chNotes[ch] == 0 || in.ridden[ch] || (self && !speaks(ch))) continue;
@@ -549,6 +587,7 @@ Direction direct(const DirInput& in) {
     for (auto& a : arc) at.push_back(a.first);
     for (const Swell& s : swells[ch]) { at.push_back(s.on); at.push_back(s.peak); at.push_back(s.off); }
     for (const Spoken& s : spoken[ch]) { at.push_back(s.on); at.push_back(std::max(s.on + 1, s.off - 1)); }
+    for (const LineNote& s : velLine[ch]) { at.push_back(s.on); at.push_back(std::max(s.on + 1, s.off - 1)); }
     std::sort(at.begin(), at.end());
     at.erase(std::unique(at.begin(), at.end()), at.end());
     size_t k = 0, q = 0;
@@ -558,6 +597,16 @@ Direction direct(const DirInput& in) {
       while (q + 1 < v.size() && v[q + 1].on <= t) ++q;
       if (v.empty() || v[q].on > t) return 0.0f;
       const Spoken& s = v[q];
+      const long e = std::max(s.on + 1, s.off - 1);
+      return t >= e ? s.end : s.at + (s.end - s.at) * float(t - s.on) / float(e - s.on);
+    };
+    // (the file's own line at t: through the note sounding, held over the gap after it)
+    size_t lq = 0;
+    auto fileLine = [&](long t) {
+      const std::vector<LineNote>& v = velLine[ch];
+      while (lq + 1 < v.size() && v[lq + 1].on <= t) ++lq;
+      if (v.empty() || v[lq].on > t) return v.empty() ? 0.0f : v[0].at;
+      const LineNote& s = v[lq];
       const long e = std::max(s.on + 1, s.off - 1);
       return t >= e ? s.end : s.at + (s.end - s.at) * float(t - s.on) / float(e - s.on);
     };
@@ -572,7 +621,7 @@ Direction direct(const DirInput& in) {
       // (a spoken long note begins below its level: the swell rises from softer)
       float soft = 0;
       if (!spoken[ch].empty() && k < swells[ch].size() && swells[ch][k].on == t) soft = -0.04f * float(kSpeech);
-      const float own = speaks(ch) ? lineArc(ch, t) + drama(t) : 0.0f;
+      const float own = speaks(ch) ? lineArc(ch, t) + drama(t) + fileLine(t) : 0.0f;
       d.level[ch].push_back({t, std::clamp(levelAt(arc, t) + off + bump + soft + said(t) + own, 0.05f, 0.95f)});
     }
   }
@@ -593,6 +642,11 @@ Direction direct(const DirInput& in) {
                   "each phrase to its high point, with the piece's drama",
                   kStyleS[d.style], gStyle >= 0 ? ", -style" : "", notes, lines, sighs, breaths);
     d.summary = outWhy + b2;
+    if (lineParts > 0) {
+      std::snprintf(b2, sizeof b2, "\n  their key velocities read as lines and accents (%d parts): %d notes growing or fading "
+                    "through to the next, %d accents", lineParts, lineGlides, lineAccents);
+      d.summary += b2;
+    }
     return d;
   }
 

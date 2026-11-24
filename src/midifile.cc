@@ -774,6 +774,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           off.tick = on.tick + uint64_t(std::max(1.0, double(off.tick - on.tick) * len));
           moved = true;
         }
+        if (q < dir.keyVel.size() && dir.keyVel[q] > 0) on.b = uint8_t(dir.keyVel[q]);  // (its line is in the level: src/velline.h)
         on.b = uint8_t(std::clamp(int(std::lround(on.b * (1 + 0.22 * c.v[kCueAccent]))), 1, 127));
       }
       if (moved) std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
@@ -1859,7 +1860,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           const Instrument& wi = *p.inst;
           if ((wi.kind == Kind::kFlute || wi.kind == Kind::kDuct || wi.kind == Kind::kEndBlown || wi.reed() || wi.lip()) &&
               std::strcmp(wi.family, "bagpipe") != 0)
-            p.dirGain = float(std::pow(10.0, kWindDb * (lv - 0.5) / 20));
+            // (the horn turns its bell with the dynamics, src/hornplayer.cc: ~20 dB per unit of
+            // level by itself, measured pp .. ff 16 dB; no gain on top, or its line doubles)
+            p.dirGain = std::strcmp(wi.name, "horn") == 0 && knob("PJ_BELLTURN", 1) > 0 ? 1.0f : float(std::pow(10.0, kWindDb * (lv - 0.5) / 20));
         }
       // A Tonewheel's planned Rotary nudges: in the middle of a long note, where no event comes, so
       // by the clock (their ticks turned to seconds by the tempo map).
