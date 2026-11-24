@@ -47,6 +47,7 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
+  kLipClose_ = knob("PJ_FLUTE_LIPCLOSE", 0.012);
   kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
   kTrillTune_ = knob("PJ_TRILLTUNE", 0.05);  // s; 0: the lips do not listen
   kTrillHeld_ = 0.3;                          // s on the trill key: report the tuning
@@ -334,6 +335,12 @@ void Player::render(float* out, int n) {
       // flow, turbulence and edge hiss; the jet spreads before the edge).
       const double airy = 1 + 0.5 * (air_ - 0.35);
       e.lipH = 0.75e-3 * ke * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_);
+      // At the release of an overblown note (its second register or higher) the lips close as the
+      // breath stops: the jet ends with the air. Left open while the breath fades, the slowing jet
+      // falls into the lower register, the note dropping an octave as it dies (no flutist's
+      // ending). PJ_FLUTE_LIPCLOSE: their time constant (s; 0: they stay as they were).
+      if (!blowing_ && kLipClose_ > 0 && note_ >= 0 && played(note_) && played(note_)->harmonic > 1)
+        e.lipH *= std::exp(-sinceOff_ / kLipClose_);
       e.lipWidth = (7 + 4 * dyn) * 1e-3 * ke * airy;
       e.air = air_;
       // Jet offset at the edge: players aim further off-centre on low notes,

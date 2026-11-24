@@ -157,6 +157,10 @@ void Flute::buildDesign() {
   embLong_ = inst_.kind == Kind::kDuct ? j.w : 2 * embA_;
   // The window's opening at the bore: a duct's window as cut; an end's rim: the bore.
   embRin_ = inst_.kind == Kind::kDuct ? std::sqrt(j.w * j.window / M_PI) : embA_;
+  if (inst_.kind == Kind::kFlute) {  // a transverse flute's embouchure hole, the concert flute's x emb
+    embLong_ = kEmbLong * inst_.emb;
+    embRin_ = kEmbRin * inst_.emb;
+  }
   for (int i = 0; i < d.nHoles; ++i) {
     const HoleDef& h = d.holes[i];
     addHole(h.x * 1e-3, 0.5e-3 * h.d, h.t * 1e-3, h.padH * 1e-3, 0.5e-3 * h.cup, h.flags);

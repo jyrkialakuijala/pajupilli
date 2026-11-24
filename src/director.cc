@@ -14,6 +14,7 @@ namespace pajupilli {
 namespace {
 
 int gMode = 0;  // -1 off, 0 auto, 1 on
+bool gFrench = false;  // -style french: Baroque with notes inégales
 int gStyle = -1;  // -style: the reading's style forced (a Direction::Style; -1: read from the rhythm)
 
 double median(std::vector<double> v) {
@@ -43,7 +44,8 @@ bool setDirectorMode(const std::string& mode) {
 }
 
 bool setDirectorStyle(const std::string& style) {
-  if (style == "baroque") gStyle = Direction::kBaroque;
+  gFrench = style == "french";
+  if (style == "baroque" || style == "french") gStyle = Direction::kBaroque;
   else if (style == "classical") gStyle = Direction::kClassical;
   else if (style == "romantic") gStyle = Direction::kRomantic;
   else if (style == "auto") gStyle = -1;
@@ -343,9 +345,69 @@ Direction direct(const DirInput& in) {
   }
 
   // --- Meter: each place in the bar has its weight.
+  // A compound metre (6/8, 9/8, 12/8: the beat a dotted quarter): the onsets fall on the dotted
+  // quarters far more than on the plain quarters between them (the file says only the bar's length).
+  bool compound = false;
+  if (div % 2 == 0 && bar % (3 * div / 2) == 0 && bar != 3 * div / 2) {
+    int onDot = 0, onQuarter = 0;
+    const long dq = 3 * div / 2;
+    for (const DirNote& x : nt) {
+      const long pos = x.tick % bar;
+      if (pos == 0) continue;
+      onDot += pos % dq == 0 && pos % div != 0;
+      onQuarter += pos % div == 0 && pos % dq != 0;
+    }
+    compound = onDot >= n / 30 && onDot > 2 * onQuarter;
+  }
+  // The dance (PJ_DIRECTOR_DANCE, 1; Baroque only): its bar has its own weights (Mattheson 1739;
+  // Little and Jenne, Dance and the Music of J. S. Bach):
+  //   - sarabande (3/4, slow; long notes begun on the second beat): the second beat leaned on;
+  //   - minuet (3/4, moving): felt in one, the second and third beats light;
+  //   - gavotte (duple, its phrases from the half bar): the half bar nearly a downbeat;
+  //   - bourrée (duple, quick, a quarter's upbeat): in two, the half bar strong;
+  //   - gigue (compound, quick): the lilt of each dotted beat's first note.
+  enum Dance { kNoDance, kSarabande, kMinuet, kGavotte, kBourree, kGigue };
+  static const char* const kDanceName[] = {"", "sarabande", "minuet", "gavotte", "bourrée", "gigue"};
+  Dance dance = kNoDance;
+  if (baroque && knob("PJ_DIRECTOR_DANCE", 1.0) > 0 && bars >= 8) {
+    const double q = lenAt(in.tempo, 0);  // (a quarter, s)
+    if (compound) {
+      if (1.5 * q < 0.6) dance = kGigue;
+    } else if (bar == 3 * div) {
+      int beat2Long = 0, beat1Long = 0;
+      for (const DirNote& x : nt) {
+        if (x.tickOff - x.tick < 3 * div / 2) continue;
+        beat2Long += x.tick % bar == div;
+        beat1Long += x.tick % bar == 0;
+      }
+      if (q >= 0.5 && beat2Long >= bars / 5 && beat2Long * 3 >= beat1Long) dance = kSarabande;
+      else if (q < 0.5 && q >= 0.25) dance = kMinuet;
+    } else if (bar == 4 * div) {
+      // (the melody's first note, and its notes after each general rest: where its phrases begin)
+      std::map<long, int> startAt;
+      long prevOff = -1;
+      for (const DirNote& x : nt) {
+        if (x.ch == melody && (prevOff < 0 || x.tick - prevOff >= div)) ++startAt[x.tick % bar];
+        if (x.ch == melody) prevOff = std::max(prevOff, x.tickOff);
+      }
+      int total = 0;
+      for (auto& [p, c] : startAt) total += c;
+      if (total >= 3 && startAt[bar / 2] * 2 >= total) dance = kGavotte;
+      else if (total >= 3 && startAt[3 * div] * 2 >= total && q < 0.4) dance = kBourree;
+    }
+  }
   auto weight = [&](long tick) {
     const long pos = tick % bar;
     if (pos == 0) return 1.0;
+    if (compound) {
+      const long dq = 3 * div / 2;
+      if (pos % dq == 0) return bar == 4 * dq && pos == 2 * dq ? 0.6 : dance == kGigue ? 0.45 : 0.35;
+      if (div % 2 == 0 && pos % (div / 2) == 0) return dance == kGigue ? 0.05 : 0.1;
+      return 0.0;
+    }
+    if (dance == kSarabande && pos == div) return 0.75;
+    if (dance == kMinuet && pos % div == 0) return 0.2;
+    if ((dance == kGavotte || dance == kBourree) && pos == bar / 2) return 0.8;
     if ((bar / div) % 2 == 0 && pos == bar / 2) return 0.6;
     if (pos % div == 0) return 0.35;
     if (div % 2 == 0 && pos % (div / 2) == 0) return 0.1;
@@ -395,6 +457,24 @@ Direction direct(const DirInput& in) {
   std::vector<Spoken> spoken[16];
   std::vector<char> sighFrom(n, 0), sighTo(n, 0);
   auto speaks = [&](int ch) { return in.wind[ch] && !in.ridden[ch]; };  // (its breaths; the rest x kSpeech)
+  // A flute's register (PJ_WIND_LEAP, 1; with or without the speech): the higher notes speak with
+  // faster air and come out louder by themselves; a flutist does not blow the highest note the
+  // most, least of all in an inner or accompanying part. Under the part's median key, its notes
+  // a little fuller; above, a little held back: -0.08 a unit of level an octave in a part under
+  // the melody, -0.04 in the melody (to +-0.1). A note reached by a leap up of a third or more
+  // is tongued softly and begun up to 0.06 below its level, grown into over the note.
+  const double kLeap = kAll * knob("PJ_WIND_LEAP", 1.0);
+  auto flutes = [&](int ch) { return kLeap > 0 && in.flute[ch] && !in.ridden[ch]; };
+  int midKey[16];
+  for (int ch = 0; ch < 16; ++ch) {
+    std::vector<int> k;
+    for (const DirNote& x : nt) if (x.ch == ch) k.push_back(x.key);
+    midKey[ch] = k.empty() ? 60 : (std::nth_element(k.begin(), k.begin() + k.size() / 2, k.end()), k[k.size() / 2]);
+  }
+  auto register_ = [&](int ch, int key) {
+    const double perOct = ch == melody ? 0.04 : 0.08;
+    return kLeap * std::clamp(-perOct * (key - midKey[ch]) / 12.0, -0.1, 0.1);
+  };
   for (int i = 0; i < n; ++i) {  // (the sighs, first: a note needs to know it resolves one)
     const DirNote& x = nt[i];
     const int nx = nextIn[i];
@@ -407,7 +487,176 @@ Direction direct(const DirInput& in) {
       sighTo[nx] = 1;
     }
   }
-  int breaths = 0;
+  // A wind's trill: two keys a step apart, alternating at least four notes under 0.18 s each.
+  //   - A flute's (PJ_FLUTE_TAKA, 1) double-tongued "ta-ka-ta-ka": every note tongued (not
+  //     slurred), the "ta"s a little firmer, the "ka"s (the back of the tongue) softer and a
+  //     shade shorter.
+  //   - Any wind's played alive (PJ_TRILL_QUICKEN, 0.2; Baroque, a quantized file): begun slower
+  //     and quickening to its end, its start and end kept (the rate from 1 - 0.2 to 1 + 0.2), as
+  //     the organ's (PJ_ORGAN_TRILL). Begun on the upper note (the Baroque trill, from above, on
+  //     the beat): that note leaned on, an appoggiatura's start.
+  // (taka[i]: 1 a "ta", 2 a "ka", 0 not; trillAt[i]: its place in the trill from 1, 0 not in one)
+  static const double kTaka = knob("PJ_FLUTE_TAKA", 1.0);
+  const double kQuicken = kAll * knob("PJ_TRILL_QUICKEN", 0.2) * (baroque ? 1.0 : 0.5);
+  std::vector<char> taka(n, 0);
+  std::vector<int> trillAt(n, 0);
+  std::vector<std::vector<int>> trillRuns;
+  int takaTrills = 0;
+  for (int i = 0; i < n; ++i) {
+    if (trillAt[i] || !(speaks(nt[i].ch) || flutes(nt[i].ch)) || (prevIn[i] >= 0 && trillAt[prevIn[i]])) continue;
+    auto quick = [&](int q) {
+      const long d = nt[q].tickOff - nt[q].tick;
+      return d <= div / 2 && double(d) / div * lenAt(in.tempo, double(nt[q].tick) / div) < 0.18;
+    };
+    std::vector<int> run{i};
+    for (int q = i; quick(q);) {
+      const int nx = nextIn[q];
+      if (nx < 0 || nt[nx].tick > nt[q].tickOff + div / 16) break;
+      const int step = std::abs(nt[nx].key - nt[q].key);
+      if (step < 1 || step > 2 || (run.size() >= 2 && nt[nx].key != nt[run[run.size() - 2]].key)) break;
+      run.push_back(nx);
+      q = nx;
+    }
+    if (run.size() >= 2 && !quick(run.back())) run.pop_back();  // (the trill's end note held: not tongued in it)
+    if (run.size() < 4) continue;
+    for (size_t k = 0; k < run.size(); ++k) trillAt[run[k]] = int(k) + 1;
+    trillRuns.push_back(run);
+    if (kTaka > 0 && flutes(nt[i].ch)) {
+      ++takaTrills;
+      for (size_t k = 0; k < run.size(); ++k) taka[run[k]] = k % 2 ? 2 : 1;
+    }
+  }
+  // (the time each trill's notes are moved by, onShift/offShift, filled in below with the
+  // inequality's: per input note, in ticks)
+  d.onShift.assign(n, 0);
+  d.offShift.assign(n, 0);
+  int quickened = 0;
+  if (kQuicken > 0 && (d.acts || d.gridded))
+    for (const std::vector<int>& run : trillRuns) {
+      const long t0 = nt[run.front()].tick, D = nt[run.back()].tickOff - t0;
+      if (D <= 0) continue;
+      auto g = [&](long t) {
+        const double u = std::clamp(double(t - t0) / double(D), 0.0, 1.0);
+        return t0 + long(std::lround(double(D) * ((1 + kQuicken) * u - kQuicken * u * u)));
+      };
+      for (int q : run) {
+        d.onShift[q] = g(nt[q].tick) - nt[q].tick;
+        d.offShift[q] = g(nt[q].tickOff) - nt[q].tickOff;
+      }
+      ++quickened;
+    }
+  // --- Notes inégales (-style french, or PJ_INEGALES 1 in any Baroque reading; Hotteterre 1719,
+  // Couperin, Quantz XI.12): in French music the running eighths by step are played unequal,
+  // long-short, the first of each pair taking PJ_INEGALES_RATIO of the two (0.6; up to 2:1), every
+  // part alike. Not in a compound metre, not across a leap, not a pair broken by a rest; the pair
+  // on the beat, the second note the eighth after it.
+  const bool inegal = baroque && !compound && (gFrench || knob("PJ_INEGALES", 0.0) > 0) && div % 2 == 0;
+  int unequal = 0;
+  if (inegal && (d.acts || d.gridded)) {
+    const double r = std::clamp(knob("PJ_INEGALES_RATIO", 0.6), 0.5, 0.67);
+    const long u = div / 2, sh = long(std::lround((2 * r - 1) * u));
+    for (int i = 0; i < n; ++i) {
+      const DirNote& x = nt[i];
+      const int nx = nextIn[i];
+      if (x.tick % div != 0 || nx < 0 || trillAt[i] || trillAt[nx]) continue;
+      if (std::abs(x.tickOff - x.tick - u) > u / 8 || nt[nx].tick != x.tick + u || std::abs(nt[nx].tickOff - nt[nx].tick - u) > u / 8) continue;
+      if (std::abs(nt[nx].key - x.key) > 2 || x.tickOff < nt[nx].tick - u / 8) continue;
+      d.offShift[i] += sh;
+      d.onShift[nx] += sh;
+      ++unequal;
+    }
+  }
+  // A flute's three repeated notes beginning an accompanying passage (PJ_FLUTE_REPEAT, 1; Baroque
+  // x1, Classical x0.7, Romantic x0.3; Quantz's good and bad notes, the soft "di-ri" tonguing): a
+  // part under the melody, after a rest or at a phrase's start, the same key three times, the
+  // fourth another or none. Not three alike, but shaped by where the beat falls, portato (a hint
+  // of air between them), the accompaniment kept under the soloist:
+  //   - the first on the beat: DA-ra-da, leaned on, then lighter and lighter;
+  //   - the third on the beat: ri-ti-DA, a pickup: light, warmer, arriving;
+  //   - the second on the beat: da-DA-da;
+  //   - none on a beat: ti-RI-ti, sneaking in feather-light (no new downbeat), a little warmth
+  //     in the middle, released.
+  // (repShape[i]: the note's accent, level and length; repAt[i]: its place in the three, 1..3)
+  const double kRepN = kAll * knob("PJ_FLUTE_REPEAT", 1.0) * (baroque ? 1.0 : romantic ? 0.3 : 0.7);
+  struct RepShape { float acc, lvl, len; };
+  std::vector<RepShape> repShape(n, RepShape{0, 0, 1});
+  std::vector<char> repAt(n, 0);
+  int repeats = 0;
+  if (kRepN > 0)
+    for (int i = 0; i < n; ++i) {
+      const int ch = nt[i].ch, pv = prevIn[i];
+      if (!flutes(ch) || ch == melody || taka[i] || repAt[i]) continue;
+      const bool starts = pv < 0 || nt[i].tick - nt[pv].tickOff >= div / 2 || phraseOf(nt[pv].tick) != phraseOf(nt[i].tick);
+      if (!starts) continue;
+      int r[3] = {i, nextIn[i], -1};
+      if (r[1] < 0) continue;
+      r[2] = nextIn[r[1]];
+      if (r[2] < 0) continue;
+      bool ok = true;
+      for (int k = 1; k < 3 && ok; ++k)
+        ok = nt[r[k]].key == nt[i].key && nt[r[k]].tick - nt[r[k - 1]].tickOff < div / 2 && nt[r[k]].tick - nt[r[k - 1]].tick <= 2 * div;
+      const int r4 = nextIn[r[2]];
+      if (!ok || (r4 >= 0 && nt[r4].key == nt[i].key && nt[r4].tick - nt[r[2]].tickOff < div / 2)) continue;
+      const double w1 = weight(nt[r[0]].tick), w2 = weight(nt[r[1]].tick), w3 = weight(nt[r[2]].tick);
+      static const RepShape kDown[3] = {{0.15f, 0.02f, 0.88f}, {-0.1f, -0.01f, 0.82f}, {-0.2f, -0.03f, 0.78f}};
+      static const RepShape kUp[3] = {{-0.15f, -0.03f, 0.78f}, {-0.05f, -0.01f, 0.82f}, {0.15f, 0.02f, 0.9f}};
+      static const RepShape kMid[3] = {{-0.1f, -0.02f, 0.8f}, {0.15f, 0.015f, 0.86f}, {-0.1f, -0.02f, 0.78f}};
+      static const RepShape kOff[3] = {{-0.25f, -0.035f, 0.8f}, {0.05f, 0.0f, 0.85f}, {-0.12f, -0.02f, 0.76f}};
+      const RepShape* sh = w1 >= 0.35 && w1 >= w2 && w1 >= w3 ? kDown
+                           : w3 >= 0.35 && w3 > w1 && w3 >= w2 ? kUp
+                           : w2 >= 0.35 && w2 > w1 && w2 > w3 ? kMid : kOff;
+      ++repeats;
+      for (int k = 0; k < 3; ++k) {
+        repAt[r[k]] = char(k + 1);
+        repShape[r[k]] = {float(kRepN * sh[k].acc), float(kRepN * sh[k].lvl), float(1 + kRepN * (sh[k].len - 1))};
+      }
+    }
+  // --- Dissonance and resolution (PJ_DIRECTOR_HARMONY, 1; Quantz XVII.vi.12-14, C. P. E. Bach):
+  // a dissonance struck on a beat (an appoggiatura, a suspension, a seventh against the bass) is
+  // played a little louder and leaned on, the sharper the dissonance the more; its resolution, a
+  // step down onto a consonance, is softer and lifted. Each note against the notes of the other
+  // parts sounding when it begins (and against the lowest of them, the bass): a minor second or
+  // major seventh 1, a tritone 0.8, a major second or minor seventh 0.6, a fourth over the bass
+  // 0.4. Off the beat (passing notes) nothing. All the parts' accents; the speaking winds' level too.
+  const double kHarm = kAll * knob("PJ_DIRECTOR_HARMONY", 1.0) * (baroque ? 1.0 : romantic ? 0.6 : 0.8);
+  std::vector<float> diss(n, 0.0f);
+  std::vector<char> resolves(n, 0);
+  int dissonant = 0, resolved = 0;
+  if (kHarm > 0) {
+    long longest = 0;
+    for (const DirNote& x : nt) longest = std::max(longest, x.tickOff - x.tick);
+    auto score = [&](int i) {
+      const DirNote& x = nt[i];
+      int low = x.key;
+      double sc = 0;
+      std::vector<int> other;
+      for (int j = i - 1; j >= 0 && x.tick - nt[j].tick <= longest; --j)
+        if (nt[j].ch != x.ch && nt[j].tickOff > x.tick) other.push_back(nt[j].key);
+      for (int j = i + 1; j < n && nt[j].tick == x.tick; ++j)
+        if (nt[j].ch != x.ch) other.push_back(nt[j].key);
+      for (int k : other) low = std::min(low, k);
+      for (int k : other) {
+        const int iv = ((x.key - k) % 12 + 12) % 12;
+        sc = std::max(sc, iv == 1 || iv == 11 ? 1.0 : iv == 6 ? 0.8 : iv == 2 || iv == 10 ? 0.6 : 0.0);
+      }
+      if (low < x.key && (x.key - low) % 12 == 5) sc = std::max(sc, 0.4);
+      return sc;
+    };
+    for (int i = 0; i < n; ++i) {
+      if (weight(nt[i].tick) < 0.35) continue;
+      const double sc = score(i);
+      const int nx = nextIn[i];
+      // (a dissonance that resolves: it falls by a step, soon, to something clearly less
+      // dissonant; the note it clashes with, which does not, is not the dissonance)
+      const bool res = nx >= 0 && nt[i].key - nt[nx].key >= 1 && nt[i].key - nt[nx].key <= 2 &&
+                       nt[nx].tick - nt[i].tickOff < div / 2 && score(nx) < sc - 0.3;
+      if (sc < 0.4 || !res) continue;
+      diss[i] = float(kHarm * sc);
+      ++dissonant;
+      if (res) { resolves[nx] = 1; ++resolved; }
+    }
+  }
+  int breaths = 0, leapsUp = 0;
   long sinceBreath[16];
   std::fill(sinceBreath, sinceBreath + 16, -1L);
   const double vibBase = baroque ? 0.5 : romantic ? 1.0 : 0.8;
@@ -462,9 +711,22 @@ Direction direct(const DirInput& in) {
         }
       }
     }
-    if (speech) c.v[kCueAccent] = float(std::clamp(acc * kAcc, -1.0, 1.0));
+    // (a flute's leap up: tongued softly, "dah", not "tah": the top note eased into)
+    const int leapUp = flutes(x.ch) && !chord && pv >= 0 && x.tick - nt[pv].tickOff < div / 2 ? x.key - nt[pv].key : 0;
+    leapsUp += leapUp >= 3;
+    if (leapUp >= 3) acc -= kLeap * std::min(0.25, 0.04 * (leapUp - 2));
+    if (trillAt[i] == 1 && nextIn[i] >= 0 && nt[nextIn[i]].key < x.key) acc += 0.15 * kQuicken / 0.2;  // (from above: leaned on)
+    if (taka[i]) {  // (ta-ka: tongued through, the ka softer and a shade shorter)
+      acc += kTaka * (taka[i] == 1 ? 0.08 : -0.1);
+      len = std::min(len, taka[i] == 1 ? 0.9 : 0.82);
+    }
+    const bool harm = diss[i] > 0 || resolves[i];
+    if (diss[i] > 0) acc += 0.3 * diss[i];  // (the dissonance leaned on; its resolution softer)
+    if (resolves[i]) acc -= 0.2 * kHarm;
+    if (repAt[i]) { acc += repShape[i].acc; len = std::min(len, double(repShape[i].len)); }  // (portato, shaped)
+    if (speech || leapUp >= 3 || trillAt[i] || repAt[i] || harm) c.v[kCueAccent] = float(std::clamp(acc * kAcc, -1.0, 1.0));
     c.v[kCueLength] = float(1 + (len - 1) * std::min(1.0, kAll));
-    c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && len > 0.9 ? 1.0f : 0.0f;
+    c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && !taka[i] && !repAt[i] && len > 0.9 ? 1.0f : 0.0f;
     c.v[kCuePhraseEnd] = lastOfPhrase ? 1.0f : 0.0f;
     c.v[kCueMute] = muted[p] ? 1.0f : 0.0f;
     // Vibrato: none on Baroque passagework, an ornament on its long notes; light in the
@@ -480,12 +742,18 @@ Direction direct(const DirInput& in) {
     c.v[kCueVibRate] = float(1 + (romantic ? 0.04 : 0.0) + 0.03 * c.v[kCueAccent]);
     // A long note of a line swells and fades.
     // (a wind line's notes: the bar's stress and each note's own shape)
-    if (speech) {
+    if (speech || flutes(x.ch)) {
       const double g = w >= 1 ? 0.05 : w >= 0.6 ? 0.035 : w >= 0.35 ? 0.01 : w >= 0.1 ? -0.03 : -0.045;
       const double lean = sighFrom[i] ? 0.05 : sighTo[i] ? -0.05 : 0.0;
-      const double at = kSpeech * (g + lean);
-      const double relax = secs >= 0.2 ? kSpeech * std::min(0.05, 0.03 + 0.02 * secs) : 0.0;
-      spoken[x.ch].push_back({x.tick, x.tickOff, float(at), float(at - relax)});
+      const double at = speech ? kSpeech * (g + lean) : 0.0;
+      const double relax = speech && secs >= 0.2 ? kSpeech * std::min(0.05, 0.03 + 0.02 * secs) : 0.0;
+      // (a flute's high notes not its loudest: blown under the register's own rise; the leap's
+      // top note begun a little below and grown into)
+      const double reg = flutes(x.ch) ? register_(x.ch, x.key) : 0.0;
+      const double tk = taka[i] ? kTaka * (taka[i] == 1 ? 0.01 : -0.01) : 0.0;
+      const double rp = repShape[i].lvl + 0.04 * diss[i] - (resolves[i] ? 0.03 * kHarm : 0.0);
+      const double dip = leapUp >= 3 ? kLeap * std::min(0.06, 0.012 * (leapUp - 2)) : 0.0;
+      spoken[x.ch].push_back({x.tick, x.tickOff, float(at + reg + tk + rp - dip), float(at - relax + reg + tk + rp)});
     }
     const bool longSpoken = speech && dur >= div && secs >= 0.6;
     if (!chord && x.ch != bass && (longSpoken || (dur >= 3 * div / 2 && secs >= 0.8)) && !in.ridden[x.ch]) {
@@ -539,7 +807,8 @@ Direction direct(const DirInput& in) {
     double v;
     if (t <= pk) v = -0.03 + 0.09 * double(t - s) / double(std::max(1L, pk - s));
     else v = 0.06 - 0.11 * double(t - pk) / double(std::max(1L, e - pk));
-    return float(kArc * std::clamp(v, -0.05, 0.06));
+    // (an accompanying flute part does not climb to its top note: a third of the arc)
+    return float(kArc * (in.flute[ch] && ch != melody && kLeap > 0 ? 0.33 : 1.0) * std::clamp(v, -0.05, 0.06));
   };
 
   // --- A wind part's own velocities (a played file's; the owner: a higher velocity is "a stronger
@@ -642,6 +911,15 @@ Direction direct(const DirInput& in) {
                   "each phrase to its high point, with the piece's drama",
                   kStyleS[d.style], gStyle >= 0 ? ", -style" : "", notes, lines, sighs, breaths);
     d.summary = outWhy + b2;
+    if (quickened || dissonant || dance != kNoDance) {
+      std::snprintf(b2, sizeof b2, "\n  %d trills played alive, %d dissonances leaned on, %d resolutions eased%s%s",
+                    quickened, dissonant, resolved, dance != kNoDance ? ", a " : "", kDanceName[dance]);
+      d.summary += b2;
+    }
+    if (takaTrills + leapsUp + repeats > 0) {
+      std::snprintf(b2, sizeof b2, "\n  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d accompanying repeated-note starts shaped", leapsUp, takaTrills, repeats);
+      d.summary += b2;
+    }
     if (lineParts > 0) {
       std::snprintf(b2, sizeof b2, "\n  their key velocities read as lines and accents (%d parts): %d notes growing or fading "
                     "through to the next, %d accents", lineParts, lineGlides, lineAccents);
@@ -726,6 +1004,13 @@ Direction direct(const DirInput& in) {
                          kStyle[d.style], gStyle >= 0 ? " (-style)" : "", baroque ? "terraced dynamics" : "hairpins to each phrase's climax", bars, barBeats, np,
                          echoes ? (", " + std::to_string(echoes) + " echoes").c_str() : "", melody + 1,
                          bass >= 0 ? (", bass on " + std::to_string(bass + 1)).c_str() : "");
+  if (quickened || unequal)
+    nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d trills played alive (slower to quicker), %d eighth pairs unequal (notes inegales)\n",
+                        quickened, unequal);
+  if (compound || dance != kNoDance || dissonant)
+    nb += std::snprintf(buf + nb, sizeof buf - nb, "  %s%s%s%s; %d dissonances leaned on, %d resolutions eased\n",
+                        compound ? "compound metre" : "simple metre", dance != kNoDance ? ", a " : "", kDanceName[dance],
+                        dance != kNoDance ? "'s weights" : "", dissonant, resolved);
   if (top >= 0 && climax[top] >= 0)
     nb += std::snprintf(buf + nb, sizeof buf - nb, "  climax bar %ld; ", nt[climax[top]].tick / bar + 1);
   else
@@ -742,6 +1027,8 @@ Direction direct(const DirInput& in) {
     if (notes)
       nb += std::snprintf(buf + nb, sizeof buf - nb, "  winds speak: %d notes of %d lines, good and bad notes, %d sighs, %d breaths\n",
                           notes, lines, sighs, breaths);
+    if (takaTrills + leapsUp + repeats > 0)
+      nb += std::snprintf(buf + nb, sizeof buf - nb, "  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d accompanying repeated-note starts shaped\n", leapsUp, takaTrills, repeats);
   }
   if (repeated) nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d repeats (a bar or more said again at once): keyed long / mid / short in turn\n", repeated);
   std::snprintf(buf + nb, sizeof buf - nb, "  vibrato: %s; articulation: %s  (%s)",

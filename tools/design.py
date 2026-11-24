@@ -188,6 +188,14 @@ class Model:
             rin = math.sqrt(sw / math.pi)
             sbot = sw
             extra = 0.0
+        elif self.kind == 'side':  # a transverse flute's embouchure hole (src/flute.cc: 11.6 x emb long, 6.4 x emb at the bore)
+            fw = nfreq(midi - self.s['transpose'])
+            t = min(max(math.log(fw / 261.6) / math.log(1760 / 261.6), 0.0), 1.2)
+            unc = (6.0 - 2.5 * t) * 1e-3 * self.s['emb'] * cover
+            sw = max(4e-6 * self.s['emb'] ** 2, unc * 11.6e-3 * self.s['emb'])
+            rin = 6.4e-3 * self.s['emb']
+            sbot = math.pi * rin * rin
+            extra = 2e-3 * self.s['emb']
         else:  # end-blown: the lips leave `unc` of the rim open (the player's schedule)
             fw = nfreq(midi - self.s['transpose'])
             t = min(max(math.log(fw / 261.6) / math.log(1760 / 261.6), 0.0), 1.2)
@@ -411,7 +419,7 @@ def emit(results):
                    f"{spec.get('excite', 0.5 * model.dx * 1e3):.2f}, {model.end * 1e3:.1f}, "
                    f"{'true' if model.closed else 'false'}, {pipes}, {reed}, {jet_si}}};")
         out.append('')
-        kind = {'duct': 'kDuct', 'end': 'kEndBlown', 'reed': 'kReed', 'dreed': 'kDoubleReed'}[spec['kind']]
+        kind = {'duct': 'kDuct', 'end': 'kEndBlown', 'side': 'kFlute', 'reed': 'kReed', 'dreed': 'kDoubleReed'}[spec['kind']]
         entries.append(f"    {{\"{spec['name']}\", {spec['transpose']}, {spec['lo']}, {spec['hi']}, {spec.get('scale', 1):g}, "
                        f"1, {spec.get('emb', 1):g}, {spec['fs']}, 0, false, false, 0, {spec.get('gain', 1):g}, "
                        f"Kind::{kind}, &{cn}Design, \"{spec.get('family', spec['name'])}\"}},")
@@ -552,7 +560,8 @@ def main():
         notes = {int(k): tuple(v) for k, v in sv['notes'].items()}
         errs = {int(k): v for k, v in sv['errs'].items()}
         results.append((spec, model, notes, errs))
-    open(os.path.join(ROOT, 'src', 'designs.cc'), 'w').write(emit(results))
+    # (PJ_DESIGN_OUT: write elsewhere, to merge one instrument by hand)
+    open(os.environ.get('PJ_DESIGN_OUT') or os.path.join(ROOT, 'src', 'designs.cc'), 'w').write(emit(results))
 
 
 if __name__ == '__main__':

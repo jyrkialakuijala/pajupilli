@@ -163,6 +163,7 @@ sounding MIDI notes (`./pajupilli -inst bass -note 48`).
 | `-inst` | What | Range (written) | Model rate |
 |---|---|---|---|
 | `recorder` | alto recorder in F, Baroque fingering: duct, thumb half-holed for the 2nd register | F4–G6 | 48 kHz |
+| `baroque-flute` | one-keyed Baroque flute (traverso) in D: boxwood, a cylindrical head, a contracting conical body, six small holes and a D# key; fork fingerings (F, G#, Bb, C) softer and veiled; softer and darker than the Boehm flute. `-reinstrument flute=baroque-flute` plays a file's flutes on it | D4–A6 | 48 kHz |
 | `ocarina` | alto C, 12 holes: a vessel (Helmholtz), duct | A4–F6 | 48 kHz |
 | `shakuhachi` | 1.8 (in D), end-blown: the lips cover the rim (meri / kari) | D4–D6 | 48 kHz |
 | `panflute` | chromatic nai, one stopped pipe per note | G4–C7 | 96 kHz |

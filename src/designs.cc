@@ -443,6 +443,71 @@ const NoteInfo kRecorderNotes[] = {
 };
 const Design kRecorderDesign = {kRecorderBore, 8, kRecorderHoles, 10, kRecorderNotes, 3.73, 432.5, false, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.0011, 0.012, 0.003, 0.012, 0.002, 0.055, 0.0002, 250, 1500}};
 
+// One-keyed Baroque flute (traverso) in D, D4..A6
+// Boxwood: a cylindrical head, a contracting conical body (19 -> 11.6 mm),
+// six small finger holes and one closed key (D#); a small round embouchure.
+// The chromatic notes fork-fingered: veiled and softer.
+const BorePoint kBaroqueFluteBore[] = {
+    {0.0, 19.00}, {191.0, 19.00}, {337.0, 16.09}, {467.5, 14.00}, {543.6, 14.80}};
+const HoleDef kBaroqueFluteHoles[] = {
+    {241.2, 7.55, 4.6, 8.0, 15.0, kFingerHole},  // 1 1
+    {270.0, 6.52, 4.6, 8.0, 15.0, kFingerHole},  // 2 2
+    {311.2, 6.84, 4.6, 8.0, 15.0, kFingerHole},  // 3 3
+    {364.2, 6.65, 4.6, 8.0, 15.0, kFingerHole},  // 4 4
+    {376.2, 5.12, 4.6, 8.0, 15.0, kFingerHole},  // 5 5
+    {434.4, 4.34, 4.6, 8.0, 15.0, kFingerHole},  // 6 6
+    {469.7, 5.58, 4.0, 2.5, 11.0, kNormallyClosed},  // 7 Eb
+};
+const NoteInfo kBaroqueFluteNotes[] = {
+    {"xxxxxxx", 1},  // 62 D4 (-32 c passive)
+    {"xxxxxxo", 1},  // 63 D#4 (-14 c passive)
+    {"xxxxxoo", 1},  // 64 E4 (-20 c passive)
+    {"xxxxoxx", 1},  // 65 F4 (+29 c passive)
+    {"xxxxooo", 1},  // 66 F#4 (-26 c passive)
+    {"xxxoooo", 1},  // 67 G4 (-11 c passive)
+    {"xxoxxxx", 1},  // 68 G#4 (+7 c passive)
+    {"xxooooo", 1},  // 69 A4 (+1 c passive)
+    {"xoxxooo", 1},  // 70 A#4 (+21 c passive)
+    {"xoooooo", 1},  // 71 B4 (+1 c passive)
+    {"oxxoooo", 1},  // 72 C5 (+1 c passive)
+    {"ooooooo", 1},  // 73 C#5 (-5 c passive)
+    {"oxxxxxx", 2},  // 74 D5 (+34 c passive)
+    {"xxxxxxo", 2},  // 75 D#5 (+50 c passive)
+    {"xxxxxoo", 2},  // 76 E5 (+42 c passive)
+    {"xxxxoxx", 2},  // 77 F5 (-12 c passive)
+    {"xxxxooo", 2},  // 78 F#5 (+10 c passive)
+    {"xxxoooo", 2},  // 79 G5 (+27 c passive)
+    {"xoxxooo", 2},  // 80 G#5 (+2 c passive)
+    {"xxooooo", 2},  // 81 A5 (+2 c passive)
+    {"xoxoooo", 2},  // 82 A#5 (in the waveguide: oxooxox fell to its first mode) (-1 c passive)
+    {"xoooooo", 2},  // 83 B5 (-40 c passive)
+    {"oxoxxxx", 3},  // 84 C6 (-17 c passive; ooooxoo played +22 c)
+    {"xoooxoo", 3},  // 85 C#6 (-1 c passive)
+    {"ooxoooo", 3},  // 86 D6 (in the waveguide: xxooooo sounded A5) (+16 c passive)
+    // (the third octave: found by playing every fingering (and one half-hole) in the waveguide)
+    {"xxxxxxo", 3},  // 87 D#6 (+3 c played)
+    {"xxoooxx", 3},  // 88 E6 (-2 c played; the chart's xxoxxoo +31 c)
+    {"oxooooo", 3},  // 89 F6 (+0 c played)
+    {"xxoxhox", 3},  // 90 F#6 (+4..+7 c played; the fifth finger half-holed: no open fingering holds it)
+    {"xoooxxx", 3},  // 91 G6 (-3 c played)
+    {"oooooox", 3},  // 92 G#6 (+0 c played)
+    {"oxxxxxx", 4},  // 93 A6 (the D5 fingering overblown: -2 c calibrated, +14 c at velocity 90)
+};
+// (alternates the calibration may choose: the steadier, then the truer; nullptr: none)
+const NoteInfo kBaroqueFluteAlt[] = {
+    {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0},  // D4 .. G#4
+    {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0},  // A4 .. D#5
+    {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0},               // E5 .. A5
+    {"xxooxxx", 3},                                                                                     // A#5
+    {nullptr, 0},                                                                                       // B5
+    {"ooooxoo", 2},                                                                                     // C6
+    {nullptr, 0},                                                                                       // C#6
+    {"ooooooo", 3},                                                                                     // D6
+    {"xxxoxox", 3}, {"xxooxox", 3}, {"xooooox", 3}, {"xhoxxxx", 3}, {"xooxoxx", 3}, {"oohooox", 3},  // D#6 .. G#6
+    {"oxxxxhx", 4},                                                                                     // A6
+};
+const Design kBaroqueFluteDesign = {kBaroqueFluteBore, 5, kBaroqueFluteHoles, 7, kBaroqueFluteNotes, 26.00, 543.6, false, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0}, {0, 0, 0, 0, 0.0048, 0, 0, 0, 0}, nullptr, kBaroqueFluteAlt};
+
 // Tin whistle in D, D5..A6
 // A duct on a cylinder, six finger holes; the second octave by overblowing
 // the same fingerings. The breath sets the pitch.
@@ -976,6 +1041,7 @@ extern const Instrument kDesigned[] = {
     {"shehnai", 0, 60, 79, 1, 1, 1, 48000, 0, false, false, 0, 0.25, Kind::kDoubleReed, &kShehnaiDesign, "shehnai"},
     {"bagpipe", 0, 67, 81, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kBagpipeDesign, "bagpipe", 33},  // (drones down to A1)
     {"recorder", 0, 65, 88, 1, 1, 1, 48000, 0, false, false, 0, 1, Kind::kDuct, &kRecorderDesign, "recorder"},
+    {"baroque-flute", 0, 62, 93, 1, 1, 0.85, 48000, 0, false, false, 0, 1, Kind::kFlute, &kBaroqueFluteDesign, "flute"},
     {"whistle", 0, 74, 93, 1, 1, 0.8, 96000, 0, false, false, 0, 0.8, Kind::kDuct, &kWhistleDesign, "whistle"},
     {"shakuhachi", 0, 62, 85, 1, 1, 1.3, 48000, 0, false, false, 0, 1, Kind::kEndBlown, &kShakuhachiDesign, "shakuhachi"},
     {"ocarina", 0, 69, 89, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kDuct, &kOcarinaDesign, "ocarina"},
@@ -986,6 +1052,6 @@ extern const Instrument kDesigned[] = {
     {"tenor-sax", -14, 58, 87, 1.33333, 1, 1, 36000, 0, false, false, 0, 0.4, Kind::kReed, &kTenorSaxDesign, "sax"},
     {"baritone-sax", -21, 58, 87, 2, 1, 1, 24000, 0, false, false, 0, 0.45, Kind::kReed, &kBaritoneSaxDesign, "sax"},
 };
-extern const int kNumDesigned = 18;
+extern const int kNumDesigned = 19;
 
 }  // namespace pajupilli

@@ -777,8 +777,65 @@ def bottles():
                 jet=dict(chimney=1.5))
 
 
+# ---------------------------------------------------------------------------
+# One-keyed Baroque flute (traverso) in D, fitted D4..D6; src/designs.cc carries it on to A6 by
+# hand (the third octave's fingerings found by playing every fingering, and one half-hole, in the
+# waveguide: this spec's search does not reach them), with alternates for Bb5, C6, D6..A6: boxwood, a cylindrical head
+# (19 mm) and a contracting conical body (~19 -> ~11.6 mm at the foot, a
+# little flare at the end); six small finger holes (5-7 mm, a thick wooden
+# wall) and one closed key, D#. A small, round embouchure hole with little
+# undercut. The chromatic notes are fork (cross) fingered (Hotteterre 1707,
+# Quantz 1752): F, G#, A#, C are veiled and a little softer, as on the real
+# one. Most notes are played with the D# key open (the charts' rule: it
+# clears the tone); D and the forks with it closed. Designed at the program's
+# pitch (A = 440), not at 415: the ensemble has one pitch.
+
+def baroque_flute():
+    names = ['1', '2', '3', '4', '5', '6', 'Eb']
+    ds = [6.6, 6.8, 5.6, 7.0, 6.4, 5.4]
+    holes = [hole(n, 0, d, 4.6, flags=FINGER, dlo=0.8 * d, dhi=1.25 * d) for n, d in zip(names, ds)]
+    holes.append(hole('Eb', 0, 6.8, 4.0, padH=2.5, cup=11.0, flags=NCLOSED, dlo=5.5, dhi=8.0))
+    excite = 26.0  # (the cork a little further than a bore's width: it tunes the octaves)
+    seq = {'1': 'C#5', '2': 'B4', '3': 'A4', '4': 'G4', '5': 'F#4', '6': 'E4', 'Eb': 'D#4'}
+    for h in holes:
+        f = 440 * 2 ** ((midi(seq[h['name']]) - 69) / 12)
+        h['x'] = excite + 349.5e3 / (2 * f) - 35
+
+    # (the head a cylinder to its socket; the body contracts, most in the upper joint; the foot
+    # nearly cylindrical, a little flare at the end. The fit sets the taper: a steep one widens
+    # the octaves.)
+    def bore(end, mid=15.5, foot=12.8):
+        return [(0, 19.0), (excite + 165, 19.0), (0.62 * end, mid), (0.86 * end, foot), (end, foot + 0.8)]
+    core = {
+        midi('D4'): ('xxxxxxx', 1, 1.0), midi('D#4'): ('xxxxxxo', 1, 1.0), midi('E4'): ('xxxxxoo', 1, 1.0),
+        midi('F#4'): ('xxxxooo', 1, 1.0), midi('G4'): ('xxxoooo', 1, 1.0), midi('A4'): ('xxooooo', 1, 1.0),
+        midi('B4'): ('xoooooo', 1, 1.0), midi('C#5'): ('ooooooo', 1, 1.0),
+        midi('D5'): ('oxxxxxx', 2, 0.8), midi('E5'): ('xxxxxoo', 2, 0.8), midi('F#5'): ('xxxxooo', 2, 0.8),
+        midi('G5'): ('xxxoooo', 2, 0.8), midi('A5'): ('xxooooo', 2, 0.8), midi('B5'): ('xoooooo', 2, 0.6),
+        # (the forks the charts give, lightly weighted: they pull the holes as on a real flute)
+        midi('F4'): ('xxxxoxx', 1, 0.8), midi('G#4'): ('xxoxxxx', 1, 0.5), midi('A#4'): ('xoxxooo', 1, 0.6),
+        midi('C5'): ('oxxoooo', 1, 0.6), midi('D#5'): ('xxxxxxo', 2, 0.5),
+    }
+
+    def cand(m, notes):
+        out = []
+        ns = (1,) if m < midi('D5') else (2,) if m < midi('C#6') else (2, 3)
+        for pat, n, cost in finger_cands(holes[:6], core, m, notes, thumb=None, max_cross=2, half=False, ns=ns):
+            for key in 'xo':  # the D# key: closed or open
+                out.append((pat + key, n, cost))
+        return out
+    return dict(name='baroque-flute', title='One-keyed Baroque flute (traverso) in D, D4..D6', family='flute',
+                kind='side', transpose=0, lo=midi('D4'), hi=midi('D6'), fs=48000, gain=1.0, end=590, excite=excite,
+                bore_fn=bore, holes=holes, core=core, candidates=cand, gap=12, emb=0.85, fit='xd',
+                extra=[('mid', 15.5, 14.0, 17.5), ('foot', 12.8, 11.5, 14.0)],
+                doc="""Boxwood: a cylindrical head, a contracting conical body (19 -> 11.6 mm),
+                six small finger holes and one closed key (D#); a small round embouchure.
+                The chromatic notes fork-fingered: veiled and softer.""",
+                jet=dict(chimney=4.8))
+
+
 INSTRUMENTS = {}
-for f in (clarinet, oboe, english_horn, bassoon, duduk, shawm, shehnai, bagpipe, recorder, whistle, shakuhachi, ocarina, panflute, bottles,
+for f in (clarinet, oboe, english_horn, bassoon, duduk, shawm, shehnai, bagpipe, recorder, baroque_flute, whistle, shakuhachi, ocarina, panflute, bottles,
           lambda: sax('soprano-sax', 2 / 3, -2, 48000, dict(width=11e-3, h0=0.8e-3, k=4.5e6, fr=2400, qr=0.3,
                       sr=4.3e-5, press=1700, pressHi=2300, vib=1), 0.5, 'Soprano saxophone in Bb, written Bb3..D6', midi('D6')),
           lambda: sax('alto-sax', 1.0, -9, 48000, dict(width=13e-3, h0=0.8e-3, k=4e6, fr=1900, qr=0.3,

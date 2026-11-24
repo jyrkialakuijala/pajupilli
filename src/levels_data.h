@@ -5,6 +5,7 @@ namespace pajupilli {
 struct LevelTrim { const char* name; float db; };
 constexpr LevelTrim kLevelTrims[] = {
     {"flute", -1.3f},
+    {"baroque-flute", 6.0f},  // (by hand, tools/levels.py: -36.7 LUFS untrimmed; to 2.5 dB under the common level: a softer flute)
     {"flute-c", -1.8f},
     {"piccolo", -2.9f},
     {"alto", 1.0f},

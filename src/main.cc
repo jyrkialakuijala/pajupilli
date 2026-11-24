@@ -420,7 +420,8 @@ const char kUsage[] =
     "                      another (organ: the church organ by its plan), e.g.\n"
     "                      -reinstrument grand-piano=organ,piano=tonewheel\n"
     "  -style S            with -play: the director's reading in style S (baroque, classical,\n"
-    "                      romantic; auto: read from the rhythm), and the director on\n"
+    "                      romantic; french: Baroque with notes inegales; auto: read from\n"
+    "                      the rhythm), and the director on\n"
     "  -only LIST          with -play: only these heard: instrument names, families,\n"
     "                      channels (11 or ch11) or drums, e.g. -only choir,oboe,16\n"
     "                      (the piece's tempo and phrasing read from all its parts)\n"
@@ -605,7 +606,7 @@ int run(int argc, char** argv) {
       if (!setDirectorMode(next())) { std::fprintf(stderr, "-director: on, off or auto\n"); return 1; }
     }
     else if (a == "-style") {
-      if (!setDirectorStyle(next())) { std::fprintf(stderr, "-style: baroque, classical, romantic or auto\n"); return 1; }
+      if (!setDirectorStyle(next())) { std::fprintf(stderr, "-style: baroque, french, classical, romantic or auto\n"); return 1; }
     }
     else if (a == "-only") setOnly(next());
     else if (a == "-onlyskip") setOnly(next(), true);

@@ -237,10 +237,14 @@ std::vector<std::pair<std::string, const Instrument*>> gReinstrument;
 // research/fretless_bass.md 5, 8.4; the user's decision of 2026-11-16)
 bool gJazzUpright = false;
 
+// (the director's choice for a Baroque piece: the flute is the one-keyed Baroque flute)
+const Instrument* gBaroqueFlute = nullptr;
+
 const Instrument* forProgram(int prog) {
   const Instrument* in = nullptr;
   for (const char* nm : kGm[prog & 127])
     if (nm && !in) in = findInstrument(nm);
+  if (gBaroqueFlute && in && std::strcmp(in->name, "flute") == 0) in = gBaroqueFlute;
   if (gJazzUpright && (prog & 127) == 35)
     if (const Instrument* db = findInstrument("double-bass")) in = db;
   for (const auto& [from, to] : gReinstrument)
@@ -689,6 +693,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         if (const Instrument* w = spans.back().inst)
           di.wind[ch] |= (w->kind == Kind::kFlute || w->kind == Kind::kDuct || w->kind == Kind::kEndBlown || w->reed() ||
                           w->lip()) && std::strcmp(w->family, "bagpipe") != 0;
+        if (const Instrument* w = spans.back().inst)
+          di.flute[ch] |= w->kind == Kind::kFlute || w->kind == Kind::kDuct || w->kind == Kind::kEndBlown;
       }
     }
     std::vector<size_t> order;
@@ -701,6 +707,42 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     }
     dir = direct(di);
     std::fprintf(stderr, "%s\n", dir.summary.c_str());
+    // The flutes of a Baroque piece played on the Baroque flute (PJ_BAROQUE_FLUTE, 1; 0: never,
+    // 2: always where it can): the director read the piece as Baroque, or the file is named by a
+    // Baroque catalogue (BWV, HWV, TWV, BuxWV, RV: Bach, Handel, Telemann, Buxtehude, Vivaldi). Only
+    // if every flute note is in its compass (D4 .. D6: it has no third octave, and a note folded
+    // down is a wrong note), and not when -reinstrument says what the flute is.
+    {
+      static const double kBf = knob("PJ_BAROQUE_FLUTE", 1.0);
+      std::string base = path.substr(path.find_last_of('/') + 1);
+      for (char& ch : base) ch = char(std::tolower((unsigned char)ch));
+      bool catalogue = false;
+      for (const char* cat : {"bwv", "hwv", "twv", "buxwv", "rv"})
+        for (size_t at = base.find(cat); at != std::string::npos && !catalogue; at = base.find(cat, at + 1)) {
+          size_t k = at + std::strlen(cat);
+          while (k < base.size() && (base[k] == ' ' || base[k] == '_' || base[k] == '-' || base[k] == '.')) ++k;
+          catalogue = k < base.size() && std::isdigit((unsigned char)base[k]) && (at == 0 || !std::isalpha((unsigned char)base[at - 1]));
+        }
+      bool ruled = false;
+      for (const auto& [from, to] : gReinstrument) ruled |= from == "*" || from == "flute";
+      const Instrument* bf = findInstrument("baroque-flute");
+      if (kBf > 0 && bf && !ruled && (kBf >= 2 || dir.style == Direction::kBaroque || catalogue)) {
+        int flutes = 0, lo = 127, hi = 0;
+        for (const Span& sp : spans)
+          if (sp.inst && std::strcmp(sp.inst->name, "flute") == 0) {
+            ++flutes;
+            lo = std::min(lo, int(song.ev[sp.on].a));
+            hi = std::max(hi, int(song.ev[sp.on].a));
+          }
+        if (flutes > 0 && lo >= bf->lo && hi <= bf->hi) {
+          gBaroqueFlute = bf;
+          std::fprintf(stderr, "  the flutes on the Baroque flute (%s; their compass %d .. %d)\n",
+                       dir.style == Direction::kBaroque ? "a Baroque reading" : catalogue ? "a Baroque catalogue's number" : "PJ_BAROQUE_FLUTE 2", lo, hi);
+        } else if (flutes > 0) {
+          std::fprintf(stderr, "  (the flutes stay modern: their notes %d .. %d beyond the Baroque flute's %d .. %d)\n", lo, hi, bf->lo, bf->hi);
+        }
+      }
+    }
     // (the times must be the ticks' through the tempo map: so they are in a file as read)
     auto secAt = [](const std::vector<DirTempo>& tm, int div, uint64_t tick) {
       const double b = double(tick) / div;
@@ -724,6 +766,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         const Cue& c = dir.cues[q];
         Event& on = song.ev[sp.on];
         Event& off = song.ev[sp.off];
+        if (q < dir.onShift.size()) {  // (a trill played alive, the notes inégales: ticks moved; the organs too)
+          on.tick = uint64_t(std::max(0L, long(on.tick) + dir.onShift[q]));
+          off.tick = std::max(on.tick + 1, uint64_t(std::max(0L, long(off.tick) + dir.offShift[q])));
+        }
         // (the organs articulate and balance by their own plans: they take the shared time only)
         if (sp.inst && (std::strcmp(sp.inst->family, "organ") == 0 || isTonewheel(sp.inst))) continue;
         on.cue = int(q);
@@ -768,6 +814,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         Event& on = song.ev[sp.on];
         Event& off = song.ev[sp.off];
         on.cue = int(q);
+        if (dir.gridded && q < dir.onShift.size() && (dir.onShift[q] || dir.offShift[q])) {
+          on.tick = uint64_t(std::max(0L, long(on.tick) + dir.onShift[q]));
+          off.tick = std::max(on.tick + 1, uint64_t(std::max(0L, long(off.tick) + dir.offShift[q])));
+          on.t = secAt(di.tempo, song.div, on.tick);
+          off.t = secAt(di.tempo, song.div, off.tick);
+          moved = true;
+        }
         const float len = dir.gridded ? c.v[kCueLength] : std::min(1.0f, std::max(c.v[kCueLength], c.v[kCueLegato] > 0 ? 1.0f : 0.83f));
         if (len < 1 && off.t > on.t) {
           off.t = on.t + (off.t - on.t) * len;

@@ -60,7 +60,7 @@ class Player : public Performer {
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
-  double regKick_ = 0, kKickP_, kKickW_, kKickT_, kKickDyn_, kSlurKick_ = 1.9, kVentKickDyn_ = 0,
+  double regKick_ = 0, kLipClose_ = 0.012, kKickP_, kKickW_, kKickT_, kKickDyn_, kSlurKick_ = 1.9, kVentKickDyn_ = 0,
          kVentKickT_ = 0.04, kickT_ = 0.06;
   double slurKick(int to);  // the register kick for a slur up to `to` (sets its duration)
   double kDynH_, kDynP_, kVelDyn_;

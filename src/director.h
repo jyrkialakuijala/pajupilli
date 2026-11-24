@@ -62,6 +62,7 @@ struct DirInput {
   bool minor = false;
   bool ridden[16] = {};  // the channel has its own expression (CC 11, 1, 2 or pressure)
   bool wind[16] = {};    // the channel is a wind player's (a flute, a reed, a brass: it speaks and breathes)
+  bool flute[16] = {};   // ... a flute's (a transverse flute, a recorder, a pan pipe: its high notes blown hard)
 };
 
 struct Direction {
@@ -75,6 +76,9 @@ struct Direction {
   // only): the line goes into the part's level, the key keeps the accent. Per input note, the
   // velocity to play its key with (0: the file's).
   std::vector<int> keyVel;
+  // Per input note, its key and its release moved later by so many ticks (a trill played alive,
+  // the notes inégales); empty or 0: as written.
+  std::vector<long> onShift, offShift;
   std::vector<std::pair<long, float>> level[16];      // per channel: (tick, level), linear between
   std::vector<std::pair<long, long>> phrases;         // (start, end) ticks
   std::vector<std::pair<long, double>> fermatas;      // (tick, hold factor)

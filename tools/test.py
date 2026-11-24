@@ -275,11 +275,12 @@ def register_map():
 # that must sound in its register after calibration (the rest is logged).
 # (2026-11-13: recorder 21/24, ocarina 21/21, shakuhachi 23/24, pan flute 30/30, clarinet 32/33,
 # soprano sax 28/29, alto 30/30, tenor 30/30, oboe 26/28, bassoon 30/30, duduk 16/17;
-# 2026-11-13: English horn 27/28, whistle 19/20, bottles 25/25, shehnai 19/20, bagpipe 14/15.)
+# 2026-11-13: English horn 27/28, whistle 19/20, bottles 25/25, shehnai 19/20, bagpipe 14/15;
+# 2026-11-24: baroque flute 25/25.)
 WOODWINDS = {'recorder': 0.85, 'ocarina': 0.95, 'shakuhachi': 0.9, 'panflute': 1.0, 'clarinet': 0.9,
              'soprano-sax': 0.9, 'alto-sax': 0.95, 'tenor-sax': 0.95, 'baritone-sax': 0.9, 'oboe': 0.9,
              'bassoon': 0.95, 'duduk': 0.9, 'shawm': 0.75, 'english-horn': 0.9, 'whistle': 0.9, 'bottle': 1.0,
-             'shehnai': 0.9, 'bagpipe': 0.9}
+             'shehnai': 0.9, 'bagpipe': 0.9, 'baroque-flute': 1.0}
 # The share of the sounding notes allowed over 10 c (the shawm's cross fingerings: 3 of 13).
 WOODWINDS_OFF = {'shawm': 0.25, 'shehnai': 0.35, 'bagpipe': 0.25}  # (the shehnai's half-holed komal notes, the chanter's chromatic notes)
 

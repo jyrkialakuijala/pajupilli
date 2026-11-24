@@ -80,6 +80,7 @@ constexpr GmLevel kGmLevels[] = {
     {"clarinet", 5.9f},  // GM 72 Clarinet
     {"piccolo", 7.9f},  // GM 73 Piccolo
     {"flute", 8.7f},  // GM 74 Flute
+    {"baroque-flute", 8.7f},  // GM 74 Flute (by hand: the flute's program)
     {"recorder", 10.0f},  // GM 75 Recorder
     {"panflute", 10.4f},  // GM 76 Pan Flute
     {"bottle", 4.7f},  // GM 77 Blown Bottle
