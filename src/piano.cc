@@ -355,6 +355,7 @@ void Piano::build() {
         db += 20 * d_.bassLength * std::log10(std::max(d_.key[q].len / d_.key[39].len, 1.0));
       key_[k].lenGain = float(std::pow(10.0, db / n / 20));
     }
+    if (s.levelDb != 0) key_[k].lenGain *= float(std::pow(10.0, s.levelDb / 20));
     key_[k].pluckK = float(s.pluckK);
     key_[k].pluckLimit = float(s.pluckLimit);
     key_[k].pluckSide = float(s.pluckSide);
@@ -548,7 +549,7 @@ void Piano::build() {
       // the patch narrower (12 mm at C6, 7 at C8; PJ_PIANO_HAMW scales them, 0.010 = 1).
       // A round crown holds back the high partials smoothly, a point lets them through:
       // the sinc of a flat patch with its side lobes never was either.)
-      static const double kWscale = hamW / 0.010;
+      const double kWscale = hamW / 0.010;  // (this design's: a static here kept the first-built instrument's for all)
       static const double kKw[] = {1, 40, 64, 88}, kW[] = {0.024, 0.018, 0.012, 0.007};
       double crown = kW[3];
       for (int j = 0; j < 3; ++j)
@@ -732,6 +733,87 @@ void Piano::build() {
       tapG_[c][p] = float(1.18 / (2 * M_PI * r) * ((1 - pat) + pat * cosine));
     }
   }
+  // The array microphone in place of the pair (PJ_PIANO_ARRAY=1): PJ_PIANO_ARRAY_N mono omnis (32) in a
+  // line across the board, bass to treble, at the pair's distance from the keyboard's end and
+  // centred over the board, each a random 2 .. 11 cm from the next (no two gaps alike: their
+  // sum's combs fall apart). Each stands as high as makes its sum of 1 / d to the board's patches
+  // the same as the middle one's, PJ_PIANO_ARRAY_LIFT (0.15 m) over the pair's height: over the
+  // board's edges, where less of it lies around, they come down. Each goes to both channels, a
+  // crossfade along the line: the bass end's 80 % left and 20 % right, the treble end's 20 % left
+  // and 80 % right (PJ_PIANO_ARRAY_PAN, 0.6: the difference between the two at an end); a
+  // channel is its mics' weighted mean, then PJ_PIANO_ARRAY_DB (-5: omnis hear the board's bass
+  // that the crossed figure-of-eight pair turns away; at -5 as loud as the pair overall).
+  if (knob("PJ_PIANO_ARRAY", 0) != 0 && kP > 0) {
+    const int n = std::clamp(int(knob("PJ_PIANO_ARRAY_N", 32)), 2, 128);
+    const double pan = std::clamp(knob("PJ_PIANO_ARRAY_PAN", 0.6), 0.0, 1.0);
+    const double lift = knob("PJ_PIANO_ARRAY_LIFT", 0.15), base = d_.mic[0].z, mx = d_.mic[0].x;
+    double ylo = 1e9, yhi = -1e9;
+    for (int p = 0; p < kP; ++p) {
+      ylo = std::min(ylo, double(d_.board.patchPos[2 * p + 1]));
+      yhi = std::max(yhi, double(d_.board.patchPos[2 * p + 1]));
+    }
+    std::vector<double> ys(n, 0.0), zs(n);
+    uint32_t r = d_.seed * 2654435761u + 77;
+    for (int m = 1; m < n; ++m) {
+      r = r * 1664525u + 1013904223u;
+      ys[m] = ys[m - 1] + 0.02 + 0.09 * ((r >> 8) / 16777216.0);
+    }
+    const double shift = 0.5 * (ylo + yhi) - 0.5 * (ys[0] + ys[n - 1]);
+    for (double& y : ys) y += shift;
+    auto near = [&](double y, double z) {  // (its sum of 1 / d over the patches)
+      double s = 0;
+      for (int p = 0; p < kP; ++p) {
+        const double dx = d_.board.patchPos[2 * p] - mx, dy = d_.board.patchPos[2 * p + 1] - y;
+        s += 1 / std::sqrt(dx * dx + dy * dy + z * z);
+      }
+      return s;
+    };
+    const double yc = 0.5 * (ys[0] + ys[n - 1]), target = near(yc, base + lift);
+    for (int m = 0; m < n; ++m) {
+      double lo = 0.05, hi = 3.0;  // (the sum falls as it rises: halve the height's range)
+      if (near(ys[m], lo) <= target) { zs[m] = lo; continue; }
+      for (int it = 0; it < 50; ++it) {
+        const double mid = 0.5 * (lo + hi);
+        (near(ys[m], mid) > target ? lo : hi) = mid;
+      }
+      zs[m] = 0.5 * (lo + hi);
+    }
+    double sl = 0, sr = 0;
+    std::vector<double> wl(n), wr(n);
+    for (int m = 0; m < n; ++m) {
+      const double u = std::clamp((ys[m] - yc) / std::max(0.5 * (ys[n - 1] - ys[0]), 1e-6), -1.0, 1.0);
+      wl[m] = 0.5 * (1 - pan * u);
+      wr[m] = 0.5 * (1 + pan * u);
+      sl += wl[m];
+      sr += wr[m];
+    }
+    const double trim = std::pow(10.0, knob("PJ_PIANO_ARRAY_DB", -5.0) / 20);
+    arrN_ = n;
+    arrI_.assign(size_t(kP) * n, 0);
+    arrF_.assign(size_t(kP) * n, 0.0f);
+    arrGL_.assign(size_t(kP) * n, 0.0f);
+    arrGR_.assign(size_t(kP) * n, 0.0f);
+    for (int p = 0; p < kP; ++p)
+      for (int m = 0; m < n; ++m) {
+        const double dx = d_.board.patchPos[2 * p] - mx, dy = d_.board.patchPos[2 * p + 1] - ys[m];
+        const double rr = std::sqrt(dx * dx + dy * dy + zs[m] * zs[m]);
+        const double d = std::min(rr / 345.0 * fs_, double(kRing - 2));
+        const size_t at = size_t(p) * n + m;
+        arrI_[at] = int(d);
+        arrF_[at] = float(d - int(d));
+        const double g = trim * 1.18 / (2 * M_PI * rr);
+        arrGL_[at] = float(g * wl[m] / sl);
+        arrGR_[at] = float(g * wr[m] / sr);
+      }
+    static bool told = false;
+    if (!told) {
+      told = true;
+      double zlo = 1e9, zhi = 0;
+      for (double z : zs) { zlo = std::min(zlo, z); zhi = std::max(zhi, z); }
+      std::fprintf(stderr, "  piano array mic: %d omnis over %.2f m across (the board %.2f m), %.2f .. %.2f m high (middle %.2f)\n",
+                   n, ys[n - 1] - ys[0], yhi - ylo, zlo, zhi, zs[n / 2]);
+    }
+  }
   // (the regions as sources: as a patch straight under the pair is heard by it, its delay and
   // gain, the same for every patch)
   {
@@ -826,7 +908,20 @@ int Piano::activeStrings() const {
   return asleep_ ? 0 : n;
 }
 
-void Piano::wake() { asleep_ = false; }
+// Awake, every string is computed, the damped ones under their dampers too, until all of it has
+// died away: a key answers the others alike whether it has been played before or not. (Before, a
+// string was computed from its first note on and left out again only at rest: in running music
+// never, the others stirring it; a key not yet played did not answer at all.) PJ_PIANO_ALLSTRINGS=0:
+// as before.
+void Piano::wake() {
+  static const bool kAll = knob("PJ_PIANO_ALLSTRINGS", 1) != 0;
+  allStrings_ = kAll;
+  if (asleep_ && allStrings_) {
+    for (Str& s : str_) s.active = true;
+    census();
+  }
+  asleep_ = false;
+}
 
 // The blow's vowel. The hammer's speed walks a path of six vowels, y u o a e i (0.45 to 5.35 m/s,
 // even in the logarithm: about velocity 10, 30, 50, 70, 95, 127), their two formants between them
@@ -912,7 +1007,16 @@ void Piano::strike(int key, double speed) {
     const double place = std::exp(-(key + 21 - 72) * (key + 21 - 72) / 64.0);
     const double from = std::clamp(std::log(speed / 0.8) / std::log(1.3 / 0.8), 0.0, 1.0);
     const double mid = place * from * (1 - a2) * std::log(kMid);
-    k.napPack = float(d_.napPack * std::exp((1 - a1) * std::log(kSoft) + a2 * std::log(kHard) + mid));
+    // From F3 up, from a low-medium blow on, the nap gives out a little sooner (its depth x
+    // PJ_PIANO_BRILL, 0.75): a bit more of the overtones, more brilliance. In from D3 to G#3 and
+    // from 0.9 to 1.8 m/s (velocity ~35 to 60); the softest blows and the bass as they were. It is
+    // the nap, not the felt under it, that holds the overtones back there: the felt 4 x stiffer
+    // gave ~1 dB, the nap a third as deep ~10 dB at velocity 60. (The user's ear, 2026-11-24.)
+    static const double kBrill = knob("PJ_PIANO_BRILL", 0.75);
+    const double upK = std::clamp((key + 21 - 50) / 6.0, 0.0, 1.0);
+    const double hardK = std::clamp(std::log(speed / 0.9) / std::log(1.8 / 0.9), 0.0, 1.0);
+    const double brill = upK * hardK * std::log(kBrill);
+    k.napPack = float(d_.napPack * std::exp((1 - a1) * std::log(kSoft) + a2 * std::log(kHard) + mid + brill));
   }
   if (d_.vowelDb > 0 && speed > 0)
     for (int j = 0; j < k.ns; ++j) blowVowel(speed, d_.vowelDb, k.f1, k.B, str_[k.s0 + j].n, key + 21, vw_ + str_[k.s0 + j].off);
@@ -961,7 +1065,9 @@ void Piano::damper(int key, bool down, double speed, double loud) {
     }
     if (noise_ > 0) {
       k.hy = 0.3e-3f + k.landDelay + k.dW / (dFeltK_ * std::max(1, k.ns));  // (from its rest)
-      k.hv = -float(speed * noise_ * std::max(0.3, std::min(1.0, loud)));
+      // (loud: the pedal let go, PianoDesign::pedalUp; it was capped at 1 here, so that setting
+      // reached only the rail's knock)
+      k.hv = -float(speed * noise_ * std::max(0.3, loud));
       k.engage = 0;
     } else {  // (the landings unheard (PJ_PIANO_PEDALNOISE=0): set down on its strings at rest)
       k.hy = k.hv = 0;
@@ -1124,6 +1230,10 @@ void Piano::damperContact(Key& k) {
   k.hy += dt_ * k.hv;
   // (how much of the time the felt touches, over ~4 ms)
   k.engage += (float(touch) - k.engage) * std::min(1.0f, dt_ / 0.004f);
+  // (All the way there: in single precision the approach stops ~6e-6 short of 1, and a string is
+  // only left out of the computing once its damper's grip is whole: without this no string that
+  // had sounded ever came to rest again.)
+  if (touch && k.engage > 0.9999f) k.engage = 1;
 }
 
 // A damper's felt pushing its strings this sample, while it lands; its grip comes on with it.
@@ -1551,7 +1661,8 @@ float Piano::sample(float testForce) {
   // The air each patch of the board moves, and what of it reaches the two
   // microphones now.
   ringPos_ = (ringPos_ + 1) & (kRing - 1);
-  float l = 0, r = 0;
+  float l = 0, r = 0, hs = 0;  // (hs: the board's own sound, for a blend with the hall)
+  const bool blend = keepRegions_ && !regionSrc_ && hallG_ > 0;
   if (keepRegions_) std::fill(region_, region_ + kRegions, 0.0f);
   for (int p0 = 0; p0 < kP; p0 += 4) {
     const int g = std::min(4, kP - p0);
@@ -1563,23 +1674,42 @@ float Piano::sample(float testForce) {
       const int p = p0 + u;
       float* ring = ring_ + size_t(p) * kRing;
       ring[ringPos_] = q4[u];
-      const int i0 = (ringPos_ - tapI_[0][p]) & (kRing - 1), i1 = (ringPos_ - tapI_[1][p]) & (kRing - 1);
-      const float cl = tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
-      const float cr = tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+      float cl = 0, cr = 0;
+      if (arrN_) {  // (the array: each of its mics, mixed to the two sides)
+        const size_t at = size_t(p) * arrN_;
+        const int* ai = &arrI_[at];
+        const float *af = &arrF_[at], *gl = &arrGL_[at], *gr = &arrGR_[at];
+        for (int m = 0; m < arrN_; ++m) {
+          const int i = (ringPos_ - ai[m]) & (kRing - 1);
+          const float v = ring[i] + af[m] * (ring[(i - 1) & (kRing - 1)] - ring[i]);
+          cl += gl[m] * v;
+          cr += gr[m] * v;
+        }
+      } else {
+        const int i0 = (ringPos_ - tapI_[0][p]) & (kRing - 1), i1 = (ringPos_ - tapI_[1][p]) & (kRing - 1);
+        cl = tapG_[0][p] * (ring[i0] + tapF_[0][p] * (ring[(i0 - 1) & (kRing - 1)] - ring[i0]));
+        cr = tapG_[1][p] * (ring[i1] + tapF_[1][p] * (ring[(i1 - 1) & (kRing - 1)] - ring[i1]));
+      }
       l += cl;
       r += cr;
       if (keepRegions_)
         {
-        if (regionSrc_) {
+        if (regionSrc_ || blend) {
           const int ih = (ringPos_ - srcI_[p]) & (kRing - 1);
-          region_[regionOf_[p]] += srcW_[p] * (ring[ih] + srcF_[p] * (ring[(ih - 1) & (kRing - 1)] - ring[ih]));
+          const float h = srcW_[p] * (ring[ih] + srcF_[p] * (ring[(ih - 1) & (kRing - 1)] - ring[ih]));
+          if (regionSrc_) {
+            region_[regionOf_[p]] += h;
+          } else {
+            region_[regionOf_[p]] += closeG_ * 0.5f * (cl + cr) + hallG_ * h;
+            hs += h;
+          }
         } else {
           region_[regionOf_[p]] += 0.5f * (cl + cr);
         }
       }
     }
   }
-  side_ = pickup_ ? 0 : 0.5f * (l - r);
+  side_ = pickup_ ? 0 : (blend ? closeG_ : 1.0f) * 0.5f * (l - r);
   pick_ = pick * fs;  // (what the strings gave the bridge in this sample, as a force)
   // Now and then: strings that have come to rest under their dampers stop
   // being computed; with every string and the board at rest, the piano sleeps.
@@ -1608,7 +1738,7 @@ float Piano::sample(float testForce) {
       // (no damper reaches the strings behind the bridge: the key stays awake until they have rung out)
       float rearEn = 0;
       for (int q = 0; q < k.rearN; ++q) rearEn += k.rx[q] * k.rx[q] + k.rv[q] * k.rv[q];
-      if (k.damperDown && k.engage >= 1 && !k.hammerOn && k.landLeft == 0 && en < 1e-13f && rearEn < 1e-13f) {
+      if (!allStrings_ && k.damperDown && k.engage >= 1 && !k.hammerOn && k.landLeft == 0 && en < 1e-13f && rearEn < 1e-13f) {
         s.active = false;
         for (int d = 0; d < 2; ++d) {
           std::memset(x_[d] + s.off, 0, sizeof(float) * s.n);
@@ -1638,6 +1768,7 @@ float Piano::sample(float testForce) {
     for (int j = 0; j < kRegions; ++j) sum += region_[j];
     return sum;
   }
+  if (blend && !pickup_) return closeG_ * 0.5f * (l + r) + hallG_ * hs;
   return pickup_ ? pick_ : 0.5f * (l + r);
 }
 

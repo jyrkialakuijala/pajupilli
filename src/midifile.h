@@ -26,6 +26,12 @@ namespace pajupilli {
 // rule that matches wins. Returns false (and says why) if a rule is wrong.
 bool setReinstrument(const std::string& spec);
 
+// Only some instruments heard (-only LIST with -play): comma-separated instrument names
+// (grand-piano), families (choir), channels (11 or ch11) or drums; the rest's notes left out after
+// the director has read the whole piece, so the tempo and phrasing stay as with every part.
+// skip (-onlyskip LIST): and the song from just before the first of their notes.
+void setOnly(const std::string& list, bool skip = false);
+
 // Transposing (-transpose N with -play): every note but the drums' N
 // semitones (12: an octave up), as the file is read, before any planning.
 void setPlayTranspose(int semitones);

@@ -136,13 +136,12 @@ static PianoDesign designFor(const Instrument& inst) {
   if (dulcimer(inst)) return dulcimerDesign();
   if (std::strncmp(inst.name, "harpsichord", 11) == 0) return harpsichordDesign();
   if (honkyTonk(inst) && uprightDesign) return honkyTonkDesign(uprightDesign());
-  if (brightPiano(inst)) {  // (its felt packs down as the grand's does: it stays the brighter)
-    PianoDesign d = brightGrandDesign();
-    d.napPack = knob("PJ_PIANO_NAPPACK", 1.0);
-    return d;
-  }
   if (upright(inst) && uprightDesign) return uprightDesign();
-  PianoDesign d = grandDesign();
+  // The grands: the concert grand, and the bright piano's semi-concert grand, which keeps its own
+  // scale (lengths, wire, stiffness), felt, board and microphones (src/brightgrand.cc) and takes
+  // the rest of the grand's voicing.
+  const bool bright = brightPiano(inst);
+  PianoDesign d = bright ? brightGrandDesign() : grandDesign();
   d.topBridge = knob("PJ_PIANO_TOPBRIDGE", 4.8);
   d.topUp = knob("PJ_PIANO_TOPUP", 1.5);
   d.topF0 = knob("PJ_PIANO_TOPF0", 1.0);
@@ -151,7 +150,21 @@ static PianoDesign designFor(const Instrument& inst) {
   d.bloom = knob("PJ_PIANO_BLOOM", 1);  // (the bass's partials coming out one after another, as a bell's: 0 none)
   d.hiDecay = knob("PJ_PIANO_HIDECAY", 0.5);  // (the upper partials' sustain, from the mid-bass up: more, shorter)
   d.glide = knob("PJ_PIANO_GLIDE", 1);  // (the pitch's rise at a loud blow: 0 none)
-  if (knob("PJ_PIANO_SCALE", 1) != 0) concertScale(&d);  // (the concert grand's lengths; 0: the earlier scale)
+  if (bright) {
+    // (its strings behind the bridge at the concert grand's shares of the speaking lengths: it
+    // has a rear duplex too, its lengths not published)
+    static const bool kGrandVoice = knob("PJ_BRIGHTGRAND_GRANDVOICE", 1) != 0;  // (0: as before it took the grand's voicing)
+    if (!kGrandVoice) {
+      PianoDesign plain = brightGrandDesign();
+      plain.napPack = d.napPack;
+      return plain;
+    }
+    PianoDesign g = grandDesign();
+    concertScale(&g);
+    for (int key = 0; key < 88; ++key) d.key[key].rear = g.key[key].rear;
+  } else if (knob("PJ_PIANO_SCALE", 1) != 0) {
+    concertScale(&d);  // (the concert grand's lengths; 0: the earlier scale)
+  }
   tuneTheGrand(&d);
   {  // (the hammers strike every string at an eighth of its length, from its far end from the bridge)
     const double strike = gHammerPos > 0 ? gHammerPos : knob("PJ_PIANO_STRIKE", 0.125);
@@ -186,8 +199,8 @@ PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, des
         actS_[b][m] = float(g * std::sin(2 * M_PI * f / inst.fs));
       }
   }
-  // (the grand: its board's regions at their places in the room)
-  if (std::strcmp(inst.name, "grand-piano") == 0 && knob("PJ_PIANO_PARTS", 1) != 0) {
+  // (the grands: the board's regions at their places in the room)
+  if ((std::strcmp(inst.name, "grand-piano") == 0 || brightPiano(inst)) && knob("PJ_PIANO_PARTS", 1) != 0) {
     piano_.keepRegions(true);
     double cx = 0, cy = 0;
     for (int j = 0; j < Piano::kRegions; ++j) {
@@ -203,6 +216,15 @@ PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, des
     }
     partPlace_.insert(partPlace_.end(), {0.0f, 0.0f, 0.0f});
     part_.resize(Piano::kRegions + 1);
+    // The close microphones down by PJ_PIANO_CLOSE_DB (-piano_close; 0: all close, as before), the
+    // board's own sound into the room making up the rest of the power (-inf: as in the concert
+    // hall); the hammers' direct sound as the two shares give it.
+    const double db = std::min(0.0, knob("PJ_PIANO_CLOSE_DB", 0.0));
+    const double close = std::pow(10.0, db / 20), hall = std::sqrt(std::max(0.0, 1 - close * close));
+    piano_.micBlend(float(close), float(hall));
+    hallShare_ = hall * hall;
+    const double act = knob("PJ_PIANO_HALLACT", 0.5);
+    blendAct_ = hallAct_ = float(std::sqrt(close * close + hall * hall * act * act));
   }
   if (honkyTonk(inst)) {
     treble_ = float(std::pow(10.0, knob("PJ_HONKY_TREBLE", 6.0) / 20) - 1);
@@ -345,7 +367,7 @@ float PianoModel::sample() {
 
 void PianoModel::concertHall(bool on) {
   piano_.hallSound(on);
-  hallAct_ = inConcertHall() ? float(knob("PJ_PIANO_HALLACT", 0.5)) : 1.0f;
+  hallAct_ = inConcertHall() ? float(knob("PJ_PIANO_HALLACT", 0.5)) : blendAct_;
 }
 
 void PianoModel::actionKnock(int key, double hammerSpeed) {

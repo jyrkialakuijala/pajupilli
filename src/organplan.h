@@ -56,6 +56,31 @@ struct OrganPlan {
   std::vector<long> partStarts;
 };
 
+// The others playing with the organ (an orchestra, a choir): then the organ is their basso
+// continuo, registered to support them and never to cover them (the owner, on Bach's Christmas
+// Oratorio; research/church_organ.md, "The continuo"):
+//   - which organ, by the stage: in a room or a small hall a positive (a chamber organ: Gedackt
+//     8' and Flöte 4', no pedal), in a church or a concert hall the church organ's Positiv;
+//   - how much, by who plays, movement by movement (the general pauses; inside one a change must
+//     last 8 bars): a quiet aria or a recitative the Gedackt 8' alone; an orchestral movement
+//     or a chorus the 8' and the 4'; a festive tutti (trumpets, timpani) on the church organ a
+//     flute 2' more, and for the piece's last bars a light Principal 8';
+//   - the pedal's Subbass 16' only in the full tuttis and the chorales, never on a positive;
+//     elsewhere the bass line on the manual at 8' (the cello's and the bassoon's to carry).
+struct OrganCompanyNote {
+  long on, off;  // ticks
+  int line;      // (channel * 1000 + track)
+  int kind;      // 0 strings, winds, keys; 1 brass; 2 timpani, percussion; 3 a choir
+};
+struct OrganCompany {
+  std::vector<OrganCompanyNote> notes;
+  std::string stage;  // the room's name ("church", "concert", "hall", "studio", "dry")
+};
+// Is the organ a continuo here? (It hardly ever plays alone. PJ_ORGAN_CONTINUO: 0 never, 1 always.)
+bool organIsContinuo(const std::vector<OrganNote>& organ, const OrganCompany& company);
+// Chamber music: a handful of lines, no choir, no trumpets or timpani (its stage a room, not a church).
+bool organCompanyIsChamber(const OrganCompany& company);
+
 // notes: the organ part's notes, by track; tpq: ticks a quarter; barTicks:
 // a bar's length; partStarts: ticks where a large part begins (the tempo's
 // big changes; 0 implied).
@@ -63,7 +88,7 @@ struct OrganPlan {
 // registered softer). General pauses (every line silent a beat or more) also
 // begin sections.
 OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks, const std::vector<long>& partStarts,
-                    const std::vector<std::pair<long, double>>& tempo = {});
+                    const std::vector<std::pair<long, double>>& tempo = {}, const OrganCompany* company = nullptr);
 
 // The registration of a level (0 ppp .. 7 fff) with the hands on a division,
 // the pedal's under them if it plays.

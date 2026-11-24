@@ -1202,6 +1202,57 @@ Analysed in the scratchpad (`ffmpeg`, numpy), numbers only:
 - Pedal: the lowest octave of the keyboard as the pedal division when a "split" preset is on (cf.
   the drum kit's pads) **[design]**.
 
+## 10a. The continuo: the organ under an orchestra (2026-11-24)
+
+The owner, with a text on registering the continuo of Bach's Christmas Oratorio (BWV 248): "you
+(the director) needs to make the decision if it is a chamber music piece with a positive or chamber
+organ -- small continuo positive organ with Gedackt 8' + Flöte 4' for tuttis and choruses, dropping
+the 4' for quiet arias and recitatives -- or if it is a church pipe organ, perhaps look at if the
+stage is a concert hall, room, or one of the churches"; and: "even if it is a church, the organ
+would need to be register used in a way that it doesn't block the whole orchestra -- perhaps it can
+overdo a bit in the climax, but even in usual tutti it needs to be considerate".
+
+Before: a General MIDI church organ in an orchestral file got the solo plan (src/organplan.cc): in
+Part 1 of the oratorio it built up to fff, the Hauptwerk's mixtures and reeds and the pedal's
+Posaune and Untersatz 32' under the choir. Now (planContinuo, src/organplan.cc; the others' notes
+from src/midifile.cc's organCompany):
+
+- **Is it a continuo?** The organ hardly ever plays alone: 85 % of its sounding time another line
+  sounds (their articulation gaps bridged). PJ_ORGAN_CONTINUO=0: never (the solo plan), 1: always.
+- **Which organ?** By the stage. In a room (-room hall, studio, dry) a positive: Gedackt 8' and
+  Flöte 4' (the Positiv's Rohrgedackt 8' and Gedacktflöte 4'; Janakkala's Rückpositiv Gedackt 8',
+  Rohrflöt 4'), no pedal. In a church or a concert hall the church organ, played from the Positiv.
+  With no -room given, an organ still means the church, timpani the concert hall; new: chamber
+  music (six other lines at most, no choir, brass or timpani) over a continuo organ goes to the
+  hall, on the positive.
+- **How much?** Two-bar windows; the others' lines sounding in each (the mean), the choir's lines,
+  trumpets (two brass lines) and timpani. Levels: 0 the Gedackt 8' alone (under 4.5 lines: a quiet
+  aria, a recitative); 1 the 8' and the 4' (an orchestral movement, a chorus); 2, church organ only,
+  a flute 2' more (the swell's Waldflöte coupled, its box at 0.6; Janakkala's Waltflöt 2'): a
+  festive tutti, trumpets or timpani with six lines or more; 3 a light Principal 8' more, for the
+  last bars of a piece that ends festive ("it can overdo a bit in the climax").
+- **The pedal.** The Subbass 16' (with the Gedacktbass 8' in a festive tutti) only under a full
+  texture (eight lines, or three of the choir's) or a festive one, never on the positive;
+  elsewhere the bass line plays on the manual at 8'.
+- **When does it change?** At a movement's start (a general pause: everyone silent a beat). Inside a
+  movement one registration, what its fuller passages ask (the 70th percentile of its windows; a
+  movement with trumpets and timpani in a tenth of it is festive throughout); another only where
+  it lasts 16 bars.
+
+On the oratorio's files (-play, no -room): Part 1 in the church: the opening chorus level 2 with
+the Subbass, the recitatives and the aria the Gedackt alone, the chorale (bar 648) 8' + 4' +
+Subbass. Part 6 (timpani on a GM program: the concert hall): the opening chorus 2 and 1 by its
+sections, the arias 0 and 1, the last chorale 8' + 4' + Subbass (not festive: in this file's
+windows the trumpet mostly plays alone over a thin texture, and the climax's Principal never comes).
+
+Not done: the positive is the church organ's Positiv stops in its own place and room coupling,
+not a small instrument beside the cello; no tacet movements (the file decides where the organ
+plays); recitative chords are not shortened. In these files the organ's channel also carries a
+harpsichord's and a "Rock Organ" program (18) on other tracks, and the program in force flips
+between them: only the notes that fall to the church organ are planned here.
+
+Tests: tools/test.py organ_continuo.
+
 ## 11. Open questions for the user
 
 1. The **~35 stops** (now 37): is the selection in §6 right (the Pedal keeps 9 of its 12, incl. the

@@ -32,6 +32,8 @@ int Ensemble::windEar(const Instrument& in) {
   static const bool kOn = knob("PJ_WIND_EAR", 1) > 0;
   if (!kOn) return -1;
   if (brassSectionInstrument(in)) return kBandBrass;
+  // (the choir: its singers hear the band as the winds do, src/choir.cc choirEar)
+  if (std::strcmp(in.family, "choir") == 0) return knob("PJ_CHOIR_EAR", 1) > 0 ? kBandChoir : -1;
   const int fam = bandFamily(in.family, in.name);
   // (The lips and the reeds blown: the free reeds are organs' family, synth brass a circuit.)
   if (in.lip() && fam == kBandBrass) return kBandBrass;
@@ -183,6 +185,7 @@ void Ensemble::bandRhs(int n, const int* idx, const bool* young, int ny, double 
 
 double Ensemble::keyShare(int key) const {
   if (!listens() || key < 0 || key > 127) return 0;
+  if (choir_) return choirKey(key, true);
   if (brass_) {
     for (const Section& k : kids_)
       for (const Slot& s : k.ens->f_)
@@ -195,6 +198,7 @@ double Ensemble::keyShare(int key) const {
 
 double Ensemble::keyCents(int key) const {
   if (!listens() || key < 0 || key > 127) return 0;
+  if (choir_) return choirKey(key, false);
   if (brass_) {  // (the seat playing it: the key's own note, or an octave of it)
     for (const Section& k : kids_) {
       const Ensemble& kid = *k.ens;

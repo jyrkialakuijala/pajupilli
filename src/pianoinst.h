@@ -48,6 +48,9 @@ class PianoModel : public Tube {
   void concertHall(bool on);
   float actionShare() const { return hallAct_; }
   bool inConcertHall() const { return static_cast<const Piano&>(piano_).hallSound(); }
+  // Of the sound's power, the share the board sends into the room unmiked (the rest the close
+  // microphones'): 1 in the concert hall, else by -piano_close (PJ_PIANO_CLOSE_DB).
+  double boardShare() const { return inConcertHall() ? 1.0 : hallShare_; }
   // The grand's board as regions at their places (Piano::keepRegions; across: the bass at the
   // listener's left, as the player sees it; along the strings: the tail away), the rest of its
   // sound at the middle: the last part. PJ_PIANO_PARTS=0: one point.
@@ -66,7 +69,8 @@ class PianoModel : public Tube {
   float actRe_[kActBands][kActModes] = {}, actIm_[kActBands][kActModes] = {};
   float actC_[kActBands][kActModes] = {}, actS_[kActBands][kActModes] = {}, actD_[kActBands][kActModes] = {};
   bool actOn_ = false;
-  float actGain_ = 0, hallAct_ = 1;
+  float actGain_ = 0, hallAct_ = 1, blendAct_ = 1;
+  double hallShare_ = 0;
   // The top keys' hammer tick: the hard felt on a short, thin string, a faint hiss of high,
   // inharmonic overtones gone in a few ms (above ~4 kHz; from D6, fully from E7).
   float tick_[kActBands] = {}, tickD_ = 0, tickHp_[kActBands][2] = {}, tickA_ = 0;

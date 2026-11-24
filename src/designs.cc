@@ -127,7 +127,10 @@ const NoteInfo kOboeNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5, 0, 0.15}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (2026-11-24, by ear: the lips a rounder cushion on the blades, their damping 0.9 -> 1.45: the
+// partials 4-12 1-1.6 dB down in the low and middle registers, as steady; the level made up in
+// the instrument's gain, 0.35 -> 0.47; the breath vibrato half the other winds', vibScale)
+const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 1.45, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5, 0, 0.15, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // English horn in F, written Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,
@@ -183,7 +186,7 @@ const NoteInfo kEnglishHornNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-const Design kEnglishHornDesign = {kEnglishHornBore, 7, kEnglishHornHoles, 17, kEnglishHornNotes, 3.73, 938.0, false, nullptr, 0, {0.008, 0.0004, 2.4e+07, 2000, 0.9, 0.00015, 0, 1e-05, 4000, 5500, 0, 0.75, 0, 0.5, 0.0001, 0.15}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+const Design kEnglishHornDesign = {kEnglishHornBore, 7, kEnglishHornHoles, 17, kEnglishHornNotes, 3.73, 938.0, false, nullptr, 0, {0.008, 0.0004, 2.4e+07, 2000, 0.9, 0.00015, 0, 1e-05, 4000, 5500, 0, 0.75, 0, 0.5, 0.0001, 0.15, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // Bassoon, Bb1..Eb4
 // A long narrow cone and a double reed; small holes with long oblique
@@ -965,7 +968,7 @@ const Design kBaritoneSaxDesign = {kBaritoneSaxBore, 6, kBaritoneSaxHoles, 22, k
 
 extern const Instrument kDesigned[] = {
     {"clarinet", -2, 52, 84, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kClarinetDesign, "clarinet"},
-    {"oboe", 0, 58, 85, 1, 1, 1, 48000, 0, false, false, 0, 0.35, Kind::kDoubleReed, &kOboeDesign, "oboe"},
+    {"oboe", 0, 58, 85, 1, 1, 1, 48000, 0, false, false, 0, 0.47, Kind::kDoubleReed, &kOboeDesign, "oboe"},
     {"english-horn", -7, 58, 85, 1.5, 1, 1, 48000, 0, false, false, 0, 0.4, Kind::kDoubleReed, &kEnglishHornDesign, "oboe"},
     {"bassoon", 0, 34, 63, 1, 1, 1, 24000, 0, false, false, 0, 0.6, Kind::kDoubleReed, &kBassoonDesign, "bassoon"},
     {"duduk", 0, 57, 73, 1, 1, 1, 48000, 0, false, false, 0, 0.3, Kind::kDoubleReed, &kDudukDesign, "duduk"},

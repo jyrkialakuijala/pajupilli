@@ -29,4 +29,10 @@ clean:
 test: pajupilli scalar
 	python3 -I tools/test.py $(if $(J),-j $(J)) $(T)
 
-.PHONY: scalar asm clean test
+# The players practise their slurs and trills again (after a change to an instrument or its
+# player): searches the gestures, rewrites src/slur_data.h, rebuilds, checks. Long (an hour or
+# more for all). make slurs I='oboe' for one instrument (tools/slurs.py; research/slurs.md).
+slurs: pajupilli
+	python3 -I tools/slurs.py recalibrate $(I)
+
+.PHONY: scalar asm clean test slurs

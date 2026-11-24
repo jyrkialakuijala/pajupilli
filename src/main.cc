@@ -9,12 +9,20 @@
 //   ./pajupilli -h                        all options
 //   ./pajupilli -live                     play it from the 25-key MIDI controller
 //       [-dev hw:0] [-midi controller] [-period 64] [-periods 3] [-transpose 12] [-v] [-selftest]
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <random>
 #if defined(__SSE__)
 #include <xmmintrin.h>
 #endif
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <climits>
+#include <ctime>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -394,6 +402,11 @@ const char kUsage[] =
     "  -start_time T       with -play: begin at T in the song (seconds or m:ss, e.g. 2:35)\n"
     "  -organ NAME         which church organ: large (default), janakkala (40 stops, North German baroque)\n"
     "  -hammer_pos X       where the grand's hammers strike, a share of the string (default 0.125)\n"
+    "  -piano_close DB     the grand's close microphones down by DB (e.g. -6), the board heard\n"
+    "                      through the room making up the rest (default 0: all close mics)\n"
+    "  -piano_mics M       the grand's close microphones: pair (default, a crossed figure-of-eight\n"
+    "                      pair) or array (32 mono omnis in a line across the board, crossfaded\n"
+    "                      80/20 at the bass end to 20/80 at the treble end)\n"
     "  -tuning \"grand-piano;grand-piano-stretch,organ;tet12\"   a tuning per instrument (quote it: the ; is the shell's)\n"
     "  -tuning NAME        the organ's tuning: jyrki-spectral (default, adaptive by the pipes' partials),\n"
     "                      jyrki-heuristic (adaptive by an interval table), tet12, meantone,\n"
@@ -406,12 +419,20 @@ const char kUsage[] =
     "                      (a name, a family, or * for all but the drums) on\n"
     "                      another (organ: the church organ by its plan), e.g.\n"
     "                      -reinstrument grand-piano=organ,piano=tonewheel\n"
+    "  -style S            with -play: the director's reading in style S (baroque, classical,\n"
+    "                      romantic; auto: read from the rhythm), and the director on\n"
+    "  -only LIST          with -play: only these heard: instrument names, families,\n"
+    "                      channels (11 or ch11) or drums, e.g. -only choir,oboe,16\n"
+    "                      (the piece's tempo and phrasing read from all its parts)\n"
+    "  -onlyskip LIST      as -only, and the song from just before their first note\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
     "\n"
     "Options:\n"
     "  -o FILE.wav         write the sound (48 kHz)\n"
+    "  -out_mp4 FILE.mp4   write FILE.wav, then a video of it over pajupilli.png (needs ffmpeg;\n"
+    "                      the image is looked for beside the program, then in this folder)\n"
     "  -secs S             note length (default 1)\n"
     "  -dyn D              dynamics 0 (piano) .. 1 (forte), default 0.5\n"
     "  -dump FILE          with -note: raw float32 window pressure\n"
@@ -522,7 +543,7 @@ int roomImpulse(const RoomSpec& rs) {
   return 0;
 }
 
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
 #if defined(__SSE__)
   // Flush denormals to zero: decaying states must not slow the real-time path
   // (fast-math links this in too, the portable build does not).
@@ -583,6 +604,11 @@ int main(int argc, char** argv) {
     else if (a == "-director") {
       if (!setDirectorMode(next())) { std::fprintf(stderr, "-director: on, off or auto\n"); return 1; }
     }
+    else if (a == "-style") {
+      if (!setDirectorStyle(next())) { std::fprintf(stderr, "-style: baroque, classical, romantic or auto\n"); return 1; }
+    }
+    else if (a == "-only") setOnly(next());
+    else if (a == "-onlyskip") setOnly(next(), true);
     else if (a == "-reinstrument") {
       if (!setReinstrument(next())) return 1;
     }
@@ -698,6 +724,12 @@ int main(int argc, char** argv) {
       const RoomSpec* rs = findRoom(next());
       if (!rs) { std::fprintf(stderr, "-roomimp: dry, studio, hall, concert or church\n"); return 1; }
       return roomImpulse(*rs);
+    }
+    else if (a == "-piano_close") setenv("PJ_PIANO_CLOSE_DB", next(), 1);
+    else if (a == "-piano_mics") {
+      const std::string m = next();
+      if (m != "array" && m != "pair") { std::fprintf(stderr, "-piano_mics: array or pair\n"); return 1; }
+      setenv("PJ_PIANO_ARRAY", m == "array" ? "1" : "0", 1);
     }
     else if (a == "-o") out = next();
     else if (a == "-dump") dump = next();
@@ -993,4 +1025,90 @@ int main(int argc, char** argv) {
     return 1;
   }
   return 0;
+}
+
+namespace {
+
+// The logo for -out_mp4: beside the program, else in the current folder. Empty: neither.
+std::string findLogo() {
+  char self[PATH_MAX];
+  const ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+  if (n > 0) {
+    std::string path(self, n);
+    path.resize(path.rfind('/') + 1);
+    path += "pajupilli.png";
+    if (access(path.c_str(), R_OK) == 0) return path;
+  }
+  return access("pajupilli.png", R_OK) == 0 ? "pajupilli.png" : "";
+}
+
+// The still logo with the sound under it. (ffmpeg is run directly: no shell to read the file names.)
+bool makeVideo(const std::string& wav, const std::string& mp4) {
+  const std::string logo = findLogo();
+  if (logo.empty()) {
+    std::fprintf(stderr, "-out_mp4: pajupilli.png not found; the sound is in %s\n", wav.c_str());
+    return false;
+  }
+  const char* args[] = {"ffmpeg", "-y", "-nostdin", "-hide_banner", "-loglevel", "error",
+                        "-loop", "1", "-framerate", "30", "-i", logo.c_str(), "-i", wav.c_str(),
+                        "-vf", "scale=1080:1080,format=yuv420p",
+                        "-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "18",
+                        "-c:a", "aac", "-b:a", "320k", "-ar", "48000",
+                        "-shortest", "-movflags", "+faststart", mp4.c_str(), nullptr};
+  std::fflush(nullptr);
+  const pid_t pid = fork();
+  if (pid == 0) {
+    execvp("ffmpeg", const_cast<char* const*>(args));
+    _exit(127);
+  }
+  int status = -1;
+  if (pid < 0) {
+    status = -1;
+  } else {
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+  }
+  if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+    std::fprintf(stderr, "wrote %s\n", mp4.c_str());
+    return true;
+  }
+  if (WIFEXITED(status) && WEXITSTATUS(status) == 127)
+    std::fprintf(stderr, "-out_mp4: ffmpeg not found; the sound is in %s\n", wav.c_str());
+  else
+    std::fprintf(stderr, "-out_mp4: ffmpeg failed; the sound is in %s\n", wav.c_str());
+  return false;
+}
+
+}  // namespace
+
+// -out_mp4 FILE is -o with FILE's name as a .wav, and the video made from it afterwards.
+int main(int argc, char** argv) {
+  std::vector<char*> args(argv, argv + argc);
+  std::string mp4, wav;
+  for (int i = 1; i < argc; ++i) {
+    if (!std::strcmp(argv[i], "-o") && std::find_if(argv + 1, argv + argc, [](const char* a) { return !std::strcmp(a, "-out_mp4"); }) != argv + argc) {
+      std::fprintf(stderr, "-out_mp4 and -o: give one (-out_mp4 writes the .wav too)\n");
+      return 1;
+    }
+    if (std::strcmp(argv[i], "-out_mp4")) continue;
+    if (i + 1 >= argc) { std::fprintf(stderr, "-out_mp4: which file?\n"); return 1; }
+    mp4 = argv[i + 1];
+    const size_t dot = mp4.rfind('.'), slash = mp4.rfind('/');
+    const bool hasExt = dot != std::string::npos && (slash == std::string::npos || dot > slash);
+    wav = (hasExt ? mp4.substr(0, dot) : mp4) + ".wav";
+    if (!hasExt) mp4 += ".mp4";
+    if (wav == mp4) { std::fprintf(stderr, "-out_mp4: %s is a .wav name\n", mp4.c_str()); return 1; }
+    args[i] = const_cast<char*>("-o");
+    args[i + 1] = &wav[0];
+    break;
+  }
+  const std::time_t started = std::time(nullptr);
+  args.push_back(nullptr);
+  const int code = run(argc, args.data());
+  if (code != 0 || mp4.empty()) return code;
+  struct stat st;
+  if (stat(wav.c_str(), &st) != 0 || st.st_mtime < started) {  // (a mode with no sound to write: not an older file's)
+    std::fprintf(stderr, "-out_mp4: this mode wrote no sound, so no video\n");
+    return 1;
+  }
+  return makeVideo(wav, mp4) ? 0 : 1;
 }

@@ -122,6 +122,7 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
   if (spec.volume > 0) {
     const double ys = std::min(3.0, 0.2 * len), ym = std::min(ys + spec.listener, len - 1);
     const double alpha = std::min(0.9, absorption / surface);
+    wid_ = wid, len_m_ = len, hei_ = hei, ys_ = ys, alpha_ = alpha;
     auto refl = [&](double k) { return std::sqrt(1 - std::min(0.95, k * alpha)); };
     const double bSide = refl(0.4), bEnd = refl(0.8), bCeil = refl(0.8), bFloor = refl(2.5);
     auto image = [](int u, double c, double d) { return u % 2 == 0 ? u * d + c : (u + 1) * d - c; };
@@ -186,6 +187,105 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
                      std::sqrt(on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_));
     directShare_ = on * on / (on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_);
   }
+}
+
+bool Room::ambienceArray(int count, double near, double far) {
+  const int ns = int(x_.size());
+  if (count <= 0 || spec_.volume <= 0 || ambMics_) return false;
+  const double margin = 0.5, cx = wid_ / 2, cy = ys_;
+  auto inside = [&](double x, double y) { return x > margin && x < wid_ - margin && y > margin && y < len_m_ - margin; };
+  // (the farthest any angle reaches within the walls: the room must hold the near distance somewhere)
+  if (!inside(cx, cy + far) || !inside(cx + near, cy) || !inside(cx - near, cy)) return false;
+  const double golden = M_PI * (3 - std::sqrt(5.0)), mz = std::min(2.5, hei_ - 0.5);
+  const double sz = std::min(1.2, hei_ / 2);
+  auto refl = [&](double k) { return std::sqrt(1 - std::min(0.95, k * alpha_)); };
+  const double bSide = refl(0.4), bEnd = refl(0.8), bCeil = refl(0.8), bFloor = refl(2.5);
+  auto image = [](int u, double c, double d) { return u % 2 == 0 ? u * d + c : (u + 1) * d - c; };
+  struct Mic { double x, y, wl, wr; };
+  std::vector<Mic> mics;
+  double nearest = 1e9, farthest = 0;
+  for (int i = 0; i < count; ++i) {
+    // (the distance: van der Corput in base 2 over near .. far; the angle: the golden angle's)
+    double vdc = 0, f = 0.5;
+    for (int b = i + 1; b; b >>= 1, f *= 0.5) vdc += (b & 1) * f;
+    double d = near + (far - near) * vdc;
+    const double a0 = std::fmod(i * golden, 2 * M_PI);
+    double mx = 0, my = 0;
+    bool placed = false;
+    for (; !placed && d >= near * 0.5; d *= 0.97)  // (a small room: in, a little at a time)
+      for (int step = 0; step <= 180 && !placed; ++step)
+        for (int sgn : {1, -1}) {
+          const double a = a0 + sgn * step * M_PI / 180;
+          // (angle 0: straight into the hall, away from the stage's wall; positive: towards the right)
+          const double x = cx + d * std::sin(a), y = cy + d * std::cos(a);
+          if (inside(x, y)) { mx = x; my = y; placed = true; break; }
+        }
+    if (!placed) continue;
+    const double r = std::hypot(mx - cx, my - cy), lat = std::clamp((mx - cx) / far, -1.0, 1.0);
+    nearest = std::min(nearest, r);
+    farthest = std::max(farthest, r);
+    mics.push_back({mx, my, 0.5 * (1 - lat), 0.5 * (1 + lat)});
+  }
+  if (mics.empty()) return false;
+  double sl = 0, sr = 0;
+  for (const Mic& m : mics) { sl += m.wl; sr += m.wr; }
+  // (a channel the mics' weighted mean: their direct sounds add up in step in the deep bass,
+  // which so stays at one mic's level; higher up they arrive apart and add as power, quieter)
+  const double nl = 1 / std::max(sl, 1e-9), nr = 1 / std::max(sr, 1e-9);
+  // (the array mixed in under the main pair: PJ_ROOM_AMB_DB on all of it, -10; PJ_ROOM_AMB_EARLY_DB
+  // more on its direct sound and reflections alone)
+  const double level = std::pow(10.0, knob("PJ_ROOM_AMB_DB", -10.0) / 20);
+  const double early = level * std::pow(10.0, knob("PJ_ROOM_AMB_EARLY_DB", 0.0) / 20);
+  amb_.clear();
+  ambFrom_.assign(ns + 1, 0);
+  for (int s = 0; s < ns; ++s) {
+    ambFrom_[s] = int(amb_.size());
+    const double sx = std::clamp(wid_ / 2 + x_[s], 0.3, wid_ - 0.3), sy = ys_;
+    for (const Mic& m : mics)
+      for (int u = -1; u <= 1; ++u)
+        for (int w = -1; w <= 1; ++w)
+          for (int z = -1; z <= 1; ++z) {
+            if (std::abs(u) + std::abs(w) + std::abs(z) > 1) continue;  // (the direct sound and the six walls once)
+            const double dx = image(u, sx, wid_) - m.x, dy = image(w, sy, len_m_) - m.y, dz = image(z, sz, hei_) - mz;
+            const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+            const int dl = int(std::lround(r / kC * fs_));
+            if (dl >= kRing - kBlock) continue;
+            double g = (u ? bSide : 1) * (w ? bEnd : 1) * (z < 0 ? bFloor : z > 0 ? bCeil : 1) / std::max(r, 0.5);
+            g *= early;
+            amb_.push_back({s, dl, float(g * m.wl * nl), float(g * m.wr * nr)});
+          }
+  }
+  ambFrom_[ns] = int(amb_.size());
+  // The reverberant field: each mic its own random tap; a channel's is their weighted sum, as
+  // long as one tap (an omni's level); left and right as alike as the weights make them.
+  unsigned seed = 777;
+  auto gauss = [&]() {
+    double t = 0;
+    for (int j = 0; j < 4; ++j) { seed = seed * 1664525u + 1013904223u; t += (seed >> 8) / double(1 << 24) - 0.5; }
+    return t;
+  };
+  double L[kLines] = {}, R[kLines] = {};
+  for (const Mic& m : mics) {
+    double row[kLines], nn = 0;
+    for (double& v : row) { v = gauss(); nn += v * v; }
+    for (int k = 0; k < kLines; ++k) {
+      L[k] += m.wl * row[k] / std::sqrt(nn);
+      R[k] += m.wr * row[k] / std::sqrt(nn);
+    }
+  }
+  double ll = 0, rr = 0, lr = 0;
+  for (int k = 0; k < kLines; ++k) { ll += L[k] * L[k]; rr += R[k] * R[k]; lr += L[k] * R[k]; }
+  for (int k = 0; k < kLines; ++k) {
+    ambDir_[k] = float(level * L[k] / std::sqrt(ll));
+    ambDir_[kLines + k] = float(level * R[k] / std::sqrt(rr));
+  }
+  ambMics_ = int(mics.size());
+  std::fprintf(stderr, "  room mics: %d mono omnis %.1f .. %.1f m from the stage, %.1f .. %.1f m across; their reverb's left-right correlation %.2f\n",
+               ambMics_, nearest, farthest,
+               std::min_element(mics.begin(), mics.end(), [](const Mic& a, const Mic& b) { return a.x < b.x; })->x - cx,
+               std::max_element(mics.begin(), mics.end(), [](const Mic& a, const Mic& b) { return a.x < b.x; })->x - cx,
+               lr / std::sqrt(ll * rr));
+  return true;
 }
 
 void Room::setAxes(int s, const float* axes) {
@@ -296,6 +396,15 @@ inline void addRun(float* __restrict out, const float* __restrict ring, int at, 
     for (int i = 0; i < n; ++i) out[i] += g * r[i];
   }
 }
+// The same run into left and right at once (one read of the ring for both).
+inline void addRun2(float* __restrict l, float* __restrict r, const float* __restrict ring, int at, int n, float gl, float gr) {
+  const float* __restrict s = ring + at;
+  if (n == Room::kBlock) {
+    for (int i = 0; i < Room::kBlock; ++i) { l[i] += gl * s[i]; r[i] += gr * s[i]; }
+  } else {
+    for (int i = 0; i < n; ++i) { l[i] += gl * s[i]; r[i] += gr * s[i]; }
+  }
+}
 }  // namespace
 
 void Room::block(const float* const* src, int o, int n, float* const* atSource, float* left, float* right,
@@ -391,7 +500,7 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
   // The delay network, sample by sample.
   for (int i = 0; i < n; ++i) {
     const int now = (rpos_ + i) & (kRing - 1);
-    float x[kLines], y[kLines];
+    alignas(64) float x[kLines], y[kLines];
     for (int k = 0; k < kLines; ++k) {
       const float raw = line_[k * kLineRing + ((pos_ - len_[k]) & (kLineRing - 1))];
       lp_[k] = b0_[k] * raw + a1_[k] * lp_[k];
@@ -422,6 +531,12 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
       if (t < ns) atSource[t][o + i] = acc;
       else amb[t - ns] = lg * micDiffuse_ * acc;
     }
+    if (ambMics_)  // (the room microphones' reverberant field, under the pair's)
+      for (int c = 0; c < 2; ++c) {
+        float acc = 0;
+        for (int k = 0; k < kLines; ++k) acc += ambDir_[c * kLines + k] * x[k];
+        amb[c] += lg * acc;
+      }
     if (spec_.gate > 0) {
       // The ambience compressed hard (8:1 over 20 dB under its recent peak,
       // 2 ms attack, 150 ms release; made up 3x): the body holds up while
@@ -473,7 +588,7 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
     }
   }
   // Early sound at the microphones.
-  float e[2][kBlock] = {};
+  alignas(64) float e[2][kBlock] = {};
   for (int s = 0; s < ns; ++s) {
     const float gl = listenGain[s];
     if (!heard(s) || gl == 0) continue;
@@ -508,6 +623,18 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
         for (int c = 0; c < 3; ++c) addRun(e[tp.mic], &dring_[size_t(3 * s + c) * kSpan], at, n, gl * tp.dg[c]);
     }
   }
+  // The room microphones' direct sound and first reflections, already mixed to left and right.
+  if (ambMics_)
+    for (int s = 0; s < ns; ++s) {
+      const float gl = listenGain[s];
+      if (!heard(s) || gl == 0) continue;
+      const float* ring = &ring_[size_t(s) * kSpan];
+      for (int k = ambFrom_[s]; k < ambFrom_[s + 1]; ++k) {
+        const AmbTap& t = amb_[k];
+        const int at = (rpos_ - t.delay) & (kRing - 1);
+        addRun2(e[0], e[1], ring, at, n, gl * t.gl, gl * t.gr);
+      }
+    }
   for (int i = 0; i < n; ++i) {
     left[o + i] += lg * e[0][i];
     right[o + i] += lg * e[1][i];

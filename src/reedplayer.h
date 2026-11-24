@@ -18,6 +18,7 @@
 #include "drone.h"
 #include "performer.h"
 #include "reed.h"
+#include "slurs.h"
 
 namespace pajupilli {
 
@@ -36,6 +37,14 @@ class ReedPlayer : public Performer {
   bool ringing_ = false;
   double kRingT_ = 0.002;
   bool rings(int from, int to) const;  // a slur down onto a note the old one is a harmonic of
+  // A practised slur (src/slurs.h): its gesture, kept from slurPlan for applyNote.
+  Attack slurPlan(int from, Attack a, bool plain);
+  SlurGesture gesture_;
+  bool practised_ = false;
+  double ringT_ = 0.002, tongueFloor_ = 0;
+  double slurAir_ = 0, slurLip_ = 0, slurDip_ = 0, slurAirT_ = 0.03, slurLipT_ = 0.03, slurDipT_ = 0.08, sinceSlur_ = 1e9;
+  double leadLeft_ = 0, leadSpeed_ = 1;
+  const char* leadHoles_ = nullptr;
 
   Reed& reed_;
   int held_[128] = {};

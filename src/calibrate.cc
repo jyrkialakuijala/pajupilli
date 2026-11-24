@@ -683,7 +683,11 @@ static Calibration learn(const Instrument& inst, double a4, int lo, int hi) {
   Calibration cal;
   // Notes are independent: learn them in parallel.
   std::atomic<int> next{lo};
-  const int nThreads = std::max(1, std::min(int(std::thread::hardware_concurrency()), hi - lo + 1));
+  // (PJ_THREADS: no more workers than that, as -play's pool)
+  int cores = int(std::thread::hardware_concurrency());
+  if (const char* e = std::getenv("PJ_THREADS"))
+    if (std::atoi(e) > 0) cores = std::min(cores, std::atoi(e));
+  const int nThreads = std::max(1, std::min(cores, hi - lo + 1));
   std::vector<std::thread> pool;
   for (int t = 0; t < nThreads; ++t)
     pool.emplace_back([&] {
@@ -740,7 +744,8 @@ static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) 
     if (std::strncmp(*e, "PJ_", 3) == 0) {
       // (not the settings that do not touch a calibration: the threads, how much of a file plays)
       bool skip = false;
-      for (const char* k : {"PJ_THREADS=", "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK=", "PJ_PLAY_LEAD="})
+      // (nor a slur's trial gesture, tools/slurs.py: the practice plays the calibrated instrument)
+      for (const char* k : {"PJ_THREADS=", "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK=", "PJ_PLAY_LEAD=", "PJ_SLURTRY"})
         skip |= std::strncmp(*e, k, std::strlen(k)) == 0;
       if (!skip) env.emplace_back(*e);
     }

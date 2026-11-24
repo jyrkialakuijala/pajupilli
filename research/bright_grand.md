@@ -239,3 +239,30 @@ grand's (the shorter board's bridge), against the makers' claims of a long-singi
   (and an A1 owner's 1.27-1.42 m, PianoWorld).
 - Jaatinen & Pätynen, JASA 2022 (inharmonicity of every string of a Steinway D): the literature's
   measurements are of Steinways; none of a Kawai was found.
+
+## 10. The grand's later voicing taken over (2026-11-24)
+
+After section 8 the concert grand gained much that the bright piano, built from `grandDesign()`
+alone, did not have. `designFor()` (src/pianoinst.cc) now gives both grands the same: the blow's
+vowels, the bass's bloom, the upper partials' shorter sustain, the pitch's glide at a loud blow,
+the top strings' voicing (`topBridge`, `topUp`, `topF0`), the strike at an eighth of the string,
+restrikes, the long strings' larger swing, the strings behind the bridge (at the concert grand's
+shares of the speaking length: the bright piano's own rear lengths are not published), the
+bridge's slower hand-over (`bridgeIn`, `bridgeBass`), the tuning (the concert stretch table and
+`-tuning grand-piano:...`, in place of `tuneByPartials`), and the board's regions placed in the
+room. Kept its own (sections 3-5, 7): the string lengths, wire and stiffness, the felt (K, nap),
+the board, its loss, the close microphones. `PJ_BRIGHTGRAND_GRANDVOICE=0`: the earlier model.
+
+Measured against the earlier model (one note, close mics): the bass 6-8 dB louder and its
+sustain the grand's (the level at 2-3 s against the start: A0 -17 -> -8 dB, C3 -19 -> -9 dB);
+above 2 kHz still 10-25 dB over the grand in the middle at velocity 48-100 (C3 at 100: equal).
+
+Calibrated again, as played from a MIDI file in the room, A-weighted, against the grand:
+- the keys evened in the model (`PianoKey::levelDb`, `PJ_BRIGHTGRAND_EVEN`): by itself the
+  tenor (A1-D#3) stood ~3 dB under the grand's balance and the treble (C5-A6) 3-5 dB over;
+  src/gmkeys_data.h's row (fitted to the earlier model) removed;
+- src/velgain_data.h's row: the stroke that gives the grand's loudness at each velocity;
+- src/levels_data.h: 9.8 (with gmlevels' -4.5): the grand's level at C3-C5. The earlier trim
+  dated from before the grand's changes and left the bright piano ~8 dB under the grand in a mix.
+After: the smoothed key balance within 2 dB of the grand's, the velocity response within ~2 dB
+from velocity 24 up (median of C2-C6).

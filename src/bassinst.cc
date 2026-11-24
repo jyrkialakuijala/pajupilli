@@ -493,6 +493,14 @@ void BassPlayer::noteOn(int midi, int velocity) {
   }
   harm_[s] = harmonic != 0;
   sinceAny_ = 0;
+  // (PJ_BASS_IDLEDAMP: the hands lightly on the strings not played, each dying at this rate (1/s);
+  // 0, the default: they ring along freely. An open A string's octave sits on the body's strong
+  // resonance near 109 Hz: after a hard pluck low on the E string the two ring on for a second,
+  // louder than the note's own partials.)
+  static const double kIdle = knob("PJ_BASS_IDLEDAMP", 0);
+  if (kIdle > 0)
+    for (int k = 0; k < 4; ++k)
+      if (k != s && key_[k] < 0) b.damp(k, kIdle);
   // A ghost note (the mute pad held): the left hand lies on the string, the
   // pluck is a short thud of no clear pitch.
   if (flutter_ > 0 && !harmonic) {

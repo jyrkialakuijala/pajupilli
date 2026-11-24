@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "slurs.h"
 
 namespace pajupilli {
 
@@ -92,10 +93,9 @@ void ReedPlayer::noteOn(int midi, int velocity) {
              : art == kArtTongueLegato || art == kArtDu ? kDu
              : breath ? kBreath
              : art == kArtAccent ? kAccent : kTu;
-  ringing_ = art == kArtSlur && !bag_ && rings(from, midi);
-  if (ringing_) a = kDu;
   // (A glide's soft key is its sign, not a diminuendo.)
   if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
+  a = slurPlan(from, a, art == kArtSlur);
   if (a != kSlur) velDyn_ = velDynTarget_;
   const double over = std::max(0.0, (velocity - 50) / 77.0);
   velAccent_ = a == kAccent ? 1.2 * over : a == kTu ? 0.5 * over : 0;
@@ -135,8 +135,7 @@ void ReedPlayer::noteOff(int midi) {
     const int from = note_;
     note_ = stack_[stackTop_ - 1];
     keyVel_ = 64;
-    ringing_ = !bag_ && rings(from, note_);
-    applyNote(ringing_ ? kDu : kSlur);
+    applyNote(slurPlan(from, kSlur, true));
   } else if (!hold_) {
     blowing_ = false;
     sinceOff_ = 0;
@@ -155,11 +154,50 @@ bool ReedPlayer::rings(int from, int to) const {
   return kOn && from >= 0 && (d == 12 || d == 19 || d == 24);
 }
 
+// How a slur from `from` to the note now is played: as practised (src/slurs.h: the gesture kept
+// for applyNote), else the old way. A slur found unplayable is tongued lightly ("du").
+ReedPlayer::Attack ReedPlayer::slurPlan(int from, Attack a, bool plain) {
+  ringing_ = practised_ = false;
+  ringT_ = kRingT_;
+  if (a != kSlur || bag_ || !plain || from < 0 || from == note_) return a;
+  if (slurGesture(inst_.name, from, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &gesture_)) {
+    if (gesture_.fails) return kDu;
+    practised_ = true;
+    if (gesture_.tongue <= 0) return kSlur;
+    ringing_ = true;
+    ringT_ = gesture_.tongue;
+    return kDu;
+  }
+  ringing_ = rings(from, note_);
+  return ringing_ ? kDu : kSlur;
+}
+
 void ReedPlayer::applyNote(Attack a) {
   // PJ_HOLES: any fingering (experiments).
   const char* ov = std::getenv("PJ_HOLES");
   reed_.setGlide(takeHoleGlide());
-  reed_.setHoles(ov && *ov ? ov : info(note_)->holes, std::exp2((keyVel_ - 64) / 63.0));
+  const char* holes = ov && *ov ? ov : info(note_)->holes;
+  const double fingerSpeed = std::exp2((keyVel_ - 64) / 63.0) * (practised_ ? gesture_.fingers : 1);
+  leadLeft_ = 0;
+  tongueFloor_ = 0;
+  if (practised_) {
+    slurAir_ = gesture_.air;
+    slurLip_ = gesture_.lip;
+    slurDip_ = gesture_.dip;
+    slurAirT_ = std::max(1e-3f, gesture_.airT);
+    slurLipT_ = std::max(1e-3f, gesture_.lipT);
+    slurDipT_ = std::max(1e-3f, gesture_.dipT);
+    sinceSlur_ = 0;
+    if (gesture_.tongue > 0) tongueFloor_ = std::clamp(double(gesture_.floor), 0.0, 1.0);
+  }
+  if (practised_ && gesture_.lead > 0) {  // the lips and the breath first: the fingers follow
+    leadLeft_ = gesture_.lead;
+    leadHoles_ = holes;
+    leadSpeed_ = fingerSpeed;
+  } else {
+    reed_.setHoles(holes, fingerSpeed);
+  }
+  practised_ = false;
   blowing_ = true;
   if (!gliding()) earCorr_ = 0;
   earClock_ = 0;
@@ -172,7 +210,7 @@ void ReedPlayer::applyNote(Attack a) {
       lungAttack_ = bag_ ? 0.015 : 0.040;  // (the bag is full: the arm's squeeze)
       break;
     case kDu:  // a light touch of the tongue on the reed
-      tongueClosed_ = ringing_ ? kRingT_ : 0.002;
+      tongueClosed_ = ringing_ ? ringT_ : 0.002;
       tongueRelease_ = 0.006;
       lungAttack_ = 0.008;
       break;
@@ -199,6 +237,8 @@ void ReedPlayer::render(float* out, int n) {
     const int m = std::min(kBlock, n - i);
     const double bdt = m / fs_;
     tick(bdt);
+    if (leadLeft_ > 0 && (leadLeft_ -= bdt) <= 0 && note_ >= 0) reed_.setHoles(leadHoles_, leadSpeed_);
+    sinceSlur_ += bdt;
     if (graceLeft_ > 0 && (graceLeft_ -= bdt) <= 0 && note_ >= 0) reed_.setHoles(info(note_)->holes, 2);
     if (gliding()) glideEar();
     if (ear_ && note_ >= 0) earClock_ += bdt;
@@ -233,12 +273,17 @@ void ReedPlayer::render(float* out, int n) {
       const double hiP = std::exp(kDynP_ * (std::max(dynLo[note_], dynHi[note_]) - dyn));
       const double accent = std::min(1 + 0.2 * velAccent_ * std::exp(-sinceOn_ / 0.05), std::max(1.0, hiP));
       if (blowing_)
-        lungTarget = p0 * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * pressScale_ * accent;
+        lungTarget = p0 * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[note_] * kP_ * pressScale_ * accent *
+                     std::max(0.1, 1 + slurAir_ * std::exp(-sinceSlur_ / slurAirT_));
       // The lips: calibrated per note and dynamics; a little looser when loud;
       // the bend; the ear; the jaw vibrato.
       double lip = coverAt(note_, dyn) * glideCover(note_, dyn) * std::exp(-kDynLip_ * (dyn - 0.5) + kRollLip_ * roll_);
       if (ear_) lip *= std::exp(earCorr_);
       lip *= 1 + 0.04 * wander_ * w2b_;
+      if (sinceSlur_ < 2) {  // a practised slur's lips (src/slurs.h)
+        const double el = std::exp(-sinceSlur_ / slurLipT_);
+        lip *= std::exp(slurLip_ * el - slurDip_ * (std::exp(-sinceSlur_ / slurDipT_) - el));
+      }
       lip *= 1 + 2 * jaw * vib * sv;
       e.reed = lip;
       // The top notes: the lips rolled out (less lip on the blades).
@@ -252,6 +297,7 @@ void ReedPlayer::render(float* out, int n) {
     sinceOn_ += bdt;
     sinceOff_ += bdt;
     e.tongue = tongueClock_ < tongueClosed_ ? 0 : std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
+    e.tongue = tongueFloor_ + (1 - tongueFloor_) * e.tongue;
     e.tongue *= tongueStop();
     if (primePending_ && note_ >= 0 && tongueClock_ >= tongueClosed_) {
       // The skilled start: the column set ringing at the note as the tongue

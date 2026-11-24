@@ -13,6 +13,7 @@
 #include "knob.h"
 #include "lead.h"
 #include "parallel.h"
+#include "pianoinst.h"
 
 namespace pajupilli {
 
@@ -168,6 +169,16 @@ void Ensemble::init(const std::vector<Member>& members, const RoomSpec* room) {
       // (an instrument whose sound differs with direction: how it stands in the room)
       for (size_t k = 0; k < roomSlots_[c].size(); ++k)
         if (const float* axes = f_[roomSlots_[c][k]].v->dipoleAxes()) rooms_[c]->setAxes(int(k), axes);
+    }
+    // (a grand recorded: mono room microphones around it, PJ_ROOM_AMB (32, two AVX-512 vectors'
+    // worth) at PJ_ROOM_AMB_NEAR .. PJ_ROOM_AMB_FAR m, under the main pair; 0: none)
+    for (int c = 0; c < 3; ++c) {
+      if (!rooms_[c]) continue;
+      bool grand = false;
+      for (int i : roomSlots_[c])
+        grand |= grandPiano(f_[i].v->instrument()) && std::strcmp(f_[i].v->instrument().name, "dulcimer") != 0;
+      static const int kAmb = int(knob("PJ_ROOM_AMB", 32));
+      if (grand && kAmb > 0) rooms_[c]->ambienceArray(kAmb, knob("PJ_ROOM_AMB_NEAR", 5), knob("PJ_ROOM_AMB_FAR", 9));
     }
     placeParts();
     room_ = true;

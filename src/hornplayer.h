@@ -45,14 +45,22 @@ class HornPlayer : public Performer {
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   Vibrato vib_;  // its own vibrato (performer.h)
   double flutterPhase_ = 0, flutterRate_ = 27;
-  double kDynP_, kDynH_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
+  double kDynP_, kDynH_, kDynLip_, kVelDyn_, kRollLip_, kP_, kFl_, kSlurLip_, kSlurAir_, kSlurDip_, kSlurDipT_, kSlurTongue_, kEarTau_, kAtkP_, kAtkT_, kSlurDipUp_, kLegatoGap_, kSoftAir_, kSoftLips_, kSlurTongueMax_, kSlurTongueFloor_, kSlurAirDown_;
   double tongueFloor_ = 0;
   double pendingOff_ = 0;  // a key let go: the air stops when this runs out
   double slurDip_ = 0;
+  // The bell turned with the dynamics (hornplayer.cc): the sound above its beaming, dB now.
+  bool kBellTurn_ = false;
+  double kBellSoft_ = -12, kBellLoud_ = 12, bellK_ = 0.05, bellDb_ = 0, bellVel_ = 0;
+  float bellLp_ = 0;
   double atkPush_ = 0;
   // A slur to another partial: the lips overshoot towards it and the air
   // pushes, briefly (log of the lips' factor; the breath's extra share).
   double slurLip_ = 0, slurAir_ = 0, sinceSlur_ = 1e9;
+  double slurLipT_ = 0.03, slurAirT_ = 0.03, slurDipT_ = 0.08;  // (their times: src/slurs.h)
+  // A practised slur's lead: the valves go when this runs out (the lips went at the key).
+  double leadLeft_ = 0, leadSpeed_ = 1;
+  const char* leadHoles_ = nullptr;
   int prevNote_ = -1;
   int prevSlideNote_ = -1;  // (the last note, for its slide position)
   double kSlideTongue_;

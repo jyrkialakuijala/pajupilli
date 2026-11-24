@@ -251,12 +251,26 @@ class Ensemble {
   std::vector<SectPlayer> sp_;
   // The choir (src/choir.cc, src/choir.h): one ensemble of singers (kids_[0]), each singer's key
   // dealt by its voice part.
-  void initChoir(const Instrument& inst, const RoomSpec* room);
+  // (role: one voice part only (kChoirBass .. kChoirSoprano; -1: the whole choir), its singers a
+  // block of the stage's width, the index-th of count from the left)
+  void initChoir(const Instrument& inst, const RoomSpec* room, int role = -1, int index = 0, int count = 1);
+  const Instrument* choirInst_ = nullptr;
+  const RoomSpec* choirRoom_ = nullptr;
   void choirAssign();
   void choirTune();  // (the chord tuned by the spectra: src/choir.cc)
   void choirOn(int key, int velocity);
   void choirOff(int key);
   void choirRender(float* left, float* right, int n);
+  // The choir by ear (windEar's kBandChoir, PJ_CHOIR_EAR, on): each sung note's band pull, heard as
+  // the winds hear theirs (true: one moved >= 1 c, choirTune to solve again); and where it has a key.
+  bool choirEar(double dt);
+ public:
+  // (-play) A choir channel singing one line of a part-song: only that voice part sings it, its
+  // section standing in its own block, the index-th of count across the stage from the left
+  // (src/choir.cc; the director's reading, src/midifile.cc).
+  void setChoirRole(int part, int index, int count);
+ private:
+  double choirKey(int key, bool share) const;
   std::shared_ptr<ChoirState> choir_;
   // The brass section (src/brasssect.cc, src/brasssect.h): one ensemble of players (kids_[0]), the
   // held keys voiced and dealt to its seats.

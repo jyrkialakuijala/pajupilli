@@ -1,10 +1,12 @@
 #include "organplan.h"
 
+#include "knob.h"
 #include "organ.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <set>
 
 namespace pajupilli {
@@ -89,10 +91,276 @@ ZoneRegistration organZoneRegistration(int level) {
   return z;
 }
 
+namespace {
+
+// The ticks covered by a set of notes: merged spans.
+std::vector<std::pair<long, long>> spansOf(std::vector<std::pair<long, long>> iv) {
+  std::sort(iv.begin(), iv.end());
+  std::vector<std::pair<long, long>> out;
+  for (auto& s : iv) {
+    if (s.second <= s.first) continue;
+    if (!out.empty() && s.first <= out.back().second) out.back().second = std::max(out.back().second, s.second);
+    else out.push_back(s);
+  }
+  return out;
+}
+
+long lengthOf(const std::vector<std::pair<long, long>>& spans, long a = 0, long b = -1) {
+  long sum = 0;
+  for (auto& s : spans) {
+    const long x = std::max(a, s.first), y = b < 0 ? s.second : std::min(b, s.second);
+    if (y > x) sum += y - x;
+  }
+  return sum;
+}
+
+// The continuo's plan (src/organplan.h).
+OrganPlan planContinuo(const std::vector<OrganNote>& notes, int tpq, long barTicks, const OrganCompany& company) {
+  OrganPlan plan;
+  plan.pedalDetached = true;
+  const bool jan = organDisposition() == 1;
+  const bool positive = company.stage != "church" && company.stage != "concert";
+  // The organ's pedal line, if it has its own track: the lowest, one voice, within the compass.
+  std::map<int, TrackStats> st;
+  for (const OrganNote& n : notes) {
+    TrackStats& s = st[n.track];
+    s.track = n.track;
+    ++s.n;
+    s.mean += n.pitch;
+    s.overPedal += n.pitch > 67;
+    s.lo = std::min(s.lo, n.pitch);
+  }
+  int pedal = -1;
+  if (st.size() >= 2) {
+    const TrackStats* low = nullptr;
+    for (auto& [t, s] : st) {
+      s.mean /= s.n;
+      s.overPedal /= s.n;
+      if (!low || s.mean < low->mean) low = &s;
+    }
+    std::vector<std::pair<long, long>> iv;
+    long sum = 0;
+    for (const OrganNote& n : notes)
+      if (n.track == low->track) iv.push_back({n.on, n.off}), sum += n.off - n.on;
+    const bool oneVoice = sum < 1.15 * lengthOf(spansOf(iv));
+    if (low->overPedal < 0.05 && low->lo >= 24 && oneVoice) pedal = low->track;
+  }
+  // The lines around it, and the general pauses (everyone silent a beat: a movement's end).
+  std::map<int, std::vector<std::pair<long, long>>> lines;  // line -> its spans
+  std::map<int, int> kindOf;
+  std::vector<std::pair<long, long>> all;
+  long end = 0;
+  for (const OrganCompanyNote& n : company.notes) {
+    lines[n.line].push_back({n.on, n.off});
+    kindOf[n.line] = n.kind;
+    all.push_back({n.on, n.off});
+    end = std::max(end, n.off);
+  }
+  for (const OrganNote& n : notes) all.push_back({n.on, n.off}), end = std::max(end, n.off);
+  for (auto& [l, iv] : lines) iv = spansOf(iv);
+  all = spansOf(all);
+  std::set<long> pauseEnds;
+  for (size_t i = 1; i < all.size(); ++i)
+    if (all[i].first - all[i - 1].second >= tpq) pauseEnds.insert(all[i].first);
+  // Windows of two bars (a movement's first beginning where its pause ends): who plays in each.
+  struct Win {
+    long at, to;
+    bool fresh;  // (after a general pause)
+    double sounding = 0;  // the others' lines sounding, on average
+    int choir = 0;        // the choir's lines singing
+    bool festive = false, organ = false;
+    int level = 0;
+    bool ped = false;
+  };
+  std::vector<Win> win;
+  {
+    std::vector<long> cuts = {0};
+    for (long p : pauseEnds) cuts.push_back(p);
+    cuts.push_back(end);
+    for (size_t c = 0; c + 1 < cuts.size(); ++c)
+      for (long t = cuts[c]; t < cuts[c + 1]; t += 2 * barTicks) {
+        const long to = std::min(t + 2 * barTicks, cuts[c + 1]);
+        if (to - t < barTicks && t > cuts[c]) {  // (a short tail joins the window before)
+          win.back().to = to;
+          break;
+        }
+        win.push_back({t, to, t == cuts[c] && c > 0});
+      }
+  }
+  std::vector<std::pair<long, long>> organSpans;
+  for (const OrganNote& n : notes) organSpans.push_back({n.on, n.off});
+  organSpans = spansOf(organSpans);
+  for (Win& w : win) {
+    const double len = double(std::max(1L, w.to - w.at));
+    double brass = 0;
+    bool timp = false;
+    for (auto& [l, iv] : lines) {
+      const double share = lengthOf(iv, w.at, w.to) / len;
+      w.sounding += share;
+      if (kindOf[l] == 1) brass += share;
+      if (kindOf[l] == 2 && share > 0.02) timp = true;
+      if (kindOf[l] == 3 && share > 0.3) ++w.choir;
+    }
+    w.organ = lengthOf(organSpans, w.at, w.to) > 0;
+    const bool full = w.sounding >= 8 || w.choir >= 3;
+    w.festive = (timp || brass >= 1.5) && w.sounding >= 6;  // (two trumpets: one "brass" line may be a soloist on a trombone's program)
+    w.level = w.festive ? 2 : w.sounding >= 4.5 || full ? 1 : 0;
+    w.ped = w.festive || full;
+  }
+  // A change inside a movement must last 8 bars (four windows): first the middle of each five
+  // windows (a bar's rest in the trumpets is not a new registration), then the shortest run left
+  // joins its longer neighbour until none is shorter.
+  if (std::getenv("PJ_ORGAN_CONTINUO_TRACE")) {
+    for (const Win& w : win) std::fprintf(stderr, "%s%d%s", w.fresh ? " | " : "", w.level, w.ped ? "p" : "");
+    std::fprintf(stderr, "\n");
+  }
+  for (size_t a = 0; a < win.size();) {
+    size_t b = a + 1;
+    while (b < win.size() && !win[b].fresh) ++b;
+    for (int pass = 0; pass < 2; ++pass) {
+      std::vector<int> v;
+      for (size_t k = a; k < b; ++k) v.push_back(pass == 0 ? win[k].level : int(win[k].ped));
+      const int n = int(v.size());
+      std::vector<int> m = v;
+      for (int k = 0; k < n; ++k) {
+        int five[5];
+        for (int d = -2; d <= 2; ++d) five[d + 2] = v[std::clamp(k + d, 0, n - 1)];
+        std::sort(five, five + 5);
+        m[k] = five[2];
+      }
+      for (;;) {
+        int best = -1, bestLen = 4, bestEnd = 0;
+        for (int k = 0; k < n;) {
+          int e = k + 1;
+          while (e < n && m[e] == m[k]) ++e;
+          if (e - k < bestLen && e - k < n) best = k, bestLen = e - k, bestEnd = e;
+          k = e;
+        }
+        if (best < 0) break;
+        auto runLen = [&](int at, int dir) {
+          int len = 0;
+          for (int k = at; k >= 0 && k < n && m[k] == m[at]; k += dir) ++len;
+          return len;
+        };
+        const int left = best > 0 ? runLen(best - 1, -1) : 0, right = bestEnd < n ? runLen(bestEnd, 1) : 0;
+        const int to = left >= right ? m[best - 1] : m[bestEnd];
+        for (int k = best; k < bestEnd; ++k) m[k] = to;
+      }
+      // The movement's own registration: what its fuller passages ask (a chorale's lines come and go
+      // with the choir, the trumpets rest: the organist does not follow them); another only where it
+      // lasts 16 bars.
+      std::vector<int> sorted = v;
+      std::sort(sorted.begin(), sorted.end());
+      int base = sorted[int(0.7 * (n - 1))];
+      if (pass == 0 && base == 1) {  // (a movement with trumpets and timpani in a tenth of it or more: festive)
+        int fest = 0;
+        for (size_t k = a; k < b; ++k) fest += win[k].festive;
+        if (fest >= 0.1 * n) {
+          base = 2;
+          for (int& x : m) x = x == 1 ? 2 : x;
+        }
+      }
+      for (int k = 0; k < n;) {
+        int e = k + 1;
+        while (e < n && m[e] == m[k]) ++e;
+        if (m[k] != base && e - k < 8)
+          for (int q = k; q < e; ++q) m[q] = base;
+        k = e;
+      }
+      for (size_t k = a; k < b; ++k) (pass == 0 ? win[k].level = m[k - a] : win[k].ped = m[k - a] != 0);
+    }
+    a = b;
+  }
+  for (Win& w : win) w.ped = w.ped && w.level >= 1;
+  // The climax: a festive ending's last bars, a little more.
+  if (!positive && !win.empty() && win.back().level == 2) {
+    size_t i = win.size();
+    while (i > 0 && win[i - 1].level == 2 && (i == win.size() || !win[i].fresh)) --i;
+    const size_t run = win.size() - i, take = std::min<size_t>(4, run / 3);
+    for (size_t k = win.size() - take; k < win.size(); ++k) win[k].level = 3;
+  }
+  static const char* const kMainHands[4] = {"rohrgedackt8", "rohrgedackt8,gedacktflote4", "rohrgedackt8,gedacktflote4,waldflote2,sw-pos",
+                                            "rohrgedackt8,gedacktflote4,waldflote2,sw-pos,principal8,hw-pos"};
+  static const char* const kJanHands[4] = {"j_rp_gedackt8", "j_rp_gedackt8,j_rp_rohrflot4", "j_rp_gedackt8,j_rp_rohrflot4,j_rp_waltflot2",
+                                           "j_rp_principal8,j_rp_gedackt8,j_rp_rohrflot4,j_rp_waltflot2"};
+  static const char* const kMainPed[4] = {"", "subbass16", "subbass16,gedacktbass8", "subbass16,gedacktbass8"};
+  static const char* const kJanPed[4] = {"", "j_p_subbass16", "j_p_subbass16,j_p_octav8", "j_p_subbass16,j_p_octav8"};
+  static const char* const kWhat[4] = {"a quiet aria or a recitative: the Gedackt 8' alone", "the 8' and the Flute 4'",
+                                       "a festive tutti: the 8', the 4' and a flute 2'", "the climax: a light Principal 8' more"};
+  char buf[512];
+  std::snprintf(buf, sizeof buf, "organ plan: a continuo under %zu other lines, on %s (the stage: %s)%s\n", lines.size(),
+                positive ? "a positive organ: Gedackt 8', Flute 4', no pedal" : "the church organ's Positiv, registered lightly",
+                company.stage.c_str(), pedal >= 0 ? "; its bass line on the pedal where the Subbass is drawn" : "");
+  plan.summary = buf;
+  int lastLevel = -1, lastPed = -1;
+  for (size_t wi = 0; wi < win.size(); ++wi) {
+    const Win& w = win[wi];
+    const int level = positive ? std::min(1, w.level) : w.level;
+    const bool ped = !positive && w.ped;
+    if (!w.organ && lastLevel >= 0) continue;  // (the organ resting: nothing to change)
+    if (level == lastLevel && int(ped) == lastPed) continue;
+    lastLevel = level;
+    lastPed = ped;
+    std::string reg = (jan ? kJanHands : kMainHands)[level];
+    if (ped) reg += std::string(",") + (jan ? kJanPed : kMainPed)[level];
+    OrganPlanChange c{w.at, reg, level >= 2 ? 0.6 : 1.0, {}, ""};
+    for (auto& [t, s] : st) c.manuals[t] = t == pedal && ped ? 3 : 2;
+    double around = 0;  // (over the bars this registration stays)
+    int nw = 0, choir = 0;
+    bool festive = false;
+    for (size_t k = wi; k < win.size() && (k == wi || (win[k].level == w.level && win[k].ped == w.ped && !win[k].fresh)); ++k)
+      around += win[k].sounding, ++nw, choir = std::max(choir, win[k].choir), festive |= win[k].festive;
+    around /= nw;
+    std::snprintf(buf, sizeof buf, "bar %ld: %s%s (%.1f lines around it%s%s) | %s", w.at / barTicks + 1, kWhat[level],
+                  ped ? (pedal >= 0 ? "; the bass on the pedal's Subbass 16'" : "; the Subbass 16' under the bass") : "",
+                  around, choir >= 3 ? ", the choir" : "", festive ? ", trumpets or timpani" : "", reg.c_str());
+    c.what = buf;
+    plan.summary += c.what + "\n";
+    plan.changes.push_back(c);
+  }
+  if (!plan.changes.empty()) plan.changes[0].tick = 0;
+  return plan;
+}
+
+}  // namespace
+
+bool organIsContinuo(const std::vector<OrganNote>& organ, const OrganCompany& company) {
+  static const double kForce = knob("PJ_ORGAN_CONTINUO", -1);
+  if (kForce >= 0) return kForce > 0 && !organ.empty();
+  if (organ.empty() || company.notes.empty()) return false;
+  std::vector<std::pair<long, long>> o, c;
+  for (const OrganNote& n : organ) o.push_back({n.on, n.off});
+  // (the others' articulation is not silence: each note reaches a typical note's length past its end)
+  std::vector<long> dur;
+  for (const OrganCompanyNote& n : company.notes) dur.push_back(n.off - n.on);
+  std::nth_element(dur.begin(), dur.begin() + dur.size() / 2, dur.end());
+  const long reach = dur[dur.size() / 2];
+  for (const OrganCompanyNote& n : company.notes) c.push_back({n.on, n.off + reach});
+  o = spansOf(o);
+  c = spansOf(c);
+  long with = 0;  // (the organ's ticks with another line sounding)
+  size_t j = 0;
+  for (auto& s : o) {
+    while (j < c.size() && c[j].second <= s.first) ++j;
+    for (size_t k = j; k < c.size() && c[k].first < s.second; ++k) with += std::min(s.second, c[k].second) - std::max(s.first, c[k].first);
+  }
+  return with >= 0.85 * lengthOf(o);
+}
+
+bool organCompanyIsChamber(const OrganCompany& company) {
+  std::set<int> lines;
+  for (const OrganCompanyNote& n : company.notes) {
+    if (n.kind != 0) return false;
+    lines.insert(n.line);
+  }
+  return !lines.empty() && lines.size() <= 6;
+}
+
 OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks, const std::vector<long>& partStartsIn,
-                    const std::vector<std::pair<long, double>>& tempo) {
+                    const std::vector<std::pair<long, double>>& tempo, const OrganCompany* company) {
   OrganPlan plan;
   if (notes.empty()) return plan;
+  if (company && organIsContinuo(notes, *company)) return planContinuo(notes, tpq, barTicks, *company);
   // The sections: the tempo's changes, and the general pauses (every line
   // silent a beat or more, inside the piece).
   std::vector<long> partStarts = partStartsIn;

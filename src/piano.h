@@ -38,6 +38,7 @@ struct PianoKey {
   double len = 0, tension = 0, mu = 0, B = 0;  // per string: m, N, kg/m, stiffness (partial n at n f0 sqrt(1 + B n^2))
   double f1 = 0;                   // the first partial as tuned (Hz)
   double strike = 0.122;           // the hammer's place, a share of the length
+  double levelDb = 0;              // its sound at the bridge, dB: the keys evened (the voicer's work)
   double rear = 0;                 // the string from the bridge to the plate, a share of the speaking length (0: none)
   // The hammer: mass (kg); the felt F = K x^p as it is at a gentle blow, and
   // from the force `pivot` (N a string) up an exponent higher by `colour`.
@@ -235,6 +236,9 @@ class Piano {
   // The regions as the hall hears them (no microphones: PianoModel::concertHall).
   void hallSound(bool on) { regionSrc_ = on && keepRegions_; }
   bool hallSound() const { return regionSrc_; }
+  // The close microphones and the hall blended (keepRegions(true) first): the close pair's sound
+  // times close, the board's own sound into the room (as hallSound) times hall; hallSound wins.
+  void micBlend(float close, float hall) { closeG_ = close; hallG_ = keepRegions_ ? hall : 0.0f; }
   void regionPlace(int j, double* x, double* y) const { *x = regionX_[j]; *y = regionY_[j]; }
   void reset();
   bool asleep() const { return asleep_; }
@@ -369,12 +373,18 @@ class Piano {
   int ringPos_ = 0, quiet_ = 0;
   int tapI_[2][kMaxPatches];
   float tapF_[2][kMaxPatches], tapG_[2][kMaxPatches];
+  // The array microphone over the board (PJ_PIANO_ARRAY=1, -piano_mics array) in place of the pair:
+  // each patch's paths to its mics, [patch][mic], each mic's share of left and right in its gains.
+  int arrN_ = 0;
+  std::vector<int> arrI_;
+  std::vector<float> arrF_, arrGL_, arrGR_;
   float side_ = 0;
   bool keepRegions_ = false;
   // (the regions as sources (PJ_PIANO_PARTSRC, 1): each patch's own sound, one common delay and
   // gain (the microphones' distance straight down), the room doing the rest; 0: the two close
   // microphones' mean, as heard there)
   bool regionSrc_ = false;
+  float closeG_ = 1, hallG_ = 0;  // (micBlend)
   int srcD_ = 0;
   float srcG_ = 0;
   int srcI_[kMaxPatches] = {};      // (each patch's delay toward the audience, within its region)
@@ -385,6 +395,7 @@ class Piano {
   double regionX_[kRegions] = {}, regionY_[kRegions] = {};
   int activeKeys_[kKeys], nActive_ = 0;
   bool asleep_ = true;
+  bool allStrings_ = false;  // (awake: every string computed, wake())
   int clock_ = 0;
   uint32_t rng_ = 4242;
   float pick_ = 0;        // the pickup's signal, this sample

@@ -78,7 +78,7 @@ class Performer {
     cue_ = c;
     cued_ = true;
     hardness_ = std::clamp(1.0 + 0.7 * c.v[kCueAccent], 0.6, 1.9);
-    vibDepth_ = 0.05 * c.v[kCueVibDepth];
+    vibDepth_ = 0.05 * c.v[kCueVibDepth] * (inst_.design ? inst_.design->reed.vibScale : 1.0);
     vibRate_ = 5.0 * c.v[kCueVibRate];
   }
   // (live) An instrument's own use of the controller's knobs K1..K8 (k 0..7, x 0..1); true if it took

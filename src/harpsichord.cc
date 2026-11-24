@@ -32,7 +32,10 @@ PianoDesign harpsichordDesign() {
   des.pedalNoise = 0;  // (a jack's cloth is no piano damper; no pedal)
   des.keys = kChoirs * kKeys;
   const double a4 = knob("PJ_HPSI_A4", 440), voice = knob("PJ_HPSI_VOICE", 1.0), boardK = knob("PJ_HPSI_BOARD", 2.0);
-  const double lossK = knob("PJ_HPSI_LOSS", 1.0);
+  // (the brilliance, by ear, 2026-11-24: plucked a fifth nearer the nut, PJ_HPSI_PLUCKAT 0.8, and the
+  // wire's loss x0.75, PJ_HPSI_LOSS: 2-8 kHz +1.5 .. 4.5 dB at the pluck, +3.5 .. 6.5 dB as it rings;
+  // PJ_HPSI_PLECTRUM scales the tongue's stiffness)
+  const double lossK = knob("PJ_HPSI_LOSS", 0.75), pluckAt = knob("PJ_HPSI_PLUCKAT", 0.8), plectrumK = knob("PJ_HPSI_PLECTRUM", 1.0);
   // The tuning: just on the song's key (a MIDI file's; alone: C), PJ_HPSI_TONIC (0 = C .. 11 = B)
   // says otherwise; PJ_HPSI_TUNING=equal: equal temperament.
   static const double kJust[12] = {1, 16.0 / 15, 9.0 / 8, 6.0 / 5, 5.0 / 4, 4.0 / 3, 45.0 / 32, 3.0 / 2, 8.0 / 5, 5.0 / 3, 9.0 / 5, 15.0 / 8};
@@ -76,14 +79,14 @@ PianoDesign harpsichordDesign() {
       s.B = M_PI * M_PI * M_PI * E * d * d * d * d / (64 * s.tension * L * L);
       if (c == 3 && midi < 48) s.B *= 0.15;  // (the 16' bass overspun: a thin core under a wrap of the same mass)
       // Where its row plucks: an eighth of the string from the nut in the
-      // bass to a third in the treble; the front 8' 15 mm further on; the
+      // bass to a third in the treble (x PJ_HPSI_PLUCKAT); the front 8' 15 mm further on; the
       // 4' and the 16' their own.
       double beta = c == 2 ? 0.15 + 0.20 * t : c == 3 ? 0.10 + 0.15 * t : 0.125 + 0.20 * t;
       if (c == 1) beta += 0.015 / L;
-      s.strike = std::min(beta, 0.5);
+      s.strike = std::min(beta * pluckAt, 0.5);
       // The plectrum: a Delrin tongue of 1200 N/m that lets go at 1.2 N in
       // the treble to 2.5 N in the bass (more for the 16', less for the 4').
-      s.pluckK = 1200;
+      s.pluckK = 1200 * plectrumK;
       s.pluckLimit = voice * (c == 2 ? 0.7 : c == 3 ? 1.4 : 1.0) * (2.5 - 1.3 * t);
       s.pluckSide = 0.33;  // (the string leaves 1 mm sideways to 3 mm up)
       s.mh = 1e-3; s.K = 1e9; s.p = 2.5;  // (no hammer)

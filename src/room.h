@@ -95,6 +95,18 @@ class Room {
   // that comes straight from it (the rest: the room's reverberant field; a dry room: all direct).
   double directShare() const { return directShare_; }
   const RoomSpec& spec() const { return spec_; }
+  // Room microphones for a recording (a grand's): count omnis around the stage's centre, each at
+  // its own angle (the golden angle apart, kept within the walls: a mic that would stand outside
+  // turns towards the hall at the same distance) and its own distance, near .. far spread evenly
+  // (a van der Corput sequence, independent of the angles). Each hears the sources' direct sound
+  // and first reflections and the reverberant field by its own tap; every mic goes to both
+  // channels, weighted by where it stands across: left 0.5 (1 - x / far), right 0.5 (1 + x / far).
+  // Mixed in under the main pair, which stays as it was: PJ_ROOM_AMB_DB (-10) on all of the array,
+  // PJ_ROOM_AMB_EARLY_DB more on its direct sound and reflections (a channel's: the mics' weighted
+  // mean). False: the room is too small for them (the far distance
+  // straight out, the near one to each side): nothing changes.
+  bool ambienceArray(int count, double near, double far);
+  int ambienceMics() const { return ambMics_; }
   // Source s's first reflections off the side walls: when, and how much louder
   // in the right channel than the left.
   std::string lateral(int s) const;
@@ -157,6 +169,12 @@ class Room {
   std::vector<float> dring_;    // [3 * source + k][kSpan]
   std::vector<float> inDirDip_; // [3 * source + k][line], unit length
   std::vector<Tap> early_;      // to the microphones: direct and reflections
+  struct AmbTap { int src, delay; float gl, gr; };
+  std::vector<AmbTap> amb_;     // the room microphones' direct sound and first reflections, mixed to left and right
+  std::vector<int> ambFrom_;    // [source] its first entry in amb_ (and one past the last source's)
+  int ambMics_ = 0;
+  alignas(64) float ambDir_[2 * kLines] = {};  // the array's reverberant field, left and right (its level in it)
+  double wid_ = 0, len_m_ = 0, hei_ = 0, ys_ = 0, alpha_ = 0;  // (the shoebox, the stage's depth, the walls' absorption)
 };
 
 }  // namespace pajupilli

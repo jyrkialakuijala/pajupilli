@@ -39,6 +39,7 @@
 #include "parallel.h"
 #include "performer.h"
 #include "modalinst.h"
+#include "choir.h"
 #include "knob.h"
 #include "songclock.h"
 
@@ -319,6 +320,18 @@ std::string instrumentList() {
 
 static int gPlayTranspose = 0;
 void setPlayTranspose(int semitones) { gPlayTranspose = semitones; }
+
+static std::vector<std::string> gOnly;  // (-only: the instruments heard)
+static bool gOnlySkip = false;          // (-onlyskip: ... from just before the first of their notes)
+void setOnly(const std::string& list, bool skip) {
+  gOnlySkip = skip;
+  gOnly.clear();
+  for (size_t at = 0; at <= list.size();) {
+    const size_t e = std::min(list.find(',', at), list.size());
+    if (e > at) gOnly.push_back(list.substr(at, e - at));
+    at = e + 1;
+  }
+}
 static bool gPianist = false;
 void setPianist(bool on) { gPianist = on; }
 static double gPlayVolumeDb = 0;
@@ -428,6 +441,7 @@ struct Part {
   const Instrument* inst;
   std::unique_ptr<Ensemble> ens;
   float gmGain = 1;  // the program's level at the fader (src/gmlevels_data.h)
+  float dirGain = 1;  // (a wind: the director's level as the player's loudness, PJ_DIRECTOR_WINDDB)
   // An organ played by a plan (organ-plan: src/organplan.h): its tracks to
   // the Pedal and the manuals, its registration by the bar.
   std::unique_ptr<OrganPlan> plan;
@@ -459,6 +473,32 @@ struct Part {
 
 }  // namespace
 
+// The lines playing with the church organ (src/organplan.h: is it their continuo, and how large are they).
+static OrganCompany organCompany(const Song& song) {
+  OrganCompany c;
+  std::map<int, std::pair<int, uint64_t>> on;  // channel * 128 + key -> (kind, tick)
+  int progs[16] = {};
+  for (const Event& e : song.ev) {
+    const int ech = e.status & 15, kind = e.status & 0xf0;
+    if (kind == 0xc0) progs[ech] = e.a;
+    if (kind != 0x90 && kind != 0x80) continue;
+    if (ech != 9) {
+      const Instrument* in = forProgram(progs[ech]);
+      if (in && std::strcmp(in->name, "organ-plan") == 0) continue;
+    }
+    if (kind == 0x90 && e.b > 0) {
+      const int pg = progs[ech];
+      on[ech * 128 + e.a] = {ech == 9 || pg == 47 ? 2 : pg >= 56 && pg <= 63 ? 1 : pg >= 52 && pg <= 54 ? 3 : 0, e.tick};
+    } else {
+      auto it = on.find(ech * 128 + e.a);
+      if (it == on.end()) continue;
+      c.notes.push_back({long(it->second.second), long(e.tick), ech * 1000 + e.track, it->second.first});
+      on.erase(it);
+    }
+  }
+  return c;
+}
+
 int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* room, const std::string& device,
                  bool verbose, bool roomGiven) {
   Song song;
@@ -475,6 +515,28 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       e.a = uint8_t(std::clamp(k, 0, 127));
     }
     std::fprintf(stderr, "  transposed %+d semitones%s\n", gPlayTranspose, clipped ? " (some notes clamped to 0..127)" : "");
+  }
+  // Two channels (or more) on the grand piano: most likely two pianos, and no two grands are
+  // alike: the first of those channels plays the bright piano (General MIDI 2, a grand too), the
+  // others the grand. (The user's, 2026-11-24. PJ_PLAY_TWOGRANDS=0: all on the one grand's model.)
+  if (knob("PJ_PLAY_TWOGRANDS", 1) != 0 && findInstrument("bright-piano")) {
+    int prog[16] = {}, grandN[16] = {};
+    for (const Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) prog[ch] = e.a;
+      if (kind == 0x90 && e.b > 0 && ch != 9 && prog[ch] == 0) ++grandN[ch];
+    }
+    int first = -1, n = 0;
+    for (int ch = 0; ch < 16; ++ch)
+      if (grandN[ch]) { if (first < 0) first = ch; ++n; }
+    if (n >= 2) {
+      for (Event& e : song.ev)
+        if (e.status == (0xc0 | first) && e.a == 0) e.a = 1;
+      // (and from the start: a channel is on program 1 until told otherwise)
+      Event pc{0.0, -1, uint8_t(0xc0 | first), uint8_t(1), uint8_t(0)};
+      song.ev.insert(song.ev.begin(), pc);
+      std::fprintf(stderr, "  (%d channels on the grand piano: channel %d plays the bright piano)\n", n, first + 1);
+    }
   }
   // A file played hot throughout (every note near 127: a sequencer's default,
   // a keyboard with a hard curve) has no loudness to spare: its velocities
@@ -623,6 +685,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if (kind == 0x90 && e.b > 0) {
         open[ch * 128 + e.a] = spans.size();
         spans.push_back({i, i, forProgram(pr[ch])});
+        // (a wind player's line: a flute, a recorder, a reed, a brass; not a bagpipe's drone-bound chanter)
+        if (const Instrument* w = spans.back().inst)
+          di.wind[ch] |= (w->kind == Kind::kFlute || w->kind == Kind::kDuct || w->kind == Kind::kEndBlown || w->reed() ||
+                          w->lip()) && std::strcmp(w->family, "bagpipe") != 0;
       }
     }
     std::vector<size_t> order;
@@ -644,6 +710,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     };
     bool byTicks = true;
     for (const Event& e : song.ev) byTicks &= std::fabs(secAt(di.tempo, song.div, e.tick) - e.t) < 2e-3;
+    if (dir.self && !byTicks) {
+      std::fprintf(stderr, "  (the winds' own reading: the events' times are not their ticks': left out)\n");
+      dir.self = false;
+    }
     if (dir.acts && !byTicks) {
       std::fprintf(stderr, "  (director: the events' times are not their ticks': it stays out)\n");
       dir.acts = false;
@@ -684,6 +754,31 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
       for (int ch = 0; ch < 16; ++ch)
         for (auto& [tick, lv] : dir.level[ch]) dirLevel[ch].push_back({secAt(dir.tempo, song.div, uint64_t(tick)), lv});
+    } else if (dir.self) {
+      // The winds' own reading: their notes' cues (the emphasis, the vibrato; a quantized file's
+      // lengths, its breaths and sighs: a played one keeps its own but for the breaths) and their
+      // levels, at the file's own times.
+      bool moved = false;
+      for (size_t q = 0; q < order.size(); ++q) {
+        const Span& sp = spans[order[q]];
+        const Event& on0 = song.ev[sp.on];
+        const int ch = on0.status & 15;
+        if (dir.level[ch].empty()) continue;  // (not a wind line of its own)
+        const Cue& c = dir.cues[q];
+        Event& on = song.ev[sp.on];
+        Event& off = song.ev[sp.off];
+        on.cue = int(q);
+        const float len = dir.gridded ? c.v[kCueLength] : std::min(1.0f, std::max(c.v[kCueLength], c.v[kCueLegato] > 0 ? 1.0f : 0.83f));
+        if (len < 1 && off.t > on.t) {
+          off.t = on.t + (off.t - on.t) * len;
+          off.tick = on.tick + uint64_t(std::max(1.0, double(off.tick - on.tick) * len));
+          moved = true;
+        }
+        on.b = uint8_t(std::clamp(int(std::lround(on.b * (1 + 0.22 * c.v[kCueAccent]))), 1, 127));
+      }
+      if (moved) std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
+      for (int ch = 0; ch < 16; ++ch)
+        for (auto& [tick, lv] : dir.level[ch]) dirLevel[ch].push_back({secAt(di.tempo, song.div, uint64_t(tick)), lv});
     }
   }
   // An instrument may want its note early: what its player does before the
@@ -711,6 +806,54 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     noteLeadsApplied() = true;
   }
   if (gPianist) planPianists(song, dir.acts && dir.style == Direction::kBaroque);  // (-pianist: the pedalling planned)
+  // -only: the notes of the other instruments left out, after the director has read the whole
+  // piece (its tempo, phrasing and dynamics as with every part). A note-on decides; its note-off
+  // and aftertouch follow it.
+  if (!gOnly.empty()) {
+    int pg[16] = {}, kept = 0, dropped = 0;
+    double first = -1;  // (the first heard note's time)
+    bool keep[16 * 128] = {};
+    std::set<std::string> heard, left;
+    auto wanted = [&](int ch, const Instrument* in) {
+      for (const std::string& w : gOnly) {
+        if (w == std::to_string(ch + 1) || w == "ch" + std::to_string(ch + 1)) return true;
+        if (ch == 9 ? (w == "drums" || w == "drum") : in && (w == in->name || w == in->family)) return true;
+      }
+      return false;
+    };
+    std::vector<Event> out;
+    out.reserve(song.ev.size());
+    for (const Event& e : song.ev) {
+      const int ch = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pg[ch] = e.a;
+      if (kind == 0x90 && e.b > 0) {
+        const Instrument* in = ch == 9 ? nullptr : forProgram(pg[ch]);
+        const std::string nm = ch == 9 ? "drums" : in ? in->name : "?";
+        keep[ch * 128 + e.a] = wanted(ch, in);
+        (keep[ch * 128 + e.a] ? heard : left).insert(nm);
+        if (!keep[ch * 128 + e.a]) { ++dropped; continue; }
+        if (!kept++) first = e.t;
+      } else if ((kind == 0x80 || kind == 0x90 || kind == 0xa0) && !keep[ch * 128 + e.a]) {
+        continue;
+      }
+      out.push_back(e);
+    }
+    song.ev.swap(out);
+    auto join = [](const std::set<std::string>& v) {
+      std::string r;
+      for (const std::string& x : v) r += (r.empty() ? "" : ", ") + x;
+      return r.empty() ? std::string("nothing") : r;
+    };
+    std::fprintf(stderr, "  -only: %s heard (%d notes); %s left out (%d notes)\n", join(heard).c_str(), kept,
+                 join(left).c_str(), dropped);
+    if (!kept) { std::fprintf(stderr, "-only: no notes left to play\n"); return 1; }
+    // -onlyskip: the song from PJ_ONLYSKIP_LEAD (0.5 s) before their first note (or -start_time, if later).
+    if (gOnlySkip) {
+      const double at = std::max(0.0, first - knob("PJ_ONLYSKIP_LEAD", 0.5));
+      if (at > gPlayStart) gPlayStart = at;
+      std::fprintf(stderr, "  -onlyskip: their first note at %d:%04.1f\n", int(first) / 60, std::fmod(first, 60.0));
+    }
+  }
   int prog[16] = {};
   std::map<int, int> sounding;  // part -> notes down now
   std::map<int, int> noteOwner;  // channel * 128 + key -> part
@@ -802,8 +945,23 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       room = findRoom("concert");
       std::fprintf(stderr, organ ? "  (timpani and an organ: in the concert hall)\n" : "  (timpani: in the concert hall)\n");
     } else if (organ) {
-      room = findRoom("church");
-      std::fprintf(stderr, "  (an organ: in the church)\n");
+      // (chamber music with an organ under it, a handful of lines: a room, and a positive organ)
+      std::vector<OrganNote> on;
+      int pg[16] = {};
+      for (const Event& e : song.ev) {
+        if ((e.status & 0xf0) == 0xc0) pg[e.status & 15] = e.a;
+        const Instrument* in = (e.status & 15) == 9 ? nullptr : forProgram(pg[e.status & 15]);
+        if ((e.status & 0xf0) == 0x90 && e.b > 0 && in && std::strcmp(in->name, "organ-plan") == 0)
+          on.push_back({e.track, long(e.tick), long(e.tick) + song.div, e.a});
+      }
+      const OrganCompany company = organCompany(song);
+      if (!on.empty() && organIsContinuo(on, company) && organCompanyIsChamber(company)) {
+        room = findRoom("hall");
+        std::fprintf(stderr, "  (chamber music over an organ's continuo: in the hall, on a positive organ)\n");
+      } else {
+        room = findRoom("church");
+        std::fprintf(stderr, "  (an organ: in the church)\n");
+      }
     }
   }
   std::map<const Instrument*, std::unique_ptr<Calibration>> cals;
@@ -824,6 +982,55 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     else
       std::fprintf(stderr, "  %s %2d: %s (%d held at once; %d voices for their tails)\n", id / 128 == 9 ? "drums  " : "channel",
                    id / 128 + 1, p.inst->name, p.maxHeld, poly);
+  }
+  // A part-song's choir (PJ_CHOIR_SECTIONS, on): the choir channels that each sing one line (at
+  // most two notes at once) are its voice parts. Each is named by its median pitch, the nearest of
+  // the soprano's (A4), the alto's (D4), the tenor's (G3) and the bass's (C3): two lines on one
+  // name a divided part (SSAATTBB: the second sopranos the mezzos, the first basses the
+  // baritones). Each sings with its own section alone, standing in its own block, from the left
+  // the highest line to the right the lowest: the harmony laid out across the stage.
+  if (knob("PJ_CHOIR_SECTIONS", 1) > 0) {
+    std::vector<std::pair<double, int>> lines;  // (median key, part id)
+    std::map<int, std::vector<int>> keysOf;
+    int pg[16] = {};
+    for (const Event& e : song.ev) {
+      const int ech = e.status & 15, kind = e.status & 0xf0;
+      if (kind == 0xc0) pg[ech] = e.a;
+      if (kind == 0x90 && e.b > 0) keysOf[ech * 128 + pg[ech]].push_back(e.a);
+    }
+    for (auto& [id, p] : parts) {
+      if (id / 128 == 9 || std::strcmp(p.inst->family, "choir") != 0 || p.maxHeld > 2) continue;
+      std::vector<int>& k = keysOf[id];
+      if (k.empty()) continue;
+      std::nth_element(k.begin(), k.begin() + k.size() / 2, k.end());
+      lines.push_back({double(k[k.size() / 2]), id});
+    }
+    if (lines.size() >= 2) {
+      std::stable_sort(lines.begin(), lines.end(), [](auto& a, auto& b) { return a.first > b.first; });
+      static const int kCentre[4] = {69, 62, 55, 48};  // S A T B
+      const int n = int(lines.size());
+      std::vector<int> group(n);
+      for (int i = 0; i < n; ++i) {
+        int g = 0;
+        for (int j = 1; j < 4; ++j)
+          if (std::fabs(lines[i].first - kCentre[j]) < std::fabs(lines[i].first - kCentre[g])) g = j;
+        group[i] = i ? std::max(g, group[i - 1]) : g;  // (never above the line over it)
+      }
+      // (four lines are SATB, eight SSAATTBB, however they are voiced)
+      if (n == 4 || n == 8)
+        for (int i = 0; i < n; ++i) group[i] = i * 4 / n;
+      std::string named = "  (the choir in sections, from the left:";
+      for (int i = 0; i < n; ++i) {
+        const bool upper = i + 1 < n && group[i + 1] == group[i], lower = i > 0 && group[i - 1] == group[i];
+        int part = group[i] == 0 ? (lower ? kChoirMezzo : kChoirSoprano)
+                 : group[i] == 1 ? kChoirAlto
+                 : group[i] == 2 ? kChoirTenor
+                 : (upper ? kChoirBaritone : kChoirBass);
+        parts[lines[i].second].ens->setChoirRole(part, i, n);
+        named += strf(" channel %d %s%s", lines[i].second / 128 + 1, kChoirPart[part].name, i + 1 < n ? "," : ")\n");
+      }
+      std::fprintf(stderr, "%s", named.c_str());
+    }
   }
   // The brass section: the part read once with the rest of the song (src/brasssect.h): which
   // section it stands for, and under each onset the song's chord, to voice a sparse part by.
@@ -943,8 +1150,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if (p.ens->size() < 1) continue;
       const auto* pm = dynamic_cast<PianoModel*>(&p.ens->model(0));
       if (!pm) continue;
-      const int board = pm->inConcertHall() ? 100 : 0;
-      const char* why = board ? (hall > 0 ? "PJ_PIANO_HALL=1" : "with an orchestra")
+      const int board = int(std::lround(100 * pm->boardShare()));
+      const char* why = !pm->inConcertHall() && board ? "-piano_close"
+                        : board ? (hall > 0 ? "PJ_PIANO_HALL=1" : "with an orchestra")
                         : wanted ? "this piano has no board regions to send"
                         : hall == 0 ? "PJ_PIANO_HALL=0" : "no orchestra";
       if (std::strcmp(p.inst->name, "grand-piano") == 0) std::fprintf(stderr, "  piano   %2d: tuning: %s\n", id / 128 + 1, pianoTuningName());
@@ -1172,7 +1380,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if (i > 0) starts.push_back(tk);
       bpm.push_back({tk, 60 / song.tempo[i].len});
     }
-    p.plan.reset(new OrganPlan(planOrgan(notes, song.div, song.barTicks ? song.barTicks : 4L * song.div, starts, bpm)));
+    OrganCompany company = organCompany(song);
+    company.stage = room ? room->name : "dry";
+    p.plan.reset(new OrganPlan(planOrgan(notes, song.div, song.barTicks ? song.barTicks : 4L * song.div, starts, bpm, &company)));
     {
       int stops, ranks, pipes;
       organSize(stops, ranks, pipes);
@@ -1387,9 +1597,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             gap = std::max(gap, baroque ? 0.5 * dur : std::min(0.5 * dur, 0.06));
             ++repeats;
           }
-          // (a phrase's end lifted early, the organist's breath before the next phrase: a fifth
-          // of the note, 80 .. 250 ms (the romantic's legato a little less), so the church hears
-          // the line close; PJ_ORGAN_BREATH scales it)
+          // (a phrase's end lifted early, the organist's breath before the next phrase: 80 .. 250 ms
+          // (the romantic's legato a little less), so the church hears the line close, and a
+          // phrase's last note never loses over 17 % of its length; PJ_ORGAN_BREATH scales it)
           if (phraseEnd) {
             static const double kBreath = std::getenv("PJ_ORGAN_BREATH") ? std::atof(std::getenv("PJ_ORGAN_BREATH")) : 1.0;
             const double b = kBreath * std::clamp(0.2 * dur, 0.08, 0.25) * (baroque ? 1.0 : 0.7);
@@ -1398,7 +1608,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
               ++breaths;
             }
           }
-          gap = std::min(gap, 0.6 * dur);
+          gap = std::min(gap, (phraseEnd || lineEnd || restAfter ? 0.17 : 0.6) * dur);
           // (a pedal note sounds at least its big pipes' speech and 0.1 s more, or, written shorter,
           // all but 25 ms: a 16' Principal's fundamental takes ~0.2 s to reach -6 dB, so a fast line
           // detached by a quarter would speak or not by a few ms, its notes struck cold nearly
@@ -1631,7 +1841,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
       // The director's level for each part, block by block (as a file's own expression would
       // come: the breath, the bow's speed); the organs keep their plans' own.
-      if (dir.acts)
+      if (dir.acts || dir.self)
         for (auto& [id, p] : parts) {
           const int ch = id / 128;
           if (ch == 9 || p.plan || p.hplan || dirLevel[ch].empty()) continue;
@@ -1642,6 +1852,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           if (k + 1 < c.size() && now > c[k].first)
             lv += (c[k + 1].second - lv) * (now - c[k].first) / std::max(1e-9, c[k + 1].first - c[k].first);
           p.ens->all(&Performer::setBreath, lv - 0.5);
+          // (A wind's breath moves its level only a little (the flute: ~4 dB over its whole
+          // range, the tone changing more); the director's dynamics and its note-by-note speech
+          // are heard as the player's loudness too: PJ_DIRECTOR_WINDDB (16) dB per unit of level.)
+          static const double kWindDb = knob("PJ_DIRECTOR_WINDDB", 16);
+          const Instrument& wi = *p.inst;
+          if ((wi.kind == Kind::kFlute || wi.kind == Kind::kDuct || wi.kind == Kind::kEndBlown || wi.reed() || wi.lip()) &&
+              std::strcmp(wi.family, "bagpipe") != 0)
+            p.dirGain = float(std::pow(10.0, kWindDb * (lv - 0.5) / 20));
         }
       // A Tonewheel's planned Rotary nudges: in the middle of a long note, where no event comes, so
       // by the clock (their ticks turned to seconds by the tempo map).
@@ -1838,7 +2056,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             ++hp.played;
             continue;
           }
-          if (dir.acts && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
+          if ((dir.acts || dir.self) && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
           if (it->second.bplan)  // (the brass section: what the song says about this key)
             if (const BrassHint* bh = it->second.bplan->find(e.a, e.t)) it->second.ens->brassHint(*bh);
           // (a drum: the stroke that sounds it at the SoundFonts' level: drumkit.h)
@@ -1971,7 +2189,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         float g = float(std::pow(chVol[ch] * 127 / 100.0, 2) * std::pow(chExpr[ch], 2));
         // (and the program's level: where the SoundFonts put it against their piano, src/gmlevels_data.h;
         // the drums have theirs key by key, src/drumcal_data.h)
-        if (ch != 9) g *= p.gmGain;
+        if (ch != 9) g *= p.gmGain * p.dirGain;
         // (one Tonewheel playing several channels: one fader, the channels' own by how many of its
         // notes each plays)
         if (!p.tonewheelChans.empty()) {

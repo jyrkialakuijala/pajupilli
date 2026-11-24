@@ -61,10 +61,13 @@ struct DirInput {
   int tonic = -1;
   bool minor = false;
   bool ridden[16] = {};  // the channel has its own expression (CC 11, 1, 2 or pressure)
+  bool wind[16] = {};    // the channel is a wind player's (a flute, a reed, a brass: it speaks and breathes)
 };
 
 struct Direction {
   bool acts = false;
+  bool self = false;  // (not acting: the wind parts' own reading only, their cues and levels; the time the file's)
+  bool gridded = false;  // (the file is quantized: its note lengths are the notation's, free to articulate)
   enum Style { kUnknown, kBaroque, kClassical, kRomantic } style = kUnknown;
   std::vector<DirTempo> tempo;                        // the song's new tempo map (if acts)
   std::vector<Cue> cues;                              // one per input note
@@ -77,6 +80,9 @@ struct Direction {
 
 // -director on|off|auto (default auto). False: not one of those.
 bool setDirectorMode(const std::string& mode);
+// -style baroque|classical|romantic|auto: the reading's style forced, not read from the rhythm;
+// a style given also turns the director on (as -director on), unless it is off. False: no such style.
+bool setDirectorStyle(const std::string& style);
 Direction direct(const DirInput& in);
 // A level curve at a tick.
 float levelAt(const std::vector<std::pair<long, float>>& curve, long tick);

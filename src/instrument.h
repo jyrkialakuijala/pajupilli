@@ -77,6 +77,9 @@ struct ReedParams {
   // ~0.1 s by itself; lips that chase it from the first periods tighten past
   // the note's state into its octave.
   double earStart = 0;
+  // The breath vibrato's depth, x the director's (an oboist's is narrow: the pressure's pulse moves
+  // the double reed's overtones, a shimmer; 1: as any wind's).
+  double vibScale = 1;
 };
 
 // A duct or the lips at an open end: the jet and the window it crosses.

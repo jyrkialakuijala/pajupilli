@@ -13,6 +13,7 @@ namespace pajupilli {
 namespace {
 
 int gMode = 0;  // -1 off, 0 auto, 1 on
+int gStyle = -1;  // -style: the reading's style forced (a Direction::Style; -1: read from the rhythm)
 
 double median(std::vector<double> v) {
   if (v.empty()) return 0;
@@ -40,6 +41,16 @@ bool setDirectorMode(const std::string& mode) {
   return true;
 }
 
+bool setDirectorStyle(const std::string& style) {
+  if (style == "baroque") gStyle = Direction::kBaroque;
+  else if (style == "classical") gStyle = Direction::kClassical;
+  else if (style == "romantic") gStyle = Direction::kRomantic;
+  else if (style == "auto") gStyle = -1;
+  else return false;
+  if (gStyle >= 0 && gMode == 0) gMode = 1;  // (a style given: the director acts, unless -director off)
+  return true;
+}
+
 float levelAt(const std::vector<std::pair<long, float>>& c, long tick) {
   if (c.empty()) return 0.5f;
   if (tick <= c.front().first) return c.front().second;
@@ -59,8 +70,8 @@ Direction direct(const DirInput& in) {
   static const double kDyn = kAll * knob("PJ_DIRECTOR_DYN", 1.0), kAcc = kAll * knob("PJ_DIRECTOR_ACCENT", 1.0);
   static const double kVib = knob("PJ_DIRECTOR_VIB", 1.0), kRit = kAll * knob("PJ_DIRECTOR_RIT", 1.0);
   static const double kHold = knob("PJ_DIRECTOR_FERMATA", 1.6), kQuant = knob("PJ_DIRECTOR_QUANT", 0.9);
-  if (gMode < 0 || n < 8) {
-    d.summary = gMode < 0 ? "director: off" : "director: too few notes to read";
+  if (n < 8) {
+    d.summary = "director: too few notes to read";
     return d;
   }
   const long div = std::max(1, in.div), bar = in.barTicks > 0 ? in.barTicks : 4 * div;
@@ -95,14 +106,27 @@ Direction direct(const DirInput& in) {
     }
   }
   const bool fewTempo = double(in.tempo.size()) <= 1 + bars / 4;
-  d.acts = gMode > 0 || (quant >= kQuant && flat && fewTempo);
+  d.acts = gMode > 0 || (gMode == 0 && quant >= kQuant && flat && fewTempo);
+  d.gridded = quant >= kQuant;
   char why[200];
   std::snprintf(why, sizeof why, "%.0f %% of the notes on the grid, velocities %s, %d tempo events in %.0f bars",
                 100 * quant, flat ? "flat" : "varied", int(in.tempo.size()), bars);
+  // Without the director (off, or out of a file with its own performance), the wind players still
+  // read their own lines (PJ_WIND_SELF, 1): a wind part with no breath or expression of its own
+  // (no CC 11, 1, 2 or pressure) is not blown like a machine. Its players say their notes, shape
+  // their phrases to the line's high point and play with the piece's drama (below); the tempo,
+  // the other parts and every other decision stay the file's (d.self, not d.acts).
+  const std::string outWhy = gMode < 0 ? "director: off" : std::string("director: stays out (the file has its own performance: ") + why + ")";
   if (!d.acts) {
-    d.summary = std::string("director: stays out (the file has its own performance: ") + why + ")";
-    return d;
+    bool any = false;
+    for (int c = 0; c < 16; ++c) any |= in.wind[c] && !in.ridden[c] && chNotes[c] > 0;
+    if (!any || knob("PJ_WIND_SELF", 1.0) <= 0) {
+      d.summary = outWhy;
+      return d;
+    }
+    d.self = true;
   }
+  const bool self = d.self;
 
   // --- The parts: which carries the melody (the highest), which the bass (the lowest).
   int melody = -1, bass = -1, channels = 0;
@@ -139,6 +163,7 @@ Direction direct(const DirInput& in) {
   const double longShare = double(longN) / n, melLongShare = melN ? double(melLong) / melN : 0;
   d.style = motor >= 0.55 && longShare < 0.08 && modeIoi <= div / 2 ? Direction::kBaroque
           : melLongShare >= 0.3 ? Direction::kRomantic : Direction::kClassical;
+  if (gStyle >= 0) d.style = Direction::Style(gStyle);  // (-style)
   const bool baroque = d.style == Direction::kBaroque, romantic = d.style == Direction::kRomantic;
 
   // --- Phrases: everyone rests together; or the melody rests on a long note; none longer than
@@ -278,11 +303,11 @@ Direction direct(const DirInput& in) {
   // --- The arc. Baroque: terraces (the full texture forte, the thin one piano, an echo softer,
   // a small swell into the cadence). Otherwise hairpins: up to each phrase's climax and down
   // again, the piece's climax the highest.
-  std::vector<std::pair<long, float>> arc;
+  std::vector<std::pair<long, float>> arc;  // (none for the winds' own reading: there is no conductor)
   double meanTex = 0;
   for (double t : texture) meanTex += t / np;
   int echoes = 0;
-  for (int p = 0; p < np; ++p) {
+  for (int p = 0; p < np && !self; ++p) {
     const long s = d.phrases[p].first, e = d.phrases[p].second;
     if (baroque) {
       const bool ec = echo(p);
@@ -347,6 +372,43 @@ Direction direct(const DirInput& in) {
   // a chord's).
   struct Swell { long on, peak, off; float depth; };
   std::vector<Swell> swells[16];
+  // A Baroque wind line speaks (PJ_DIRECTOR_SPEECH, 1; Quantz, Versuch 1752, VII, VIII, XI and
+  // XIV 41; Hotteterre, Principes 1707): not every note alike, as an organ's, but each said as
+  // a syllable of a sentence.
+  //   - Good and bad notes: the note on the beat a little louder and tongued harder ("ti"), the
+  //     ones between softer and lighter ("di"): the bar's own stress, note by note.
+  //   - Each note relaxes once it has spoken (a breath-borne tone falls a little after its
+  //     start); a long note is begun softly, swells and fades (messa di voce), deeper than a
+  //     string's.
+  //   - The sigh: a stressed note that falls by a step onto a weaker one (an appoggiatura or a
+  //     Seufzer) is leaned on and slurred into its resolution, which is softer and lifted.
+  //   - Breaths: a line running on without a rest breathes after PJ_DIRECTOR_BREATHE seconds
+  //     (5) where a flutist would, after a note on the beat before a leap or after a longer
+  //     note, the note shortened by up to 0.15 s; past 1.8 x that, at the next note on a beat.
+  // Points on the channel's level curve (tick, offset), added to it below.
+  // (A Classical reading too, at 0.6: Quantz's rules are the galant style's, and a Bach movement of
+  // long lines is read as Classical by its rhythm alone.)
+  const double kSpeech = kAll * knob("PJ_DIRECTOR_SPEECH", 1.0) * (baroque ? 1.0 : romantic ? 0.0 : 0.6);
+  static const double kBreathe = knob("PJ_DIRECTOR_BREATHE", 5.0);
+  struct Spoken { long on, off; float at, end; };
+  std::vector<Spoken> spoken[16];
+  std::vector<char> sighFrom(n, 0), sighTo(n, 0);
+  auto speaks = [&](int ch) { return in.wind[ch] && !in.ridden[ch]; };  // (its breaths; the rest x kSpeech)
+  for (int i = 0; i < n; ++i) {  // (the sighs, first: a note needs to know it resolves one)
+    const DirNote& x = nt[i];
+    const int nx = nextIn[i];
+    if (kSpeech <= 0 || !speaks(x.ch) || nx < 0 || nt[nx].tick > x.tickOff + div / 16) continue;
+    const int step = x.key - nt[nx].key;
+    const long dur = x.tickOff - x.tick, ndur = nt[nx].tickOff - nt[nx].tick;
+    if (step >= 1 && step <= 2 && weight(x.tick) >= 0.35 && weight(nt[nx].tick) < weight(x.tick) && ndur <= dur &&
+        dur >= div && phraseOf(nt[nx].tick) == phraseOf(x.tick)) {  // (a quarter at least: not passagework)
+      sighFrom[i] = 1;
+      sighTo[nx] = 1;
+    }
+  }
+  int breaths = 0;
+  long sinceBreath[16];
+  std::fill(sinceBreath, sinceBreath + 16, -1L);
   const double vibBase = baroque ? 0.5 : romantic ? 1.0 : 0.8;
   for (int i = 0; i < n; ++i) {
     const DirNote& x = nt[i];
@@ -371,13 +433,37 @@ Direction direct(const DirInput& in) {
     double len = 1;
     if (baroque && dur <= div && gapless && !lastOfPhrase)
       len = std::abs(nt[nx].key - x.key) > 2 || weight(nt[nx].tick) >= 0.6 ? 0.80 : 0.93;
-    if (lastOfPhrase && gapless) {  // the breath: ~0.12 s, at most a quarter of the note
+    if (lastOfPhrase && gapless) {  // the breath: ~0.12 s, at most 17 % of the note
       const double breath = 0.12 / lenAt(in.tempo, double(x.tickOff) / div) * div;
-      len = std::max(0.6, 1 - std::min(0.25 * dur, breath) / dur);
+      len = 1 - std::min(0.17 * dur, breath) / dur;
     }
     if (!lastOfPhrase && dur <= 2 * div) len *= keying(x.tick);
+    // (a wind line's speech: its sighs and its breaths)
+    const bool speech = speaks(x.ch) && !chord;
+    bool breathe = false;
+    if (speech) {
+      if (sighFrom[i]) { len = 1; acc += 0.25; }  // (leaned on, slurred into its resolution)
+      if (sighTo[i]) { len = std::min(len, 0.75); acc -= 0.2; }  // (the resolution: softer, lifted)
+      // The breath: the time since the line last had air (a rest, a phrase's end, a breath).
+      if (sinceBreath[x.ch] < 0 || pv < 0 || x.tick - nt[pv].tickOff >= div / 8) sinceBreath[x.ch] = x.tick;
+      const double ran = double(x.tickOff - sinceBreath[x.ch]) / div * lenAt(in.tempo, double(x.tick) / div);
+      if (lastOfPhrase || !gapless) {
+        sinceBreath[x.ch] = -1;
+      } else if (ran >= kBreathe && !sighFrom[i]) {
+        const long ndur = nt[nx].tickOff - nt[nx].tick;
+        const bool good = w >= 0.35 && (std::abs(nt[nx].key - x.key) > 2 || dur > ndur);
+        breathe = good || (ran >= 1.8 * kBreathe && weight(nt[nx].tick) >= 0.35);
+        if (breathe) {
+          ++breaths;
+          const double b = 0.15 / lenAt(in.tempo, double(x.tickOff) / div) * div;
+          len = std::min(len, 1 - std::min(0.4 * dur, b) / dur);
+          sinceBreath[x.ch] = -1;
+        }
+      }
+    }
+    if (speech) c.v[kCueAccent] = float(std::clamp(acc * kAcc, -1.0, 1.0));
     c.v[kCueLength] = float(1 + (len - 1) * std::min(1.0, kAll));
-    c.v[kCueLegato] = gapless && !lastOfPhrase && len > 0.9 ? 1.0f : 0.0f;
+    c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && len > 0.9 ? 1.0f : 0.0f;
     c.v[kCuePhraseEnd] = lastOfPhrase ? 1.0f : 0.0f;
     c.v[kCueMute] = muted[p] ? 1.0f : 0.0f;
     // Vibrato: none on Baroque passagework, an ornament on its long notes; light in the
@@ -392,8 +478,17 @@ Direction direct(const DirInput& in) {
     c.v[kCueVibDelay] = float(delay);
     c.v[kCueVibRate] = float(1 + (romantic ? 0.04 : 0.0) + 0.03 * c.v[kCueAccent]);
     // A long note of a line swells and fades.
-    if (!chord && x.ch != bass && dur >= 3 * div / 2 && secs >= 0.8 && !in.ridden[x.ch]) {
-      const float depth = float(kDyn * (baroque ? 0.06 : romantic ? 0.16 : 0.10));
+    // (a wind line's notes: the bar's stress and each note's own shape)
+    if (speech) {
+      const double g = w >= 1 ? 0.05 : w >= 0.6 ? 0.035 : w >= 0.35 ? 0.01 : w >= 0.1 ? -0.03 : -0.045;
+      const double lean = sighFrom[i] ? 0.05 : sighTo[i] ? -0.05 : 0.0;
+      const double at = kSpeech * (g + lean);
+      const double relax = secs >= 0.2 ? kSpeech * std::min(0.05, 0.03 + 0.02 * secs) : 0.0;
+      spoken[x.ch].push_back({x.tick, x.tickOff, float(at), float(at - relax)});
+    }
+    const bool longSpoken = speech && dur >= div && secs >= 0.6;
+    if (!chord && x.ch != bass && (longSpoken || (dur >= 3 * div / 2 && secs >= 0.8)) && !in.ridden[x.ch]) {
+      const float depth = float(kDyn * (longSpoken ? 0.12 * kSpeech : baroque ? 0.06 : romantic ? 0.16 : 0.10));
       const float peak = lastOfPhrase ? 0.35f : 0.55f;
       c.v[kCueSwell] = depth;
       c.v[kCueSwellPeak] = peak;
@@ -401,16 +496,71 @@ Direction direct(const DirInput& in) {
     }
   }
 
+  // --- A wind line's own shape (PJ_WIND_ARC, 1; Baroque x0.5, Classical x0.8, Romantic x1): each
+  // phrase rises to the line's highest note in it and falls after (the melody's own charge), and
+  // the whole follows the piece's drama (PJ_WIND_DRAMA, 1): how busy all the parts are just now
+  // (onsets a second, over a bar each side) against the piece's median: busier, fuller and more
+  // urgent (up to +0.07); calmer, more intimate (down to -0.07).
+  const double kArc = kAll * knob("PJ_WIND_ARC", 1.0) * (baroque ? 0.5 : romantic ? 1.0 : 0.8);
+  const double kDrama = kAll * knob("PJ_WIND_DRAMA", 1.0);
+  std::vector<long> allOn;
+  for (const DirNote& x : nt) allOn.push_back(x.tick);  // (sorted: nt is)
+  auto activity = [&](long t) {
+    const long lo = t - bar, hi = t + bar;
+    const long c = long(std::upper_bound(allOn.begin(), allOn.end(), hi) - std::lower_bound(allOn.begin(), allOn.end(), lo));
+    return double(c) / std::max(1e-3, double(hi - lo) / div * lenAt(in.tempo, double(t) / div));
+  };
+  double medAct = 1;
+  {
+    std::vector<double> a;
+    for (long b = 0; b < lastOff; b += bar) a.push_back(activity(b));
+    if (!a.empty()) { std::nth_element(a.begin(), a.begin() + a.size() / 2, a.end()); medAct = std::max(0.1, a[a.size() / 2]); }
+  }
+  auto drama = [&](long t) {
+    return float(kDrama * 0.07 * std::clamp(std::log2(std::max(1e-3, activity(t)) / medAct), -1.5, 1.5) / 1.5);
+  };
+  std::vector<long> peakOf[16];  // [ch][phrase]: its highest note's tick (-1: silent there)
+  for (int ch = 0; ch < 16; ++ch) {
+    if (!speaks(ch)) continue;
+    peakOf[ch].assign(np, -1);
+    std::vector<int> top(np, -1);
+    for (int i = 0; i < n; ++i)
+      if (nt[i].ch == ch) {
+        const int p = phraseOf(nt[i].tick);
+        if (top[p] < 0 || nt[i].key > top[p]) { top[p] = nt[i].key; peakOf[ch][p] = nt[i].tick; }
+      }
+  }
+  auto lineArc = [&](int ch, long t) {
+    if (peakOf[ch].empty()) return 0.0f;
+    const int p = phraseOf(t);
+    const long s = d.phrases[p].first, e = d.phrases[p].second, pk = peakOf[ch][p];
+    if (pk < 0) return 0.0f;
+    double v;
+    if (t <= pk) v = -0.03 + 0.09 * double(t - s) / double(std::max(1L, pk - s));
+    else v = 0.06 - 0.11 * double(t - pk) / double(std::max(1L, e - pk));
+    return float(kArc * std::clamp(v, -0.05, 0.06));
+  };
+
   // --- Each part's level: the arc, the melody a little over the others, its swells.
   for (int ch = 0; ch < 16; ++ch) {
-    if (chNotes[ch] == 0 || in.ridden[ch]) continue;
+    if (chNotes[ch] == 0 || in.ridden[ch] || (self && !speaks(ch))) continue;
     const float off = float(kDyn * (channels < 2 ? 0.0 : ch == melody ? 0.05 : -0.02));
     std::vector<long> at;
     for (auto& a : arc) at.push_back(a.first);
     for (const Swell& s : swells[ch]) { at.push_back(s.on); at.push_back(s.peak); at.push_back(s.off); }
+    for (const Spoken& s : spoken[ch]) { at.push_back(s.on); at.push_back(std::max(s.on + 1, s.off - 1)); }
     std::sort(at.begin(), at.end());
     at.erase(std::unique(at.begin(), at.end()), at.end());
-    size_t k = 0;
+    size_t k = 0, q = 0;
+    // (a spoken note's offset at t: from its start to its end, held over the gap after it)
+    auto said = [&](long t) {
+      const std::vector<Spoken>& v = spoken[ch];
+      while (q + 1 < v.size() && v[q + 1].on <= t) ++q;
+      if (v.empty() || v[q].on > t) return 0.0f;
+      const Spoken& s = v[q];
+      const long e = std::max(s.on + 1, s.off - 1);
+      return t >= e ? s.end : s.at + (s.end - s.at) * float(t - s.on) / float(e - s.on);
+    };
     for (long t : at) {
       while (k < swells[ch].size() && swells[ch][k].off < t) ++k;
       float bump = 0;
@@ -419,12 +569,31 @@ Direction direct(const DirInput& in) {
         bump = t <= s.peak ? s.depth * float(t - s.on) / float(std::max(1L, s.peak - s.on))
                            : s.depth * (1 - 1.3f * float(t - s.peak) / float(std::max(1L, s.off - s.peak)));
       }
-      d.level[ch].push_back({t, std::clamp(levelAt(arc, t) + off + bump, 0.05f, 0.95f)});
+      // (a spoken long note begins below its level: the swell rises from softer)
+      float soft = 0;
+      if (!spoken[ch].empty() && k < swells[ch].size() && swells[ch][k].on == t) soft = -0.04f * float(kSpeech);
+      const float own = speaks(ch) ? lineArc(ch, t) + drama(t) : 0.0f;
+      d.level[ch].push_back({t, std::clamp(levelAt(arc, t) + off + bump + soft + said(t) + own, 0.05f, 0.95f)});
     }
   }
   for (int i = 0; i < n; ++i) {
     d.cues[i].v[kCueLevel] = levelAt(d.level[nt[i].ch], nt[i].tick);
     d.cues[i].v[kCueLevelEnd] = levelAt(d.level[nt[i].ch], nt[i].tickOff);
+  }
+
+  // (the winds' own reading ends here: the time, the mutes and the other parts are the file's)
+  if (self) {
+    d.mutes.clear();
+    int lines = 0, notes = 0, sighs = 0;
+    for (int ch = 0; ch < 16; ++ch) { lines += !spoken[ch].empty(); notes += int(spoken[ch].size()); }
+    for (char c : sighFrom) sighs += c;
+    static const char* const kStyleS[] = {"unknown", "Baroque", "Classical", "Romantic"};
+    char b2[300];
+    std::snprintf(b2, sizeof b2, "\n  the winds read their own lines (%s%s): %d notes of %d lines, %d sighs, %d breaths, "
+                  "each phrase to its high point, with the piece's drama",
+                  kStyleS[d.style], gStyle >= 0 ? ", -style" : "", notes, lines, sighs, breaths);
+    d.summary = outWhy + b2;
+    return d;
   }
 
   // --- The time: fermatas (a long chord everyone begins together, then a general rest), the
@@ -499,8 +668,8 @@ Direction direct(const DirInput& in) {
   // --- What it decided.
   static const char* const kStyle[] = {"unknown", "Baroque", "Classical", "Romantic"};
   char buf[800];
-  int nb = std::snprintf(buf, sizeof buf, "director: %s, %s; %.0f bars of %g quarters; %d phrases%s; melody on channel %d%s\n",
-                         kStyle[d.style], baroque ? "terraced dynamics" : "hairpins to each phrase's climax", bars, barBeats, np,
+  int nb = std::snprintf(buf, sizeof buf, "director: %s%s, %s; %.0f bars of %g quarters; %d phrases%s; melody on channel %d%s\n",
+                         kStyle[d.style], gStyle >= 0 ? " (-style)" : "", baroque ? "terraced dynamics" : "hairpins to each phrase's climax", bars, barBeats, np,
                          echoes ? (", " + std::to_string(echoes) + " echoes").c_str() : "", melody + 1,
                          bass >= 0 ? (", bass on " + std::to_string(bass + 1)).c_str() : "");
   if (top >= 0 && climax[top] >= 0)
@@ -512,6 +681,14 @@ Direction direct(const DirInput& in) {
   nb += std::snprintf(buf + nb, sizeof buf - nb, "final rit. over %g quarters (-%.0f %%), the last chord held\n", ritLen,
                       100 * ritDepth / (1 + ritDepth));
   if (mutedN) nb += std::snprintf(buf + nb, sizeof buf - nb, "  mutes on in %d of the %d phrases\n", mutedN, np);
+  {
+    int lines = 0, notes = 0, sighs = 0;
+    for (int ch = 0; ch < 16; ++ch) { lines += !spoken[ch].empty(); notes += int(spoken[ch].size()); }
+    for (char c : sighFrom) sighs += c;
+    if (notes)
+      nb += std::snprintf(buf + nb, sizeof buf - nb, "  winds speak: %d notes of %d lines, good and bad notes, %d sighs, %d breaths\n",
+                          notes, lines, sighs, breaths);
+  }
   if (repeated) nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d repeats (a bar or more said again at once): keyed long / mid / short in turn\n", repeated);
   std::snprintf(buf + nb, sizeof buf - nb, "  vibrato: %s; articulation: %s  (%s)",
                 baroque ? "an ornament, long notes only" : romantic ? "always, widest at the climaxes" : "light, on the longer notes",

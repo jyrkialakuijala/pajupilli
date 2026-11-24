@@ -55,6 +55,17 @@ PianoDesign brightGrandDesign() {
     s.mh *= kMass;
   }
   tuneByPartials(&d);
+  // The keys evened to the concert grand's balance over the keyboard, as a voicer evens a scale
+  // (dB at every sixth key from A0; by itself the shorter tenor strings speak ~3 dB under the
+  // grand's against middle C and the hard treble hammers 3-5 dB over: measured as played in the
+  // room, A-weighted, velocities 48, 80 and 112, smoothed over nine keys).
+  static const double kEven = knob("PJ_BRIGHTGRAND_EVEN", 1);
+  static constexpr double kEvenDb[16] = {-3.6, -1.1, 2.3, 3.8, 3.2, 3.0, 0.8, -1.6, -2.7, -1.3, -3.5, -5.0, -5.4, -3.2, -2.0, -2.7};
+  for (int key = 0; key < 88; ++key) {
+    const int i = std::min(key / 6, 14);
+    const double t = std::min((key - 6 * i) / 6.0, 1.0);
+    d.key[key].levelDb = kEven * (kEvenDb[i] + t * (kEvenDb[i + 1] - kEvenDb[i]));
+  }
   d.board.n = brightboard::kModes;
   d.board.patches = brightboard::kPatches;
   d.board.freq = brightboard::kFreq;
