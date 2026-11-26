@@ -236,6 +236,10 @@ const char* const kGm[128][3] = {
 
 // -reinstrument's rules: (from, to).
 std::vector<std::pair<std::string, const Instrument*>> gReinstrument;
+// (a rule's transposition, TO:N semitones, for the lead singer: "flute=voice-lead:-12"; kNoShift: the singer's own choice)
+constexpr int kNoShift = 1000;
+std::vector<int> gReinstrumentShift;
+std::vector<std::string> gReinstrumentVoice;  // (... and its voice, TO:soprano; empty: the singer's own choice)
 // (a jazz trio's file, a piano and an upright bass: its GM 36 is the upright, not a fretless:
 // research/fretless_bass.md 5, 8.4; the user's decision of 2026-11-16)
 bool gJazzUpright = false;
@@ -253,6 +257,21 @@ const Instrument* forProgram(int prog) {
   for (const auto& [from, to] : gReinstrument)
     if (from == "*" || (in && (from == in->name || from == in->family))) return to;
   return in;
+}
+
+// The transposition -reinstrument gave the part of program prog (kNoShift: none given), and the voice.
+int reinstrumentShift(int prog, std::string* voice) {
+  const Instrument* in = nullptr;
+  for (const char* nm : kGm[prog & 127])
+    if (nm && !in) in = findInstrument(nm);
+  for (size_t i = 0; i < gReinstrument.size(); ++i) {
+    const std::string& from = gReinstrument[i].first;
+    if (from == "*" || (in && (from == in->name || from == in->family))) {
+      *voice = gReinstrumentVoice[i];
+      return gReinstrumentShift[i];
+    }
+  }
+  return kNoShift;
 }
 
 // (an instrument of the Tonewheel family: all of a file's join one organ)
@@ -417,6 +436,8 @@ void planPianists(Song& song, bool baroque) {
 
 bool setReinstrument(const std::string& spec) {
   gReinstrument.clear();
+  gReinstrumentShift.clear();
+  gReinstrumentVoice.clear();
   for (size_t at = 0; at <= spec.size();) {
     const size_t e = std::min(spec.find(',', at), spec.size());
     const std::string rule = spec.substr(at, e - at);
@@ -429,14 +450,45 @@ bool setReinstrument(const std::string& spec) {
     }
     const std::string from = rule.substr(0, eq);
     std::string to = rule.substr(eq + 1);
+    // (TO:N: transposed N semitones; TO:VOICE: the lead singer's voice; both: voice-lead:tenor:-12)
+    int shift = kNoShift;
+    std::string voiceName;
+    for (size_t colon = to.rfind(':'); colon != std::string::npos; colon = to.rfind(':')) {
+      const std::string part = to.substr(colon + 1);
+      char* endp = nullptr;
+      const long v = std::strtol(part.c_str(), &endp, 10);
+      if (!part.empty() && !*endp) {
+        if (v < -60 || v > 60) {
+          std::fprintf(stderr, "-reinstrument: %s: a transposition of -60 .. 60 semitones\n", rule.c_str());
+          return false;
+        }
+        shift = int(v);
+      } else {
+        JazzSinger probe;
+        if (!probe.setVoice(part)) {
+          std::fprintf(stderr, "-reinstrument: %s: want TO:SEMITONES or TO:VOICE (profondo, bass, baritone, tenor, countertenor, contralto, mezzo, soprano, coloratura)\n",
+                       rule.c_str());
+          return false;
+        }
+        voiceName = part;
+      }
+      to = to.substr(0, colon);
+    }
     if (to == "organ") to = "organ-plan";  // (the church organ by its plan)
     const Instrument* in = findInstrument(to.c_str());
     if (!in) {
       std::fprintf(stderr, "-reinstrument: no instrument %s\n", to.c_str());
       return false;
     }
+    if ((shift != kNoShift || !voiceName.empty()) && std::strcmp(in->name, "voice-lead") != 0) {
+      std::fprintf(stderr, "-reinstrument: %s: only voice-lead takes a transposition or a voice so far\n", rule.c_str());
+      return false;
+    }
     gReinstrument.push_back({from, in});
-    std::fprintf(stderr, "  reinstrumented: %s on %s\n", from.c_str(), in->name);
+    gReinstrumentShift.push_back(shift);
+    gReinstrumentVoice.push_back(voiceName);
+    if (shift != kNoShift) std::fprintf(stderr, "  reinstrumented: %s on %s, %+d semitones\n", from.c_str(), in->name, shift);
+    else std::fprintf(stderr, "  reinstrumented: %s on %s\n", from.c_str(), in->name);
   }
   return true;
 }
@@ -462,6 +514,7 @@ struct Part {
   // The lead voice's singer, who reads the part ahead and sings it (src/jazzsinger.h): the part's
   // keys do not go to its ensemble, the singer's sound is heard from a place in it.
   std::unique_ptr<JazzSinger> singer;
+  float singerSide = 0;  // where it stands, -1 .. 1 of the stage's half width
   std::map<int, int> tonewheelDiv;             // channel * 128 + key -> division (held notes)
   size_t rotaryNext = 0;                     // the plan's next Rotary change
   size_t lvibNext = 0;                       // the plan's next lower vibrato tab switch
@@ -649,7 +702,73 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     }
     std::vector<DrumTempo> tm;
     for (const Song::Tempo& x : song.tempo) tm.push_back({x.t, x.beat, x.len});
-    const std::vector<CymbalSwirl> sw = planCymbalSwirls(notes, tm, song.gs);
+    std::vector<CymbalSwirl> sw = planCymbalSwirls(notes, tm, song.gs);
+    // The ending (the author, 2026-11-26: "the swoosh has to stop before the final note, it cannot
+    // continue over it, perhaps there can be a snare, kick and crash to indicate the end instead").
+    // The final note: the last notes of the pitched parts, from the first of those begun within a
+    // second of the very last. A swirl is over two bars before it (a swirl left under a second
+    // long is not played at all), and with brushes the drummer marks the final note with the snare,
+    // the bass drum and a crash, unless the file's own drums already strike there. PJ_SWIRL_END=0: as before.
+    if (knob("PJ_SWIRL_END", 1) > 0 && (jazzBand || brushKitWanted() || !sw.empty())) {
+      double last = -1, final = -1;
+      for (const DrumPlanNote& nn : notes)
+        if (!nn.drum) last = std::max(last, nn.t);
+      for (const DrumPlanNote& nn : notes)
+        if (!nn.drum && nn.t >= last - 1.0 && (final < 0 || nn.t < final)) final = nn.t;
+      if (final > 0) {
+        const double bar = 4 * (song.tempo.empty() ? 0.5 : song.tempo.back().len);
+        for (size_t q = 0; q < sw.size();) {
+          if (sw[q].off > final - 2 * bar) sw[q].off = final - 2 * bar;
+          if (sw[q].off - sw[q].on < 1.0) {
+            std::fprintf(stderr, "  (the brushes: no swirl into the ending, from %.1f s)\n", sw[q].on);
+            sw.erase(sw.begin() + q);
+          } else ++q;
+        }
+        // A proper ending for the drummer of a jazz band (JazzDrumming.md): the file's time-keeping
+        // does not run on over the final note (with brushes every such stroke is a sweep, a swoosh
+        // under the last chord). Nothing of the drums after the final note; the beat before it left
+        // open (the breath); before that a setup figure, three snare strokes in a triplet growing
+        // into it, so that the final hit is no surprise.
+        if (jazzBand || brushKitWanted()) {
+          const double beat = bar / 4;
+          int after = 0, open = 0;
+          for (Event& e : song.ev) {
+            if ((e.status & 15) != 9 || (e.status & 0xf0) != 0x90 || e.b == 0) continue;
+            if (e.t > final + 0.03) { e.skip = true; ++after; }
+            else if (e.t > final - 0.95 * beat && e.t < final - 0.03) { e.skip = true; ++open; }
+          }
+          uint64_t tick = 0;
+          for (const Event& e : song.ev)
+            if (e.t <= final - 2 * beat) tick = e.tick;
+          for (int q = 0; q < 3; ++q) {
+            const double t = final - 2 * beat + q * beat / 3;
+            song.ev.push_back({t, 0, uint8_t(0x99), uint8_t(38), uint8_t(56 + 9 * q)});
+            song.ev.back().tick = tick;
+            song.ev.push_back({t + 0.08, 0, uint8_t(0x89), uint8_t(38), uint8_t(0)});
+            song.ev.back().tick = tick;
+          }
+          std::fprintf(stderr, "  (the ending: a triplet on the snare into the last beat, the beat before the final note left open (%d strokes), nothing after it (%d strokes))\n",
+                       open, after);
+        }
+        bool struck = false;
+        for (const DrumPlanNote& nn : notes)
+          if (nn.drum && std::fabs(nn.t - final) < 0.05 && (nn.key == 35 || nn.key == 36 || nn.key == 38 || nn.key == 40 || nn.key == 49 || nn.key == 57)) struck = true;
+        if (!struck && (jazzBand || brushKitWanted())) {
+          uint64_t tick = 0;
+          for (const Event& e : song.ev)
+            if (e.t <= final) tick = e.tick;
+          const int hit[3][2] = {{36, 86}, {38, 80}, {49, 70}};
+          for (const auto& h : hit) {
+            song.ev.push_back({final, 0, uint8_t(0x99), uint8_t(h[0]), uint8_t(h[1])});
+            song.ev.back().tick = tick;
+            song.ev.push_back({final + 0.25, 0, uint8_t(0x89), uint8_t(h[0]), uint8_t(0)});
+            song.ev.back().tick = tick;
+          }
+          std::fprintf(stderr, "  (the ending: the snare, the bass drum and a crash on the final note, %.1f s)\n", final);
+          std::stable_sort(song.ev.begin(), song.ev.end(), [](const Event& a, const Event& b) { return a.t < b.t; });
+        }
+      }
+    }
     for (const CymbalSwirl& s : sw) {
       std::fprintf(stderr, "  (the brushes: a swirl on the %s, bars %d-%d, %.1f-%.1f s, velocity %d)\n",
                    s.key == kKeySwirlRide ? "ride" : s.key == kKeySwirlCrash2 ? "crash (18\")" : "crash (16\")", s.bar0 + 1, s.bar0 + s.bars, s.on, s.off, s.velocity);
@@ -1866,7 +1985,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if ((e.status & 0xf0) != 0xb0 || e.a != 64 || e.b >= 64 || ech == 9 || between[ech]) continue;
       bool piano = false;
       for (auto& [id, p] : parts)
-        if (id / 128 == ech && dynamic_cast<PianoPlayer*>(&p.ens->player(0))) piano = true;
+        if (id / 128 == ech && p.ens->size() > 0 && dynamic_cast<PianoPlayer*>(&p.ens->player(0))) piano = true;
       if (!piano) continue;
       size_t k = 0;
       while (k + 1 < song.tempo.size() && song.tempo[k + 1].t <= e.t) ++k;
@@ -1898,6 +2017,8 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       if (id / 128 == 9 || std::strcmp(p.inst->name, "voice-lead") != 0) continue;
       std::vector<SungNote> notes;
       std::vector<double> others;
+      std::vector<HeardNote> heard;         // the other parts' notes, for the singer's tuning
+      std::map<int, size_t> heardOpen;      // channel x 128 + key -> its note
       std::map<int, size_t> open;  // key -> its note
       int pg[16] = {};
       for (const Event& e : song.ev) {
@@ -1907,6 +2028,23 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         const bool on = kind == 0x90 && e.b > 0;
         if (ech * 128 + pg[ech] != id) {
           if (on && ech != 9 && !e.skip) others.push_back(e.t - startT);
+          if (ech != 9) {
+            auto ho = heardOpen.find(ech * 128 + e.a);
+            if (ho != heardOpen.end()) {
+              heard[ho->second].off = e.t - startT;
+              heardOpen.erase(ho);
+            }
+            auto hp = parts.find(ech * 128 + pg[ech]);
+            const int fam = hp == parts.end() ? kBandNone : bandFamily(hp->second.inst->family, hp->second.inst->name);
+            if (on && !e.skip && fam != kBandNone && !hp->second.singer && std::strcmp(hp->second.inst->name, "voice-lead") != 0) {
+              HeardNote h;
+              h.on = e.t - startT;
+              h.off = h.on + 0.25;
+              h.ch = ech; h.pitch = e.a; h.vel = e.b; h.fam = fam;
+              heardOpen[ech * 128 + e.a] = heard.size();
+              heard.push_back(h);
+            }
+          }
           continue;
         }
         auto o = open.find(e.a);
@@ -1920,20 +2058,52 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         s.off = s.on + 0.25;
         s.key = e.a;
         s.vel = e.b;
+        {  // (where in the bar: the weighted syllables)
+          const long bar = song.barTicks ? song.barTicks : 4L * song.div;
+          const long tk = long(e.tick);
+          s.beat = tk % bar == 0 ? 1.0f : (bar % (2 * song.div) == 0 && tk % (bar / 2) == 0) ? 0.75f : tk % song.div == 0 ? 0.5f : 0.2f;
+        }
         if ((dir.acts || dir.self) && e.cue >= 0) {
           s.accent = dir.cues[e.cue].v[kCueAccent];
           s.phraseEnd = dir.cues[e.cue].v[kCuePhraseEnd] > 0.5f;
+          // (the drama, the hairpins and the vibrato are the director's for the singer too)
+          const float* cv = dir.cues[e.cue].v;
+          s.cued = true;
+          s.level = cv[kCueLevel]; s.levelEnd = cv[kCueLevelEnd];
+          s.swell = cv[kCueSwell]; s.swellPeak = cv[kCueSwellPeak];
+          s.vibDepth = cv[kCueVibDepth]; s.vibDelay = cv[kCueVibDelay]; s.vibRate = cv[kCueVibRate];
         }
         open[e.a] = notes.size();
         notes.push_back(s);
       }
       if (notes.empty()) continue;
       p.singer.reset(new JazzSinger());
-      p.singer->setScore(notes, others);
+      // (its transposition: -reinstrument's TO:N, else PJ_SINGER_SHIFT, else the singer's own choice)
+      {
+        std::string voice;
+        int shift = reinstrumentShift(id % 128, &voice);
+        if (shift == kNoShift && std::getenv("PJ_SINGER_SHIFT")) shift = std::atoi(std::getenv("PJ_SINGER_SHIFT"));
+        if (shift != kNoShift) p.singer->setShift(shift);
+        if (voice.empty() && std::getenv("PJ_SINGER_VOICE")) voice = std::getenv("PJ_SINGER_VOICE");
+        if (!voice.empty() && !p.singer->setVoice(voice)) std::fprintf(stderr, "  (no voice %s: the singer chooses)\n", voice.c_str());
+      }
+      p.singer->setScore(notes, others, heard);
       JazzSinger* js = p.singer.get();
-      p.ens->setLeadFeed([js](float* out, int n) { js->render(out, n); });
-      say(stderr, "  (channel %d: the lead voice sung, moved %+d semitones into the singer's range; it begins: %s)\n", id / 128 + 1,
-          js->transposed(), js->words().substr(0, std::min<size_t>(js->words().find('\n'), 90)).c_str());
+      // (one singer at the centre; two a tenth of the stage either side; more spread a little wider)
+      int nLead = 0, kLead = 0;
+      for (auto& [id2, p2] : parts)
+        if (id2 / 128 != 9 && std::strcmp(p2.inst->name, "voice-lead") == 0) {
+          if (id2 == id) kLead = nLead;
+          ++nLead;
+        }
+      p.singerSide = nLead < 2 ? 0.0f : float(-0.1 * (nLead - 1) + 0.2 * kLead);
+      // (intimacy by our own means: the singer in the hall everyone shares, with a microphone close
+      // to the voice blended in, PJ_SINGER_NEAR_DB: its direct and early sound that much over what
+      // the hall's main microphones have of it, the reverberation as it was)
+      p.ens->setLeadFeed([js](float* out, int n) { js->render(out, n); }, p.singerSide, float(std::pow(10.0, knob("PJ_SINGER_NEAR_DB", 6) / 20)));
+      say(stderr, "  (channel %d: the lead voice sung by a %s, moved %+d semitones%s; %d of its %d notes outside the voice's range %s; it begins: %s)\n",
+          id / 128 + 1, js->voiceName(), js->transposed(), js->shiftAsked() ? " as asked" : "", js->outside(), int(notes.size()), js->range().c_str(),
+          js->weighted().substr(0, std::min<size_t>(js->weighted().find('\n'), 90)).c_str());
     }
   auto renderSong = [&]() {
     std::vector<float> l(kBlock), r(kBlock);
@@ -2310,7 +2480,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         p.ens->setShareGain(float(std::pow(chVol[ch] * 127 / 100.0, 2) * std::pow(chExpr[ch], 2)) * (ch != 9 ? p.gmGain * p.dirGain : 1.0f));
       }
       pool.run(int(jobs.size()), [&](int i) {
-        for (Part* p : jobs[i]) p->ens->render(p->l.data(), p->r.data(), kBlock);
+        for (Part* p : jobs[i]) {
+          p->ens->render(p->l.data(), p->r.data(), kBlock);
+          // (the lead singer's own plate, behind the voice: src/jazzsinger.h)
+          if (p->singer) p->singer->halo(p->l.data(), p->r.data(), kBlock, p->singerSide);
+        }
       });
       for (auto& [id, p] : parts) {
         // Volume and expression: as a mixing desk's fader, on the square law

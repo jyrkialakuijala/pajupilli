@@ -642,6 +642,13 @@ void Piano::build() {
         static const double kRef = knob("PJ_PIANO_RESTRIKE_LEN", 0.1);
         const double left = std::log(0.4) * d_.restrike / 0.6 * kRef / s.len * std::fabs(std::sin(a));
         restrikeLn_[m] = float(0.5 * left * (1 + std::min(1.0, f * 1.5e-3)));
+      } else if (d_.repluck > 0 && s.pluckK > 0) {
+        // (A plectrum on a ringing string: the energy left = (1 - repluck) ^ how far the partial
+        // moves at the pluck point, whatever the string's length: the tip is held by the jack and
+        // does not give as a felt does. The log is for the amplitude, and a partial that turns
+        // within the touch is taken twice as fast on its half-turns, as under the hammer.)
+        const double left = std::log(1 - std::min(d_.repluck, 0.99)) * std::fabs(std::sin(a));
+        restrikeLn_[m] = float(0.5 * left * (1 + std::min(1.0, f * d_.repluckTime)));
       }
       vw_[m] = 1;
       hc_[m] = float(shape * cs_[m] / w);
@@ -1078,7 +1085,7 @@ void Piano::strike(int key, double speed) {
   // (the voicing above and below goes by the blow as played; only the energy by the mass)
   k.vh = float(speed * (d_.massPower != 1 && nKeys_ > 48 ? fastPow(std::max(k.mh / key_[48].mh, 1.0f), (d_.massPower - 1) / 2) : 1.0));
   k.hammerOn = true;
-  k.restrikeT = d_.restrike > 0 && rang ? 0 : -1;
+  k.restrikeT = (d_.restrike > 0 || (d_.repluck > 0 && k.pluckK > 0)) && rang ? 0 : -1;
   if (d_.bloom > 0 && !rang) k.bloomT = 0;  // (a string still ringing is not made to duck)
   // The nap by the blow: a gentle hammer lands on all of its depth and stays round (x
   // PJ_PIANO_NAPPACKP, 3.0, at 0.5 m/s and under), by a moderate blow it is the design's own
@@ -1506,8 +1513,10 @@ void Piano::glideStep(Key& k) {
 // smooth window), each partial's up-and-down swing, by the string's length (restrikeLn_), only
 // while it is on the hammer's side of the string. The sideways swing goes on. (PJ_PIANO_RESTRIKE, 0.6; PJ_PIANO_RESTRIKE_DIR=-1: the
 // other half of the swing, for comparing.)
+// A plectrum touching a ringing string does the same from under it, over the design's repluckTime
+// (PianoDesign::repluck): the swing toward the tip at the pluck point is what it stops.
 void Piano::restrikeStep(Key& k) {
-  const int n = std::max(1, int(1.5e-3 * fs_));
+  const int n = std::max(1, int((k.pluckK > 0 ? d_.repluckTime : 1.5e-3) * fs_));
   if (k.restrikeT >= n) { k.restrikeT = -1; return; }
   const float sn = std::sin(float(M_PI) * (k.restrikeT + 0.5f) / n), w = 2 * sn * sn / n;
   static const float kDir = knob("PJ_PIANO_RESTRIKE_DIR", 1) < 0 ? -1.0f : 1.0f;

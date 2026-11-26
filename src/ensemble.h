@@ -302,9 +302,17 @@ class Ensemble {
   // A sound made elsewhere, heard from one player's place in the room instead of that player (the
   // lead singer, who reads the part ahead: src/jazzsinger.h). f gives the next n samples (mono,
   // 48 kHz), in order. setFeed: a slot of this ensemble; setLeadFeed: a choir's middle seat.
-  void setFeed(int slot, std::function<void(float*, int)> f) { feedSlot_ = slot; feed_ = std::move(f); }
-  void setLeadFeed(std::function<void(float*, int)> f);
+  // (near: a microphone close to that place, blended in: its direct and early sound x this at the
+  // listener, the reverberation it raises in the room as it was)
+  // (slot2: a second place sharing the sound half and half with the first: between two seats, where no seat is)
+  void setFeed(int slot, std::function<void(float*, int)> f, float near = 1, int slot2 = -1) {
+    feedSlot_ = slot; feed_ = std::move(f); feedNear_ = near; feedSlot2_ = slot2;
+  }
+  // (at: where on the stage, -1 .. 1 of its half width from the middle: a duet's two a little apart)
+  void setLeadFeed(std::function<void(float*, int)> f, double at = 0, float near = 1);
   int feedSlot_ = -1;
+  float feedNear_ = 1;
+  int feedSlot2_ = -1;
   std::function<void(float*, int)> feed_;
  private:
   void choirOn(int key, int velocity);

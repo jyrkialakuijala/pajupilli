@@ -101,7 +101,9 @@ class ModalSet {
 
   // Pluck vibrator i: a force (N) rising over `rise` s, held `hold` s, let go
   // over `slip` s; angle: the pull's direction from z towards y (rad).
-  void pluck(int i, double force, double rise, double hold, double slip, double angle = 0.6);
+  // repluck: of a vibrator still ringing, the energy the pick takes from the modes that swing
+  // fully where it meets the string (0: none, the new pull only added to the old motion).
+  void pluck(int i, double force, double rise, double hold, double slip, double angle = 0.6, double repluck = 0);
   // A mallet: mass (kg), speed (m/s), contact stiffness K (N/m^alpha), alpha.
   void strike(int i, double mass, double speed, double K, double alpha = 1.5);
   // The bow on vibrator i: its speed (m/s), force (N); exc is the shape under
@@ -143,6 +145,11 @@ class ModalSet {
     float couple = 1;
     // Pluck.
     double pF = 0, pRise = 0, pHold = 0, pSlip = 0, pT = 1e9, pAngle = 0.6;
+    // A pluck of a ringing vibrator: the motion it had (stepped on its own beside the whole),
+    // each mode's loss (the log of its amplitude's gain over the whole contact), the contact's
+    // sample (-1: none) and its length.
+    alignas(64) float rx[2][kModes] = {}, rv[2][kModes] = {}, rLn[kModes] = {};
+    int rT = -1, rN = 0;
     // Mallet.
     bool mOn = false;
     double mMass = 0, mZ = 0, mV = 0, mK = 0, mAlpha = 1.5, mT = 0;

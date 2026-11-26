@@ -85,6 +85,89 @@ exp/log/pow in vectorized loops). Everything is in `namespace puhuja`.
 - Judged by: pajupilli's measurement of the same test line (src/jazzsinger.cc); not yet by ear.
 - For puhuja: part of a sung-note call (pitch, length, the two anchors in ms), not fields of the speech shape.
 
+### 2026-11-26: an expression line: breath pressure and vibrato over time
+- Motivation: the author: "the director should be in charge of drama, vibrato and hairpins of the singer, too".
+  pajupilli's director gives each note a level at its start and its end, a swell with its peak, and a vibrato
+  (depth, rate, when it begins). Speech has one level a sound and no vibrato: a crescendo through a held vowel
+  or a vibrato coming in late had no way in.
+- Change: `Synth::setExpression(std::vector<Expr>)` (puhuja.h): points over the output's time (s), each a lung
+  pressure factor and a vibrato (cents either way, Hz), straight lines between them. In the sample loop
+  (puhuja.cc, beside the tension map): the pitch target x the vibrato before the pitch control and the tension
+  map read it, the lung pressure x the factor after the line's level. Empty by default: speech is unchanged.
+  The caller has to know when each sound falls in the output; pajupilli takes that from a first rendering's
+  labels.
+  Later the same day a fourth value a point, `cents`: the pitch target itself moved (default 0). The singer's
+  practice needed it (the author: "practice the voice similarly to wind instruments, both for slurred and direct
+  intervals"): one of the things tried on arriving at a note is aiming a little past it for some tens of ms, as a
+  singer's folds are set for a leap; a vowel's two pitch anchors can only draw a straight line through the note.
+- Judged by: pajupilli's measurement of a sung line (level and pitch tracks against the line asked); not by ear.
+- For puhuja: part of a sung-note call, the contour given over the note's own length, so no first rendering is
+  needed to place it.
+
+### 2026-11-26: the mouth opened for high notes, and the folds brought together
+- Motivation: a soprano sings above her vowels' first resonance, where the air column stops helping the folds
+  (the author's notes on inertive reactance: she drops the jaw and flares the lips so that the first resonance
+  stays at or just above her pitch, and all vowels move towards "ah" up there). pajupilli first tried this with
+  `Shape::f1`: on the line tract the formant targets of a shape do nothing (the sound was the same bit for bit,
+  as it was for `Shape::press`), the tube's shape comes from the phoneme. And the soprano's overtones are weak
+  (on G5 the 2nd to 5th partials 27 to 45 dB under the fundamental): a way to bring the folds together was
+  wanted to try a firmer closure.
+- Change: `Synth::Expr::open` (puhuja.h; 0 by default): in the sample loop, where the line's shape for the
+  moment is final (`lineShapePlanned`), the shape mixed 0.7 x open towards the table's "ah", the lip area
+  x (1 + 1.5 open), the lip tube x (1 - 0.5 open), the oral area x (1 + 0.5 open).
+  `Synth::setAdduction(rest)` / `LarynxControl::restX` (larynx.cc, after the voice-quality rest factors): the
+  folds' rest gap and chink while voicing x rest. Speech is unchanged (0 and 1).
+  And `Synth::Expr::neutral` (0 by default): the shape mixed towards the table's neutral vowel, at the same
+  place as `open` (the author's notes on scat: at tempo the articulators cannot reach the vowels, which
+  centralize to a schwa-like carrier between the consonants; and an unstressed syllable's vowel is reduced).
+  Later the same day `Synth::Expr::adduct` (1 by default): the same factor over time, for stress in scat
+  singing (the author's notes: a stressed syllable has the folds pressed together, a longer closed phase and a
+  flatter spectral tilt, without more breath; a ghost note has them let apart, breathy).
+- Judged by: see pajupilli's measurements of held soprano notes (src/jazzsinger.h); the closure moved the
+  overtones by 1 to 3 dB at most and upset the pitch of single notes, and is not used.
+- For puhuja: a jaw and lip gesture belongs in the articulation (a sung vowel's shape by its pitch), not laid
+  over the finished shape; the folds' closure in the larynx control beside the glottal area.
+
+### 2026-11-26: the vocal folds' mass by voice, and following the pitch
+- Motivation: the string folds have one mass (0.15 g on 1.4 cm) and their stiffness grows as the square of the
+  pitch asked. Sung, they held their pitch only to about D4; at a flute's pitches the voice gave almost no
+  sound (the author: "it is producing no or almost no output in the flute range"). The author: "idealize the
+  singer by changing the mass on the vocal cords to get higher -- if mass is changed, then it needs to be a
+  controlled (PD-system) change that changes relatively quickly (like in ~3 ms to reach 98 % of the goal mass)
+  since then the tension needs to be suitable fitted as well -- or otherwise, choose singers vocal coord mass
+  initially based on their wished range". Both are in: a voice's own mass (a soprano's folds are shorter and
+  thinner than a baritone's), and less of the fold swinging above the voice's passaggio.
+- Change: `VocalFolds::Input::mass` (folds.h; 1 by default), used by the string folds alone (string.cc: every
+  lane's mass and every stiffness derived from it x this, so the pitch is still the tension's);
+  `LarynxControl::foldMass` (larynx.h), followed in `FoldLarynx::step` by a critically damped follower, 98 % of
+  a change in 3 ms (larynx.cc); `Synth::setFoldMass(scale, kneeHz, power)` (puhuja.h): the mass x scale, and
+  above kneeHz x (kneeHz / pitch)^power, set each sample from the pitch target (puhuja.cc). Speech is unchanged
+  (1, 0: the mass table itself, bit for bit).
+- Judged by: a sung scale C3 to E6 on "dah" (pajupilli, 2026-11-26). Mass 1: on pitch to D4, then 70 to 200
+  cents off. Mass 0.5: to G#4. Mass 0.25: to C5. Mass 1 falling as (150 Hz / pitch)^1.5: within 7 cents from C3
+  to E5 and from A#5 to D6, with a hole at F#5 and G#5 (240 and 95 cents flat; the pitch crossing the vowel's
+  first formant, probably) and at E6. Lighter folds are far louder on the same breath (mass 0.5: +10 dB; the
+  falling mass: +20 dB and more at the top); pajupilli levels that after the fact. Not judged by ear.
+- For puhuja: the fold's length is a constant (1.4 cm), so a shorter fold is only stood in for by its mass; a
+  voice preset would set length, mass and the chink together. The level should follow from the physics (a
+  shorter fold passes less air), not be levelled afterwards.
+
+### 2026-11-26: a voice between or beyond the male and the female preset
+- Motivation: pajupilli's singers are nine voices, basso profondo to coloratura soprano. The author: "if it is a
+  woman, the whole head is smaller, including nasal cavities, brains are 1.2 liters vs. man brain 1.4 liters, so
+  probably in the same ratio other things, too", and: "the amount of female and male hormones can be a bit of a
+  continuum so perhaps soprano could be slightly more feminine than the usual female head -- like the parameters
+  could be 1.1 * female - 0.1 * male, for mezzo the defaults, and 0.9 * female + 0.1 * male for alto, and
+  similarly for male voices". puhuja has the two presets and nothing between.
+- Change: `Synth::setVoiceBlend(woman)` (puhuja.h, puhuja.cc): `setVoice` of the nearer preset (the pulse, the
+  per-voice knobs and filters are one or the other), then every value of the `Voice` struct mixed
+  male + woman x (female - male), and what `setVoice` derives from them set again. 0 and 1 return right after
+  `setVoice`: the presets themselves, speech unchanged.
+- Judged by: not judged; pajupilli uses -0.15 (basso profondo), -0.1 (bass), 0 (baritone), 0.1 (tenor,
+  countertenor), 0.9 (contralto), 1 (mezzo), 1.1 (soprano), 1.15 (coloratura).
+- For puhuja: the per-voice parameters chosen by `-female` at start-up ("@f" values) are not mixed and cannot be
+  chosen in-process at all; a voice as a value from 0 to 1 would need them read per Synth.
+
 ## The form of an entry
 
     ### YYYY-MM-DD: a short title

@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "jazzsinger.h"
 #include "director.h"
 #include "analysis.h"
 #include "brasssect.h"
@@ -427,6 +428,8 @@ const char kUsage[] =
     "                      channels (11 or ch11) or drums, e.g. -only choir,oboe,16\n"
     "                      (the piece's tempo and phrasing read from all its parts)\n"
     "  -onlyskip LIST      as -only, and the song from just before their first note\n"
+    "  -singer-practice    the lead singer practises its notes and intervals (slurred and\n"
+    "                      direct) and writes src/singer_data.h; build again to use it\n"
     "  -polydemo           a line, a held note under a melody, chords, a rolled\n"
     "                      chord; with -ensemble also a chorale (-o to save,\n"
     "                      stereo)\n"
@@ -601,6 +604,8 @@ int run(int argc, char** argv) {
     else if (a == "-transpose") lopt.transpose = std::atoi(next());
     else if (a == "-v") lopt.verbose = true;
     else if (a == "-poly") lopt.poly = std::max(1, std::min(16, std::atoi(next())));
+    else if (a == "-singer-practice") return JazzSinger::practise("src/singer_data.h", 0);
+    else if (a == "-singer-voices") { setenv("PJ_SINGER_PRACTICE_VOICES_MODE", "1", 1); return JazzSinger::practise("src/singer_data.h", 0); }  // (which folds suit each voice: src/jazzsinger.cc)  // (the lead singer practises: src/jazzsinger.h)
     else if (a == "-polydemo") polyDemo = true;
     else if (a == "-play") playFile = next();
     else if (a == "-director") {

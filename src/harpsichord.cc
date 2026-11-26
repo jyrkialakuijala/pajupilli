@@ -141,6 +141,15 @@ PianoDesign harpsichordDesign() {
   }
   des.board.phi = phi.data();
   des.hammerWidth = 0.001;   // (a plectrum's width)
+  // (a key plucked again while its string still rings, by the owner's ear, 2026-11-26: the new
+  // pluck is not only added to the old swing. The quill's tip rests against the string for a
+  // moment before it bends, and stops part of what swings into it there: PJ_HPSI_REPLUCK, 0.6, of
+  // the energy of a partial that moves fully at the pluck point and is on the quill's side of the
+  // string during the touch (-4 dB), less by the partial's share of motion at that point, none of
+  // one with a node there or swinging away; over PJ_HPSI_REPLUCK_MS, 1.5, as a hammer on the
+  // grand's ringing string. 0: off, the pluck only added, as before.)
+  des.repluck = knob("PJ_HPSI_REPLUCK", 0.6);
+  des.repluckTime = knob("PJ_HPSI_REPLUCK_MS", 1.5) * 1e-3;
   des.sideTuneCents = knob("PJ_HPSI_SIDETUNE", 14);  // the bridge pin: the two directions 0.8 % apart
   des.top = 12000;
   // (the strings nobody plays, ringing in sympathy: their overtones to 5 kHz only. All 244 strings

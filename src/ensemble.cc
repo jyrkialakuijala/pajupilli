@@ -981,7 +981,7 @@ void Ensemble::block(float* left, float* right, int n) {
     // seconds)
     const double idle = s.v->instrument().kind == Kind::kString ? 6.0 : kIdle;
     if (s.active && !s.held && !s.v->player().busy() && now_ - s.lastOff > idle) s.active = false;
-    if (i == feedSlot_) s.active = true;  // (a sound from elsewhere is heard from this place: setFeed)
+    if (i == feedSlot_ || i == feedSlot2_) s.active = true;  // (a sound from elsewhere is heard from this place: setFeed)
     sounding += s.active;
   }
   // (Every flute there is: a section's players all (a roster: each a seat on the stage); of a
@@ -1022,6 +1022,10 @@ void Ensemble::block(float* left, float* right, int n) {
     }
   }
   if (feedSlot_ >= 0 && feedSlot_ < nf && feed_) feed_(buf_[feedSlot_].data(), n);  // (instead of the player there)
+  if (feedSlot_ >= 0 && feedSlot_ < nf && feed_ && feedSlot2_ >= 0 && feedSlot2_ < nf) {
+    for (int j = 0; j < n; ++j) buf_[feedSlot_][j] *= 0.5f;
+    std::copy(buf_[feedSlot_].begin(), buf_[feedSlot_].begin() + n, buf_[feedSlot2_].begin());
+  }
   for (int i : go) playing += f_[i].v->player().busy();
   if (velGain_)
     for (Slot& s : f_) s.vg += (1 - std::exp(-n / 48000.0 / s.vgTau)) * (s.vgTo * s.sg - s.vg);
@@ -1060,6 +1064,7 @@ void Ensemble::block(float* left, float* right, int n) {
       // (an instrument making its own early sound, the organ's pipes each
       // through the church: the room adds only its late field)
       lg[i] = f_[i].v->ownEarly() ? 0.0f : g;
+      if (i == feedSlot_ || i == feedSlot2_) lg[i] *= feedNear_;  // (its close microphone: setFeed)
     }
     // An instrument whose sound differs with direction: its three directional parts, to the
     // same scale (the velocity's gain; not the listener's gain and trim, which the voice's

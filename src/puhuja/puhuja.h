@@ -235,6 +235,11 @@ class Synth {
   // Select a speaker preset (pitch, formant scaling, tempo, breathiness).
   // Call before pushing text; setBaseF0 afterwards overrides the pitch.
   void setVoice(VoicePreset preset);
+  // (pajupilli, singing: CHANGES.md 2026-11-26) A voice between or beyond the two presets: every value of the
+  // preset `woman` of the way from the male's to the female's (0 the male, 1 the female, 1.1 a little past her,
+  // -0.1 a little past him); what is one or the other (the pulse, the per-voice knobs and filters) from the
+  // nearer. 0 and 1 are the presets themselves.
+  void setVoiceBlend(float woman);
   void setBaseF0(float f0) { baseF0_ = f0; }
   // (pajupilli, singing: CHANGES.md 2026-11-25) The folds' pitch controller for this voice: the share of the pitch
   // error corrected per cycle, and the flow fluctuation (cm^3/s) from which it learns. A singer holds the pitch
@@ -252,6 +257,28 @@ class Synth {
   // singer's low larynx); raiseScale x the consonants' larynx rise (LINE_RAISE_*; 0: it stays where it is through
   // s k g r). 0 and 1: the speaker's.
   void setLarynx(float lowerCm, float raiseScale) { larynxLow_ = lowerCm; larynxRaiseX_ = raiseScale; }
+  // (pajupilli, singing: CHANGES.md 2026-11-26) Lighter vocal folds, for a higher voice: their mass x `scale`;
+  // and above `kneeHz` (0: nowhere) also x (kneeHz / pitch)^power, so that with power 2 the folds' stiffness
+  // stops growing with the pitch from there up. The larynx follows a change within 3 ms. 1, 0: as built.
+  void setFoldMass(float scale, float kneeHz = 0, float power = 2) { foldMass_ = scale; foldKneeHz_ = kneeHz; foldPower_ = power; }
+  // (pajupilli, singing: CHANGES.md 2026-11-26) How firmly the folds are brought together while voicing: their
+  // rest gap and the posterior chink x `rest` (1: the speaker's; less: firmer, the flow shut sharply each
+  // cycle, the overtones stronger; a trained singer's closure against a speaker's).
+  void setAdduction(float rest) { adduction_ = rest; }
+  // (pajupilli, singing: CHANGES.md 2026-11-26) An expression line over the output's time: at each point (t in s
+  // from the first sample pulled, ascending) the lung pressure x `press`, and a vibrato of `vibCents` (the pitch's
+  // swing either way) at `vibHz`; straight lines between the points, the first and the last held outside them. A
+  // hairpin, a swell, a vibrato beginning late in a note: the singer's, where speech has one level a sound. Empty
+  // (the default): none.
+  // (cents: the pitch itself moved this far, e.g. a brief aim past a note on arriving at it)
+  // (open: the mouth opened for a high note, 0 .. 1: the vowel's shape that far towards "ah"'s, the jaw dropped
+  // and the lips flared, which raises the tract's first resonance; a soprano keeps it at or above her pitch)
+  // (adduct: the folds' rest gap and chink x this at that moment, on top of setAdduction: < 1 pressed together
+  // for a stressed syllable, > 1 let apart for a breathy ghost note)
+  // (neutral: the vowel's shape this far towards the neutral vowel's, 0 .. 1: a quick or unstressed sung
+  // syllable, whose articulators do not reach the vowel)
+  struct Expr { double t; float press, vibCents, vibHz; float cents = 0; float open = 0; float adduct = 1; float neutral = 0; };
+  void setExpression(std::vector<Expr> e) { expr_ = std::move(e); exprI_ = 0; }
   // Kokoro mode: a reference reading's profile guides rhythm, pitch and level (prosody.h); nullptr: puhuja's own.
   void setProsodyGuide(ProsodyGuide* g) { prosodyGuide_ = g; }
   // Kokoro mode: the reference's gap after the given input word (1-based as setWord; 0: before the first word), ms; < 0: none.
@@ -780,6 +807,12 @@ class Synth {
   float tensionLoHz_ = 0;  // (setTensionMap)
   std::vector<float> tensionMap_;
   float larynxLow_ = 0, larynxRaiseX_ = 1;  // (setLarynx)
+  float foldMass_ = 1, foldKneeHz_ = 0, foldPower_ = 2;  // (setFoldMass)
+  float adduction_ = 1;  // (setAdduction)
+  std::vector<Expr> expr_;  // (setExpression)
+  size_t exprI_ = 0;
+  double exprPhase_ = 0;
+  float exprOpen_ = 0, exprAdduct_ = 1, exprNeutral_ = 0;
   float creakTarget_ = 0, creakNow_ = 0, kCreakFollow_ = 0;  // creaky irregularity
   float liqShelfNow_ = 0, liqShelfTarget_ = 0;  // LIQ agent31: extra source shelf share in an ɹ / l (LIQ_R_SHELF ...)
   bool liqShelfSet_ = false;

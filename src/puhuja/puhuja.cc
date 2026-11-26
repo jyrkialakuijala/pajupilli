@@ -2650,6 +2650,43 @@ void Synth::setVoice(VoicePreset preset) {
   setFixedResonances();
 }
 
+void Synth::setVoiceBlend(float woman) {
+  setVoice(woman >= 0.5f ? VoicePreset::Female : VoicePreset::Male);
+  if (woman == 0.0f || woman == 1.0f) return;
+  const Voice &m = kMaleVoice, &f = kFemaleVoice;
+  auto mix = [woman](float a, float b) { return a + woman * (b - a); };
+  Voice v;
+  v.f0 = mix(m.f0, f.f0);
+  for (int i = 0; i < 3; ++i) { v.formant[i] = mix(m.formant[i], f.formant[i]); v.bw[i] = mix(m.bw[i], f.bw[i]); }
+  v.highFormants = mix(m.highFormants, f.highFormants);
+  v.rate = mix(m.rate, f.rate);
+  v.doubledVowel = mix(m.doubledVowel, f.doubledVowel);
+  v.breathiness = std::max(0.0f, mix(m.breathiness, f.breathiness));
+  v.gain = mix(m.gain, f.gain);
+  v.treble = mix(m.treble, f.treble);
+  v.air = std::max(0.0f, mix(m.air, f.air));
+  v.noiseScale = mix(m.noiseScale, f.noiseScale);
+  v.shGain = mix(m.shGain, f.shGain);
+  v.glottalGap = std::max(0.0f, mix(m.glottalGap, f.glottalGap));
+  v.f4 = mix(m.f4, f.f4);
+  v.f5 = mix(m.f5, f.f5);
+  v.microGain = mix(m.microGain, f.microGain);
+  v.cycleJitter = mix(m.cycleJitter, f.cycleJitter);
+  v.cycleShimmer = mix(m.cycleShimmer, f.cycleShimmer);
+  v.sourceTiltDb = mix(m.sourceTiltDb, f.sourceTiltDb);
+  v.sourceUpperCutDb = mix(m.sourceUpperCutDb, f.sourceUpperCutDb);
+  v.sourceMidLiftDb = mix(m.sourceMidLiftDb, f.sourceMidLiftDb);
+  voice_ = v;
+  // (what setVoice derives from the voice, again)
+  baseF0_ = voice_.f0;
+  larynx_->setBaseF0(voice_.f0);
+  trebleShelf_.highShelf(kTrebleShelfHz, voice_.treble, fs_);
+  physUpperCut_.peaking(kPhysUpperCutHz * voice_.formant[2], kPhysUpperCutBw * voice_.formant[2], voice_.sourceUpperCutDb, fs_);
+  physMidLift_.peaking(kPhysMidLiftHz * voice_.formant[1], kPhysMidLiftBw * voice_.formant[1], voice_.sourceMidLiftDb, fs_);
+  physTiltGain_ = std::pow(10.0f, voice_.sourceTiltDb / 20.0f) - 1.0f;
+  setFixedResonances();
+}
+
 // ---------------------------------------------------------------------------
 // Input: UTF-8 text -> phonemes.
 
@@ -12522,6 +12559,22 @@ float Synth::tick() {
         sh = lineShapeMix(lineKeys_[0].s, lineKeys_[1].s, w);
       }
     lineShapePlanned:
+      if (exprNeutral_ > 0.001f) {  // (singing, setExpression's neutral: towards the neutral vowel)
+        static const TractShape kSchwa = [] { TractShape a; lineShapeOf(Ph::Schwa, &a); return a; }();
+        const float len = sh.length, o = std::min(exprNeutral_, 1.0f);
+        sh = lineShapeMix(sh, kSchwa, o);
+        sh.length = len + (kSchwa.length - len) * o;
+      }
+      if (exprOpen_ > 0.001f) {  // (singing, setExpression's open: towards "ah", the jaw dropped, the lips flared)
+        static const TractShape kAh = [] { TractShape a; lineShapeOf(Ph::AA, &a); return a; }();
+        const float o = std::min(exprOpen_, 1.0f);
+        const float len = sh.length;
+        sh = lineShapeMix(sh, kAh, 0.7f * o);
+        sh.length = len + (kAh.length - len) * 0.7f * o;
+        sh.aLip *= 1.0f + 1.5f * o;
+        sh.lLip *= 1.0f - 0.5f * o;
+        sh.aOral *= 1.0f + 0.5f * o;
+      }
       // The female voice: a shorter tract in place of the formant multipliers.
       sh.length /= (voice_.formant[0] + voice_.formant[1] + voice_.formant[2]) / 3.0f;
       sh.lLip += lineExtra_; sh.length += lineExtra_ - larynxRaiseX_ * lineRaise_ + larynxLow_;  // (as above; the larynx raised: LINE_RAISE_*; setLarynx)
@@ -12763,6 +12816,26 @@ float Synth::tick() {
       }
       if (prosodyF0HeldT_ >= 0) lc.f0 = baseF0_ * std::exp2(prosodyF0St_ / 12.0f) * jitter_ * (1.0f + kF0Tension * tension_);
     }
+    float exprPress = 1.0f;
+    if (!expr_.empty()) {  // (singing: the expression line, setExpression)
+      const double ts = static_cast<double>(t_) / fs_;
+      while (exprI_ + 1 < expr_.size() && expr_[exprI_ + 1].t <= ts) ++exprI_;
+      const Expr& a = expr_[exprI_];
+      const Expr& b = expr_[std::min(exprI_ + 1, expr_.size() - 1)];
+      const float x = b.t > a.t ? static_cast<float>(std::clamp((ts - a.t) / (b.t - a.t), 0.0, 1.0)) : 0.0f;
+      exprPress = a.press + x * (b.press - a.press);
+      const float cents = a.vibCents + x * (b.vibCents - a.vibCents), hz = a.vibHz + x * (b.vibHz - a.vibHz);
+      exprPhase_ += 6.283185307179586 * hz / fs_;
+      if (exprPhase_ > 6.283185307179586) exprPhase_ -= 6.283185307179586;
+      if (cents != 0.0f) lc.f0 *= 1.0f + 5.7762265e-4f * cents * static_cast<float>(std::sin(exprPhase_));  // (ln 2 / 1200 a cent)
+      exprOpen_ = a.open + x * (b.open - a.open);
+      exprAdduct_ = a.adduct + x * (b.adduct - a.adduct);
+      exprNeutral_ = a.neutral + x * (b.neutral - a.neutral);
+      const float off = a.cents + x * (b.cents - a.cents);
+      if (off != 0.0f) lc.f0 *= 1.0f + 5.7762265e-4f * off;
+    }
+    lc.restX = adduction_ * (expr_.empty() ? 1.0f : exprAdduct_);  // (setAdduction, Expr::adduct)
+    lc.foldMass = foldMass_ * (foldKneeHz_ > 0 && lc.f0 > foldKneeHz_ ? std::pow(foldKneeHz_ / lc.f0, foldPower_) : 1.0f);  // (setFoldMass)
     lc.pitchControl = pitchControl_;
     if (!tensionMap_.empty()) {  // (singing: the tension known for this pitch)
       const float at = std::clamp(12.0f * std::log2(std::max(lc.f0, 1.0f) / tensionLoHz_), 0.0f, static_cast<float>(tensionMap_.size() - 1));
@@ -12786,6 +12859,7 @@ float Synth::tick() {
       lc.ps *= lineLevelPow_;
     }  // voice amplitude ~ Ps^1.5: a level factor L needs Ps x L^(1/1.5)
     if (gapPsMul_ != 1.0f) lc.ps *= gapPsMul_;  // (GAP_PS_DB)
+    lc.ps *= exprPress;  // (setExpression)
     // Kokoro mode: the reference's level track (dB re its voiced median) through the warp, as a pressure factor.
     // Per word by default (Jyrki 2026-11-06: the 5 ms track made the level "bounce" where Kokoro is "continuous and
     // nicely leveled"), eased over PROSODY_LEVEL_MS; no reference: back to 0 dB.

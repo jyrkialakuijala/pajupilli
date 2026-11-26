@@ -188,12 +188,22 @@ float StringFolds::step(float h, const VocalFolds::Input& in) {
     }
     return t;
   }();
-  const auto& mass = masses.mass;
-  const auto& invMass = masses.invMass;
+  // (pajupilli, singing: CHANGES.md 2026-11-26) lighter folds for a higher voice: every mass x in.mass (the
+  // stiffnesses below follow, so the pitch stays the tension's to set). 1: the table itself, bit for bit.
+  const float massX = in.mass > 0 ? in.mass : 1.0f;
+  Masses scaled;
+  if (massX != 1.0f)
+    for (int j = 0; j < L; ++j)
+      for (int l = 0; l < N; ++l) {
+        scaled.mass[j][l] = masses.mass[j][l] * massX;
+        scaled.invMass[j][l] = masses.invMass[j][l] / massX;
+      }
+  const auto& mass = massX != 1.0f ? scaled.mass : masses.mass;
+  const auto& invMass = massX != 1.0f ? scaled.invMass : masses.invMass;
   alignas(64) float kWall[L][N], damp[L][N];
   float kString[L], kShear[L];
   for (int j = 0; j < L; ++j) {
-    const float layerMass = kMass * (j == 0 ? 1.0f - kTopMass : kTopMass);
+    const float layerMass = massX * kMass * (j == 0 ? 1.0f - kTopMass : kTopMass);
     const float stiff = j == 0 ? 1.0f : kTopStiff;
     const float sqrt_stiff = j == 0 ? 1.0f : std::sqrt(kTopStiff);
     const float meanMass = layerMass * kMovingInv;

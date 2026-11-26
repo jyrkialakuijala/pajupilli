@@ -154,6 +154,11 @@ struct PianoDesign {
   // A hammer landing on a string still ringing: how much of each partial's swing into the hammer
   // it stops, at a place where that partial moves fully (0: none; Piano::restrikeStep).
   double restrike = 0;
+  // A plectrum meeting a string still ringing (the keys with a pluckK): its tip rests against
+  // the string before it bends and lets go, and stops part of each partial's swing into it, as
+  // the hammer above does: this share of the partial's energy where it moves fully at the pluck
+  // point, none at its node there, over repluckTime s from the touch (0: none).
+  double repluck = 0, repluckTime = 1.5e-3;
   // How the blow's energy goes with the hammer's mass, as a power of it, for the hammers heavier
   // than A4's (1: 1/2 m v^2 alone; 2: a heavier hammer also hands its energy over better).
   double massPower = 1;

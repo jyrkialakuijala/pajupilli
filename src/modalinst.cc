@@ -1044,7 +1044,12 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       } else {
         s_.retune(vib, ratio);
       }
-      s_.pluck(vib, 6.25 * amp, 0.002, 0.001, 0.0003, 0.6);
+      // (A string still ringing: the tsume stops part of what swings into it, by where it
+      // meets the string and each partial's phase then (ModalSet::pluck). PJ_KOTO_REPLUCK: the
+      // energy taken from a partial that swings fully there, 0.6 (-4 dB) by the owner's ear,
+      // 2026-11-26; 0: the new pluck only added to the old ring, as before.)
+      static const double kRepluck = std::clamp(knob("PJ_KOTO_REPLUCK", 0.6), 0.0, 1.0);
+      s_.pluck(vib, 6.25 * amp, 0.002, 0.001, 0.0003, 0.6, kRepluck);
       break;
     }
     case ModalModel::kKalimba: {

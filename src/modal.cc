@@ -42,6 +42,7 @@ void ModalSet::reset() {
     std::memset(v.x, 0, sizeof v.x);
     std::memset(v.v, 0, sizeof v.v);
     v.pT = 1e9;
+    v.rT = -1;
     v.mOn = false;
     v.bowOn = false;
     v.bowF = v.bowV = 0;
@@ -116,6 +117,7 @@ void ModalSet::silence(int i) {
   std::memset(v.v, 0, sizeof v.v);
   v.mOn = false;
   v.pT = 1e9;
+  v.rT = -1;
 }
 
 void ModalSet::retune(int i, double ratio, double glide) {
@@ -154,7 +156,15 @@ void ModalSet::setBody(int n, const float* freq, const float* t60, const float* 
   }
 }
 
-void ModalSet::pluck(int i, double force, double rise, double hold, double slip, double angle) {
+// (A pick on a string still ringing stops part of what swings into it, as a piano's hammer does
+// on its string: the modes by how far they move where the pick meets the string (none of one
+// with a node there, the most of one that swings fully), and each only while it is on the pick's
+// side of the string. repluck: the energy taken from a mode that swings fully there and stays on
+// the pick's side; one that turns within the contact is caught only on its half-turns, so it is
+// taken twice as fast then. The motion the string had is kept beside the whole for the contact's
+// time, so only the old ring is taken from, by its own phase: the new pull is the same as on a
+// string at rest. By the owner's ear, 2026-11-26.)
+void ModalSet::pluck(int i, double force, double rise, double hold, double slip, double angle, double repluck) {
   Vib& v = vib_[i];
   v.pF = force;
   v.pRise = std::max(rise, dt_);
@@ -162,6 +172,19 @@ void ModalSet::pluck(int i, double force, double rise, double hold, double slip,
   v.pSlip = std::max(slip, dt_);
   v.pT = 0;
   v.pAngle = angle;
+  v.rT = -1;
+  if (repluck > 0 && v.awake && energy(i) > 1e-13) {
+    const double contact = v.pRise + v.pHold + v.pSlip;
+    const double left = 0.5 * std::log(std::max(1 - repluck, 1e-3));
+    std::memcpy(v.rx, v.x, sizeof v.rx);
+    std::memcpy(v.rv, v.v, sizeof v.rv);
+    for (int k = 0; k < kModes; ++k) {
+      const double f = k < v.def.n ? v.def.freq[k] * v.ratio : 0;
+      v.rLn[k] = float(left * std::min(1.0, std::fabs(double(v.exc[k]))) * (1 + std::min(1.0, f * contact)));
+    }
+    v.rN = std::max(1, int(contact * fs_));
+    v.rT = 0;
+  }
   v.awake = true;
 }
 
@@ -447,6 +470,30 @@ float ModalSet::sample() {
         x[k] = v.c00[p][k] * xk + v.c01[p][k] * vk;
         vv[k] = v.c10[p][k] * xk + v.c11[p][k] * vk;
       }
+    }
+    // A pluck's contact on a ringing vibrator (pluck()): the old motion a step on, and its
+    // share of the whole taken down with it, over a smooth window, while it is on the pick's
+    // side (the pick pulls towards +; the old swing's place along the pull, where the pick is).
+    if (v.rT >= 0) {
+      const float sw = std::sin(float(M_PI) * (v.rT + 0.5f) / v.rN), w = 2 * sw * sw / v.rN;
+      const float ay = d.one ? 1.0f : float(std::sin(v.pAngle)), az = d.one ? 0.0f : float(std::cos(v.pAngle));
+      for (int p = 0; p < (d.one ? 1 : 2); ++p)
+        for (int k = 0; k < nv; ++k) {
+          const float vk = v.rv[p][k] * dm, xk = v.rx[p][k] * dm;
+          v.rx[p][k] = v.c00[p][k] * xk + v.c01[p][k] * vk;
+          v.rv[p][k] = v.c10[p][k] * xk + v.c11[p][k] * vk;
+        }
+      for (int k = 0; k < nv; ++k) {
+        if ((ay * v.rx[0][k] + az * v.rx[1][k]) * v.exc[k] >= 0) continue;
+        const float g = std::max(0.0f, 1 + v.rLn[k] * w) - 1;
+        for (int p = 0; p < 2; ++p) {
+          v.x[p][k] += g * v.rx[p][k];
+          v.v[p][k] += g * v.rv[p][k];
+          v.rx[p][k] += g * v.rx[p][k];
+          v.rv[p][k] += g * v.rv[p][k];
+        }
+      }
+      if (++v.rT >= v.rN) v.rT = -1;
     }
     for (int k = 0; k < nv; ++k) {
       const float vk = v.v[0][k] + d.zShare * v.v[1][k];

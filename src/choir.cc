@@ -780,12 +780,26 @@ void Ensemble::joinChoir(Ensemble& host) {
 }
 
 // The lead singer's place: the seat nearest the middle of the stage.
-void Ensemble::setLeadFeed(std::function<void(float*, int)> f) {
+void Ensemble::setLeadFeed(std::function<void(float*, int)> f, double at, float near) {
   if (!choir_ || kids_.empty() || choir_->seats.empty()) return;
+  double half = 0;
+  for (const ChoirState::Seat& s : choir_->seats) half = std::max(half, std::fabs(double(s.x)));
+  const double want = at * half;
   const ChoirState::Seat* mid = &choir_->seats[0];
   for (const ChoirState::Seat& s : choir_->seats)
-    if (std::fabs(s.x) < std::fabs(mid->x)) mid = &s;
-  kids_[0].ens->setFeed(mid->slot, std::move(f));
+    if (std::fabs(s.x - want) < std::fabs(mid->x - want)) mid = &s;
+  if (std::getenv("PJ_SINGER_TRACE")) {
+    std::fprintf(stderr, "singer seat: x %.2f m (stage half width %.2f m); seats at", mid->x, half);
+    for (const ChoirState::Seat& q : choir_->seats) std::fprintf(stderr, " %.2f", q.x);
+    std::fprintf(stderr, "\n");
+  }
+  // (the stage's very middle has no seat: a singer alone there is heard from the two seats either
+  // side of it, half and half)
+  int slot2 = -1;
+  if (at == 0 && std::fabs(mid->x) > 0.05)
+    for (const ChoirState::Seat& q : choir_->seats)
+      if (q.slot != mid->slot && std::fabs(q.x + mid->x) < 0.02) { slot2 = q.slot; break; }
+  kids_[0].ens->setFeed(mid->slot, std::move(f), near, slot2);
 }
 
 bool Ensemble::sharedPart() const { return share_ || choirHost_ || (choir_ && choir_->clients.size() > 1); }

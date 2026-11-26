@@ -97,6 +97,12 @@ struct LarynxControl {
   // (pajupilli, singing: CHANGES.md 2026-11-25) what the singer knows of the tension this pitch takes: x the
   // tension, beside the controller's correction (which then only trims). 1: nothing known. Synth::setTensionMap.
   float tensionPrior = 1;
+  // (pajupilli, singing: CHANGES.md 2026-11-26) the folds' mass x this, for a higher voice; the larynx follows a
+  // change smoothly (98 % of it in 3 ms). 1: as built. Synth::setFoldMass.
+  float foldMass = 1;
+  // (pajupilli, singing: CHANGES.md 2026-11-26) the folds brought together: their rest gap and the chink while
+  // voicing x this (< 1: firmer closure, a flow that shuts sharply, stronger overtones). 1: as built.
+  float restX = 1;
 };
 
 // What the larynx gives back for this sample.
@@ -216,6 +222,7 @@ class FoldLarynx : public Larynx {
   float cycleJ_ = 0, cycleS_ = 0;  // this cycle's random tension and pressure deviation
   float diploSign_ = 1;  // round AC CREAK: the alternating cycle sign (LarynxControl::diplo)
   float pitchCorr_ = 1, pitchCorrTarget_ = 1;  // pitch controller: tension correction
+  float foldMass_ = 1, foldMassV_ = 0;  // (LarynxControl::foldMass, followed)
   double lastCloseTime_ = 0;  // last fold closure (samples, sub-sample)
   bool belowHalf_ = false;  // the flow has been under half its mean since the last cycle mark
   float kPitchRelax_ = 0, kVibTrack_ = 0;

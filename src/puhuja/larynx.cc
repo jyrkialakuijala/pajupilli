@@ -178,6 +178,15 @@ void FoldLarynx::step(const LarynxControl& c, LarynxOutput& out) {
   in.ps = c.ps;
   in.p1 = p1_;
   in.q = target / kFoldNaturalF0 * pitchCorr_ * c.tensionPrior;
+  // (pajupilli, singing) the folds' mass towards what is asked: a critically damped follower, 98 % of a change in
+  // 3 ms (w = 5.83 / 3 ms), so the mass never jumps under the tension that was fitted to it.
+  if (c.foldMass != foldMass_ || foldMassV_ != 0) {
+    const float w = 1944.0f, h = 1.0f / fs_;
+    foldMassV_ += h * (w * w * (c.foldMass - foldMass_) - 2 * w * foldMassV_);
+    foldMass_ += h * foldMassV_;
+    if (std::fabs(c.foldMass - foldMass_) < 1e-5f && std::fabs(foldMassV_) < 1e-3f) foldMass_ = c.foldMass, foldMassV_ = 0;
+  }
+  in.mass = foldMass_;
   // A half-open glottis (breathy h between vowels) lets the folds sag in
   // pitch (-2.4 st in "few who"), faster than the pitch control learns:
   // the tension makes up for it, following the opening over ~8 ms (at
@@ -260,6 +269,11 @@ void FoldLarynx::step(const LarynxControl& c, LarynxOutput& out) {
       in.rest *= k;
       in.gap *= k;
     }
+  }
+  if (c.restX != 1.0f) {  // (pajupilli, singing: Synth::setAdduction) the voicing rest gap and the chink x restX
+    const float k = 1.0f + (c.restX - 1.0f) * (1.0f - smoothstep(kAgBreathy, kAgOpen, ag));
+    in.rest *= k;
+    in.gap *= k;
   }
   // The folds run kFoldOversample times faster than the output, and their
   // flow is low-passed before it is taken once per sample: the flow drops
