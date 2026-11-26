@@ -62,6 +62,7 @@
 // computed.
 #pragma once
 
+#include <functional>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -97,6 +98,7 @@ class Ensemble {
     if (brass_ && set == &Performer::setLipRoll) { brassBend(x); return; }
     if (brass_ && set == &Performer::setDynamics) { brassSetDynamics(x); return; }
     if (rollFeed_ && set == &Performer::setLipRoll) { wheel_ = x; bandRoll(); return; }  // (src/windear.cc)
+    if (share_) { shareAll(set, x); return; }  // (its own players of the shared orchestra)
     for (Slot& s : f_) (s.v->player().*set)(x);
     for (Section& k : kids_) k.ens->all(set, x);
   }
@@ -112,6 +114,7 @@ class Ensemble {
   // line keeps to its player). Live keeps its own choice.
   void setKeepTails(double secs) {
     keepTails_ = secs;
+    if (Ensemble* e = shareKid()) e->setKeepTails(secs);
     for (Section& k : kids_) k.ens->setKeepTails(secs);
   }  // (how long a released note is taken to ring)
   // (-play) Velocity is loudness, as a General MIDI player's: each note's
@@ -119,11 +122,13 @@ class Ensemble {
   // the listener's gain (the room's air is not). Live keeps the physics alone.
   void setVelocityGain(bool on) {
     velGain_ = on;
+    if (Ensemble* e = shareKid()) e->setVelocityGain(on);
     for (Section& k : kids_) k.ens->setVelocityGain(on && !brass_);  // (the brass section applies its own)
   }
   // (-play) The director's cue for the key that follows (Performer::direct).
   void direct(const Cue& c) {
     if (brass_) brassCue(c);
+    if (share_) { shareCue(c); return; }  // (its own players of the shared orchestra)
     for (Slot& s : f_) s.v->player().direct(c);
     for (Section& k : kids_) k.ens->direct(c);
   }
@@ -173,6 +178,8 @@ class Ensemble {
     double cents = 0;        // its offset from equal temperament
     double gl = 1, gr = 1;   // its pan (no room): gains left and right
     double vg = 1, vgTo = 1, vgTau = 0.005;  // velocity's gain: now, its goal, how fast (s)
+    double sg = 1;           // (a shared string orchestra's player: its part's fader, x vgTo)
+    int earSelf = -2;        // (... and the part it plays for, the band's channel; -2: the ensemble's)
     std::vector<float> room; // the room's pressure here, next block
     // The band's pull (the winds by ear): the note it is for; now, where it goes, how firmly (the
     // weight); when it was last heard, the band's version then; what the section's solve last
@@ -249,6 +256,29 @@ class Ensemble {
   void sectRender(float* left, float* right, int n);
   bool strings_ = false, slow_ = false, tremolo_ = false, pizzOnly_ = false;
   std::vector<SectPlayer> sp_;
+  // One string orchestra for every string part of a played file (src/stringsect.cc, the shared
+  // orchestra; PJ_STRINGS_SHARED): the parts are its clients, each with its keys, its way of
+  // playing (bowed, slow, tremolo, plucked) and its fader; the first of them renders it.
+  struct StringShare;
+  struct StringClient;
+  std::shared_ptr<StringShare> share_;
+  std::shared_ptr<StringClient> client_;
+  int clientIdx_ = -1;
+  Ensemble* shareKid() const;
+  void stringsBand(const SoundingSet* band, int self, int fam);
+  static std::weak_ptr<StringShare>& theShare();
+  static void stringWay(Performer& p, const Instrument& in, const StringClient& c);
+  void shareAll(void (Performer::*set)(double), double x);
+  void shareCue(const Cue& c);
+  void shareAssign();
+  void shareRender(float* left, float* right, int n);
+ public:
+  // (-play) A part of the shared string orchestra: its fader is each of its players' own level
+  // (setShareGain, every block before the render), not the part's output's.
+  bool sharedStrings() const { return share_ != nullptr; }
+  void setShareGain(float g);
+  static void shareStrings(bool on);  // (-play: the string parts built from here on share one orchestra)
+ private:
   // The choir (src/choir.cc, src/choir.h): one ensemble of singers (kids_[0]), each singer's key
   // dealt by its voice part.
   // (role: one voice part only (kChoirBass .. kChoirSoprano; -1: the whole choir), its singers a
@@ -258,6 +288,25 @@ class Ensemble {
   const RoomSpec* choirRoom_ = nullptr;
   void choirAssign();
   void choirTune();  // (the chord tuned by the spectra: src/choir.cc)
+  // (a file's choir parts as one choir: src/choir.cc joinChoir)
+  Ensemble* choirHost_ = nullptr;
+  int choirClient_ = 0;
+  void choirKey(int who, int key, int velocity);
+  void choirFader(float g);
+ public:
+  bool wholeChoir() const;
+  void joinChoir(Ensemble& host);
+  // A part whose players are another ensemble's too (the shared string orchestra, the shared
+  // choir): its fader is its players' own level (setShareGain), its output mixed as it is.
+  bool sharedPart() const;
+  // A sound made elsewhere, heard from one player's place in the room instead of that player (the
+  // lead singer, who reads the part ahead: src/jazzsinger.h). f gives the next n samples (mono,
+  // 48 kHz), in order. setFeed: a slot of this ensemble; setLeadFeed: a choir's middle seat.
+  void setFeed(int slot, std::function<void(float*, int)> f) { feedSlot_ = slot; feed_ = std::move(f); }
+  void setLeadFeed(std::function<void(float*, int)> f);
+  int feedSlot_ = -1;
+  std::function<void(float*, int)> feed_;
+ private:
   void choirOn(int key, int velocity);
   void choirOff(int key);
   void choirRender(float* left, float* right, int n);

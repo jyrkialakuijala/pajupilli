@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -149,7 +150,7 @@ double Vibrato::step(double dt, double rate, double sinceOn, double support, dou
   d1_ += k * urand() - dt / kTau * d1_;
   depthN_ += (d1_ - depthN_) * dt / kTau;
   const double t = sinceOn - delay_;
-  env_ = std::pow(smooth(t / fade_), curve_);
+  env_ = fastPow(smooth(t / fade_), curve_);
   const double speed = rate * rateMul * (start_ + (1 - start_) * smooth(t / (1.5 * fade_))) *
                        std::max(0.3, 1 + 0.15 * rateN_) * (1 + 0.06 * (support - 0.5));
   const double a = 2 * M_PI * speed * dt, c = std::cos(a), s = std::sin(a);

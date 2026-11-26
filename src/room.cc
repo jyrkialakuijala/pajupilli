@@ -1,9 +1,11 @@
 #include "room.h"
 
 #include "knob.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 
 namespace pajupilli {
@@ -44,6 +46,9 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
   const double surface = 2 * (len * wid + len * hei + wid * hei);
   const double mfp = 4 * v / surface;
   const double rt = std::max(spec.rt60, 0.05), rtHigh = rt / 3;  // walls and air take the highs
+  // (PJ_CONCERT_BASSRT: the symphony hall's reverberation time in the bass, x the middle's; 1: as the middle)
+  const double bassRt = std::strcmp(spec.name, "concert") == 0 ? std::max(1.0, knob("PJ_CONCERT_BASSRT", 1.0)) : 1.0;
+  bassA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_ROOM_BASSHZ", 200) / fs));
   double g2 = 0;
   for (int k = 0; k < kLines; ++k) {
     // Spread 0.5 .. 1.6 mean free paths, prime lengths (no common echoes).
@@ -52,11 +57,13 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     while (!isPrime(n)) ++n;
     n = std::min(n, kLineRing - 1);
     len_[k] = n;
-    const double gl = std::pow(10.0, -3.0 * n / (fs * rt));  // per pass, low
-    const double gh = std::pow(10.0, -3.0 * n / (fs * rtHigh));
+    const double gl = fastPow(10.0, -3.0 * n / (fs * rt));  // per pass, low
+    const double gh = fastPow(10.0, -3.0 * n / (fs * rtHigh));
     // One pole: DC gain gl, Nyquist gain gh.
     a1_[k] = float((gl - gh) / (gl + gh));
     b0_[k] = float(gl * (1 - a1_[k]));
+    // (the bass rings longer in a large hall, its warmth: under PJ_ROOM_BASSHZ the decay time x bassRt)
+    bassC_[k] = float(fastPow(10.0, -3.0 * n / (fs * rt * bassRt)) / gl - 1);
     g2 += gl * gl;
   }
   g2 /= kLines;
@@ -120,7 +127,10 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
   // early sound mirrors the stage). Walls absorb differently: hard side walls
   // (0.4 x the mean), front, back and ceiling 0.8 x, the audience floor 2.5 x.
   if (spec.volume > 0) {
-    const double ys = std::min(3.0, 0.2 * len), ym = std::min(ys + spec.listener, len - 1);
+    // (PJ_CONCERT_LISTENER: the symphony hall's main microphones, m from the players; further back,
+    // less of the direct sound against the reflections and the reverberation)
+    const double listener = std::strcmp(spec.name, "concert") == 0 ? knob("PJ_CONCERT_LISTENER", spec.listener) : spec.listener;
+    const double ys = std::min(3.0, 0.2 * len), ym = std::min(ys + listener, len - 1);
     const double alpha = std::min(0.9, absorption / surface);
     wid_ = wid, len_m_ = len, hei_ = hei, ys_ = ys, alpha_ = alpha;
     auto refl = [&](double k) { return std::sqrt(1 - std::min(0.95, k * alpha)); };
@@ -142,11 +152,11 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
               const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
               const int d = int(std::lround(r / kC * fs));
               if (d >= kRing - kBlock) continue;
-              double g = std::pow(bSide, std::abs(u)) * std::pow(bEnd, std::abs(w));
+              double g = fastPow(bSide, std::abs(u)) * fastPow(bEnd, std::abs(w));
               // (the height's bounces alternate: an image above met the ceiling first, one below the floor)
               const int hits = std::abs(z), first = (hits + 1) / 2, second = hits / 2;
-              g *= std::pow(bFloor, z < 0 ? first : second);
-              g *= std::pow(bCeil, z > 0 ? first : second);
+              g *= fastPow(bFloor, z < 0 ? first : second);
+              g *= fastPow(bCeil, z > 0 ? first : second);
               const double cosT = (dx * ax + dy * ay) / std::max(r, 1e-9);
               g *= kMicPattern + (1 - kMicPattern) * cosT;
               Tap tp{s, mic, d, float(g / std::max(r, 0.5)), u, w, z};
@@ -183,9 +193,9 @@ Room::Room(const RoomSpec& spec, const std::vector<double>& x, double fs) : spec
     // omni: energy a^2 + (1 - a)^2 / 3.
     micDiffuse_ = float(std::sqrt(kMicPattern * kMicPattern + (1 - kMicPattern) * (1 - kMicPattern) / 3));
     const double on = kMicPattern + (1 - kMicPattern) * std::cos(kMicAngle);  // the stage's centre, about
-    micGain_ = float(spec.listener /
-                     std::sqrt(on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_));
-    directShare_ = on * on / (on * on + 16 * M_PI / absorption * spec.listener * spec.listener * micDiffuse_ * micDiffuse_);
+    micGain_ = float(listener /
+                     std::sqrt(on * on + 16 * M_PI / absorption * listener * listener * micDiffuse_ * micDiffuse_));
+    directShare_ = on * on / (on * on + 16 * M_PI / absorption * listener * listener * micDiffuse_ * micDiffuse_);
   }
 }
 
@@ -234,8 +244,9 @@ bool Room::ambienceArray(int count, double near, double far) {
   const double nl = 1 / std::max(sl, 1e-9), nr = 1 / std::max(sr, 1e-9);
   // (the array mixed in under the main pair: PJ_ROOM_AMB_DB on all of it, -10; PJ_ROOM_AMB_EARLY_DB
   // more on its direct sound and reflections alone)
-  const double level = std::pow(10.0, knob("PJ_ROOM_AMB_DB", -10.0) / 20);
-  const double early = level * std::pow(10.0, knob("PJ_ROOM_AMB_EARLY_DB", 0.0) / 20);
+  // (in the symphony hall -5: the owner's ear on a concerto, 2026-11-25, more of the room)
+  const double level = fastPow(10.0, knob("PJ_ROOM_AMB_DB", std::strcmp(spec_.name, "concert") == 0 ? -5.0 : -10.0) / 20);
+  const double early = level * fastPow(10.0, knob("PJ_ROOM_AMB_EARLY_DB", 0.0) / 20);
   amb_.clear();
   ambFrom_.assign(ns + 1, 0);
   for (int s = 0; s < ns; ++s) {
@@ -504,7 +515,8 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
     for (int k = 0; k < kLines; ++k) {
       const float raw = line_[k * kLineRing + ((pos_ - len_[k]) & (kLineRing - 1))];
       lp_[k] = b0_[k] * raw + a1_[k] * lp_[k];
-      x[k] = lp_[k];
+      bass_[k] += bassA_ * (lp_[k] - bass_[k]);
+      x[k] = lp_[k] + bassC_[k] * bass_[k];
     }
     // The gate's side chain, keyed by the dry sound: a hit (its fast level
     // jumping over its slow one, within 20 dB of the recent peaks) opens it
@@ -545,7 +557,7 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
       compEnv_ += (lvl - compEnv_) * float(1 - std::exp(-1 / ((lvl > compEnv_ ? 0.002 : 0.15) * fs_)));
       compPeak_ = std::max(compEnv_, compPeak_ * float(std::exp(-1 / (3.0 * fs_))));
       const float th = std::max(1e-9f, 0.1f * compPeak_);
-      const float cg = compEnv_ > th ? std::pow(compEnv_ / th, 1.0f / 8 - 1) : 1.0f;
+      const float cg = compEnv_ > th ? fastPow(compEnv_ / th, 1.0f / 8 - 1) : 1.0f;
       g *= 3 * cg;
     }
     left[o + i] += g * amb[0];

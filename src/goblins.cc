@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -113,7 +114,7 @@ void PyrophoneModel::keyOn(int midi, int velocity) {
   n.cornerHot = 2.5 + 4.5 * v;
   n.open = 0.25 - 0.12 * v;
   // The flame's puffing: a few Hz, slower under the wider (bass) pipes' larger burners.
-  n.pw = kTwoPi * 6.5 * std::pow(n.f0 / 261.63, 0.1) * (0.94 + 0.12 * urand());
+  n.pw = kTwoPi * 6.5 * fastPow(n.f0 / 261.63, 0.1) * (0.94 + 0.12 * urand());
   n.px = 2 * urand() - 1;
   n.pv = 0;
   n.pan = std::clamp((midi - 64) / 40.0, -0.5, 0.5);
@@ -130,8 +131,8 @@ void PyrophoneModel::keyOff(int midi) {
 
 float PyrophoneModel::sample() {
   const double fs = instrument().fs, h = 1 / fs;
-  const double tauWarm = 2 * std::pow(8.0, warmth_);           // K1: 2 .. 16 s
-  const double close = std::exp(-h / (0.1 * std::pow(30.0, valve_)));  // K4: 0.1 .. 3 s
+  const double tauWarm = 2 * fastPow(8.0, warmth_);           // K1: 2 .. 16 s
+  const double close = std::exp(-h / (0.1 * fastPow(30.0, valve_)));  // K4: 0.1 .. 3 s
   const double depth = 0.6 * puff_;                            // K2: the puffing's swing of the heat
   const double eta = 0.06 * roar_ * roar_;                     // K3: the roar, re the heat's swing
   const double c2 = kC2;

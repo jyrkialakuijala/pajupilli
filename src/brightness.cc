@@ -6,6 +6,7 @@
 
 #include "knob.h"
 #include "oversample_data.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -183,7 +184,7 @@ void SingingArcModel::keyOn(int midi, int velocity) {
   // The key sets the arc's length (the column's share of the voltage: a harder key, a longer
   // arc; K1 the stroke) and, by its rheostat, its current.
   n.phi = std::clamp(0.30 + 0.1 * v + 0.3 * (length_ - 0.5), 0.28, kPhiHi);
-  n.amp = 0.04 + 0.96 * std::pow(v, 1.6);
+  n.amp = 0.04 + 0.96 * fastPow(v, 1.6);
   n.travel = 0.0015 - 0.0005 * v;  // (the slide-wire's travel: a harder key, quicker)
   n.rise = 0.007 - 0.004 * v;      // (the rheostat's: the current comes up)
   // The two arcs: a few cents apart (K2: 0 .. 12 c), panned apart about the key's place; the
@@ -211,7 +212,7 @@ void SingingArcModel::keyOff(int midi) {
 float SingingArcModel::sample() {
   const double fs = instrument().fs, h = 1 / fs;
   // The current's run-down at the release (K4: 0.5 .. 8 s to -60 dB).
-  const double fall = std::exp(-6.908 / (0.5 * std::pow(16.0, release_) * fs));
+  const double fall = std::exp(-6.908 / (0.5 * fastPow(16.0, release_) * fs));
   // The plasma's flicker: noise low-passed at ~3 kHz, a relative swing of the column's loss
   // (K3: 0 .. 4 % RMS, as its square; 1 % at the middle).
   const double kf = 1 - std::exp(-kTwoPi * 3000 / fs), sig = 0.04 * hiss_ * hiss_ * std::sqrt(3 * (2 - kf) / kf);

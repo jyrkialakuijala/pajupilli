@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -90,13 +91,13 @@ void PercExtrasModel::hit(int key, double v) {
   // 127, as General MIDI's curve and the modal percussion); its
   // force a half-sine as long as the contact, its impulse in proportion to
   // the speed (so a shorter contact is brighter, not louder).
-  const double speed = 3.0 * std::pow(std::max(v, 1e-3), 1.6);
+  const double speed = 3.0 * fastPow(std::max(v, 1e-3), 1.6);
   auto contact = [&](double ms) {  // Hertz: a faster blow, a little shorter
-    e.pulse = float(std::max(1.0, ms * 1e-3 * fs * std::pow(speed, -0.2)));
+    e.pulse = float(std::max(1.0, ms * 1e-3 * fs * fastPow(speed, -0.2)));
     e.amp = float(speed * kPi / (2 * e.pulse));
   };
   // An electronic one: its level as a sample player's, v^(5/3).
-  const float elec = float(std::pow(v, 5.0 / 3.0));
+  const float elec = float(fastPow(v, 5.0 / 3.0));
   switch (kind) {
     case kSticks: {
       // Two 5A hickory sticks (406 mm, 14.4 mm): free-free modes, each stick

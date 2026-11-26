@@ -78,6 +78,10 @@ class Singer {
   // larynx up: the tract 10 % shorter; R1 of [ɑ] up ~20 %, of [u] ~50 %); up
   // to 1.6; below 0 a little closed. Moves with the tongue (~50 ms).
   void setJaw(double jaw) { jaw_ = jaw; }
+  // The pitch's share of the lungs' pressure (sung; x): a high note needs more pressure to sound
+  // at all, so the voice's effort (how short the open phase, how quick the closure) is read from
+  // the pressure divided by this.
+  void setEffort(double pitchMul) { effort_ = pitchMul > 0 ? 1 / pitchMul : 1; }
   // The tract's resonances as shaped (sung; Hz): R1 (k = 1) or R2 (k = 2) of
   // the vowel at this jaw, from the line's chain matrix (the glottis closed,
   // the lips' piston load); and the jaw that puts R1 at f (within -0.3 .. 1).
@@ -86,6 +90,7 @@ class Singer {
 
  private:
   bool sung_ = false;
+  double effort_ = 1, gLp_ = 0, gK_ = 1;  // 1 / the pitch's share; the folds' opening smoothed, its step
   double jaw_ = 0, jitMul_ = 1, shimMul_ = 1, lenSung_ = 0.175;
   static constexpr int kSungRows = 6;  // u ʊ ɔ ɑ (sung), e i (spoken)
   float sungLn_[kSungRows][kN] = {}, sungOpen_[kSungRows][kN] = {};  // the sung rows (log m^2): the jaw at 0 and at 1

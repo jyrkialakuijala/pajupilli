@@ -19,6 +19,7 @@
 #include "knob.h"
 #include "organplan.h"
 #include "rng.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -39,8 +40,8 @@ namespace {
 PipeVoicing gedackt(double hz) {
   PipeVoicing v;
   v.stopped = true;
-  v.q1 = std::clamp(20 * std::pow(hz / 65.4, 0.3), 15.0, 35.0);
-  v.gain = std::clamp(16 * std::pow(262 / hz, 0.3), 16.0, 24.0);
+  v.q1 = std::clamp(20 * fastPow(hz / 65.4, 0.3), 15.0, 35.0);
+  v.gain = std::clamp(16 * fastPow(262 / hz, 0.3), 16.0, 24.0);
   v.modeTilt = knob("PJ_GEDACKT_TILT", 1.75);
   // The upper harmonics fall steeply above the twelfth, as the GrandOrgue
   // demo's Bourdon 8' (recorded pipes F#/G of each octave) shows: the 5th
@@ -54,15 +55,15 @@ PipeVoicing gedackt(double hz) {
   // its harmonics 20-30 dB above its steady breath for ~100-200 ms in the
   // bass, less and shorter up high).
   v.puff = knob("PJ_GEDACKT_PUFF", 0.25) * std::max(1.0, std::sqrt(262 / hz));
-  v.puffTime = std::clamp(0.1 * std::pow(262 / hz, 0.4), 0.04, 0.2);
+  v.puffTime = std::clamp(0.1 * fastPow(262 / hz, 0.4), 0.04, 0.2);
   // A big pipe's foot and its bore fill slowly: the bass speaks gently, its
   // wind rising over ~20 ms at 8' C (the recorded Bourdon's bass ~100-260 ms
   // to speak), the treble promptly.
-  v.footRise = 0.006 * std::clamp(std::pow(262 / hz, knob("PJ_GEDACKT_FOOTEXP", 1.0)), 1.0, 6.0);
+  v.footRise = 0.006 * std::clamp(fastPow(262 / hz, knob("PJ_GEDACKT_FOOTEXP", 1.0)), 1.0, 6.0);
   // Its chiff: the twelfth leading at the attack (the recorded Bourdon's ~2-6
   // dB over its steady level, less than an open pipe's octave).
   v.chiff = knob("PJ_GEDACKT_CHIFF", 4.0) * std::clamp(std::sqrt(hz / 262), 1.0, 3.0);  // (the small pipes' chiff the most)
-  v.chiffTime = std::clamp(0.03 * std::pow(262 / hz, 0.3), 0.025, 0.06);  // (at least as long as a small pipe takes to speak)
+  v.chiffTime = std::clamp(0.03 * fastPow(262 / hz, 0.3), 0.025, 0.06);  // (at least as long as a small pipe takes to speak)
   // Below C5 more wind (a wider mouth, more flow: the voicer's bass): the
   // jet's drive ~ (523 Hz / f)^PJ_GEDACKT_AIR, so the bass is as full as the
   // treble (its mouth radiates its flow's rate of change: ~6 dB an octave
@@ -72,14 +73,14 @@ PipeVoicing gedackt(double hz) {
   static const double kAir = knob("PJ_GEDACKT_AIR", 0.95), kBassTilt = knob("PJ_GEDACKT_BASSTILT", 1.3);
   if (hz < 523.25) {
     const double o = std::log2(523.25 / hz);  // octaves below C5
-    v.drive = std::pow(523.25 / hz, kAir);
+    v.drive = fastPow(523.25 / hz, kAir);
     v.modeTilt += (kBassTilt - v.modeTilt) * std::min(1.0, o / 3);
   } else {
     // Above C5 narrower mouths, less flow: the treble no louder than C5
     // (it was ~6 dB an octave louder: shrill, "stressed"), as the recorded
     // Bourdon (level, if anything, falling a little towards the top).
     static const double kTreble = knob("PJ_GEDACKT_TREBLE", 1.0);
-    v.drive = std::pow(523.25 / hz, kTreble);
+    v.drive = fastPow(523.25 / hz, kTreble);
   }
   return v;
 }
@@ -171,20 +172,20 @@ PipeVoicing principal(double hz) {
   v.maxModes = 16;
   // (the treble's mouths relatively larger, losing more a cycle: a lower Q,
   // quick speech; the bass's higher, slower)
-  v.q1 = std::clamp(knob("PJ_PRIN_Q", 30.0) * std::pow(262 / hz, knob("PJ_PRIN_QEXP", 0.3)), 12.0, 45.0);
+  v.q1 = std::clamp(knob("PJ_PRIN_Q", 30.0) * fastPow(262 / hz, knob("PJ_PRIN_QEXP", 0.3)), 12.0, 45.0);
   v.qRise = 0.5;
-  v.gain = knob("PJ_PRIN_GAIN", 16.0) * std::clamp(std::pow(hz / 262, knob("PJ_PRIN_GEXP", 0.3)), 0.6, 1.6);
+  v.gain = knob("PJ_PRIN_GAIN", 16.0) * std::clamp(fastPow(hz / 262, knob("PJ_PRIN_GEXP", 0.3)), 0.6, 1.6);
   v.bias = knob("PJ_PRIN_BIAS", 0.3);
   v.harmFeed = knob("PJ_PRIN_HFEED", 0.2);
   v.harmLead = knob("PJ_PRIN_LEAD", 0.0);
   v.chiff = knob("PJ_PRIN_CHIFF", 8.0);
-  v.chiffTime = std::clamp(0.03 * std::pow(262 / hz, 0.3), 0.025, 0.06);  // (at least as long as a small pipe takes to speak)  // (tried: the foot fills too fast for it to tell; an open question)
+  v.chiffTime = std::clamp(0.03 * fastPow(262 / hz, 0.3), 0.025, 0.06);  // (at least as long as a small pipe takes to speak)  // (tried: the foot fills too fast for it to tell; an open question)
   v.driveNorm = knob("PJ_PRIN_DNORM", 0.0);
   v.biasFrac = knob("PJ_PRIN_BFRAC", 0.4);
   v.evenTilt = knob("PJ_PRIN_EVENTILT", 1.5);
   // The octave: strong in the bass and middle (~0 dB), less at the top
   // (~-12): the even modes driven ~ 8x, falling above C5.
-  v.openEven = knob("PJ_PRIN_OCT", 1.0) * std::min(1.0, std::pow(523.25 / hz, knob("PJ_PRIN_OCTFALL", 0.8)));  // (the languid's offset: the even harmonics)
+  v.openEven = knob("PJ_PRIN_OCT", 1.0) * std::min(1.0, fastPow(523.25 / hz, knob("PJ_PRIN_OCTFALL", 0.8)));  // (the languid's offset: the even harmonics)
   v.modeTilt = knob("PJ_PRIN_TILT", 0.8);
   v.rollK = knob("PJ_PRIN_ROLL", 9.0);
   v.jetRad = knob("PJ_PRIN_JETRAD", 0.3);
@@ -194,7 +195,7 @@ PipeVoicing principal(double hz) {
   v.puffTime = std::clamp(0.08 * std::pow(262 / hz, 0.5), 0.02, 0.2);
   v.footRise = knob("PJ_PRIN_FOOT", 0.012) * std::clamp(std::pow(262 / hz, 1.0), 0.2, 4.0);
   static const double kAir = knob("PJ_PRIN_AIR", 0.95);
-  v.drive = hz < 523.25 ? std::pow(523.25 / hz, kAir) : std::pow(523.25 / hz, knob("PJ_PRIN_TREBLE", 1.0));
+  v.drive = hz < 523.25 ? fastPow(523.25 / hz, kAir) : fastPow(523.25 / hz, knob("PJ_PRIN_TREBLE", 1.0));
   return v;
 }
 
@@ -274,7 +275,7 @@ PipeVoicing gamba(double hz) {
   v.freinHz = knob("PJ_GAMBA_FREIN", 5.0) * fw;
   v.chiff *= 1 - (1 - knob("PJ_GAMBA_FREINCHIFF", 0.25)) * fw;
   v.tauFrac -= knob("PJ_GAMBA_CUTUP", 0.03) * fw;
-  v.drive *= 1 + knob("PJ_GAMBA_FREINTOE", 0.10) * std::clamp(std::pow(262 / hz, 0.45), 0.53, 1.0) * fw;
+  v.drive *= 1 + knob("PJ_GAMBA_FREINTOE", 0.10) * std::clamp(fastPow(262 / hz, 0.45), 0.53, 1.0) * fw;
   v.footRise *= 1 - (1 - knob("PJ_GAMBA_FOOT", 0.5)) * fw;
   return v;
 }
@@ -361,8 +362,8 @@ ReedVoicing reedVoicing(Family f, double hz) {
   if (v.formantHz > 0) v.formantHz = std::max(v.formantHz, knob("PJ_REED_TREBLE_FORMANT", 2.0) * hz);
   v.rollHz = std::max(v.rollHz, knob("PJ_REED_TREBLE_ROLL", 6.0) * hz);
   const double up = std::log2(hz / 262), line1 = f == kOboe ? 4 : 12, line2 = f == kOboe ? 5 : 6;
-  v.level = std::pow(10.0, -knob("PJ_REED_LINE", 1.0) * (line1 * std::clamp(up, 0.0, 1.0) + line2 * std::max(0.0, up - 1)) / 20);
-  if (v.pressure > p0 && p0 < 1) v.level *= std::pow((1 - p0) / (1 - v.pressure), 0.91);
+  v.level = fastPow(10.0, -knob("PJ_REED_LINE", 1.0) * (line1 * std::clamp(up, 0.0, 1.0) + line2 * std::max(0.0, up - 1)) / 20);
+  if (v.pressure > p0 && p0 < 1) v.level *= fastPow((1 - p0) / (1 - v.pressure), 0.91);
   return v;
 }
 
@@ -1117,7 +1118,7 @@ void OrganModel::addRank(int stop) {
         v.noiseLp = knob("PJ_PEDAL_NOISELP", 800);
         v.breath *= 0.5;
         // (their attack's puff: PJ_PEDAL_PUFF_DB further down)
-        static const double kPedalPuff = std::pow(10.0, knob("PJ_PEDAL_PUFF_DB", -3) / 20);
+        static const double kPedalPuff = fastPow(10.0, knob("PJ_PEDAL_PUFF_DB", -3) / 20);
         v.puff *= 0.5 * kPedalPuff;
       }
       pp.p.f.setup(fs * pp.os, hz, v, randomSeed(stop, m));
@@ -1130,12 +1131,12 @@ void OrganModel::addRank(int stop) {
     // middle C, a few hundredths for a mixture's smallest; a stopped wood's
     // wide mouth more, a string's narrow one less; a softer rank's mouth
     // smaller.
-    pp.flow = float(3.0 * std::pow(hz / 65.4, -1.2) * (st.fam == kStoppedWood ? 1.3 : st.fam == kString ? 0.5 : isReed(st.fam) ? 1.4 : 1.0) *
-                    std::pow(10.0, st.levelDb / 20));
+    pp.flow = float(3.0 * fastPow(hz / 65.4, -1.2) * (st.fam == kStoppedWood ? 1.3 : st.fam == kString ? 0.5 : isReed(st.fam) ? 1.4 : 1.0) *
+                    fastPow(10.0, st.levelDb / 20));
     pp.stop = stop;
     pp.pedal = pedal;
-    pp.gain = float(std::pow(10.0, (st.levelDb + regulationDb(st.token)) / 20));
-    const float regGain = float(std::pow(10.0, regulationDb(st.token) / 20));
+    pp.gain = float(fastPow(10.0, (st.levelDb + regulationDb(st.token)) / 20));
+    const float regGain = float(fastPow(10.0, regulationDb(st.token) / 20));
     const int side = (m - lo) % 2;
     const double outer = side == 0 ? -1 : 1;
     const bool off = offset(hz);
@@ -1183,7 +1184,7 @@ void OrganModel::addRank(int stop) {
     // The field moves its jet by the acoustic velocity across the mouth, ~ the
     // pressure / its frequency: the treble's jets hear the box less.
     // (PJ_ORGAN_HEARCAP caps it, e.g. at 1: middle C's)
-    pp.hear = float(kHear * std::min(knob("PJ_ORGAN_HEARCAP", 100.0), std::pow(262 / hz, knob("PJ_ORGAN_HEAREXP", 1.0))));
+    pp.hear = float(kHear * std::min(knob("PJ_ORGAN_HEARCAP", 100.0), fastPow(262 / hz, knob("PJ_ORGAN_HEAREXP", 1.0))));
     // (a reed is driven by its boot's pressure, hundreds of times the field at
     // its resonator's top: it does not hear the room; even a twentieth of a
     // flue's hearing, the low reeds' loud sound through their enclosure back
@@ -1195,7 +1196,7 @@ void OrganModel::addRank(int stop) {
     if (pedal && isReed(st.fam)) {  // (inside the case: PJ_PEDREED_CASE_DB down above PJ_PEDREED_CASE_HZ)
       pp.caseHz = float(knob("PJ_PEDREED_CASE_HZ", 300));
       pp.caseA = float(1 - std::exp(-2 * M_PI * pp.caseHz / fs));
-      pp.caseG = float(std::pow(10.0, -knob("PJ_PEDREED_CASE_DB", 5) / 20));
+      pp.caseG = float(fastPow(10.0, -knob("PJ_PEDREED_CASE_DB", 5) / 20));
     }
     if (pedal && (std::string(kStops[stop].token) == "posaune16" || std::string(kStops[stop].token) == "j_p_posaun16")) {
       // Each Posaune pipe's speech by its own place: its height over the floor, the boxes and
@@ -1205,7 +1206,7 @@ void OrganModel::addRank(int stop) {
       uint64_t h = (uint64_t(m) + 1) * 0x9E3779B97F4A7C15ull;
       auto draw = [&h] { h ^= h >> 29; h *= 0xBF58476D1CE4E5B9ull; h ^= h >> 32; h += 0x9E3779B97F4A7C15ull; return double(h >> 40) / double(1 << 24); };
       const double fc = 400 * std::exp2(2 * draw()), peakDb = kColor * (2 * draw() - 1), tiltDb = 0.6 * kColor * (2 * draw() - 1);
-      const double A = std::pow(10.0, peakDb / 40), w = 2 * M_PI * fc / fs, al = std::sin(w) / (2 * 0.8), a0 = 1 + al / A;
+      const double A = fastPow(10.0, peakDb / 40), w = 2 * M_PI * fc / fs, al = std::sin(w) / (2 * 0.8), a0 = 1 + al / A;
       // (the groove and the foot behind the pallet, ReedPipe::setGroove: PJ_POSAUNE_TOE, the toe's
       // resistance, smaller for a more open toe and more overshoot; < 0, by default: off)
       static const double kToe = knob("PJ_POSAUNE_TOE", -1), kGrooveHz = knob("PJ_POSAUNE_GROOVE_HZ", 45);
@@ -1220,10 +1221,10 @@ void OrganModel::addRank(int stop) {
       sp.on = kDb != 0 || kColor != 0 || knob("PJ_POSAUNE_DARK_DB", -8) != 0;
       sp.b0 = float((1 + al * A) / a0), sp.b1 = float(-2 * std::cos(w) / a0), sp.b2 = float((1 - al * A) / a0);
       sp.a1 = sp.b1, sp.a2 = float((1 - al / A) / a0);
-      sp.tiltA = float(1 - std::exp(-2 * M_PI * 1500 / fs)), sp.tiltG = float(std::pow(10.0, tiltDb / 20));
-      sp.gain = float(std::pow(10.0, kDb / 20));
+      sp.tiltA = float(1 - std::exp(-2 * M_PI * 1500 / fs)), sp.tiltG = float(fastPow(10.0, tiltDb / 20));
+      sp.gain = float(fastPow(10.0, kDb / 20));
       static const double kDarkDb = knob("PJ_POSAUNE_DARK_DB", -8), kDarkHz = knob("PJ_POSAUNE_DARK_HZ", 500);
-      sp.darkA = float(1 - std::exp(-2 * M_PI * kDarkHz / fs)), sp.darkG = float(std::pow(10.0, kDarkDb / 20));
+      sp.darkA = float(1 - std::exp(-2 * M_PI * kDarkHz / fs)), sp.darkG = float(fastPow(10.0, kDarkDb / 20));
       sp.holdN = int(kHoldMs * 1e-3 * fs), sp.decay = float(std::exp(-1 / (kFadeMs * 1e-3 * fs)));
     }
     pp.target = hz;
@@ -1953,7 +1954,7 @@ void OrganModel::setupNave() {
   if (puffPaths_) late_.setZones(int(enc_.size()));
   naveFb_ = float(knob("PJ_NAVE_FB", 1.0));
   lateTrim_ = float(1 / (inst_.gain * levelTrim(inst_)));
-  naveGain_ = float(std::pow(10.0, knob("PJ_NAVE_GAIN", 0.0) / 20));
+  naveGain_ = float(fastPow(10.0, knob("PJ_NAVE_GAIN", 0.0) / 20));
 }
 
 // One block of the nave: the organ's last block in; the microphones' late
@@ -2468,7 +2469,7 @@ float OrganModel::sample() {
     const float lo = 0.5f * (eLo2_[0] + eLo2_[1]);
     // (the early sound's balance against the church's late field, as a
     // recording's main pair against its room: PJ_ORGAN_EARLY_DB)
-    static const float kEarly = float(std::pow(10.0, knob("PJ_ORGAN_EARLY_DB", 0.0) / 20));
+    static const float kEarly = float(fastPow(10.0, knob("PJ_ORGAN_EARLY_DB", 0.0) / 20));
     if (earlyL_.size() >= 65536) {  // (nobody taking it: -seq, no room; keep the recent)
       earlyL_.erase(earlyL_.begin(), earlyL_.begin() + 32768);
       earlyR_.erase(earlyR_.begin(), earlyR_.begin() + 32768);

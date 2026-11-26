@@ -6,6 +6,7 @@
 #include <type_traits>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -71,7 +72,7 @@ GuitarSpec electricGuitar(const char* name) {
   const double B[6] = {1.3e-4, 5.8e-5, 2.4e-5, 1.1e-4, 4.0e-5, 1.3e-5};
   const double t60[6] = {14, 12, 10, 7, 6, 5};
   for (int i = 0; i < 6; ++i)
-    g.str[i] = {f[i], T[i], B[i], lossT * 6.91 / t60[i], lossT * lossHigh * 0.06 * std::pow(f[i] / 82.41, 0.8)};
+    g.str[i] = {f[i], T[i], B[i], lossT * 6.91 / t60[i], lossT * lossHigh * 0.06 * fastPow(f[i] / 82.41, 0.8)};
   g.ring = g.ringOvertones = g.ringOvertones45 = 1;
   g.modes = 96;
   g.topHz = 9000;  // (above, the coil's resonance and the speaker leave nothing)
@@ -100,7 +101,7 @@ GuitarSpec electricGuitar(const char* name) {
     const double d[6] = {0.046, 0.036, 0.026, 0.017, 0.013, 0.010};
     const bool wound[6] = {true, true, true, false, false, false};
     const double ref = 0.6 * 0.026 * 0.026;
-    for (int i = 0; i < 6; ++i) g.steel[i] = std::pow((wound[i] ? 0.6 : 1.0) * d[i] * d[i] / ref, knob("PJ_EGTR_STEELEXP", 0.8));
+    for (int i = 0; i < 6; ++i) g.steel[i] = fastPow((wound[i] ? 0.6 : 1.0) * d[i] * d[i] / ref, knob("PJ_EGTR_STEELEXP", 0.8));
   }
   // The five-way selector: 1 bridge, 2 bridge + middle, 3 middle, 4 middle + neck, 5 neck.
   // GM 28's: 4, the in-between "quack" (2.2, 13); GM 29's: 2, bridge and middle (the funk
@@ -223,7 +224,7 @@ GuitarSpec jazzGuitar() {
   // dies 2x as fast (towardsLoss): the archtop's punch, then the long tail.)
   const double l0[6] = {0.18, 0.21, 0.27, 0.33, 0.42, 0.54};
   // (wound: k^2; plain: k^1.2, 1.1x the three-pickup solid-body's 0.06 (f / 82.41)^0.8)
-  const double l1[6] = {0.036, 0.0405, 0.045, 0.054, 1.125 * 0.06 * std::pow(246.94 / 82.41, 0.8), 1.125 * 0.06 * std::pow(329.63 / 82.41, 0.8)};
+  const double l1[6] = {0.036, 0.0405, 0.045, 0.054, 1.125 * 0.06 * fastPow(246.94 / 82.41, 0.8), 1.125 * 0.06 * fastPow(329.63 / 82.41, 0.8)};
   const double flatExp = knob("PJ_JAZZ_FLATEXP", 2.0);
   for (int i = 0; i < 6; ++i) {
     g.str[i] = {f[i], T[i], B[i], lossT * l0[i], lossT * lossHigh * l1[i]};
@@ -273,7 +274,7 @@ GuitarSpec jazzGuitar() {
   {
     const double d[6] = {0.052, 0.042, 0.032, 0.024, 0.016, 0.012};
     const double ref = 0.9 * 0.032 * 0.032;
-    for (int i = 0; i < 6; ++i) g.steel[i] = std::pow((i < 4 ? 0.9 : 1.0) * d[i] * d[i] / ref, 0.8);
+    for (int i = 0; i < 6; ++i) g.steel[i] = fastPow((i < 4 ? 0.9 : 1.0) * d[i] * d[i] / ref, 0.8);
   }
   return g;
 }
@@ -379,7 +380,7 @@ void Guitar::tune(Str& st, int index, bool place) {
     }
     // (By ear: the notes ring a little longer than the first numbers gave,
     // the first and second overtones most.)
-    const double loss = (d.loss0 + d.loss1 * std::pow(s_.lossByFrequency ? k * st.f1 / d.f0 : double(k), s_.lossExp[index])) * end * s_.ring *
+    const double loss = (d.loss0 + d.loss1 * fastPow(s_.lossByFrequency ? k * st.f1 / d.f0 : double(k), s_.lossExp[index])) * end * s_.ring *
                         (k == 2 || k == 3 ? s_.ringOvertones : k == 4 || k == 5 ? s_.ringOvertones45 : 1.0);
     // (Along the top the string's own loss is the same; it only keeps more
     // of its sound from the body.)

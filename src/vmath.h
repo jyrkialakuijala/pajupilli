@@ -31,6 +31,14 @@ inline double fastTanh(double x) {
   const double e = std::exp(2 * x);
   return (e - 1) / (e + 1);
 }
+// x^y by a logarithm and an exponential: half the time of the library's pow (which carries
+// extra digits through for its last bit), within ~1e-15 of it for the exponents used here. A
+// constant base costs one exp (its logarithm is folded). Bases not above zero go to pow.
+template <class A, class B>
+inline auto fastPow(A x, B y) -> decltype(std::pow(x, y)) {
+  const decltype(std::pow(x, y)) a = x, b = y;  // float stays float, as with pow
+  return a > 0 ? std::exp(b * std::log(a)) : std::pow(a, b);
+}
 inline float vexpf(float x) { return ::expf(x); }
 inline float vtanhf(float x) { return ::tanhf(x); }
 inline float vexpm1f(float x) { return ::expm1f(x); }

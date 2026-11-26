@@ -17,6 +17,7 @@ extern char** environ;
 
 #include "analysis.h"
 #include "knob.h"
+#include "slurs.h"
 #include "voice.h"
 
 namespace pajupilli {
@@ -745,7 +746,10 @@ static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) 
       // (not the settings that do not touch a calibration: the threads, how much of a file plays)
       bool skip = false;
       // (nor a slur's trial gesture, tools/slurs.py: the practice plays the calibrated instrument)
-      for (const char* k : {"PJ_THREADS=", "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK=", "PJ_PLAY_LEAD=", "PJ_SLURTRY"})
+      // (nor an attack's, nor what else the practice sets: the calibration plays plain starts on
+      // a steady player whatever these say)
+      for (const char* k : {"PJ_THREADS=", "PJ_VOICE_THREADS=", "PJ_PLAY_UNTIL=", "PJ_PLAY_TICK=", "PJ_PLAY_LEAD=", "PJ_SLURTRY",
+                            "PJ_ATTACKTRY", "PJ_ATTACKS=", "PJ_SLURS=", "PJ_SLURSPEED=", "PJ_WANDER=", "PJ_PRACTICE_BIN="})
         skip |= std::strncmp(*e, k, std::strlen(k)) == 0;
       if (!skip) env.emplace_back(*e);
     }
@@ -786,7 +790,9 @@ Calibration calibrate(const Instrument& inst, double a4, FILE* log, int lo, int 
       std::fclose(f);
     }
   if (!cached) {
+    practisedAttacks(false);  // (src/slurs.h: plain starts)
     cal = learn(inst, a4, lo, hi);
+    practisedAttacks(true);
     if (!path.empty()) {
       const std::string tmp = path + ".tmp" + std::to_string(getpid());
       if (FILE* f = std::fopen(tmp.c_str(), "wb")) {

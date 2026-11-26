@@ -14,6 +14,7 @@
 #include <cstdint>
 
 #include "horn.h"
+#include "slurs.h"
 #include "performer.h"
 
 namespace pajupilli {
@@ -41,6 +42,8 @@ class HornPlayer : public Performer {
   int stackTop_ = 0, stack_[16];
   int keyVel_ = 64;
   double lung_ = 0, lungAttack_ = 0.008, sinceOff_ = 1e9, sinceOn_ = 0;
+  bool preheard_ = true;  // (this note began tongued: its lips were set for the tuning asked)
+  double riseX_ = 1;  // (a practised start's breath rise, x the plain one: undone at the next slur)
   double tongueClock_ = 1e9, tongueClosed_ = 0.004, tongueRelease_ = 0.004;
   double velAccent_ = 0, velDyn_ = 0, velDynTarget_ = 0;
   Vibrato vib_;  // its own vibrato (performer.h)
@@ -57,7 +60,10 @@ class HornPlayer : public Performer {
   // A slur to another partial: the lips overshoot towards it and the air
   // pushes, briefly (log of the lips' factor; the breath's extra share).
   double slurLip_ = 0, slurAir_ = 0, sinceSlur_ = 1e9;
+  TrillSense trillSense_;
   double slurLipT_ = 0.03, slurAirT_ = 0.03, slurDipT_ = 0.08;  // (their times: src/slurs.h)
+  // ... the embouchure's set through the change (src/slurs.h: aperture .. setT)
+  double setNow_ = 0, setAperture_ = 0, setFirm_ = 0, setFocus_ = 0, setVowel_ = 0, setVowelAt_ = 0, setT_ = 0.06;
   // A practised slur's lead: the valves go when this runs out (the lips went at the key).
   double leadLeft_ = 0, leadSpeed_ = 1;
   const char* leadHoles_ = nullptr;

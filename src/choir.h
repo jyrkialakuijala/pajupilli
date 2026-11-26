@@ -106,6 +106,7 @@ struct ChoirVariant {
   int menBelow;               // the men only on keys below this
   double consonant, hum;      // 0 .. 1
   double gainDb;
+  int singers = 0;            // at most so many singers in all (0: the choir; a lead voice: 4)
 };
 // The variant of a choir instrument (by name; the first, "choir", if none matches).
 const ChoirVariant& choirVariant(const Instrument& inst);
@@ -120,7 +121,7 @@ class SingerModel : public Tube {
   explicit SingerModel(const Instrument& inst);
   Singer& singer() { return g_; }
   int part() const { return part_; }
-  struct Controls { double f0 = 220, vowel = 3, lung = 0, breath = 0.2, vibDepth = 0, vibRate = 5, gain = 1, hum = 0; };
+  struct Controls { double f0 = 220, vowel = 3, lung = 0, breath = 0.2, vibDepth = 0, vibRate = 5, gain = 1, hum = 0, effort = 1; };
   void setControls(const Controls& c) { c_ = c; }
   // Silent long enough, it is not computed (asleep); a note wakes it, the air at rest.
   void wake();

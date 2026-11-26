@@ -6,6 +6,7 @@
 
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -95,7 +96,7 @@ void WoodPercModel::define(int vib, double f0, double detune) {
       def.freq[k] = float(b.f0 * (1 + detune) * b.ratio[k]);
       def.t60[k] = float(b.t60[k] * knob("PJ_BLOCKS_T60", 1.0));
       // The sound ~ f x rad x the shape at the stroke: rad to the recorded levels.
-      def.rad[k] = float(std::pow(10.0, b.db[k] / 20) / b.ratio[k]);
+      def.rad[k] = float(fastPow(10.0, b.db[k] / 20) / b.ratio[k]);
       def.side[k] = float(0.3 * def.rad[k] * (rnd() < 0.5 ? 1 : -1));
     }
   }
@@ -178,7 +179,7 @@ double WoodPercPlayer::speed(int velocity, double dynamics) {
   // stiff hardly brightens with speed).
   static const double top = knob("PJ_WOOD_VMAX", 3.0), ex = knob("PJ_WOOD_VEXP", 1.6);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void WoodPercPlayer::noteOn(int midi, int velocity) {

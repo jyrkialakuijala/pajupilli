@@ -30,6 +30,8 @@
 #include <cstring>
 #include <vector>
 
+#include "vmath.h"
+
 namespace pajupilli {
 
 class OrganRoom {
@@ -181,8 +183,8 @@ class OrganRoom {
           // (the direct sound PJ_ORGAN_DIRECT_DB over the physical balance, 4 dB: the stand's
           // pair nearer the case, as a recording's main pair is placed for clarity, against a
           // muffled wash of the reflections)
-          static const double kDirect = std::pow(10.0, (std::getenv("PJ_ORGAN_DIRECT_DB") ? std::atof(std::getenv("PJ_ORGAN_DIRECT_DB")) : 4.0) / 20);
-          const double g = std::pow(10.0, (p.reflDb - 3.0 * p.shadow - p.diffDb) / 20) / p.r * (lis_.pattern + (1 - lis_.pattern) * cosA) *
+          static const double kDirect = fastPow(10.0, (std::getenv("PJ_ORGAN_DIRECT_DB") ? std::atof(std::getenv("PJ_ORGAN_DIRECT_DB")) : 4.0) / 20);
+          const double g = fastPow(10.0, (p.reflDb - 3.0 * p.shadow - p.diffDb) / 20) / p.r * (lis_.pattern + (1 - lis_.pattern) * cosA) *
                            (cls(p) == 0 ? kDirect : 1.0);
           const Source& s = srcs_[i];
           const double aimed = s.lobe > 0 ? std::max(0.0, 1 + s.lobe * dot(p.firstDir, s.aim)) / std::sqrt(1 + s.lobe * s.lobe / 3) : 1.0;
@@ -323,10 +325,10 @@ class OrganRoom {
   // ISO 9613-1: the air's absorption (dB/m) at 20 C, 58 % RH.
   static double airDbPerM(double f, double tC = 20, double rh = 58) {
     const double T = tC + 273.15, T0 = 293.15, T01 = 273.16;
-    const double psat = std::pow(10.0, -6.8346 * std::pow(T01 / T, 1.261) + 4.6151);
+    const double psat = fastPow(10.0, -6.8346 * fastPow(T01 / T, 1.261) + 4.6151);
     const double h = rh * psat;
     const double frO = 24 + 4.04e4 * h * (0.02 + h) / (0.391 + h);
-    const double frN = std::pow(T / T0, -0.5) * (9 + 280 * h * std::exp(-4.170 * (std::pow(T / T0, -1.0 / 3) - 1)));
+    const double frN = std::pow(T / T0, -0.5) * (9 + 280 * h * std::exp(-4.170 * (fastPow(T / T0, -1.0 / 3) - 1)));
     const double f2 = f * f;
     return 8.686 * f2 *
            (1.84e-11 * std::sqrt(T / T0) +
@@ -357,7 +359,7 @@ class OrganRoom {
     return s;
   }
   Sec shelf1(double fc, double gDb) const {  // DC 1, the highs gDb
-    const double G = std::pow(10.0, gDb / 20), K = std::tan(M_PI * fc / fs_);
+    const double G = fastPow(10.0, gDb / 20), K = std::tan(M_PI * fc / fs_);
     const double kz = K / std::sqrt(G), kp = K * std::sqrt(G), g = kp / kz;
     const double n0 = g * (1 + kz), n1 = g * (kz - 1), d0 = 1 + kp, d1 = kp - 1;
     Sec s;
@@ -398,10 +400,10 @@ class OrganRoom {
     double best = 1e30;
     Sec bl, bs;
     for (int i = 0; i < 40; ++i) {
-      const double fl = 4000 * std::pow(23000 / 4000.0, i / 39.0);
+      const double fl = 4000 * fastPow(23000 / 4000.0, i / 39.0);
       const Sec l = fl > 0.45 * fs_ ? Sec{} : lp1(fl);
       for (int j = 0; j < 24; ++j) {
-        const double fsh = 2000 * std::pow(8.0, j / 23.0);
+        const double fsh = 2000 * fastPow(8.0, j / 23.0);
         if (fsh > 0.45 * fs_) continue;
         for (int k = 0; k <= 40; ++k) {
           const Sec s = shelf1(fsh, -20 + 0.5 * k);

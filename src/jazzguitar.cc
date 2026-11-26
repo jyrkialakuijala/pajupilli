@@ -7,6 +7,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -28,7 +29,7 @@ JazzGuitarPlayer::JazzGuitarPlayer(GuitarModel& m) : Performer(m), m_(m) {
   place_ = knob("PJ_JAZZ_PLACE", 0.165);
   move_ = knob("PJ_JAZZ_MOVE", 1.0);
   const double mm = std::clamp(knob("PJ_JAZZ_PICKMM", 1.5), 0.4, 3.0);
-  stiff_ = std::clamp(6000 * std::pow(mm, 2.6), 1500.0, 50000.0);
+  stiff_ = std::clamp(6000 * fastPow(mm, 2.6), 1500.0, 50000.0);
   edge_ = std::clamp(knob("PJ_JAZZ_EDGE", 0.25), 0.05, 2.0) * 1e-3;
   tipW_ = std::clamp(knob("PJ_JAZZ_TIPW", 2.5), 0.5, 15.0) * 1e-3;
   thumb_ = int(std::lround(knob("PJ_JAZZ_THUMB", 1)));
@@ -99,7 +100,7 @@ JazzGuitarPlayer::Touch JazzGuitarPlayer::touch(double v, bool up, int string) {
   const double vel = v * 127;
   const double phrase = std::clamp((velMean_ - 30) / 70, 0.0, 1.0), accent = std::clamp((vel - velMean_) / 40, -0.5, 1.0);
   const double I = std::clamp(0.55 * phrase + 0.45 * (0.5 + accent) + 0.2 * (v - 0.5), 0.0, 1.0);
-  t.from = std::clamp(place_ * std::pow(2.0, 1 - brightness_) * (1.15 - 0.54 * move_ * I) * (0.97 + 0.06 * ur()), 0.06, 0.24);
+  t.from = std::clamp(place_ * std::exp2(1 - brightness_) * (1.15 - 0.54 * move_ * I) * (0.97 + 0.06 * ur()), 0.06, 0.24);
   const double dyn = 0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0);
   t.depth = (0.1e-3 + 2.0e-3 * std::pow(v, 1.25)) * dyn * (0.93 + 0.14 * ur()) * (up ? 1.15 : 1.0);
   // (The low strings are heavier: the same hand moves them a little less far.)
@@ -374,7 +375,7 @@ void JazzGuitarPlayer::octave(const Asked& lo, const Asked& hi) {
   for (int k = 0; k < 3; ++k) {
     const int s = order[k];
     Touch t = touch(v, up, s);
-    if (thumb) { t.from = std::clamp(0.18 * std::pow(2.0, 1 - brightness_), 0.08, 0.24); t.depth *= 1.25; }
+    if (thumb) { t.from = std::clamp(0.18 * std::exp2(1 - brightness_), 0.08, 0.24); t.depth *= 1.25; }
     if (k == 1) {
       due_.push_back({at, kDead, s, std::max(1, fret_[s]), t, 0, 600});
     } else {
@@ -433,7 +434,7 @@ void JazzGuitarPlayer::single(const Asked& a) {
   const bool thumb = thumb_ >= 2 || (thumb_ == 1 && a.velocity < 50 && clock_ - lastOctave_ < 3);
   const double v = std::clamp(a.velocity / 127.0, 0.0, 1.0);
   Touch t = touch(v, up && !thumb, best);
-  if (thumb) { t.from = std::clamp(0.18 * std::pow(2.0, 1 - brightness_), 0.08, 0.24); t.depth *= 1.25; up = false; }
+  if (thumb) { t.from = std::clamp(0.18 * std::exp2(1 - brightness_), 0.08, 0.24); t.depth *= 1.25; up = false; }
   if (!slur) pickWay_ = up ? -1 : 1;
   if (ghost) t.depth *= 0.6;
   const Kind kind = slur ? kHammer : thumb ? kThumb : kPick;

@@ -7,6 +7,7 @@
 
 #include "knob.h"
 #include "oversample_data.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -419,10 +420,10 @@ GuitarAmp::Biquad GuitarAmp::rbj(int type, double fs, double f, double q, double
   } else if (type == 1) {
     b0 = (1 + cw) / 2; b1 = -(1 + cw); b2 = b0; a0 = 1 + al; a1 = -2 * cw; a2 = 1 - al;
   } else if (type == 2) {
-    const double A = std::pow(10, db / 40);
+    const double A = fastPow(10, db / 40);
     b0 = 1 + al * A; b1 = -2 * cw; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cw; a2 = 1 - al / A;
   } else {
-    const double A = std::pow(10, db / 40), r = 2 * std::sqrt(A) * al;
+    const double A = fastPow(10, db / 40), r = 2 * std::sqrt(A) * al;
     b0 = A * ((A + 1) + (A - 1) * cw + r); b1 = -2 * A * ((A - 1) + (A + 1) * cw); b2 = A * ((A + 1) + (A - 1) * cw - r);
     a0 = (A + 1) - (A - 1) * cw + r; a1 = 2 * ((A - 1) - (A + 1) * cw); a2 = (A + 1) - (A - 1) * cw - r;
   }
@@ -435,7 +436,7 @@ GuitarAmp::Biquad GuitarAmp::rbj(int type, double fs, double f, double q, double
 GuitarAmp::Biquad GuitarAmp::eq(const Eq& e, double fs) {
   if (e.type != 4) return rbj(e.type, fs, e.f, e.q, e.db);
   const double w = 2 * kPi * std::min(e.f, 0.45 * fs) / fs, cw = std::cos(w), al = std::sin(w) / (2 * e.q);
-  const double A = std::pow(10, e.db / 40), r = 2 * std::sqrt(A) * al;
+  const double A = fastPow(10, e.db / 40), r = 2 * std::sqrt(A) * al;
   const double b0 = A * ((A + 1) - (A - 1) * cw + r), b1 = 2 * A * ((A - 1) - (A + 1) * cw), b2 = A * ((A + 1) - (A - 1) * cw - r);
   const double a0 = (A + 1) + (A - 1) * cw + r, a1 = -2 * ((A - 1) + (A + 1) * cw), a2 = (A + 1) + (A - 1) * cw - r;
   Biquad b;
@@ -465,7 +466,7 @@ GuitarAmp::OnePole GuitarAmp::onePole(int type, double fs, double f) {
 // A first-order low shelf: the bass db (negative: under) the treble, about f its middle: (s +
 // g wp) / (s + wp), g the bass's share, its corners f sqrt(g) and f / sqrt(g).
 GuitarAmp::OnePole GuitarAmp::lowShelf(double fs, double f, double db) {
-  const double g = std::pow(10, db / 20), wp = 2 * kPi * f / std::sqrt(g), wz = g * wp, c = 2 * fs;
+  const double g = fastPow(10, db / 20), wp = 2 * kPi * f / std::sqrt(g), wz = g * wp, c = 2 * fs;
   OnePole o;
   o.b0 = (c + wz) / (c + wp);
   o.b1 = (wz - c) / (c + wp);
@@ -641,7 +642,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   // reaches it; the bar to open again back to the threshold in 50 ms.)
   gatePeakFall_ = std::exp(-1 / (0.3 * fs));
   gateReopenFall_ = std::exp(-1 / (0.05 * fs));
-  gateDropTo_ = p.gateDrop > 0 ? std::pow(10.0, -p.gateDrop / 20) : 0;
+  gateDropTo_ = p.gateDrop > 0 ? fastPow(10.0, -p.gateDrop / 20) : 0;
   // The mid-hump overdrive (EG 11.8 [YehThesis]): 15.9 Hz in; its gain's leg 4.7 k + 0.047 uF
   // (720 Hz); R2 = 51 k + drive 500 k with 51 pF across; the tone's low-pass 723 Hz .. 10 kHz.
   if (p.tsLevel > 0) {
@@ -649,7 +650,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
     tsIn_ = onePole(1, fsOs_, 15.9);
     tsLeg_ = onePole(1, fsOs_, 720);
     tsCap_ = onePole(0, fsOs_, 1 / (2 * kPi * r2 * 51e-12));
-    tsTone_ = onePole(0, fsOs_, 723 * std::pow(10000 / 723.0, std::clamp(p.tsTone, 0.0, 1.0)));
+    tsTone_ = onePole(0, fsOs_, 723 * fastPow(10000 / 723.0, std::clamp(p.tsTone, 0.0, 1.0)));
     tsGain_ = r2 / 4.7e3;
   }
   sagA_ = 1 - std::exp(-1 / (0.1 * fsOs_));
@@ -659,7 +660,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   gridRel_ = 1 - std::exp(-1 / (0.022 * fsOs_));
   compAtk_ = 1 - std::exp(-1 / (0.003 * fs));
   compRel_ = 1 - std::exp(-1 / (0.2 * fs));
-  if (p.compRatio > 1) compMakeup_ = std::pow(p.compRef / p.compAt, 1 - 1 / p.compRatio);
+  if (p.compRatio > 1) compMakeup_ = fastPow(p.compRef / p.compAt, 1 - 1 / p.compRatio);
   // Bass: the fixed filters after the stages; the DI's; its drive; the mic's delay; the studio
   // compressor; the DI and the mic lined up.
   if (p.blend > 0 || p.studio > 0) {
@@ -696,7 +697,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
 void GuitarAmp::james(double treble, double bass) {
   using C = std::complex<double>;
   const James& j = p_.james;
-  const auto taper = [](double x) { return (std::pow(102.0, std::clamp(x, 0.0, 1.0)) - 1) / 101; };
+  const auto taper = [](double x) { return (fastPow(102.0, std::clamp(x, 0.0, 1.0)) - 1) / 101; };
   const double lo = std::clamp(taper(bass), 1e-3, 1 - 1e-3), tr = std::clamp(taper(treble), 1e-3, 1 - 1e-3);
   constexpr int N = 7, M = 8;
   const double w0 = 2 * kPi * 500;
@@ -1022,14 +1023,14 @@ double GuitarAmp::strip(double x) {
   presEnv_ += (a > presEnv_ ? presAtk_ : presRel_) * (a - presEnv_);
   const double want = std::clamp(p_.presDb + p_.speak * (20 * std::log10(presEnv_ + 1e-12) - p_.presRef), p_.presLo, p_.presHi);
   presGain_ += presSmooth_ * (want - presGain_);
-  double y = x + (std::pow(10.0, presGain_ / 20) - 1) * b;
+  double y = x + (fastPow(10.0, presGain_ / 20) - 1) * b;
   if (p_.scRatio > 1) {
     scMs1_ += msA_ * (x * x - scMs1_);
     scMs2_ += msA_ * (scMs1_ - scMs2_);
     const double over = 10 * std::log10(scMs2_ + 1e-30) - p_.scAt, r = 1 - 1 / p_.scRatio, h = 0.5 * p_.scKnee;
     const double target = over <= -h ? 0 : over >= h ? r * over : r * (over + h) * (over + h) / (4 * h);
     scGr_ += (target > scGr_ ? scAtk_ : scRel_) * (target - scGr_);
-    y *= std::pow(10.0, -scGr_ / 20);
+    y *= fastPow(10.0, -scGr_ / 20);
   }
   return y;
 }
@@ -1209,7 +1210,7 @@ void GuitarAmp::gate(double x) {
   if (gateDebug_ && was != gateOpen_) say(stderr, "gate %s %.3f s\n", gateOpen_ ? "open" : "close", gateT_ / fs_);
   if (gateOpen_ ? gateDb_ < 0 : gateDb_ > -80) {
     gateDb_ = gateOpen_ ? std::min(0.0, gateDb_ + gateRise_) : std::max(-80.0, gateDb_ - (gateQuick_ ? 4 : 1) * gateFall_);
-    gateGain_ = std::pow(10.0, gateDb_ / 20);
+    gateGain_ = fastPow(10.0, gateDb_ / 20);
   }
 }
 
@@ -1263,7 +1264,7 @@ float GuitarAmp::process(float emf) {
     const double a = std::fabs(x);
     compEnv_ += (a > compEnv_ ? compAtk_ : compRel_) * (a - compEnv_);
     const double over = compEnv_ / p_.compAt;
-    x *= (over > 1 ? std::pow(over, 1 / p_.compRatio - 1) : 1.0) * compMakeup_;
+    x *= (over > 1 ? fastPow(over, 1 / p_.compRatio - 1) : 1.0) * compMakeup_;
   }
   // Bass: the DI taken here (after a stomp box, if any); the amp's path skipped if the DI is all.
   const double d = x;

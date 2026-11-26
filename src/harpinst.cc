@@ -8,6 +8,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -271,7 +272,7 @@ void HarpPlayer::play() {
     const int s = q.string;
     // (how far: Chadefaux's pulls were measured down to a 17.6 cm string; a shorter one is drawn
     // out less, as much of its length as that one)
-    p.depth = 0.0005 * std::pow(18.0, v) * std::min(1.0, h.length(s) / 0.176);
+    p.depth = 0.0005 * fastPow(18.0, v) * std::min(1.0, h.length(s) / 0.176);
     // (the middle of the string, a little higher up in the treble; near the board when asked)
     double at = 0.37 + 0.05 * s / 46.0 + 0.02 * (ur() - 0.5);
     if (bright >= 1.6) at = std::clamp(0.12 - 0.05 * (bright - 1.6) / 0.9, 0.06, 0.12);
@@ -304,7 +305,7 @@ void HarpPlayer::play() {
       p.harmonic = 0.004;
       // (a harmonic is played mezzo-forte or softer whatever the key's softness, which only marked
       // it: "one at f is hardly louder than one at p")
-      p.depth = 0.0005 * std::pow(18.0, 0.45 + 0.3 * v) * std::min(1.0, h.length(s) / 0.176);
+      p.depth = 0.0005 * fastPow(18.0, 0.45 + 0.3 * v) * std::min(1.0, h.length(s) / 0.176);
     }
     return p;
   };

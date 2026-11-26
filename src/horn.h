@@ -97,7 +97,8 @@ class Horn : public Tube {
   double h_ = 0, dp_ = 0;
   double H_ = 0, invMu_ = 0;
   // Mouth.
-  double pm_ = 0, u_ = 0;
+  double pm_ = 0, u_ = 0, ut_ = 0;
+  double kTractQ_;
   double glotLp_ = 0, noiseLp_ = 0, noiseHp_ = 0, glotA_, noiseA_, noiseHpA_;
   double kNoise_, kSweep_, kGlotNoise_, kQ_, kEps_, kPress_ = 1, kRelease_, kStroke_, kMu_, kHk_, kW_, kIn2_, kInQ_, kInA_, kQExp_;
   Valve valve_[4];

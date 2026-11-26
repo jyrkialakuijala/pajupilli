@@ -8,6 +8,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -99,7 +100,7 @@ void struckDef(ModalSet::Def& d, const ModeList& m, double f0, double mass, uint
   for (int k = 0; k < d.n; ++k) {
     const double f = f0 * m.ratio[k];
     d.freq[k] = float(f);
-    d.t60[k] = float(m.t60[k] * std::pow(m.fRef / std::max(f, 20.0), m.tExp));
+    d.t60[k] = float(m.t60[k] * fastPow(m.fRef / std::max(f, 20.0), m.tExp));
     d.exc[k] = m.amp[k];
     seed = seed * 1664525u + 1013904223u;
     d.rad[k] = m.amp[k];
@@ -171,8 +172,8 @@ ModalModel::ModalModel(const Instrument& inst) : Tube(inst), set_(inst.fs) {
 // ~39 cm apart at F3 to ~19 cm at F6. Along the frame the naturals in order, ~12 mm apart (the
 // 22 under the 1295 mm felt), an accidental over the gap between its two neighbours.
 void ModalModel::vibPlace(int i, double* x, double* y) {
-  auto len = [](int b) { return 0.381 * std::pow(0.175 / 0.381, b / 36.0); };
-  auto wid = [](int b) { return 0.057 * std::pow(0.038 / 0.057, b / 36.0); };
+  auto len = [](int b) { return 0.381 * fastPow(0.175 / 0.381, b / 36.0); };
+  auto wid = [](int b) { return 0.057 * fastPow(0.038 / 0.057, b / 36.0); };
   auto natural = [](int midi) { const int pc = midi % 12; return !(pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10); };
   constexpr double kGap = 0.012, kFelt = 0.018;
   // The naturals' middles along the frame, from F3's left edge.
@@ -255,7 +256,7 @@ float ModalModel::Bowed::step(float* bridgeForce) {
     // hair slips faster (slope with the pressure).
     const float dv = float(vel) - stringVel;
     const float slope = float(5 - 4 * press);
-    const float t = std::pow(std::fabs((dv + 0.001f) * slope) + 0.75f, -4.0f);
+    const float t = fastPow(std::fabs((dv + 0.001f) * slope) + 0.75f, -4.0f);
     newVel = dv * std::min(1.0f, t);
   }
   pos = (pos + 1) & (kN - 1);
@@ -410,7 +411,7 @@ static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
 void ModalModel::build() {
   if (type_ >= kFretNoise) sfx.reset(new Sfx(Sfx::Type(type_ - kFretNoise), fs_));
   else build1();
-  gain *= std::pow(10.0, kModalLevel[type_] / 20);
+  gain *= fastPow(10.0, kModalLevel[type_] / 20);
 }
 
 void ModalModel::build1() {
@@ -644,7 +645,7 @@ void ModalModel::build1() {
           px = (2 * px - (x0 + x1)) / (x1 - x0);
         }
         auto lerp = [](double a, double b, double t) { return a + (b - a) * std::clamp(t, 0.0, 1.0); };
-        auto logl = [](double a, double b, double t) { return a * std::pow(b / a, std::clamp(t, 0.0, 1.0)); };
+        auto logl = [](double a, double b, double t) { return a * fastPow(b / a, std::clamp(t, 0.0, 1.0)); };
         double r[6];
         r[0] = 1;
         r[1] = midi <= 79 ? 4.0 : lerp(4.0, 3.1, (midi - 79) / 10.0);
@@ -661,7 +662,7 @@ void ModalModel::build1() {
         ModalSet::Def d;
         d.one = true;
         d.n = 7 + kVibHigh;
-        d.modalMass = float(0.12 * std::pow(175 / f, 0.6));  // kg (a 0.5 kg bar at F3)
+        d.modalMass = float(0.12 * fastPow(175 / f, 0.6));  // kg (a 0.5 kg bar at F3)
         // On the instrument the bar hangs on cords through holes at its
         // fundamental's nodes: the overtones' nodes lie elsewhere, so the cords
         // and their felts damp them (a free bar's overtones ring 6-10 s,
@@ -677,7 +678,7 @@ void ModalModel::build1() {
           d.rad[k] = rad[k];
           d.side[k] = float(0.3 * rad[k] * (k % 2 ? 1 : -1));
         }
-        const double fa = f * std::exp2(-5 / 1200.0), Q = 89 * std::pow(f / 175, -0.963);
+        const double fa = f * std::exp2(-5 / 1200.0), Q = 89 * fastPow(f / 175, -0.963);
         d.freq[kVibAir] = float(fa);
         d.t60[kVibAir] = float(6.91 / (M_PI * fa / Q));
         d.exc[kVibAir] = 0;
@@ -693,7 +694,7 @@ void ModalModel::build1() {
         // value (no measurement found): PJ_VIB_HIGHT60 at 8 kHz, ~f^-0.5.
         static const double kHiT60 = knob("PJ_VIB_HIGHT60", 0.15), kHiExc = knob("PJ_VIB_HIGHEXC", 0.35);
         for (int k = 0; k < kVibHigh; ++k) {
-          const double fk = std::min(17000.0, f * r[3] * std::pow(1.32, k + 1) * (1 + 0.03 * std::sin(7.3 * (k + 1) + i)));
+          const double fk = std::min(17000.0, f * r[3] * fastPow(1.32, k + 1) * (1 + 0.03 * std::sin(7.3 * (k + 1) + i)));
           const int m = 7 + k;
           d.freq[m] = float(fk);
           d.t60[m] = float(kHiT60 * std::sqrt(8000 / fk));
@@ -702,7 +703,7 @@ void ModalModel::build1() {
           d.side[m] = float(0.5 * 0.4 * -px * (k % 2 ? 1 : -1));
         }
         d.nl = 1;
-        d.lin[0] = {0, kVibAir, float(7e3 * std::pow(f / 175, 1.739))};
+        d.lin[0] = {0, kVibAir, float(7e3 * fastPow(f / 175, 1.739))};
         S.setVib(i, d);
         Str st;
         st.vib = i;
@@ -778,13 +779,13 @@ void ModalModel::build1() {
         d.zShare = 1;
         d.split = 0.002f;
         for (int k = 0; k < d.n; ++k) {
-          const double f = 81 * std::pow(14000.0 / 81, (v + 3.0 * k + rnd()) / (3.0 * d.n));
+          const double f = 81 * fastPow(14000.0 / 81, (v + 3.0 * k + rnd()) / (3.0 * d.n));
           d.freq[k] = float(f);
-          d.t60[k] = float(4.5 * std::pow(1000 / f, 0.6));
+          d.t60[k] = float(4.5 * fastPow(1000 / f, 0.6));
           d.exc[k] = float(0.6 + 0.4 * rnd()) * (rnd() < 0.5 ? -1 : 1);
           // (The energy moves up the modes in the first 100 ms of a real
           // crash; here the highs are struck and radiate the more.)
-          d.rad[k] = float(std::pow(f / 1000, 0.8));
+          d.rad[k] = float(fastPow(f / 1000, 0.8));
           d.side[k] = float(0.5 * d.rad[k] * (rnd() < 0.5 ? -1 : 1));
         }
         c.setVib(v, d);
@@ -942,7 +943,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
   // louder on top: its speed ~ velocity^1.2 keeps the ~30 dB.)
   static const double kVibExp = knob("PJ_VIB_VELEXP", 1.2);
   const double ex = t == ModalModel::kTinkle ? 1.0 : t == ModalModel::kVibraphone ? kVibExp : stiff ? 1.2 : 1.6;
-  const double amp = std::min(1.0, std::pow(v, ex) * dyn);
+  const double amp = std::min(1.0, fastPow(v, ex) * dyn);
   if (m_.sfx) {
     // (A hard key while the hall applauds: someone shouts "bravo"; the
     // applause goes on.)
@@ -1054,7 +1055,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       const double r = hz(midi) / d.freq[0];
       for (int k = 0; k < d.n; ++k) d.freq[k] = float(d.freq[k] * r);
       // Shorter tines (higher) ring a little shorter.
-      d.t60[0] = float(3.4 * std::pow(262 / hz(midi), 0.4));
+      d.t60[0] = float(3.4 * fastPow(262 / hz(midi), 0.4));
       static const float part[3] = {0.25f, 0.13f, 0.08f};
       supportCoupling(d, part);
       s_.setVib(vib, d);
@@ -1151,7 +1152,7 @@ void ModalPlayer::noteOn(int midi, int velocity) {
         const double w = std::clamp(velocity, 1, 127) / 127.0;
         const double h = hardness_ * base * (1 + kVel * (-0.25 + 0.6 * w * w));
         // (alpha 2.0 against 2.5: K rescaled to the same force at 0.2 mm.)
-        const double K = 2.6e10 * std::pow(h, 3.5) * std::pow(2e-4, 2.5 - alpha);
+        const double K = 2.6e10 * std::pow(h, 3.5) * fastPow(2e-4, 2.5 - alpha);
         s_.strike(vib, 0.022, 2.5 * amp, K, alpha);
       }
       break;

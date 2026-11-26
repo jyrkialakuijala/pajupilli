@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -112,7 +113,7 @@ void Kettle::retune() {
       if (m == 1) t = std::max(0.6, 1 / (0.25 + 0.83 * std::pow(ka, 8)));
       else if (m == 2) t = std::max(1.5 * tMain, 1 / (0.083 + 0.036 * std::pow(ka, 6)));
       else if (m == 3) t = t3;
-      else t = std::clamp(std::min(t3, 4.5) * 0.9 * std::pow(0.85, m - 4), 0.8, 4.5);
+      else t = std::clamp(std::min(t3, 4.5) * 0.9 * fastPow(0.85, m - 4), 0.8, 4.5);
     } else {
       t = m == 1 && c == 2 ? 1.2 : m == 2 && c == 2 ? 0.7 : 0.5;
     }
@@ -189,7 +190,7 @@ float Kettle::sample(float& side) {
   if (asleep_) return 0;
   Membrane& h = *head_;
   if (handX_ != handTo_ && ++handCount_ % 64 == 0) {
-    const double step = std::pow(handTo_, 64.0 / (0.04 * fs_));
+    const double step = fastPow(handTo_, 64.0 / (0.04 * fs_));
     handX_ = std::min(handTo_, handX_ * step);
     h.setDamping(handX_);
   }
@@ -201,7 +202,7 @@ float Kettle::sample(float& side) {
     if (free > 0) {
       auto force = [&](double xx) {
         const double rate = (xx - lastX_) / dt_;
-        return kK * hard_ * std::pow(xx, kA) * std::max(0.0, 1 + lambda_ * rate);
+        return kK * hard_ * fastPow(xx, kA) * std::max(0.0, 1 + lambda_ * rate);
       };
       double lo = 0, hi = free;
       for (int it = 0; it < 30; ++it) {
@@ -322,7 +323,7 @@ static const double kHands = knob("PJ_TIMP_HANDS", 1.0);
 
 double TimpaniPlayer::rollRate(int d) const {
   const double level = std::clamp(dyn_ + breathCtl_, 0.0, 1.0);
-  return 10 * std::pow(m_.kettle(d).pitch() / 110, 0.4) * (0.85 + 0.35 * level);
+  return 10 * fastPow(m_.kettle(d).pitch() / 110, 0.4) * (0.85 + 0.35 * level);
 }
 
 void TimpaniPlayer::strike(int d, double speed, double r, double theta, double hard) {
@@ -360,7 +361,7 @@ void TimpaniPlayer::noteOn(int midi, int velocity) {
   // The two hands are not alike (timpani.h): the spot, the speed, the mallet. The same key again:
   // the other hand; another key: the leading hand.
   const double hs = hand_ ? 1 : -1;
-  const double r2 = r + 0.02 * kHands * hs, hard = std::pow(1.3, -kHands * hs), handSpeed = 1 - 0.04 * kHands * hs;
+  const double r2 = r + 0.02 * kHands * hs, hard = fastPow(1.3, -kHands * hs), handSpeed = 1 - 0.04 * kHands * hs;
   hand_ ^= 1;
   const double level = 0.85 + 0.3 * std::clamp(dyn_, 0.0, 1.0);
   double speed = malletSpeed(velocity) * (1 + 0.04 * (ur() - 0.5)) * level;
@@ -418,7 +419,7 @@ void TimpaniPlayer::render(float* out, int n) {
         hand_ ^= 1;
         const double level = 0.85 + 0.3 * std::clamp(dyn_ + breathCtl_, 0.0, 1.0);
         const double wheel = flutter_ > 0.05 ? 0.4 + 0.75 * flutter_ : 1.0;
-        strike(d, 0.85 * malletSpeed(rollVel_[d]) * level * wheel * (1 + 0.12 * (ur() - 0.5)) * (1 - 0.04 * kHands * hs), r + 0.02 * kHands * hs, th, std::pow(1.3, -kHands * hs));
+        strike(d, 0.85 * malletSpeed(rollVel_[d]) * level * wheel * (1 + 0.12 * (ur() - 0.5)) * (1 - 0.04 * kHands * hs), r + 0.02 * kHands * hs, th, fastPow(1.3, -kHands * hs));
         rollNext_[d] = now_ + (1 + 0.1 * (ur() - 0.5)) / rollRate(d);
       }
       if (dampAt_[d] >= 0 && now_ >= dampAt_[d]) {

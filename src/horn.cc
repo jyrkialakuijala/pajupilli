@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 namespace {
@@ -46,15 +47,16 @@ Horn::Horn(const Instrument& inst) : Tube(inst), lp_(*inst.design->lip) {
   const Design& d = *inst.design;
   {
     const double r = 48000 / fs_;
-    glotA_ = 1 - std::pow(1 - 0.35, r);
-    noiseA_ = 1 - std::pow(1 - 0.55, r);
-    noiseHpA_ = 1 - std::pow(1 - 0.026, r);
+    glotA_ = 1 - fastPow(1 - 0.35, r);
+    noiseA_ = 1 - fastPow(1 - 0.55, r);
+    noiseHpA_ = 1 - fastPow(1 - 0.026, r);
   }
   kNoise_ = knob("PJ_LIPNOISE", 0.02);    // turbulence in the lip opening, x the flow
   kSweep_ = knob("PJ_LIPSWEEP", 1);       // the lips' swept flow
   kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
   kQ_ = knob("PJ_LIPQ", 1);               // the lips' Q, x the design's
   kQExp_ = knob("PJ_LIPQEXP", 0.4);       // ... rising as (fl / 300 Hz)^this above 300 Hz
+  kTractQ_ = knob("PJ_TRACTQ", 6);       // the vowel's resonance (Embouchure::tract): its Q
   kEps_ = knob("PJ_LIPEPS", 0.02) * 1e-3;  // the opening's smoothing near shut (m)
   kStroke_ = knob("PJ_VALVESTROKE", 0.007);  // a valve's press (s): a slurring finger is quick (slower, the half-valve between the notes is a hole in the legato)
   kRelease_ = knob("PJ_VALVEUP", 1.3);    // a valve's spring: the return stroke, x the press
@@ -190,7 +192,8 @@ void Horn::setValveCoefs(Valve& v) {
 }
 
 void Horn::setHoles(const char* pattern, double fingerSpeed) {
-  fingerSpeed = std::clamp(fingerSpeed, 0.25, 4.0);
+  // (a slide: a practised slur may take its time, src/hornplayer.cc: to ~3.3 x slower)
+  fingerSpeed = std::clamp(fingerSpeed, lp_.slide ? 0.08 : 0.25, lp_.slide ? 6.5 : 4.0);
   if (lp_.slide && ((*pattern >= '1' && *pattern <= '7') || (*pattern >= 'A' && *pattern <= 'G'))) {
     // The slide while the note sounds (a slur: the arm hurries, research/trombone.md
     // 6: <= 40..60 ms; the lips retune at once, and at an arm's unhurried 150 ms for
@@ -267,6 +270,9 @@ void Horn::settle() {
   cur_.glottis = target_.glottis;
   cur_.reed = target_.reed;
   cur_.lipPress = target_.lipPress;
+  cur_.lipQ = target_.lipQ;
+  cur_.tract = target_.tract;
+  cur_.tractHz = target_.tractHz;
   cur_.noise = target_.noise;
   cur_.air = target_.air;
 }
@@ -279,7 +285,7 @@ void Horn::resetAir() {
     valve_[k].awake = valve_[k].cp != 0;
   }
   out_.x = out_.v = in_.x = in_.v = 0;
-  dp_ = u_ = pm_ = 0;
+  dp_ = u_ = pm_ = ut_ = 0;
   bellPc_ = bellW_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
   nlIn_ = nlOut_ = 0;
@@ -355,14 +361,18 @@ void Horn::controlStep() {
   // The lips: resonance fl, rest opening hk / fl, mass mu per area.
   const double fl = std::clamp(cur_.reed, 20.0, 2000.0);
   cur_.lipPress += (1 - std::exp(-blockDt / 0.02)) * (target_.lipPress - cur_.lipPress);
+  // (the lips' firmness and the vowel: as quick as the lips' tension)
+  cur_.lipQ *= std::exp((1 - std::exp(-blockDt / 0.004)) * std::log(std::max(target_.lipQ, 0.05) / std::max(cur_.lipQ, 0.05)));
+  cur_.tract += (1 - std::exp(-blockDt / 0.004)) * (std::clamp(target_.tract, 0.0, 1.0) - cur_.tract);
+  cur_.tractHz *= std::exp((1 - std::exp(-blockDt / 0.004)) * std::log(std::max(target_.tractHz, 50.0) / std::max(cur_.tractHz, 50.0)));
   H_ = std::clamp(kHk_ * lp_.hk / fl * cur_.lipPress, 0.0, 3e-3);  // (a tuba's low notes: 2.5 mm)
   // The lips' Q: higher as their tension rises (the top notes need a sharper
   // lip to speak; lower down a sharp one splits the slot in two regimes).
-  const double q = lp_.q * kQ_ * std::pow(std::max(1.0, fl / 300), kQExp_);
+  const double q = lp_.q * kQ_ * fastPow(std::max(1.0, fl / 300), kQExp_) * std::clamp(cur_.lipQ, 0.2, 5.0);
   const double wl = 2 * M_PI * fl, g = wl / q;
   // Low notes: more of the lips in the cup, slacker: heavier (Elliott & Bowsher:
   // the vibrating mass falls as the tension rises).
-  invMu_ = 1 / (kMu_ * lp_.mu * std::pow(std::max(1.0, 190 / fl), 0.7));
+  invMu_ = 1 / (kMu_ * lp_.mu * fastPow(std::max(1.0, 190 / fl), 0.7));
   out_.set(wl, g, 1 / fs_);
   if (kIn2_ > 0) in_.set(kIn2_ * wl, kIn2_ * wl / kInQ_, 1 / fs_);
   // The valves move: the port shuts as the loop's links open.
@@ -419,7 +429,14 @@ float Horn::sample() {
   const double vg = gIn * (cur_.lung - pm_) / ag;
   glotLp_ += glotA_ * (whiteNoise() - glotLp_);
   const double hiss = kGlotNoise_ * 0.5 * kRho * vg * vg * glotLp_;
-  pm_ = (cm / dt * pm_ + gIn * (cur_.lung + hiss) - u_) / (cm / dt + gIn);
+  // The vowel (Embouchure::tract): a share w of the feed through the throat's inertance, the
+  // mouth's volume its spring: a resonance at tractHz the lips see (ut_ always integrated, so
+  // it is in step when the tongue shapes it).
+  const double w = cur_.tract;
+  const double wt = 2 * M_PI * std::min(cur_.tractHz, 0.12 * fs_);
+  const double mt = 1 / (wt * wt * cm), rt = std::sqrt(mt / cm) / kTractQ_;
+  ut_ = (ut_ + dt / mt * (cur_.lung + hiss - pm_)) / (1 + dt * rt / mt);
+  pm_ = (cm / dt * pm_ + (1 - w) * gIn * (cur_.lung + hiss) + w * ut_ - u_) / (cm / dt + (1 - w) * gIn);
   // --- The valve links (from this step's pressures), the bores, the links' flows.
   float* p = bore_.s.p();
   for (int k = 0; k < nValves_; ++k) {

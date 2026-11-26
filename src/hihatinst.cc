@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -23,7 +24,7 @@ void HiHatModel::resetAir() {
 float HiHatModel::sample() {
   static const float g = float(knob("PJ_HAT_OUT", 1.0 / 3));
   // The highs 3 dB down, as the cymbals' (src/cymbal.cc: heard from a little further off).
-  static const float kHi = float(std::pow(10.0, knob("PJ_CYM_HIGHS", -4.3) / 20) - 1);
+  static const float kHi = float(fastPow(10.0, knob("PJ_CYM_HIGHS", -4.3) / 20) - 1);
   static const float kA = float(1 - std::exp(-2 * M_PI * 3000 / fs_));
   const float x = hat_.sample(), sd = hat_.side();
   shelfM_ += kA * (x - shelfM_);
@@ -58,7 +59,7 @@ void HiHatPlayer::lean() {
 void HiHatPlayer::stroke(int velocity) {
   HiHat& h = m_.hat();
   const double v = std::clamp(velocity, 1, 127) / 127.0, R = h.top().radius();
-  const double speed = (0.25 + 4.5 * std::pow(v, 1.6)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
+  const double speed = (0.25 + 4.5 * fastPow(v, 1.6)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
   const double th = 0.4 + 0.5 * (ur() - 0.5);
   if (brush_ || brushKey_) {
     const double r = (0.75 + 0.1 * (ur() - 0.5)) * R;

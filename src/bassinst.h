@@ -9,6 +9,7 @@
 
 #include "bass.h"
 #include "performer.h"
+#include "slurs.h"
 #include "tube.h"
 
 namespace pajupilli {
@@ -181,6 +182,12 @@ class BowPlayer : public BassPlayer {
   void due(double dt);
   double wait_ = 0, waitOwn_ = 0;
   double vibScale_ = 1, vibDelay_ = 0;
+  // A practised slur (src/slurs.h, read for the bow: the left hand's speed; the bow's speed,
+  // pressure and place at the change; a crossing's overlap and the new string's pick-up).
+  bool slurWay(int from, int to, int velocity, double sounded);
+  SlurGesture gesture_;
+  double sinceSlur_ = 1e9;  // s since a practised slur began (its string: lastString_)
+  bool crossed_ = false;    // ... which crossed to another string
   // One of a section (vary): its stops this much off (cents), its bow's speed x and pressure +,
   // its vibrato beginning this much later (s).
   double seatCents_ = 0, seatSpeed_ = 1, seatPress_ = 0, seatVibDelay_ = 0;

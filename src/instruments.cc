@@ -10,6 +10,7 @@
 #include "velgain_data.h"
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 #include <cmath>
 #include <cstring>
@@ -110,8 +111,8 @@ namespace {
 double levelTrimByName(const char* name) {
   const double drum = drumTrimDb(name);
   for (const LevelTrim& t : kLevelTrims)
-    if (std::strcmp(t.name, name) == 0) return std::pow(10.0, (t.db + drum) / 20);
-  return std::pow(10.0, drum / 20);
+    if (std::strcmp(t.name, name) == 0) return fastPow(10.0, (t.db + drum) / 20);
+  return fastPow(10.0, drum / 20);
 }
 }  // namespace
 // (Asked for every voice every block: the last answers kept, by the name's address, each
@@ -286,6 +287,6 @@ const NoteInfo* noteInfo(const Instrument& inst, int midi, int k) {
   return a->holes ? a : nullptr;
 }
 
-double noteFrequency(int midi, double a4) { return a4 * std::pow(2.0, (midi - 69) / 12.0); }
+double noteFrequency(int midi, double a4) { return a4 * std::exp2((midi - 69) / 12.0); }
 
 }  // namespace pajupilli

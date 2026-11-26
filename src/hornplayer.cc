@@ -7,6 +7,7 @@
 
 #include "knob.h"
 #include "slurs.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -181,10 +182,15 @@ void HornPlayer::applyNote(Attack a) {
   // not practised): the old way below. A slur found unplayable is tongued lightly.
   SlurGesture g;
   const bool slurring = a == kSlur && !glide && prevNote_ >= 0 && prevNote_ != note_;
-  const bool practised = slurring && slurGesture(inst_.name, prevNote_, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &g);
+  const bool trill = trillSense_.at(prevNote_, note_, sinceOn_);
+  const bool practised = slurring && slurGesture(inst_.name, prevNote_, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &g, sinceOn_, trill);
   if (practised && g.fails) a = kDa;
   const char* holes = ov && *ov ? ov : played(note_)->holes;
-  const double fingerSpeed = std::exp2((keyVel_ - 64) / 63.0) * (practised ? g.fingers : 1);
+  // (a trombone: the gesture's number is the slide's own speed: its time x 1 / fingers, where the
+  // horn takes the square root of what it is given; slower can be steadier, the note arriving
+  // with the tube)
+  const double fingerSpeed = std::exp2((keyVel_ - 64) / 63.0) *
+                             (practised ? (inst_.design->lip->slide ? g.fingers * g.fingers : g.fingers) : 1);
   leadLeft_ = 0;
   if (practised && !g.fails && g.lead > 0) {  // the lips first: the valves follow
     leadLeft_ = g.lead;
@@ -230,6 +236,14 @@ void HornPlayer::applyNote(Attack a) {
     // drive a low note into a flat regime of its slot: the player eases off
     // (but without any push the legato has holes).
     slurAir_ = practised ? g.air : dir > 0 ? kSlurAir_ : kSlurAirDown_;
+    const SlurGesture none;
+    const SlurGesture& s = practised ? g : none;
+    setAperture_ = s.aperture;
+    setFirm_ = s.firm;
+    setFocus_ = s.focus;
+    setVowel_ = s.vowel;
+    setVowelAt_ = s.vowelAt;
+    setT_ = std::max(1e-3f, s.setT);
     sinceSlur_ = 0;
   }
   prevNote_ = note_;
@@ -264,7 +278,14 @@ void HornPlayer::applyNote(Attack a) {
   prevPartial_ = played(note_)->harmonic;
   if (a != kSlur) tongueFloor_ = 0;
   switch (a) {
-    case kSlur: return;
+    case kSlur:
+      // (a practised start's slow or quick breath is the start's alone: left on, the trumpet's
+      // soft E3, begun on a breath 4.8 times slower, slurred to B3 on that slow breath and
+      // landed 47 c flat)
+      lungAttack_ /= riseX_;
+      riseX_ = 1;
+      preheard_ = false;
+      return;
     case kBreath:  // the lips start on the breath alone
       tongueClosed_ = 0;
       tongueRelease_ = 0.001;
@@ -284,6 +305,30 @@ void HornPlayer::applyNote(Attack a) {
       break;
     }
   }
+  // The start as practised for this note (src/slurs.h): the tongue, the breath, the lips' set.
+  riseX_ = 1;
+  preheard_ = true;
+  AttackGesture ag;
+  if (attackGesture(inst_.name, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &ag)) {
+    tongueRelease_ *= ag.release;
+    lungAttack_ *= ag.rise;
+    riseX_ = ag.rise;
+    slurAir_ = ag.push;
+    slurAirT_ = std::max(1e-3f, ag.pushT);
+    slurLip_ = ag.lip;
+    slurLipT_ = std::max(1e-3f, ag.lipT);
+    slurDip_ = 0;
+    setAperture_ = ag.aperture;
+    setFirm_ = ag.firm;
+    setFocus_ = 0;
+    setVowel_ = ag.vowel;
+    setVowelAt_ = ag.vowelAt;
+    setT_ = std::max(1e-3f, ag.setT);
+    sinceSlur_ = 0;
+  }
+  // (the syllable's consonant, Performer::setSyllable: a "d" slower, a "t" quicker)
+  tongueRelease_ *= std::exp(-0.6 * sylHard_);
+  lungAttack_ *= std::exp(-0.4 * sylHard_);
   tongueRelease_ *= 1 + 0.15 * wander_ * urand();
   lungAttack_ *= 1 + 0.15 * wander_ * urand();
   // The push: less on a breath attack, more on an accent.
@@ -325,7 +370,7 @@ void HornPlayer::render(float* out, int n) {
       const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[note_], std::max(dynLo[note_], dynHi[note_]));
       const double f = glideFrequency();  // (a glide: the lips slide through the partials)
       // ~ f^1.45 (the calibration's choice: x0.65 at F2, x1.4 at A4 of ~ f).
-      const double p0 = std::clamp(lp.k * f * std::pow(f / 261.6, 0.45), lp.pressLo, lp.pressHi);
+      const double p0 = std::clamp(lp.k * f * fastPow(f / 261.6, 0.45), lp.pressLo, lp.pressHi);
       // The push brings the breath up to a speaking pressure: a loud note's
       // own is most of the way there (pushed as hard, it overblows).
       const double push = std::clamp((1 + atkPush_) * std::exp(-kDynP_ * (dyn - 0.5)) - 1, 0.0, atkPush_);
@@ -335,17 +380,38 @@ void HornPlayer::render(float* out, int n) {
         lungTarget = p0 * std::exp(kDynP_ * (dyn - 0.5) * (dyn < 0.5 ? 1 - kSoftAir_ : 1)) * pressTrim[note_] * kP_ * pressScale_ * accent *
                      std::max(0.1, 1 + slurAir_ * slurA);
       // The lips: calibrated per note and dynamics; the bend; the ear.
+      static const double kPrehear = knob("PJ_BRASS_PREHEAR", 1);
+      static const bool kPrehearSlur = knob("PJ_BRASS_PREHEAR_SLUR", 0) > 0;
       double fl = f * lp.fl * kFl_ * coverAt(note_, dyn) * glideCover(note_, dyn) * std::exp(-kDynLip_ * (dyn - 0.5) + kRollLip_ * roll_);
       if (ear_) fl *= std::exp(earCorr_);
       // (a section's player: the lips set for its own pitch and the chord's tuning at once, the
       // ear then trimming: ~600 c for the lips' factor's log, as the ear's own slope)
       if (section_) fl *= std::exp((earCents_ + seatCents_) / 600);
+      // (a soloist asked a tuning by ear, the same: the note is heard before it is played, and
+      // the lips are set for it from the start. The ear alone starts 0.2 s into the note and
+      // reaches under 5 c: asked 12 c low, a trumpet's A4 sat 18 c off through a half-second
+      // note. The starts are practised with this, 12 c either side: tools/slurs.py AOCC.)
+      // (Only a tongued note for now: the slurs have not been practised with it, and a soft slur
+      // into the trumpet's G3 asked 12 c low, the lips pre-set, sagged to 68 c flat.
+      // PJ_BRASS_PREHEAR_SLUR=1: slurred notes too, for that practice.)
+      else if (ear_ && kPrehear && (preheard_ || kPrehearSlur)) fl *= std::exp(kPrehear * earCents_ / 600);
       fl *= 1 + 0.004 * wander_ * w2b_;
       // ... then they come into the note from a little below: above, the
       // oscillation can stay on the sharp side of a jump in the slot.
       fl *= std::exp(slurLip_ * slur - slurDip_ * (std::exp(-sinceSlur_ / slurDipT_) - slur) * (sinceSlur_ < 1e8));
       e.reed = fl;
       e.lipPress = std::exp(-lp.dynH * kDynH_ * std::max(0.0, dyn - 0.5) - kSoftLips_ * std::max(0.0, 0.5 - dyn));
+      // The set through a practised slur: the opening, the lips' firmness, the vowel.
+      const double set = sinceSlur_ < 8 * setT_ ? std::exp(-(sinceSlur_ / setT_) * (sinceSlur_ / setT_)) : 0;
+      e.lipPress *= std::exp(setAperture_ * set);
+      e.lipQ = std::exp(setFirm_ * set);
+      e.tract = setVowel_ * set;
+      e.tractHz = noteFrequency(note_) * std::exp2(setVowelAt_);
+      if (vowelAmt_ > e.tract) {  // (the syllable's vowel, held through the note)
+        e.tract = vowelAmt_;
+        e.tractHz = vowelHz_;
+      }
+      setNow_ = set;
     }
     // Lungs: a fast push, a slower release.
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
@@ -364,8 +430,8 @@ void HornPlayer::render(float* out, int n) {
     }
     e.lung = lung_ * (1 + vib * sv) * (1 + 0.03 * wander_ * w1b_);
     e.glottis = 1.5e-4;
-    e.noise = 0.01 * noiseCtl_;
-    e.air = air_;
+    e.noise = 0.01 * noiseCtl_ * std::exp(-setFocus_ * setNow_);
+    e.air = air_ * std::exp(-setFocus_ * setNow_);
     horn_.setEmbouchure(e);
     horn_.process(out + i, m);
     // The ear: once the note has spoken, a slow trim (a fast one hunts: the
@@ -385,7 +451,7 @@ void HornPlayer::render(float* out, int n) {
       const double want = std::clamp(dyn_ + breathCtl_ + bellVel_, 0.0, 1.0);
       const double db = want < 0.5 ? kBellSoft_ * (0.5 - want) * 2 : kBellLoud_ * (want - 0.5) * 2;
       bellDb_ += (1 - std::exp(-bdt / 0.15)) * (db - bellDb_);
-      const float g = float(std::pow(10.0, bellDb_ / 20) - 1), k = float(bellK_);
+      const float g = float(fastPow(10.0, bellDb_ / 20) - 1), k = float(bellK_);
       for (int j = 0; j < m; ++j) {
         bellLp_ += k * (out[i + j] - bellLp_);
         out[i + j] += g * (out[i + j] - bellLp_);

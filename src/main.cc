@@ -44,6 +44,7 @@
 #include "player.h"
 #include "reed.h"
 #include "room.h"
+#include "vmath.h"
 #include "voice.h"
 
 using namespace pajupilli;
@@ -262,7 +263,7 @@ int rampTest(int midi, double secs) {
     std::vector<Seg> segs;
     const int n = int(secs * kFs / frame);
     for (int k = 0; k < n; ++k) {
-      const double u = double(k) / n, s = dir == 0 ? lo * std::pow(hi / lo, u) : hi * std::pow(lo / hi, u);
+      const double u = double(k) / n, s = dir == 0 ? lo * fastPow(hi / lo, u) : hi * fastPow(lo / hi, u);
       pl.setPressureScale(s);
       voice.render(x.data(), frame);
       std::string r = "-";
@@ -1010,12 +1011,20 @@ int run(int argc, char** argv) {
         double x = 0;
         is >> x;
         pl.setBreath(x - 0.5);
+      } else if (w == "syl") {  // (the syllable the player says: da, ta, te, ti, to, du; -: its own)
+        std::string x;
+        is >> x;
+        if (!pl.setSyllable(x.c_str())) std::fprintf(stderr, "-seq: syl takes d or t and u, o, a, e or i (not %s)\n", x.c_str());
+      } else if (w == "tune") {  // (the tuning by ear asked of the player, cents from equal temperament: Performer::setTuning)
+        double x = 0;
+        is >> x;
+        pl.setTuning(x);
       } else if (w == "bend") {  // (the pitch bend, -1..1, as -play's)
         double x = 0;
         is >> x;
         pl.setLipRoll(x);
       } else {
-        std::fprintf(stderr, "-seq: on N V, off N, wait S, pedal CC, knob K X, wheel X, expr X, bend X (not %s)\n", w.c_str());
+        std::fprintf(stderr, "-seq: on N V, off N, wait S, pedal CC, knob K X, wheel X, expr X, bend X, syl XY, tune C (not %s)\n", w.c_str());
         return 1;
       }
     }

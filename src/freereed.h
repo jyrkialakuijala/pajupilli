@@ -30,6 +30,8 @@
 #include <cmath>
 #include <cstdint>
 
+#include "vmath.h"
+
 namespace pajupilli {
 
 // One reed's build: sizes in m, its tuning in Hz.
@@ -53,14 +55,14 @@ struct FreeReedBuild {
 inline FreeReedBuild accordionReed(double hz) {
   FreeReedBuild b;
   b.hz = hz;
-  b.len = std::clamp(13e-3 * std::pow(444 / hz, 0.42), 6e-3, 70e-3);
-  b.width = std::clamp(2.1e-3 * std::pow(444 / hz, 0.2), 1.4e-3, 4.5e-3);
+  b.len = std::clamp(13e-3 * fastPow(444 / hz, 0.42), 6e-3, 70e-3);
+  b.width = std::clamp(2.1e-3 * fastPow(444 / hz, 0.2), 1.4e-3, 4.5e-3);
   b.set = 0.04 * b.len;
   b.plate = std::clamp(0.07 * b.len, 0.8e-3, 2.5e-3);
   b.cell = 2e-6 * std::pow(b.len / 13e-3, 2.0);
   // The high reeds ring longer (short, stiff steel): they still start at a
   // few hundred Pa.
-  b.q = std::clamp(100 * std::pow(hz / 440, 0.35), 80.0, 250.0);
+  b.q = std::clamp(100 * fastPow(hz / 440, 0.35), 80.0, 250.0);
   b.closeP = 1500;
   // The air that feeds it (the pallet's hole and the chamber's throat): its
   // mass lowers the pitch alike over the range (~25 c) and lets it speak.

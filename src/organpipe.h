@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "rng.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -157,20 +158,20 @@ class FluePipe {
     for (size_t i = 0; i < k_.size(); ++i) {
       const int k = k_[i];
       const double f = hz_ * ratio * k * (1 + v_.stretch * (k - 1));
-      const double q0 = std::min(v_.qCap, v_.q1 * std::pow(double(k), v_.qRise));
+      const double q0 = std::min(v_.qCap, v_.q1 * fastPow(double(k), v_.qRise));
       const double q = 1 / (1 / q0 + v_.freinHz / f);
       const double r = std::exp(-M_PI * f / (q * fs_)), w = 2 * M_PI * f / fs_;
       c_[i] = float(r * std::cos(w));
       s_[i] = float(r * std::sin(w));
       const double roll = v_.rollK > 0 ? std::exp(-((k - 1) / v_.rollK) * ((k - 1) / v_.rollK)) : 1.0;
-      const double even = k % 2 ? 1.0 : v_.stopped ? v_.evenLevel : v_.openEven * std::pow(2.0 / k, v_.evenTilt);
+      const double even = k % 2 ? 1.0 : v_.stopped ? v_.evenLevel : v_.openEven * fastPow(2.0 / k, v_.evenTilt);
       const double cz = (k - v_.chimneyK) / v_.chimneyWidth;
       const double chimney = 1 + v_.chimneyBoost * std::exp(-cz * cz);
-      in_[i] = float((1 - r) * std::pow(double(k), -v_.modeTilt) * roll * even * chimney);  // (each mode's resonance gain ~ its weight)
-      if (i == 1) chiffScale_ = v_.chiffEven > 0 && even > 0 ? float(std::pow(1 / even, v_.chiffEven)) : 1.0f;
+      in_[i] = float((1 - r) * fastPow(double(k), -v_.modeTilt) * roll * even * chimney);  // (each mode's resonance gain ~ its weight)
+      if (i == 1) chiffScale_ = v_.chiffEven > 0 && even > 0 ? float(fastPow(1 / even, v_.chiffEven)) : 1.0f;
     }
     tau_ = v_.tauFrac * fs_ / (hz_ * ratio);
-    uScale_ = float(std::pow(std::max(v_.drive, 1e-3), -v_.driveNorm));
+    uScale_ = float(fastPow(std::max(v_.drive, 1e-3), -v_.driveNorm));
     const double per = fs_ / (hz_ * ratio);
     swingUp_ = float(1 - std::exp(-1 / (0.5 * per)));
     swingDown_ = float(1 - std::exp(-1 / (4 * per)));
@@ -203,7 +204,7 @@ class FluePipe {
       // its foot, ~ the square of how far the pallet had closed; else a key
       // struck again at once found its pipe speaking and boosted its octave
       // at full strength, more than a fresh attack's)
-      chiffEnv_ = std::max(chiffEnv_, float(std::pow(closed, 1 + v_.chiffFoot)) * press);
+      chiffEnv_ = std::max(chiffEnv_, float(fastPow(closed, 1 + v_.chiffFoot)) * press);
       sympEnv_ = std::max(sympEnv_, closed);
     }
     on_ = true;

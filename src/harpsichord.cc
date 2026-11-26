@@ -1,4 +1,5 @@
 #include "harpsichord.h"
+#include "director.h"
 
 #include <algorithm>
 #include <cmath>
@@ -7,6 +8,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -17,7 +19,7 @@ constexpr int kChoirs = HarpsichordPlayer::kChoirs, kKeys = HarpsichordPlayer::k
 double along(const int* at, const double* v, int n, int midi) {
   if (midi <= at[0]) return v[0];
   for (int i = 0; i + 1 < n; ++i)
-    if (midi <= at[i + 1]) return v[i] * std::pow(v[i + 1] / v[i], double(midi - at[i]) / (at[i + 1] - at[i]));
+    if (midi <= at[i + 1]) return v[i] * fastPow(v[i + 1] / v[i], double(midi - at[i]) / (at[i + 1] - at[i]));
   return v[n - 1];
 }
 }  // namespace
@@ -89,15 +91,47 @@ PianoDesign harpsichordDesign() {
       s.pluckK = 1200 * plectrumK;
       s.pluckLimit = voice * (c == 2 ? 0.7 : c == 3 ? 1.4 : 1.0) * (2.5 - 1.3 * t);
       s.pluckSide = 0.33;  // (the string leaves 1 mm sideways to 3 mm up)
+      // (the quill's tip: soft for its first PJ_HPSI_TIP mm, 0.4; the force begun with a corner
+      // rang the string's low modes for the 5-12 ms the jack pushes, a thump before the snap: a
+      // felt hammer's attack, not a quill's)
+      s.pluckSoft = knob("PJ_HPSI_TIP", 0.4) * 1e-3;
+      // (the quill's snap off the string, by ear 2026-11-25: the low strings' short-lived high
+      // transients; PJ_HPSI_SNAP samples of the release force into their high modes at the bass's
+      // lowest key, less up to middle C, none above)
+      // (... over the low and middle strings: in full to PJ_HPSI_SNAP_FULLKEY (G2), none from
+      // PJ_HPSI_SNAP_TOPKEY (F#4); and from lower down each string's own spectrum: from its
+      // PJ_HPSI_SNAP_FROM-th partial (6), in full from its PJ_HPSI_SNAP_TO-th (16), no higher than
+      // 1.5 and 5 kHz: a low string's many overtones, there at the pluck and soon gone)
+      static const double kSnapFull = knob("PJ_HPSI_SNAP_FULLKEY", 43), kSnapTop = knob("PJ_HPSI_SNAP_TOPKEY", 66);
+      static const double kSnapFrom = knob("PJ_HPSI_SNAP_FROM", 6), kSnapTo = knob("PJ_HPSI_SNAP_TO", 16);
+      // (PJ_HPSI_SNAP 14: it was 24 on the modes above 1.5 kHz alone; under C2 a little less, as
+      // the string's pitch^0.7: the lowest strings have the most modes in the band)
+      s.pluckSnap = knob("PJ_HPSI_SNAP", 14) * std::clamp((kSnapTop - midi) / std::max(1.0, kSnapTop - kSnapFull), 0.0, 1.0) *
+                    std::clamp(std::pow(pitch / 65.4, 0.7), 0.5, 1.0);
+      s.pluckSnapLo = std::min(1500.0, kSnapFrom * pitch);
+      s.pluckSnapHi = std::max(s.pluckSnapLo + 100, std::min(5000.0, kSnapTo * pitch));
+      // (the lowest two octaves, to F3: more yet of the harmonics far up, past the 60th: the
+      // snap x (1 + PJ_HPSI_SNAP_TILT) from five times its full partial on (the 80th), rising from twice it; none
+      // of that from C4. A long bass string's pluck has a hundred partials at first.)
+      s.pluckSnapTilt = knob("PJ_HPSI_SNAP_TILT", 1.5) * std::clamp((60.0 - midi) / 7.0, 0.0, 1.0);
       s.mh = 1e-3; s.K = 1e9; s.p = 2.5;  // (no hammer)
       // The wire's own loss: thin wire in air, more by frequency than a piano's.
       s.loss = lossK * 0.34 * std::exp2(2.0 * t) * (c == 2 ? 1.4 : c == 3 ? 0.9 : 1.0);
-      s.b2 = lossK * 3.0e-4;
-      s.b3 = lossK * 3e-8;
+      // The partials' decay by their number (by ear, 2026-11-25: the low ones, to the 7th, ring on;
+      // above, they die faster): less loss in proportion to frequency (PJ_HPSI_LOSS2, x0.4 of the
+      // earlier), more as its square, turning at the PJ_HPSI_TURN-th partial (7.5) of the string's
+      // own pitch: there PJ_HPSI_HIDAMP more (0.3 1/s; at twice that partial four times as much).
+      static const double kLin = knob("PJ_HPSI_LOSS2", 0.4), kHi = knob("PJ_HPSI_HIDAMP", 0.3), kTurn = knob("PJ_HPSI_TURN", 7.5);
+      s.b2 = lossK * 3.0e-4 * kLin;
+      s.b3 = std::max(lossK * 3e-8, kHi / ((kTurn * pitch) * (kTurn * pitch)));
       // The damper: a flag of cloth in the jack's top, just beyond the plectrum.
       s.hasDamper = true;
       s.damper = std::min(s.strike + 0.02, 0.6);
       s.damperLen = 0.012;
+      // (the cloth is held by the jack, which hangs on it by its own weight: PJ_HPSI_JACK g, 8.
+      // Left at the model's least, a 1 g head, a bass string threw it off again and again: a
+      // released note under C3 rang on for half a second, its level wobbling.)
+      s.damperMass = knob("PJ_HPSI_JACK", 8) * 1e-3;
       s.damperRate = 250 * (1 + 1.5 * (1 - t));  // (the bass strings' cloth is thicker)
       s.top = c == 3 ? 8000 : 12000;
       // Its place on the soundboard: the bridge point of the piano key of its pitch.
@@ -109,6 +143,10 @@ PianoDesign harpsichordDesign() {
   des.hammerWidth = 0.001;   // (a plectrum's width)
   des.sideTuneCents = knob("PJ_HPSI_SIDETUNE", 14);  // the bridge pin: the two directions 0.8 % apart
   des.top = 12000;
+  // (the strings nobody plays, ringing in sympathy: their overtones to 5 kHz only. All 244 strings
+  // are computed while anything sounds, and at their full 12 kHz that was four fifths of the
+  // harpsichord's cost. PJ_HPSI_SYMTOP 0: all of them, as before.)
+  des.symTop = knob("PJ_HPSI_SYMTOP", 5000);
   des.topTreble = 12000;
   return des;
 }
@@ -129,6 +167,12 @@ HarpsichordPlayer::HarpsichordPlayer(PianoModel& m) : Performer(m), m_(m) {
       if (*p) ++p;
     }
   }
+  // (the rows switched off: their dampers taken as holding, their strings left out of the
+  // sympathetic ringing, not computed. PJ_HPSI_OFFROWS 1: ringing along, as before.)
+  static const bool kOffRows = knob("PJ_HPSI_OFFROWS", 0) != 0;
+  if (!kOffRows)
+    for (int c = 0; c < kChoirs; ++c)
+      for (int n = 0; n < kKeys; ++n) m_.piano().sympathetic(c * kKeys + n, on_[c]);
 }
 
 int HarpsichordPlayer::keyOf(int midi) const {
@@ -148,10 +192,21 @@ void HarpsichordPlayer::noteOn(int midi, int velocity) {
   // (a slow key spreads them further).
   const double v = std::clamp(velocity, 1, 127) / 127.0, speed = 0.15 + 0.35 * v;
   static const int order[kChoirs] = {0, 2, 1, 3};
+  // The manuals, by the director's terraces (PJ_HPSI_MANUALS, 1): a two-manual harpsichord's
+  // forte ritornellos on the lower manual, the two 8' coupled (and the 4', the 16' where drawn);
+  // its echoes and quiet episodes on the upper, the front 8' alone, brighter and thinner. The
+  // director's level holds through a phrase, so the hands change keyboards only between them.
+  static const bool kManuals = knob("PJ_HPSI_MANUALS", 1) > 0;
+  bool use[kChoirs];
+  for (int c = 0; c < kChoirs; ++c) use[c] = on_[c] || (hold_ && c >= 2);
+  if (kManuals && cued_ && on_[0] && on_[1] && cue_.v[kCueLevel] < 0.46f) {
+    std::fill(use, use + kChoirs, false);
+    use[1] = true;
+  }
   int row = 0;
   for (int i = 0; i < kChoirs; ++i) {
     const int c = order[i];
-    if (!(on_[c] || (hold_ && c >= 2))) continue;
+    if (!use[c]) continue;
     due_.push_back({row * 0.0006 / speed, c * kKeys + n, speed});  // (0.6 mm of key travel between rows)
     ++row;
   }
@@ -180,7 +235,7 @@ void HarpsichordPlayer::render(float* out, int n) {
         ++j;
       }
     }
-    m_.piano().setVoicing(std::pow(2.0, brightness_ - 1) * hardness_);  // (the plectra's voicing)
+    m_.piano().setVoicing(std::exp2(brightness_ - 1) * hardness_);  // (the plectra's voicing)
     m_.process(out + i, m);
   }
   blowing_ = !m_.piano().asleep() || !due_.empty();

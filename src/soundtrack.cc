@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -90,7 +91,7 @@ void AeolianModel::damp(Note& n) {
     for (int j = 0; j < s.modes; ++j) {
       Mode& m = s.mode[j];
       // (released, the shutter's felt edge rests on the strings: T60 at most ~2.5 s)
-      const double felt = n.down ? 0.0 : 6.908 / std::clamp(2.5 * std::pow(s.f / 261.6, -0.2), 0.5, 3.5);
+      const double felt = n.down ? 0.0 : 6.908 / std::clamp(2.5 * fastPow(s.f / 261.6, -0.2), 0.5, 3.5);
       m.r = std::exp(-(std::max(m.zeta * m.w, felt) + (j + 1) * air) / fs);
     }
     for (int c = 0; c < s.cells; ++c) {
@@ -121,13 +122,13 @@ void AeolianModel::keyOn(int midi, int velocity) {
   // The shutter: it slides as far as the touch, the quicker the harder (the whole travel in
   // ~0.8 s at the hardest; K2 x 0.25 .. 4).
   n.target = 0.03 + 0.97 * std::pow(v, 1.5);
-  n.rate = (0.5 + 0.5 * v) / (0.8 * std::pow(4.0, 2 * swell_ - 1) * fs);
+  n.rate = (0.5 + 0.5 * v) / (0.8 * fastPow(4.0, 2 * swell_ - 1) * fs);
   const double f0 = 440 * std::exp2((midi - 69) / 12.0);
-  const double ringMul = std::pow(4.0, 2 * ring_ - 1);
+  const double ringMul = fastPow(4.0, 2 * ring_ - 1);
   // The voicing: a string's swing (in its diameters) grows up the keyboard (~f^0.55: its Q
   // grows); the harp's maker evens the keys out (the strings' gauges and the box's radiation,
   // not modelled: a gain).
-  n.voice = std::pow(f0 / 261.6, -0.55);
+  n.voice = fastPow(f0 / 261.6, -0.55);
   // Three strings on the note, their tensions a few cents apart, and one on the fifth.
   const double d = 1.5 + 2.5 * urand();
   const double fr[kStrings] = {f0 * std::exp2(-d / 1200), f0 * std::exp2(d / 1200),
@@ -143,7 +144,7 @@ void AeolianModel::keyOn(int midi, int velocity) {
     s.pan = std::clamp(centre + pan[k], -1.0, 1.0);
     // The ring: T60 of the first mode, ~3.5 s at middle C, longer down the keyboard; the
     // higher modes shorter (K4 x 0.25 .. 4).
-    const double t1 = std::clamp(3.5 * std::pow(s.f / 261.6, -0.45), 1.0, 5.0) * ringMul;
+    const double t1 = std::clamp(3.5 * fastPow(s.f / 261.6, -0.45), 1.0, 5.0) * ringMul;
     s.modes = 0;
     for (int j = 1; j <= kModes; ++j) {
       const double f = j * s.f * (1 + 1e-5 * j * j);  // (a thin string: barely stiff)
@@ -200,7 +201,7 @@ float AeolianModel::sample() {
     // and holds it wider).
     const double dt = 64 / fs, tau = 2.5;
     const double g = 2 * (urand() + urand() + urand() - 1.5);
-    gust_ += -gust_ * dt / tau + 0.003 * std::pow(64.0, gusts_ - 0.5) * std::sqrt(2 * dt / tau) * g;
+    gust_ += -gust_ * dt / tau + 0.003 * fastPow(64.0, gusts_ - 0.5) * std::sqrt(2 * dt / tau) * g;
     gustF_ = std::exp(gust_);
     for (Note& n : notes_) damp(n);
   }

@@ -12,6 +12,7 @@
 
 #include "knob.h"
 #include "brightgrand.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -143,6 +144,9 @@ static PianoDesign designFor(const Instrument& inst) {
   const bool bright = brightPiano(inst);
   PianoDesign d = bright ? brightGrandDesign() : grandDesign();
   d.topBridge = knob("PJ_PIANO_TOPBRIDGE", 4.8);
+  // (the semi-concert grand's shorter board already moves more at the top keys' bridge points: with
+  // the concert grand's 4.8 its top two octaves died in half the grand's time, plinking)
+  if (bright) d.topBridge = knob("PJ_BRIGHTGRAND_TOPBRIDGE", 1.5);
   d.topUp = knob("PJ_PIANO_TOPUP", 1.5);
   d.topF0 = knob("PJ_PIANO_TOPF0", 1.0);
   d.napPack = knob("PJ_PIANO_NAPPACK", 1.0);
@@ -169,7 +173,20 @@ static PianoDesign designFor(const Instrument& inst) {
   {  // (the hammers strike every string at an eighth of its length, from its far end from the bridge)
     const double strike = gHammerPos > 0 ? gHammerPos : knob("PJ_PIANO_STRIKE", 0.125);
     for (int key = 0; key < 88; ++key) d.key[key].strike = strike;
+    // (either side of the break: PJ_PIANO_STRIKE20, the top wound key's (E2), back to the common
+    // place by key 8; PJ_PIANO_STRIKE21, the lowest plain key's (F2), back to it by key 36; 0: as the rest)
+    static const double kS20 = knob("PJ_PIANO_STRIKE20", 0), kS21 = knob("PJ_PIANO_STRIKE21", 0);
+    for (int key = 8; key < 36 && !bright; ++key) {
+      const double to = key <= 20 ? kS20 : kS21, w = key <= 20 ? (key - 8) / 12.0 : (36 - key) / 15.0;
+      if (to > 0) d.key[key - 1].damper += (to - strike) * w, d.key[key - 1].strike = strike + (to - strike) * w;
+    }
   }
+  if (knob("PJ_PIANO_DUMPKEYS", 0) != 0)  // (a diagnostic: the keys' strings and hammers around the break)
+    for (int key = 15; key <= 27; ++key) {
+      const PianoKey& s = d.key[key - 1];
+      std::fprintf(stderr, "key %d n %d len %.3f T %.0f mu %.5f B %.2e strike %.3f mh %.4f K %.3g p %.2f nap %.2e napK %.0f loss %.3f b2 %.2e lev %.1f pivot %.1f col %.2f\n",
+                   key, s.strings, s.len, s.tension, s.mu, s.B, s.strike, s.mh, s.K, s.p, s.nap, s.napK, s.loss, s.b2, s.levelDb, s.pivot, s.colour);
+    }
   d.massPower = knob("PJ_PIANO_MASSPOWER", 1);  // (1: the blow is 1/2 m v^2, the same v curve on every key; over 1: the bass hammers more)
   d.restrike = knob("PJ_PIANO_RESTRIKE", 0.6);  // (a hammer on a ringing string stops part of its swing: 0 none)
   d.bassLength = knob("PJ_PIANO_BASSLEN", 1);  // (the long strings louder by their length: 1 as it, 0.5 as its root, 0 none)
@@ -220,16 +237,16 @@ PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, des
     // board's own sound into the room making up the rest of the power (-inf: as in the concert
     // hall); the hammers' direct sound as the two shares give it.
     const double db = std::min(0.0, knob("PJ_PIANO_CLOSE_DB", 0.0));
-    const double close = std::pow(10.0, db / 20), hall = std::sqrt(std::max(0.0, 1 - close * close));
+    const double close = fastPow(10.0, db / 20), hall = std::sqrt(std::max(0.0, 1 - close * close));
     piano_.micBlend(float(close), float(hall));
     hallShare_ = hall * hall;
     const double act = knob("PJ_PIANO_HALLACT", 0.5);
     blendAct_ = hallAct_ = float(std::sqrt(close * close + hall * hall * act * act));
   }
   if (honkyTonk(inst)) {
-    treble_ = float(std::pow(10.0, knob("PJ_HONKY_TREBLE", 6.0) / 20) - 1);
+    treble_ = float(fastPow(10.0, knob("PJ_HONKY_TREBLE", 6.0) / 20) - 1);
     trebleA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_TREBLEHZ", 2000) / inst.fs));
-    air_ = float(std::pow(10.0, knob("PJ_HONKY_AIR", -6.0) / 20) - 1);  // (the top shelved down: no hiss)
+    air_ = float(fastPow(10.0, knob("PJ_HONKY_AIR", -6.0) / 20) - 1);  // (the top shelved down: no hiss)
     airA_ = float(1 - std::exp(-2 * M_PI * knob("PJ_HONKY_AIRHZ", 6000) / inst.fs));
     box_ = float(knob("PJ_HONKY_BOX", 1.0));
     boxFb_ = float(knob("PJ_HONKY_BOXFB", 0.65));
@@ -435,7 +452,7 @@ int PianoPlayer::fold(int midi) const {  // (an instrument of a smaller compass:
 
 double PianoPlayer::hammerSpeed(int velocity, double dynamics) {
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return (0.35 + 5.0 * std::pow(v, 1.7)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
+  return (0.35 + 5.0 * fastPow(v, 1.7)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void PianoPlayer::noteOn(int midi, int velocity) {
@@ -523,7 +540,7 @@ void PianoPlayer::render(float* out, int n) {
     const int m = std::min(kBlock, n - i);
     t_ += m / fs_;
     tick(m / fs_);
-    m_.piano().setVoicing(std::pow(4.0, brightness_ - 1) * hardness_);
+    m_.piano().setVoicing(fastPow(4.0, brightness_ - 1) * hardness_);
     m_.process(out + i, m);
   }
   now_ += n / fs_;

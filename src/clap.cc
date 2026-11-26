@@ -6,6 +6,7 @@
 
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -39,7 +40,7 @@ void ClapModel::clap(double speed) {
     // Each person: their own hands (the cavity's pitch, how well damped),
     // how hard (the first is the loudest), when (spread over ~20 ms), where.
     const double cup = ur();                                  // 0 flat .. 1 cupped
-    const double f = 2200 * std::pow(0.33, cup) * (1 + 0.06 * un());  // 2.2 kHz flat .. 0.75 kHz cupped
+    const double f = 2200 * fastPow(0.33, cup) * (1 + 0.06 * un());  // 2.2 kHz flat .. 0.75 kHz cupped
     const double Q = 3 + 3 * ur();
     const double v = speed * (p == 0 ? 1.0 : 0.55 + 0.4 * ur());
     const int at = p == 0 ? 0 : int(spread * fs * ur());
@@ -146,7 +147,7 @@ double ClapPlayer::speed(int velocity, double dynamics) {
   // over the squeeze's time, ~ speed^1.5: about General MIDI's 30 dB, 16 to 127).
   static const double top = knob("PJ_CLAP_VMAX", 3.0), ex = knob("PJ_CLAP_VEXP", 1.4);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void ClapPlayer::noteOn(int midi, int velocity) {

@@ -1,4 +1,5 @@
 #include "sfx.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -138,7 +139,7 @@ Sfx::Sfx(Type t, double fs) : t_(t), fs_(fs), dt_(1 / fs), set_(fs) {
         Clapper& c = cl_[i];
         const float x = seat[i].second.first, y = seat[i].second.second;
         // Hands: the cupped palms' air (0.7..2.5 kHz, Q 3..10), each clapper's own.
-        const double f = 700 * std::pow(2500.0 / 700, u01()), Q = 3 + 7 * u01();
+        const double f = 700 * fastPow(2500.0 / 700, u01()), Q = 3 + 7 * u01();
         const double r = std::exp(-M_PI * f / Q / fs);
         c.a1 = float(2 * r * std::cos(2 * M_PI * f / fs));
         c.a2 = float(-r * r);
@@ -359,7 +360,7 @@ float Sfx::sample(float* side) {
         for (Bubble& b : bub_) {
           if (b.on) continue;
           const double rmin = 0.3e-3, rmax = 8e-3, a = 1.5;
-          const double R = std::pow(std::pow(rmin, -a) - u01() * (std::pow(rmin, -a) - std::pow(rmax, -a)), -1 / a) *
+          const double R = fastPow(fastPow(rmin, -a) - u01() * (fastPow(rmin, -a) - fastPow(rmax, -a)), -1 / a) *
                            std::exp2((60 - key_) / 24.0);
           const double f = 3.26 / R, d = 0.043 * f + 0.0014 * std::pow(f, 1.5);
           if (f > 0.45 * fs_) break;
@@ -405,7 +406,7 @@ float Sfx::sample(float* side) {
         if (sylT_ < sylDur_) {
           const double u = sylT_ / sylDur_;
           p = std::sin(M_PI * u);
-          f = fHi_ * std::pow(fLo_ / fHi_, u) * (1 + 0.15 * std::exp(-u / 0.08));  // a little hook up at the start
+          f = fHi_ * fastPow(fLo_ / fHi_, u) * (1 + 0.15 * std::exp(-u / 0.08));  // a little hook up at the start
         }
         sylT_ += dt_;
         if (sylT_ > sylDur_ + gap_) {

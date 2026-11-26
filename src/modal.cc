@@ -1,4 +1,5 @@
 #include "modal.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -228,7 +229,7 @@ float ModalSet::sample() {
       if (v.glideT < 1) {
         v.glideT = std::min(1.0, v.glideT + bdt / v.glideDur);
         const double u = v.glideT * v.glideT * (3 - 2 * v.glideT);
-        const double r = v.ratioFrom * std::pow(v.ratioTo / v.ratioFrom, u);
+        const double r = v.ratioFrom * fastPow(v.ratioTo / v.ratioFrom, u);
         adiabatic(v.x, v.v, v.nv, r / v.ratio);
         v.ratio = r;
         changed = true;
@@ -348,9 +349,9 @@ float ModalSet::sample() {
         F = 0.5 * hi;
         for (int it = 0; it < 30; ++it) {
           const double c = std::max(c0 - G * F, 0.0);
-          const double r = F - v.mK * std::pow(c, v.mAlpha);
+          const double r = F - v.mK * fastPow(c, v.mAlpha);
           if (r > 0) hi = F; else lo = F;
-          const double dr = 1 + v.mK * v.mAlpha * std::pow(std::max(c, 1e-12), v.mAlpha - 1) * G;
+          const double dr = 1 + v.mK * v.mAlpha * fastPow(std::max(c, 1e-12), v.mAlpha - 1) * G;
           double Fn = F - r / dr;
           if (Fn <= lo || Fn >= hi) Fn = 0.5 * (lo + hi);
           if (std::fabs(Fn - F) < 1e-9 * (1 + F)) { F = Fn; break; }

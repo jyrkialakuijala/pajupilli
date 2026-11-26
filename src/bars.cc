@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -26,7 +27,7 @@ double urand(uint32_t& s) {
   s = s * 1664525u + 1013904223u;
   return (s >> 8) * (1.0 / 16777216.0);
 }
-double logLerp(double a, double b, double t) { return a * std::pow(b / a, std::clamp(t, 0.0, 1.0)); }
+double logLerp(double a, double b, double t) { return a * fastPow(b / a, std::clamp(t, 0.0, 1.0)); }
 double pitch(int midi, double a4 = 440) { return a4 * std::exp2((midi - 69) / 12.0); }
 
 // A bar's bending modes into a key: its shapes under a mallet at `at` (a
@@ -126,7 +127,7 @@ BarDesign celestaDesign() {
     // The box: a bottle in the bass, a shallow tube at the top.
     const double oct = (midi - 48) / 12.0, ro = std::clamp(oct, 0.0, 5.0);
     const int ri = std::min(int(ro), 4);
-    const double rg = ringK * ring[ri] * std::pow(ring[ri + 1] / ring[ri], ro - ri) * (oct > 5 ? std::exp2(-(oct - 5) * 1.3) : 1);
+    const double rg = ringK * ring[ri] * fastPow(ring[ri + 1] / ring[ri], ro - ri) * (oct > 5 ? std::exp2(-(oct - 5) * 1.3) : 1);
     const double mouthA = 6e-4 * std::exp2(-0.15 * oct), neck = 0.046 * std::exp2(-0.2 * oct);
     resonator(&k, boxDetune * (2 * urand(rng) - 1), boxLoss, 6.91 / rg, mouthA, kRho * mouthA * neck, d.micDist, std::exp2(-boxTilt * (oct - 1)));
     // (The other modes that move the air over the mouth one way push it too.)
@@ -142,8 +143,8 @@ BarDesign celestaDesign() {
     const double hx = midi <= 72 ? (midi - 48) / 24.0 : 1 + (midi - 72) / 29.0;
     const double hm[3] = {8e-3, 5e-3, 1.5e-3}, hk[3] = {3e8, 1e9, 1e11};
     const int hi = hx < 1 ? 0 : 1;
-    k.mallet = hm[hi] * std::pow(hm[hi + 1] / hm[hi], std::clamp(hx, 0.0, 2.0) - hi);
-    k.K = hard * hk[hi] * std::pow(hk[hi + 1] / hk[hi], std::clamp(hx, 0.0, 2.0) - hi);
+    k.mallet = hm[hi] * fastPow(hm[hi + 1] / hm[hi], std::clamp(hx, 0.0, 2.0) - hi);
+    k.K = hard * hk[hi] * fastPow(hk[hi + 1] / hk[hi], std::clamp(hx, 0.0, 2.0) - hi);
     k.p = 2.5;
     k.hyst = 0.25;
     k.x = 1.2 * ((i + 0.5) / d.keys - 0.5);
@@ -486,9 +487,9 @@ float Bars::sample() {
         const double hyst = 1 + b.hyst * std::clamp((free - k.dPrev) / dt_, -2.0, 6.0);
         for (int it = 0; it < 34; ++it) {
           d = 0.5 * (lo + hi);
-          if (d + k.G * b.K * std::pow(d, b.p) * hyst > free) hi = d; else lo = d;
+          if (d + k.G * b.K * fastPow(d, b.p) * hyst > free) hi = d; else lo = d;
         }
-        force = std::max(0.0, b.K * std::pow(d, b.p) * hyst);
+        force = std::max(0.0, b.K * fastPow(d, b.p) * hyst);
       }
       k.dPrev = float(d);
       knockIn_ += float(force);

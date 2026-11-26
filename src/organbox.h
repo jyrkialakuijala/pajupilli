@@ -22,6 +22,8 @@
 #include <complex>
 #include <vector>
 
+#include "vmath.h"
+
 namespace pajupilli {
 
 struct Vec3 {
@@ -53,7 +55,7 @@ class Enclosure {
       line_[k].assign(n, 0.0f);
       pos_[k] = 0;
       auto damp = [&](double t60, float& g, float& b) {
-        const double gl = std::pow(10.0, -3.0 * n / (fs * t60));
+        const double gl = fastPow(10.0, -3.0 * n / (fs * t60));
         const double alpha = std::min(1.0, p.t60High / t60);
         g = float(gl);
         // (Jot's one-pole; a long line with a short high T60 asks for a pole
@@ -220,9 +222,9 @@ class Enclosure {
   void retune() {
     ctl_ = 32;
     const double s = open_;
-    const double fc = 600 * std::pow(16000 / 600.0, s);
+    const double fc = 600 * fastPow(16000 / 600.0, s);
     a_ = float(1 - std::exp(-2 * M_PI * fc / fs_));
-    gainOpen_ = float(0.25 + 0.75 * std::pow(s, 0.7));
+    gainOpen_ = float(0.25 + 0.75 * fastPow(s, 0.7));
   }
   double fs_ = 48000;
   Params p_;

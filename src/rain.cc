@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -100,7 +101,7 @@ void RainModel::drop(Note& n, Bowl& b, double D, bool glass, double height) {
   const double push = (glass ? 1.0 : 0.12) * kDropGain * b.gain * p;
   for (Mode& m : b.modes) {
     const double at = m.sine ? std::sin(m.n * theta) : std::cos(m.n * theta);
-    m.re += push * pulseSpectrum(m.f * bk_ * tau) * at * std::pow(z, m.n - 1) * kWeight[m.n - 2];
+    m.re += push * pulseSpectrum(m.f * bk_ * tau) * at * fastPow(z, m.n - 1) * kWeight[m.n - 2];
   }
   const double water = 2 * water_;
   if (water <= 0) return;
@@ -120,7 +121,7 @@ void RainModel::drop(Note& n, Bowl& b, double D, bool glass, double height) {
     f = 21000 - 8000 * (D - 0.8) / 0.4;
     amp = 0.6;
   } else if (D > 2 && urand() < 0.5) {  // irregular, large drops: 1 .. 10 kHz, the larger louder
-    f = 1000 * std::pow(10.0, urand());
+    f = 1000 * fastPow(10.0, urand());
     amp = (D / 2) * std::sqrt(1000 / f);
   }
   if (f <= 0 || f > 0.45 * fs) return;
@@ -150,17 +151,17 @@ void RainModel::keyOn(int midi, int velocity) {
   Note n;
   n.midi = midi;
   // The rain rate: 0.3 mm/h (a drizzle) .. 90 mm/h (a cloudburst), by the touch.
-  n.R = 0.3 * std::pow(300.0, v);
-  n.lambda = 4.1 * std::pow(n.R, -0.21);
+  n.R = 0.3 * fastPow(300.0, v);
+  n.lambda = 4.1 * fastPow(n.R, -0.21);
   // The largest drops: the tail cut by breakup, at a size growing with the rate (~1.2 mm in a
   // drizzle, ~4.6 mm in a cloudburst).
   n.dmax = std::clamp(1.5 * std::pow(n.R, 0.25), 0.8, 5.5);
   const double f0 = 440 * std::exp2((midi - 69) / 12.0);
   const int count = 1 + int(std::lround(4 * bowls_));
-  const double dens = 25 * std::pow(32.0, density_);  // drops a second on the note's bowl
+  const double dens = 25 * fastPow(32.0, density_);  // drops a second on the note's bowl
   const double centre = std::clamp((midi - 64) / 40.0, -0.6, 0.6);
   // The ring: T60 of the first mode, ~4 s at middle C, shorter up the keyboard (K3 x 0.25 .. 4).
-  const double ringMul = std::pow(4.0, 2 * ring_ - 1);
+  const double ringMul = fastPow(4.0, 2 * ring_ - 1);
   for (int k = 1; k <= count; ++k) {
     const double f = k * f0;
     if (k > 1 && f > 9000) break;
@@ -171,12 +172,12 @@ void RainModel::keyOn(int midi, int velocity) {
     // (lighter, a smaller bowl swings more under the same drop (~k) but moves less air with its
     // smaller wall: ~sqrt(k) between the two)
     b.gain = std::sqrt(double(k));
-    const double t1 = std::clamp(4 * std::pow(f / 261.6, -0.4), 1.0, 10.0) * ringMul;
+    const double t1 = std::clamp(4 * fastPow(f / 261.6, -0.4), 1.0, 10.0) * ringMul;
     for (int j = 0; j < kModes; ++j) {
       const double fm = f * kRatio[j];
       if (fm * 1.003 > 0.45 * fs) break;
-      const double t60 = t1 * std::pow(kRatio[j], -0.6);
-      const double t60r = std::max(0.15, std::min(t60, 1.5 * std::pow(f / 261.6, -0.2)));
+      const double t60 = t1 * fastPow(kRatio[j], -0.6);
+      const double t60r = std::max(0.15, std::min(t60, 1.5 * fastPow(f / 261.6, -0.2)));
       const double split = 0.0005 + 0.002 * urand();  // the flaws' split of the doublet
       for (int s = 0; s < 2; ++s) {
         Mode m;

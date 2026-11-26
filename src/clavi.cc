@@ -7,6 +7,7 @@
 
 #include "clavtone_data.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -38,7 +39,7 @@ const double kStiff[][2] = {{1, 5e-4}, {6, 2e-4}, {12, 6.6e-5}, {23, 4.7e-5}, {3
 // 1.5 s at 5 kHz (only the ends take energy: the tailpiece and the rubber).
 double heldDecay(double f) {
   static const double kScale = knob("PJ_CLAV_SUSTAIN", 1.0);
-  const double T60 = f < 1000 ? 20 * std::pow(std::max(f, 30.0) / 100, -0.398) : 8 * std::pow(f / 1000, -1.04);
+  const double T60 = f < 1000 ? 20 * fastPow(std::max(f, 30.0) / 100, -0.398) : 8 * fastPow(f / 1000, -1.04);
   return 6.91 / (T60 * kScale);
 }
 
@@ -484,11 +485,11 @@ float ClaviModel::sample() {
     double target = 0, fc = fc_, q = 4;
     if (wah_ >= 0) {
       target = 1;
-      fc = 450 * std::pow(1600 / 450.0, std::clamp(wah_, 0.0, 1.0));
+      fc = 450 * fastPow(1600 / 450.0, std::clamp(wah_, 0.0, 1.0));
       q = 5;
     } else if (envAmt_ > 0) {
       target = 1;
-      fc = 300 * std::pow(2500 / 300.0, std::clamp(env_ * envAmt_ * 2, 0.0, 1.0));
+      fc = 300 * fastPow(2500 / 300.0, std::clamp(env_ * envAmt_ * 2, 0.0, 1.0));
       q = 3.5;
     }
     fxMix_ += (1 - std::exp(-dt_ / 0.02)) * (target - fxMix_);

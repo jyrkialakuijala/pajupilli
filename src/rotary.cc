@@ -27,7 +27,7 @@ void butter(double fs, double fc, bool high, double* b, double* a) {
 
 // A peaking section (RBJ): gain dB at fc, its width q; b, a with a[0] = 1 dropped.
 void peak(double fs, double fc, double q, double db, double* b, double* a) {
-  const double A = std::pow(10.0, db / 40), w = 2 * M_PI * fc / fs, al = std::sin(w) / (2 * q), c = std::cos(w);
+  const double A = fastPow(10.0, db / 40), w = 2 * M_PI * fc / fs, al = std::sin(w) / (2 * q), c = std::cos(w);
   const double a0 = 1 + al / A;
   b[0] = (1 + al * A) / a0;
   b[1] = -2 * c / a0;
@@ -162,7 +162,7 @@ void Rotary::setup(double fs, uint32_t seed, double spread, bool log, double spe
   for (int i = 0; i < 4; ++i) {
     fdnLen_[i] = int(kLen[i] * fs / 48000);
     fdn_[i].assign(fdnLen_[i], 0.0f);
-    fdnG_[i] = std::pow(10.0, -3.0 * fdnLen_[i] / (fs * knob("PJ_ROTARY_CABT60", 0.04) * sT60));
+    fdnG_[i] = fastPow(10.0, -3.0 * fdnLen_[i] / (fs * knob("PJ_ROTARY_CABT60", 0.04) * sT60));
   }
 }
 
@@ -239,7 +239,7 @@ void Rotary::process(float in, float& left, float& right, float* rays) {
   // drive^0.7 at a low level, not drive)
   if (drive_ != driveFor_) {
     driveFor_ = drive_;
-    drivePow_ = std::pow(std::max(drive_, 1e-3), 0.3);
+    drivePow_ = fastPow(std::max(drive_, 1e-3), 0.3);
   }
   const double amp = y / drivePow_;
   // The crossover.
@@ -409,7 +409,7 @@ void Rotary::process(float in, float& left, float& right, float* rays) {
   if (click_ > 1e-4) {
     clickPh_ += 2 * M_PI * 2300 * dt_;
     // (by ear, the user's: 40 dB under what it was, out of the way; PJ_ROTARY_RELAY, dB over that)
-    static const double kRelay = 0.004 * std::pow(10.0, (knob("PJ_ROTARY_RELAY", 0) - 40) / 20);
+    static const double kRelay = 0.004 * fastPow(10.0, (knob("PJ_ROTARY_RELAY", 0) - 40) / 20);
     mech += noise_ * kRelay * click_ * (std::sin(clickPh_) + 0.5 * normal());
     click_ *= 1 - dt_ / 0.004;
   }

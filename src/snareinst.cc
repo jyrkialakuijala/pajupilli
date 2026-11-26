@@ -5,6 +5,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -94,13 +95,13 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   const double R = s.batter().radius();
   if (midi == 40) {  // the swirl: the left hand
     swirl_ = true;
-    load_ = 0.15 + 1.1 * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3);
+    load_ = 0.15 + 1.1 * fastPow(std::clamp(velocity, 1, 127) / 127.0, 1.3);
     if (!brushing_) ownLoad_ = held_ * load_;  // (and the brushing goes on when the key is let go)
     brushing_ = true;
     return;
   }
   if (midi == 37) {  // the cross-stick: no brush stroke, and the left hand is not circling
-    s.crossStick(0.3 + 2.7 * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.4));
+    s.crossStick(0.3 + 2.7 * fastPow(std::clamp(velocity, 1, 127) / 127.0, 1.4));
     sinceTap_ = 100;  // (that hand holds the stick)
     return;
   }
@@ -140,7 +141,7 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   }
   sinceTap_ = 0;
   brushing_ = true;
-  const double w = 0.12 + 0.75 * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3);
+  const double w = 0.12 + 0.75 * fastPow(std::clamp(velocity, 1, 127) / 127.0, 1.3);
   ownLoad_ = nGaps_ == 0 ? w : ownLoad_ + 0.3 * (w - ownLoad_);
   // A stroke of the right hand: on its own side of the head, where the
   // brightness knob puts it (the middle .. towards the edge), each one a
@@ -181,7 +182,7 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   // wire ends arrive together, nearer the middle of the head, a touch harder
   // still and let further in: a fuller slap with more of the drum in it.
   double hard = 1, spread = (2.5 + 1.5 * ur() + 1.2 * sw) * 1e-3, follow = (0.6 + 1.0 * vel + 0.3 * sw) * 1e-3;
-  if (brushing_) hard = 1 + (std::pow(10.0, meat_ / 20) - 1) * room;
+  if (brushing_) hard = 1 + (fastPow(10.0, meat_ / 20) - 1) * room;
   const bool flat = brushing_ && room > 0.5 && !lastFlat_ && ur() < flatShare_;
   lastFlat_ = flat;
   if (flat) {

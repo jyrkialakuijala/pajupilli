@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -194,7 +195,7 @@ double StickSnarePlayer::stickSpeed(int velocity, double dynamics) {
   // m/s, accents 3 .. 6.
   static const double top = knob("PJ_SSNARE_VMAX", 6.0), ex = knob("PJ_SSNARE_VEXP", 1.75);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void StickSnarePlayer::noteOn(int midi, int velocity) {

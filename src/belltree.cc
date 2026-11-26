@@ -6,6 +6,7 @@
 
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -23,8 +24,8 @@ BellTreeModel::BellTreeModel(const Instrument& inst) : Tube(inst), set_(inst.fs)
     ModalSet::Def def;
     def.one = true;
     def.zShare = 0;
-    def.modalMass = float(0.004 * std::pow(hi / lo, -1.0 + b / double(kBells - 1)));  // (smaller bells: lighter)
-    const double f0 = hi * std::pow(lo / hi, b / double(kBells - 1));  // b = 0: the top
+    def.modalMass = float(0.004 * fastPow(hi / lo, -1.0 + b / double(kBells - 1)));  // (smaller bells: lighter)
+    const double f0 = hi * fastPow(lo / hi, b / double(kBells - 1));  // b = 0: the top
     int n = 0;
     for (int k = 0; k < 3; ++k) {
       h = h * 1664525u + 1013904223u;
@@ -90,7 +91,7 @@ void BellTreePlayer::noteOn(int midi, int velocity) {
   // quicker the harder it is played: 0.5 s soft, 0.25 s hard.
   static const double top = knob("PJ_BELLTREE_VMAX", 2.0), ex = knob("PJ_BELLTREE_VEXP", 1.6);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  const double speed = top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dyn_, 0.0, 1.0));
+  const double speed = top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dyn_, 0.0, 1.0));
   m_.sweep(speed, 0.5 - 0.25 * v);
 }
 

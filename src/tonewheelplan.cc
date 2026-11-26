@@ -1,6 +1,7 @@
 #include "tonewheelplan.h"
 
 #include "knob.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -309,7 +310,7 @@ TonewheelPlan planTonewheel(const std::vector<TonewheelNote>& notes, int tpq, do
       // least): searched, as the keep shares and the steps stack differently on each registration)
       auto level = [](const std::array<double, 9>& b) {
         double g = 0;
-        for (double x : b) g += x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20);
+        for (double x : b) g += x >= 1 ? fastPow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * fastPow(10.0, -21.0 / 20);
         return 20 * std::log10(std::max(g, 1e-9));
       };
       // (but no further than ~6 dB: a soft accompaniment left a whisper is lost under the tune;

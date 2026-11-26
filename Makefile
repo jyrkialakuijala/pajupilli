@@ -10,11 +10,29 @@ LDLIBS = -lasound -lm -pthread
 SRCS = $(wildcard src/*.cc)
 HDRS = $(wildcard src/*.h)
 
-pajupilli: $(SRCS) $(HDRS)
-	$(CXX) $(CXXFLAGS) -o $@ $(SRCS) $(LDLIBS)
+# puhuja (src/puhuja: a copy of the speech synthesizer's sources, the lead singer's voice; every
+# change there is recorded with its motivation in src/puhuja/CHANGES.md). Built apart and only
+# when it changes (its largest file is a megabyte), with puhuja's own flags: no -ffast-math,
+# which lets glibc swap exp/log/pow in vectorized loops.
+PUHUJA_SRCS = $(wildcard src/puhuja/*.cc)
+PUHUJA_HDRS = $(wildcard src/puhuja/*.h src/puhuja/*.inc)
+PUHUJA_OBJS = $(patsubst src/puhuja/%.cc,build/puhuja/%.o,$(PUHUJA_SRCS))
+PUHUJA_FLAGS ?= -O3 -march=native -fno-math-errno -fno-signed-zeros -fno-trapping-math -ffp-contract=off -std=c++17
+PUHUJA_LIB = build/libpuhuja.a
+.DEFAULT_GOAL := pajupilli
 
-scalar: $(SRCS) $(HDRS)
-	$(CXX) $(SCALARFLAGS) -o pajupilli-scalar $(SRCS) $(LDLIBS)
+build/puhuja/%.o: src/puhuja/%.cc $(PUHUJA_HDRS)
+	@mkdir -p build/puhuja
+	$(CXX) $(PUHUJA_FLAGS) -c -o $@ $<
+
+$(PUHUJA_LIB): $(PUHUJA_OBJS)
+	ar rcs $@ $(PUHUJA_OBJS)
+
+pajupilli: $(SRCS) $(HDRS) $(PUHUJA_LIB)
+	$(CXX) $(CXXFLAGS) -o $@ $(SRCS) $(PUHUJA_LIB) $(LDLIBS)
+
+scalar: $(SRCS) $(HDRS) $(PUHUJA_LIB)
+	$(CXX) $(SCALARFLAGS) -o pajupilli-scalar $(SRCS) $(PUHUJA_LIB) $(LDLIBS)
 
 # Show that the bore loops use zmm registers.
 asm: $(SRCS) $(HDRS)

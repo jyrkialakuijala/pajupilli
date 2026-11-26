@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -254,9 +255,9 @@ float HandDrum::sample() {
       double lo = 0, hi = free;
       for (int it = 0; it < 30; ++it) {
         const double x = 0.5 * (lo + hi);
-        if (x + G * K_ * std::pow(x, s_.alpha) * lossF > free) hi = x; else lo = x;
+        if (x + G * K_ * fastPow(x, s_.alpha) * lossF > free) hi = x; else lo = x;
       }
-      F = float(K_ * std::pow(0.5 * (lo + hi), s_.alpha) * lossF);
+      F = float(K_ * fastPow(0.5 * (lo + hi), s_.alpha) * lossF);
       if (!hit_) hitAt_ = 0;
       hit_ = true;
     }
@@ -399,7 +400,7 @@ void HandDrumPlayer::noteOn(int midi, int velocity) {
   // a little elsewhere, a little harder or softer.
   static const double ex = knob("PJ_HD_VEXP", 1.25);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  const double speed = d.spec().vmax * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dyn_, 0.0, 1.0)) * (1 + 0.04 * (ur() - 0.5));
+  const double speed = d.spec().vmax * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dyn_, 0.0, 1.0)) * (1 + 0.04 * (ur() - 0.5));
   // The stroke as played this time (a stick on the timbal: only its place).
   // The hand lands a little elsewhere each time, more open or more closed; on
   // open tones the fingertips sometimes stay a moment at the edge (a touch

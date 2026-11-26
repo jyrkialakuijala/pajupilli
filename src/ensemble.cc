@@ -14,6 +14,7 @@
 #include "lead.h"
 #include "parallel.h"
 #include "pianoinst.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -322,7 +323,7 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   // (A one-voice instrument sounds all its keys in one voice: a gain would
   // move the notes still ringing; its stroke is chosen instead.)
   if (velGain_ && velocityAsGain(s.v->instrument())) {
-    s.vgTo = std::pow(10.0, velocityGainDb(s.v->instrument(), velocity, key) / 20);
+    s.vgTo = fastPow(10.0, velocityGainDb(s.v->instrument(), velocity, key) / 20);
     s.vgTau = s.held ? 0.06 : 0.005;  // a slur moves there as the breath does; an attack at once
     if (silent) s.vg = s.vgTo;
   } else if (velGain_) {
@@ -330,7 +331,7 @@ void Ensemble::take(int flute, int key, int pitch, int velocity) {
   }
   // (A drum at the SoundFonts' level: its one gain, never moving (drumkit.cc).)
   if (!velocityAsGain(s.v->instrument()))
-    if (const double dg = drumGainDb(s.v->instrument().name); dg != 0) s.vg = s.vgTo = std::pow(10.0, dg / 20);
+    if (const double dg = drumGainDb(s.v->instrument().name); dg != 0) s.vg = s.vgTo = fastPow(10.0, dg / 20);
   ++s.held;
   s.lastNote = pitch;
   s.active = true;
@@ -976,7 +977,11 @@ void Ensemble::block(float* left, float* right, int n) {
     // Without a room, a flute silent for a while is not computed (its tail
     // has died away); in a room every flute listens. (Circuits always run:
     // their oscillators never stop, and they share a board.)
-    if (s.active && !s.held && !s.v->player().busy() && now_ - s.lastOff > kIdle) s.active = false;
+    // (a string instrument rings on after the bow or the finger has left it: a plucked bass for
+    // seconds)
+    const double idle = s.v->instrument().kind == Kind::kString ? 6.0 : kIdle;
+    if (s.active && !s.held && !s.v->player().busy() && now_ - s.lastOff > idle) s.active = false;
+    if (i == feedSlot_) s.active = true;  // (a sound from elsewhere is heard from this place: setFeed)
     sounding += s.active;
   }
   // (Every flute there is: a section's players all (a roster: each a seat on the stage); of a
@@ -984,7 +989,10 @@ void Ensemble::block(float* left, float* right, int n) {
   // the notes' tails, not instruments on the stage: silent, they are not computed. A part of two
   // flutes held 22 voices and computed 22 bores. PJ_LISTEN_ALL=1: all of them.)
   static const bool kListenAll = knob("PJ_LISTEN_ALL", 0) != 0;
-  int listeners = kListenAll || !pool_ ? nf : std::max(0, lines_ - sounding);
+  // (PJ_ROSTER_LISTEN=0: a roster's silent players are not computed either: they no longer ring
+  // along with the hall, an experiment for the string sections' cost)
+  static const bool kRosterListen = knob("PJ_ROSTER_LISTEN", 1) != 0;
+  int listeners = kListenAll || (!pool_ && kRosterListen) ? nf : pool_ ? std::max(0, lines_ - sounding) : 0;
   for (int i = 0; i < nf; ++i) {
     Slot& s = f_[i];
     if (!s.active && nf > 1 && !s.v->instrument().circuit()) {
@@ -1013,9 +1021,10 @@ void Ensemble::block(float* left, float* right, int n) {
       }
     }
   }
+  if (feedSlot_ >= 0 && feedSlot_ < nf && feed_) feed_(buf_[feedSlot_].data(), n);  // (instead of the player there)
   for (int i : go) playing += f_[i].v->player().busy();
   if (velGain_)
-    for (Slot& s : f_) s.vg += (1 - std::exp(-n / 48000.0 / s.vgTau)) * (s.vgTo - s.vg);
+    for (Slot& s : f_) s.vg += (1 - std::exp(-n / 48000.0 / s.vgTau)) * (s.vgTo * s.sg - s.vg);
   if (room_) {
     // To pressure at 1 m (Pa) for the room; the listener's microphones keep
     // each instrument's balance (its gain).
@@ -1033,8 +1042,13 @@ void Ensemble::block(float* left, float* right, int n) {
       // (The grand: its microphones stand 65 cm over the strings and hear
       // little of what the open lid and the case send into the room: the
       // room gets 1 dB more of it than of the others, PJ_PIANO_REVERB.)
-      static const float kGrand = float(std::pow(10.0, knob("PJ_PIANO_REVERB", 1.0) / 20));
-      const float send = std::strcmp(f_[i].v->instrument().name, "grand-piano") == 0 ? kGrand : 1.0f;
+      // (The Baroque flute: the model's small embouchure radiates ~10 dB less than its Boehm flute,
+      // where the real one is a few dB softer; trimmed up to be heard, it stood as if miked close,
+      // dry, out of the room. Its sound sent into the room PJ_BAROQUE_FLUTE_REVERB dB more (6).)
+      static const float kGrand = float(fastPow(10.0, knob("PJ_PIANO_REVERB", 1.0) / 20));
+      static const float kTraverso = float(fastPow(10.0, knob("PJ_BAROQUE_FLUTE_REVERB", 6.0) / 20));
+      const char* nm = f_[i].v->instrument().name;
+      const float send = std::strcmp(nm, "grand-piano") == 0 ? kGrand : std::strcmp(nm, "baroque-flute") == 0 ? kTraverso : 1.0f;
       const float g = float(f_[i].v->instrument().gain * levelTrim(f_[i].v->instrument())) / send;
       // (Velocity's gain is the player's: the room hears it too, early and
       // late. It is at most +6 dB, velocityGainDb.)
@@ -1155,6 +1169,7 @@ int Ensemble::resets() const {
   int r = 0;
   for (const Slot& s : f_) r += s.v->model().resets();
   for (const Section& k : kids_) r += k.ens->resets();
+  if (clientIdx_ == 0 && shareKid()) r += shareKid()->resets();
   return r;
 }
 

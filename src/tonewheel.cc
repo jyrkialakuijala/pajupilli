@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -65,7 +66,7 @@ std::array<double, 9> tonewheelLowerFor(const std::array<double, 9>& upper, doub
 // the upper manual alone). kind 2, the hollow 8' (008060400: the 8' with its odd harmonics, the
 // 2 2/3' and 1 3/5', the clarinet): a line of another colour from the upper's.
 std::array<double, 9> tonewheelLowerShaped(const std::array<double, 9>& low, int kind) {
-  auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
+  auto gain = [](double x) { return x >= 1 ? fastPow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * fastPow(10.0, -21.0 / 20); };
   static const double kOff[3][9] = {{-99, -99, 0, -99, -99, -99, -99, -99, -99},
                                     {-99, -99, 0, 0, 0, -99, -99, 0, -99},
                                     {-99, -99, 0, -99, -2, -99, -4, -99, -99}};
@@ -90,7 +91,7 @@ std::array<double, 9> tonewheelLowerShaped(const std::array<double, 9>& low, int
 // 16' (a whisper over a booming pedal would be wrong), how bright it is the 8' (round registrations
 // want the simple 16', bright ones a brighter pedal).
 std::array<double, 2> tonewheelPedalFor(const std::array<double, 9>& upper, double clarity) {
-  auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
+  auto gain = [](double x) { return x >= 1 ? fastPow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * fastPow(10.0, -21.0 / 20); };
   double all = 0, high = 0;
   for (int d = 0; d < 9; ++d) {
     all += gain(upper[d]);
@@ -230,7 +231,7 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
     if (n <= 12) {
       h[2] = 0.02; h[3] = 0.25; h[5] = 0.08; h[7] = 0.03;
     } else {
-      for (int k = 2; k < 8; ++k) h[k] = std::pow(10.0, (kLevel[k] + kHarm + 4 * r.n()) / 20);
+      for (int k = 2; k < 8; ++k) h[k] = fastPow(10.0, (kLevel[k] + kHarm + 4 * r.n()) / 20);
     }
     for (int k = 2; k < 8; ++k) ph[k] = 2 * M_PI * r.u();
     // The tuned filter of wheels 49-91 (a capacitor and transformer per wheel), aged capacitors
@@ -257,11 +258,11 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
       double e2 = 0;
       for (int k = 1; k <= kSubs; ++k) {
         if (k % T == 0) continue;
-        sa[k] = std::pow(10.0, 3 * rsub.n() / 20) / k;
+        sa[k] = fastPow(10.0, 3 * rsub.n() / 20) / k;
         sp[k] = 2 * M_PI * rsub.u();
         e2 += sa[k] * sa[k];
       }
-      const double total = age * std::pow(10.0, kSubDb / 20) * h[1] / std::sqrt(std::max(e2, 1e-12));
+      const double total = age * fastPow(10.0, kSubDb / 20) * h[1] / std::sqrt(std::max(e2, 1e-12));
       for (int k = 1; k <= kSubs; ++k) {
         sa[k] *= total;
         if (n >= 49) {
@@ -270,7 +271,7 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
         }
       }
     }
-    const double level = std::pow(10.0, 0.8 * age * r.n() / 20) / std::max(h[1], 1e-6);
+    const double level = fastPow(10.0, 0.8 * age * r.n() / 20) / std::max(h[1], 1e-6);
     std::vector<float>& t = table_[n];
     t.resize(N);
     for (int i = 0; i < N; ++i) {
@@ -289,7 +290,7 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
       const double g = std::max(1 + dg, 0.3);
       const double depth = 1 + dep[k] + (dep[k1] - dep[k]) * w;
       double v = 0;
-      for (int j = 1; j < 8; ++j) v += h[j] * std::pow(g, -(2 + 1.6 * (j - 1))) * std::sin(j * th + ph[j]);
+      for (int j = 1; j < 8; ++j) v += h[j] * fastPow(g, -(2 + 1.6 * (j - 1))) * std::sin(j * th + ph[j]);
       v *= depth;
       double sub = 0;
       for (int k = 1; k <= kSubs; ++k)
@@ -297,7 +298,7 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
       t[i] = float(level * (v + dr * std::sin(phi - pd) + sub));
     }
     // The whole generator's whisper (the pickups hear their neighbours: ~-70 dB each).
-    background_[n] = std::pow(10.0, (-70 + 6 * r.n()) / 20) * (r.u() < 0.5 ? -1 : 1);
+    background_[n] = fastPow(10.0, (-70 + 6 * r.n()) / 20) * (r.u() < 0.5 ? -1 : 1);
     // Its spring coupling: a torsional resonance of 3-8 Hz, Q ~3.
     flW_[n] = 2 * M_PI * (3 + 5 * r.u());
     flQ_[n] = 2 + 2 * r.u();
@@ -429,7 +430,7 @@ void TonewheelModel::setUpperGoal(const std::array<double, 9>& bars) {
 // The gains of the sliders where they stand: 3 dB a step, below the first step fading linearly
 // to silence (the drawbar's contact leaving its first tap).
 void TonewheelModel::drawbarGains() {
-  auto gain = [](double x) { return x >= 1 ? std::pow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * std::pow(10.0, -21.0 / 20); };
+  auto gain = [](double x) { return x >= 1 ? fastPow(10.0, -3.0 * (8 - std::min(x, 8.0)) / 20) : std::max(x, 0.0) * fastPow(10.0, -21.0 / 20); };
   for (int d = 0; d < 9; ++d) {
     gainU_[d] = gain(pos_[kUpper][d]);
     gainL_[d] = gain(pos_[kLower][d]);
@@ -684,7 +685,7 @@ void TonewheelModel::resetAir() {
 
 float TonewheelModel::sample() {
   static const double kOut = knob("PJ_TONEWHEEL_OUT", 5.0), kConsole = 0.06;
-  static const double kPartner = std::pow(10.0, -45 / 20.0);
+  static const double kPartner = fastPow(10.0, -45 / 20.0);
   const double fs = fs_, dt = 1 / fs;
   t_ += dt;
   // The shaft's wobble (20 Hz) and the motor's pulses (120 Hz): every wheel's phase together.
@@ -839,7 +840,7 @@ float TonewheelModel::sample() {
   }
   // The preamp: the expression pedal (~35 dB, the bass held up as it closes), the tube's soft knee.
   expr_ += (exprTarget_ - expr_) * dt / 0.03;
-  const double g = std::pow(10.0, -35 * std::pow(1 - std::clamp(expr_, 0.0, 1.0), 1.3) / 20);
+  const double g = fastPow(10.0, -35 * fastPow(1 - std::clamp(expr_, 0.0, 1.0), 1.3) / 20);
   const double ripple = 1 + 0.002 * std::sin(2 * M_PI * 120 * t_);  // (the B+ ripple: 120 Hz, a fifth of a percent)
   // Microphonics: the console's valves hear the room. The Rotaries' sound reaching the console
   // (~2 m: ~6 ms) shakes the valves' electrodes (a mass on a spring: flat below its resonance of a
@@ -849,7 +850,7 @@ float TonewheelModel::sample() {
   // down (PJ_TONEWHEEL_MICRO, dB). A faint loop through the Rotaries (its gain far under 1).
   double micro = 0, vib = 0;
   {
-    static const double kMicro = std::pow(10.0, knob("PJ_TONEWHEEL_MICRO", -22) / 20);  // (of what they hear: ~40 dB under the signal)
+    static const double kMicro = fastPow(10.0, knob("PJ_TONEWHEEL_MICRO", -22) / 20);  // (of what they hear: ~40 dB under the signal)
     static const double w0 = 2 * M_PI * knob("PJ_TONEWHEEL_MICROHZ", 3300) / fs, q = 8;
     static const double al = std::sin(w0) / (2 * q), a0 = 1 + al, cw = std::cos(w0);
     static const double lb0 = (1 - cw) / 2 / a0, lb1 = (1 - cw) / a0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
@@ -871,7 +872,7 @@ float TonewheelModel::sample() {
   // phase in the room, more than unrelated sounds would; measured)
   static const float kShare[5] = {1, 1, float(knob("PJ_ROTARY_TWOGAIN", 0.54)), 0.37f, float(knob("PJ_ROTARY_FOURGAIN", 0.38))};
   const float share = kShare[nc];
-  static const double kGain = std::pow(10.0, knob("PJ_TONEWHEEL_BRIGHT", 3.0) / 20) - 1;  // (the tone: the mids and highs up)
+  static const double kGain = fastPow(10.0, knob("PJ_TONEWHEEL_BRIGHT", 3.0) / 20) - 1;  // (the tone: the mids and highs up)
   static const double kA = 1 - std::exp(-2 * M_PI * 1000 / fs), kShelfA = 1 - std::exp(-2 * M_PI * 250 / fs);
   static const double kValve = knob("PJ_TONEWHEEL_VALVE", 1.0) * 0.45;
   static const double kMod = knob("PJ_TONEWHEEL_MICROMOD", 0.6);  // (the valves hear ~1/8 of the signal: ~1 % of gain)

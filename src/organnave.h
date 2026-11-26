@@ -71,6 +71,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "vmath.h"
+
 namespace pajupilli {
 
 class OrganNave {
@@ -89,7 +91,7 @@ class OrganNave {
     double lensSecs = 4;     // s, the lens's wandering
     uint32_t seed = 0x5EED7A7Eu;  // (the directions' draw)
   };
-  static double bandHz(int b) { return 62.5 * std::pow(2.0, b); }
+  static double bandHz(int b) { return 62.5 * std::exp2(b); }
 
   void setup(double fs, const Params& p) {
     fs_ = fs;
@@ -118,7 +120,7 @@ class OrganNave {
     // values are set so that each band, measured so, meets its target.
     std::copy(p.t60, p.t60 + kBands, design_);
     for (int it = 0; it < 12; ++it)
-      for (int b = 0; b < kBands; ++b) design_[b] *= std::pow(p.t60[b] / bandT30(b), 0.7);
+      for (int b = 0; b < kBands; ++b) design_[b] *= fastPow(p.t60[b] / bandT30(b), 0.7);
     // Each line's loss per pass, fitted.
     for (int k = 0; k < kLines; ++k) fitLine(k);
     // The input's gain: the diffuse field's level (at 1 kHz; the same in
@@ -126,7 +128,7 @@ class OrganNave {
     const double tRef = p.t60[4], A = 0.161 * p.volume / tRef;
     double loss = 0;
     for (int k = 0; k < kLines; ++k) {
-      const double g = std::pow(10.0, lineDb(k, 1000) / 20);
+      const double g = fastPow(10.0, lineDb(k, 1000) / 20);
       loss += 1 - g * g;
     }
     loss /= kLines;
@@ -326,7 +328,7 @@ class OrganNave {
       return q;
     }
     static Bq shelf(bool high, double f0, double gDb, double fs) {  // (RBJ, S = 1)
-      const double A = std::pow(10.0, gDb / 40), w = 2 * M_PI * f0 / fs, cw = std::cos(w), sw = std::sin(w);
+      const double A = fastPow(10.0, gDb / 40), w = 2 * M_PI * f0 / fs, cw = std::cos(w), sw = std::sin(w);
       const double sA = 2 * std::sqrt(A) * sw / 2 * std::sqrt(2.0);
       if (!high)
         return norm(A * ((A + 1) - (A - 1) * cw + sA), 2 * A * ((A - 1) - (A + 1) * cw), A * ((A + 1) - (A - 1) * cw - sA),
@@ -335,7 +337,7 @@ class OrganNave {
                   (A + 1) - (A - 1) * cw + sA, 2 * ((A - 1) - (A + 1) * cw), (A + 1) - (A - 1) * cw - sA);
     }
     static Bq peak(double f0, double Q, double gDb, double fs) {  // (RBJ)
-      const double A = std::pow(10.0, gDb / 40), w = 2 * M_PI * f0 / fs, cw = std::cos(w), al = std::sin(w) / (2 * Q);
+      const double A = fastPow(10.0, gDb / 40), w = 2 * M_PI * f0 / fs, cw = std::cos(w), al = std::sin(w) / (2 * Q);
       return norm(1 + al * A, -2 * cw, 1 - al * A, 1 + al / A, -2 * cw, 1 - al / A);
     }
     static Bq pass(bool high, double f0, double fs) {  // (Butterworth, Q 0.707)
@@ -376,7 +378,7 @@ class OrganNave {
     const double f0 = bandHz(b), lo = f0 / std::sqrt(2.0), hi = std::min(f0 * std::sqrt(2.0), 0.49 * fs_);
     double w[64], T[64], sum = 0;
     for (int i = 0; i < 64; ++i) {
-      const double f = lo * std::pow(hi / lo, (i + 0.5) / 64);
+      const double f = lo * fastPow(hi / lo, (i + 0.5) / 64);
       w[i] = f;  // (equal energy per Hz, log-spaced points)
       T[i] = designT(f);
       sum += w[i];
@@ -403,7 +405,7 @@ class OrganNave {
   // (above 16 kHz weighted down); then never above 0 dB anywhere.
   void fitLine(int k) {
     std::vector<double> f, want, wt;
-    for (double fr = 40; fr < 0.49 * fs_ && fr <= 20000; fr *= std::pow(2.0, 1.0 / 3)) {
+    for (double fr = 40; fr < 0.49 * fs_ && fr <= 20000; fr *= std::exp2(1.0 / 3)) {
       f.push_back(fr);
       want.push_back(-60.0 * len_[k] / (fs_ * designT(fr)));
       wt.push_back(fr > 16500 ? 0.3 : 1.0);
@@ -450,12 +452,12 @@ class OrganNave {
       }
       for (int a = 0; a < np; ++a) x[a] += std::clamp(M[a][np] / M[a][a], -6.0, 6.0);
     }
-    gain_[k] = std::pow(10.0, x[0] / 20);
+    gain_[k] = fastPow(10.0, x[0] / 20);
     eq_[k].clear();
     for (int j = 0; j < kShelves; ++j) eq_[k].push_back(section(j, x[1 + j], fs_));
     double top = -1e9;  // (stable: under unity everywhere)
     for (double fr = 10; fr < 0.5 * fs_; fr *= 1.02) top = std::max(top, lineDb(k, fr));
-    if (top > -0.001) gain_[k] *= std::pow(10.0, (-0.001 - top) / 20);
+    if (top > -0.001) gain_[k] *= fastPow(10.0, (-0.001 - top) / 20);
     // The broadband gain folded into the first section.
     eq_[k][0].b0 *= gain_[k];
     eq_[k][0].b1 *= gain_[k];

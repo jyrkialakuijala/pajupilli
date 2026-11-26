@@ -6,6 +6,7 @@
 
 #include "ebass.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -29,7 +30,7 @@ void bassStrings(GuitarSpec& g, bool flats) {
   const double eta[6] = {0.001, 0.00055, 0.00038, 0.00046, 0, 0};
   const double lossT = knob("PJ_EBASS_LOSS", 1.0), lossHigh = knob("PJ_EBASS_LOSSHIGH", 1.0);
   for (int i = 0; i < 6; ++i)
-    g.str[i] = {f[i], T[i], B[i], lossT * (M_PI * eta[i] * f[i] + 0.17), lossT * lossHigh * 0.02 * std::pow(f[i] / 41.2, 1.2)};
+    g.str[i] = {f[i], T[i], B[i], lossT * (M_PI * eta[i] * f[i] + 0.17), lossT * lossHigh * 0.02 * fastPow(f[i] / 41.2, 1.2)};
   if (flats) {
     const double fl = knob("PJ_PBASS_FLATLOSS", 2.5);
     for (int i = 0; i < 4; ++i) {
@@ -53,7 +54,7 @@ void bassStrings(GuitarSpec& g, bool flats) {
   g.radiate = 0;
   // The steel in each string's section, against the D's (all wound: ~60 % of the section).
   const double d[6] = {0.100, 0.080, 0.065, 0.045, 0.065, 0.065};
-  for (int i = 0; i < 6; ++i) g.steel[i] = std::pow(d[i] * d[i] / (0.065 * 0.065), 0.8);
+  for (int i = 0; i < 6; ++i) g.steel[i] = fastPow(d[i] * d[i] / (0.065 * 0.065), 0.8);
   g.magnetR = 2.4e-3;
 }
 

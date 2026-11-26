@@ -335,3 +335,102 @@ the string players' level would be needed); the accent's decay back to the line 
 (an accented note is louder throughout); the flat remaining lumps are the horn's own notes.
 
 Tests: tools/test.py velocity_reading.
+
+## 13. The practice rebuilt: speed, starts, trills, more of the embouchure (2026-11-25)
+
+The practice of sections 2-7 knew one situation: a slur between two settled notes, on a steady
+player. Music asks for more, and each of these is now rehearsed on its own.
+
+### 13.1 More of the embouchure (`SlurGesture`: aperture .. setT)
+
+Six more numbers, the embouchure's set through the change, x e^(-(t / setT)^2):
+
+| Number | What the player does | Range searched |
+|---|---|---|
+| `aperture` | brass: the lips' opening x e^aperture (narrower: faster air) | -0.6 .. 0.4 |
+| `firm` | firmer or looser lips: a brass player's lips' Q, a reed's lips' damping, x e^firm | -0.8 .. 0.8 |
+| `focus` | the breath focused: its turbulence x e^-focus | 0 .. 2 |
+| `vowel`, `vowelAt` | the tongue shapes the mouth into a resonance, vowelAt octaves above the new note | 0 .. 1; -0.5 .. 2 |
+| `setT` | how long the set is held | 20 .. 250 ms |
+
+The vowel is new physics in `src/horn.cc` and `src/reed.cc`: the throat's inertance on the mouth's
+volume, one resonance (Q 6, `PJ_TRACTQ`) the lips or the reed see upstream, as the harmonica's
+tract. With `tract` 0 (the players outside a slur or a start) the mouth is the plain volume it
+was, sample for sample.
+
+### 13.2 The slur's speed (`SlurRow::pre`, `slurGesture(..., sounded)`)
+
+Every slur is practised twice: out of a settled note (held 0.6 s), and out of a note that has
+only just spoken (about ten periods, 0.09 .. 0.2 s: a run's notes), where the lips and the breath
+of the note before are still arriving. The quick search starts from the settled way. The player
+knows how long the note it leaves has sounded and plays between the two (the logarithm of the
+time, 0.1 .. 0.4 s). `PJ_SLURSPEED=0`: the settled way always.
+
+A quick slur's note left is too short to measure in place: its level is the same note's tongued
+alone.
+
+### 13.3 The occasions, the level, the effort
+
+- Three occasions a slur (the worst counts): as before the two lengths and key velocities, and
+  one on the player as it is in music, the breath and the lips wandering (`PJ_WANDER=1`).
+- The new note as loud, once settled, as tongued alone: 5 ms of cost per dB of step past 1.5 dB
+  (it was the flutes' check only).
+- Effort: a few ms of cost per unit of breath push, opening, firmness, vowel: among equally clean
+  ways the plainest, and the table stays smooth.
+- A slur that needs its own way: one costing more than 1.6 x (or 50 ms more than) the median of
+  the same interval, dynamics and speed across the instrument, on the same occasions.
+- One that still fails with its general way and its neighbours' is also tried with other
+  techniques before the search (seeds): firmer, looser, a narrower opening, a vowel tuned half an
+  octave and an octave and a half up, a touch of the tongue, no lip lead at all. One step at a
+  time does not find what only helps together.
+
+### 13.4 Starts (`AttackGesture`, `tools/slurs.py attacks`)
+
+Per note and dynamics, the tongued start: the tongue's release and the breath's rise (x the
+player's own), a push of the breath, the lips off the note at first, and the set (opening,
+firmness, vowel). Judged like a slur: ms until the note is there, the scoop (cents), a crack (ms
+on another partial, x 4), a bark (dB above 4 over the settled level), on four occasions: a key of
+64, a hard key (100), the wandering player, and the note tongued again 0.12 s after its own end.
+Up the instrument, each note from the best of the plain way, the note below's and seeds. A start
+that gains less than a tenth keeps the plain way.
+
+The calibration plays plain starts whatever the table says (`practisedAttacks(false)`), and its
+cache does not depend on the practice's knobs (`PJ_ATTACKTRY*`, `PJ_SLURTRY*`, `PJ_WANDER`, ...):
+before, every trial start calibrated the instrument again.
+
+### 13.5 Trills (`TrillSense`, `tools/slurs.py trillways`)
+
+A trill is not a row of slurs: the embouchure is held between the two notes and the fingers
+alone move. A player senses a trill (a slur back, within 0.25 s, to the note left at the change
+before) and plays its own way: one gesture for both directions, the table's rows with `pre` 0.
+Each kind of trill is rehearsed apart:
+
+| Kind | What is played |
+|---|---|
+| steady | 16 even notes |
+| accel | steady at 1.5 x the note length, then quickening to 0.75 x |
+| cresc, decresc | the expression rising or falling through the trill |
+| swell50, swell75 | an emphasis half-way, or three quarters of the way in |
+| linked | the turn under the main note and on into the next note, which must speak |
+
+Judged by: the share of notes that do not arrive, how much of each note goes to arriving, how
+unequal the two notes are (dB), the pitch (cents), and the linked note's arrival. The general way
+per interval (1 .. 4 semitones) is searched on steady, accel and swell50, a step faster than the
+instrument's middle manages as quick slurs; then every semitone and whole-tone trill plays every
+kind, and those far worse than the others rehearse alone on all of them. Last, how fast each kind
+goes on each note (`trills` in the json, by kind).
+
+The director (src/director.cc, `PJ_TRILL_SHAPE`) chooses the kind: a short trill steady; a long
+one steady at first and then quickening, growing into a higher note it is linked to, with a late
+emphasis when linked otherwise, dying away at a phrase's end, else an emphasis half-way.
+
+### 13.6 The process
+
+`python3 -I tools/slurs.py recalibrate [INST ...]`: practice, attacks, trillways for each, emit,
+rebuild, verify and verify-attacks. `audition INST -o FILE.wav`: the slurs, starts and trills that
+changed most, before and after, for the ear. The workers play a private copy of the binary (its
+path through the environment: they are processes of their own, and a peer's build took the shared
+one away mid-practice).
+
+Not done: releases; brass slurs indexed by partial instead of interval; alternate fingerings for
+the slurs that still fail; the director slowing a trill written faster than `trills` says.

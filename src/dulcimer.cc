@@ -12,6 +12,7 @@
 
 #include "knob.h"
 #include "piano.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -30,7 +31,7 @@ PianoDesign dulcimerDesign() {
     s.strings = midi < 55 ? 2 : 3;
     // The scale: 166 mm at D6, 1.7 times longer for each octave down (not
     // twice: the wire thickens instead), no longer than 1.2 m.
-    s.len = std::clamp(0.166 * std::pow(1.7, (86 - midi) / 12.0), 0.10, 1.2);
+    s.len = std::clamp(0.166 * fastPow(1.7, (86 - midi) / 12.0), 0.10, 1.2);
     const double d = midi >= 62 ? 0.5e-3 : std::min(0.9e-3, 0.5e-3 + 0.4e-3 * (62 - midi) / 19.0);
     s.mu = kRho * M_PI * d * d / 4;
     s.tension = s.mu * (2 * s.len * f) * (2 * s.len * f);

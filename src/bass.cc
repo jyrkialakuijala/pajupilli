@@ -11,6 +11,7 @@
 #include "violabowlevels_data.h"
 #include "violinbowlevels_data.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -135,7 +136,7 @@ extern const BassSpec kViolinSpec = {
 Bass::Bass(double fs, const BassSpec& sp)
     : spec_(sp), fs_(fs * std::max(1, sp.oversample)), dt_(1 / fs_), fsOut_(fs), dtOut_(1 / fs),
       os_(std::max(1, sp.oversample)), body_(fs, *sp.body) {
-  noiseK_ = float(1 - std::pow(0.7, 1.0 / os_));  // (the rosin's flicker: the same band at any rate)
+  noiseK_ = float(1 - fastPow(0.7, 1.0 / os_));  // (the rosin's flicker: the same band at any rate)
   if (sp.bankGain > 0) {
     bank_.init(fs);
     bankG_ = float(sp.bankGain);
@@ -289,7 +290,7 @@ void Bass::tune(Str& s) {
     // nut, shines and a stopped one less so.)
     static const double kFingerHi = knob("PJ_FINGER_HI", 15);
     const double fingerHi = s.stopped ? kFingerHi * std::pow(f / 4000, 2) : 0.0;
-    const double loss = ((d.loss0 + d.loss1 * std::pow(k, 1.2)) * (s.stopped ? 1.2 : 0.7) + (s.stopped ? 0.3 + 0.12 * k : 0.0) + fingerHi) *
+    const double loss = ((d.loss0 + d.loss1 * fastPow(k, 1.2)) * (s.stopped ? 1.2 : 0.7) + (s.stopped ? 0.3 + 0.12 * k : 0.0) + fingerHi) *
                         (1 + kAlive_ * 0.25 * rnd(k, 2));
     for (int dir = 0; dir < 2; ++dir) {
       // Along the top (z) the ends give differently than towards it (y):
@@ -394,7 +395,7 @@ double Bass::bowForce(int si, double speed, double where, double pressure, int h
   const double mu = s.def.tension / std::pow(2 * s.def.length * s.def.f0, 2);
   const double z = std::sqrt(s.def.tension * mu), beta = std::clamp(where * harmonic / s.len, 0.02, 0.3), v = std::fabs(speed);
   const double lo = (0.01 + 0.68 * beta) * z * v / (beta * beta), hi = std::max(1.05 * lo, (0.5 + 8 * beta) * z * v / beta);
-  return std::min(20.0, lo * std::pow(hi / lo, pressure));
+  return std::min(20.0, lo * fastPow(hi / lo, pressure));
 }
 
 void Bass::bow(int si, double speed, double force, double where, double rise, double riseForce) {
@@ -403,7 +404,7 @@ void Bass::bow(int si, double speed, double force, double where, double rise, do
   // leaves the hair (BassSpec::bowBright).
   if (spec_.bowBright > 0 && force > 0) {
     const double ref = bowForce(si, 0.40, where, 0.5, s.touchN);
-    s.bowBright = float(std::clamp(std::pow(force / std::max(1e-6, ref), spec_.bowBright), 0.3, 3.0));
+    s.bowBright = float(std::clamp(fastPow(force / std::max(1e-6, ref), spec_.bowBright), 0.3, 3.0));
   }
   if (force > 0 && (!s.bowOn || std::fabs(where - s.bowDist) > 0.002 || std::fabs(s.bowBright / s.bowBrightAt - 1) > 0.04f)) {
     s.bowDist = where;
@@ -607,7 +608,7 @@ void Bass::control() {
     if (s.glideT < s.glideDur) {  // the left hand slides
       s.glideT += bdt;
       const double u = std::min(1.0, s.glideT / s.glideDur);
-      s.len = s.lenFrom * std::pow(s.lenTo / s.lenFrom, 0.5 - 0.5 * std::cos(M_PI * u));
+      s.len = s.lenFrom * fastPow(s.lenTo / s.lenFrom, 0.5 - 0.5 * std::cos(M_PI * u));
       tune(s);
     }
     // The left hand, having stopped a string, leaves it: it is open again

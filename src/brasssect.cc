@@ -15,6 +15,7 @@
 #include "ensemble.h"
 #include "hornplayer.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -1085,7 +1086,7 @@ void Ensemble::brassAssign(bool /*onset*/) {
       if (x >= 0 && std::find(d.begin(), d.end(), x) == d.end()) d.push_back(x);
     for (int x : d) added += std::find(keys.begin(), keys.end(), x) == keys.end();
     const int given = int(d.size()) - added;
-    B.keysW = std::max(1.0, std::pow(std::max(1, given), 0.7) + 0.3 * added);  // (four keys ~ +8 dB over one, as the GM section)
+    B.keysW = std::max(1.0, fastPow(std::max(1, given), 0.7) + 0.3 * added);  // (four keys ~ +8 dB over one, as the GM section)
   }
   const bool longish = h.len > 0 ? h.len >= 0.5 : topVel < 64;
   const bool unison = [&] {
@@ -1184,8 +1185,8 @@ void Ensemble::brassRender(float* left, float* right, int n) {
           s.noteAt = now_;
           if (fresh) s.dynAt = B.expr;
           Slot& f = kid.f_[s.slot];
-          double g = s.lead ? std::pow(10.0, kLeadDb / 20) : 1.0;
-          if (velGain_) g *= std::pow(10.0, velocityGainDb(*B.inst, s.vel) / 20);
+          double g = s.lead ? fastPow(10.0, kLeadDb / 20) : 1.0;
+          if (velGain_) g *= fastPow(10.0, velocityGainDb(*B.inst, s.vel) / 20);
           s.vgTo = g;
           if (fresh || !f.v->player().busy()) s.vg = g;
         }

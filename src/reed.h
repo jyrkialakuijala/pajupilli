@@ -64,7 +64,7 @@ class Reed : public Tube {
   double t00_ = 1, t01_ = 0, t10_ = 0, t11_ = 1, b0_ = 0, b1_ = 0;
   double aFlow_ = 0;  // sqrt(2 / rho) / sqrt(1 / (w h)^2 + psi / sd^2), without h's part
   // Mouth.
-  double pm_ = 0, u_ = 0;
+  double pm_ = 0, u_ = 0, ut_ = 0;
   double primeAmp_ = 0, primeW_ = 0;
   int primeLen_ = 0, primeAt_ = 0;
   double glotLp_ = 0, noiseLp_ = 0, noiseHp_ = 0, glotA_, noiseA_, noiseHpA_;

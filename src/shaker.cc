@@ -7,6 +7,7 @@
 #include "instrument.h"
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -639,7 +640,7 @@ ShakerPlayer::ShakerPlayer(ShakerModel& m) : Performer(m), m_(m) {}
 double ShakerPlayer::handSpeed(int velocity, double dynamics, double ex) {
   static const double top = knob("PJ_SHAKER_VMAX", 2.5);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void ShakerPlayer::noteOn(int midi, int velocity) {

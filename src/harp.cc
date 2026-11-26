@@ -6,6 +6,7 @@
 
 #include "harpboard_data.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -110,7 +111,7 @@ Harp::Harp(double fs) : fs_(fs), dt_(1 / fs) {
       st.cents[i] = float(i == 0 ? 0 : cents * (2 * urand(rng) - 1));
       st.alive[i] = float(1 + lossJit * (2 * urand(rng) - 1));
       // (across the plane each partial its own 0.05-0.3 % sharper)
-      st.split[i] = float(0.0005 * std::pow(6.0, urand(rng)));
+      st.split[i] = float(0.0005 * fastPow(6.0, urand(rng)));
     }
     tune(s);
   }

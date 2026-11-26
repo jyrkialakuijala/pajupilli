@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 namespace {
@@ -64,9 +65,9 @@ double Flute::boreDiameter(double x) const {
 Flute::Flute(const Instrument& inst) : Tube(inst) {
   {  // noise filters (set at 48 kHz) for this rate
     const double r = 48000 / fs_;
-    noiseA_ = 1 - std::pow(1 - 0.55, r);
-    noiseHpA_ = 1 - std::pow(1 - 0.026, r);
-    glotA_ = 1 - std::pow(1 - 0.35, r);
+    noiseA_ = 1 - fastPow(1 - 0.55, r);
+    noiseHpA_ = 1 - fastPow(1 - 0.026, r);
+    glotA_ = 1 - fastPow(1 - 0.35, r);
   }
   kJetSign_ = knob("PJ_JET_SIGN", 1);
   kEtaSign_ = knob("PJ_ETA_SIGN", 1);
@@ -88,7 +89,7 @@ Flute::Flute(const Instrument& inst) : Tube(inst) {
   kAgc_ = knob("PJ_AGC", 2);  // swing limit, in jet widths
   agcA_ = 1 - std::exp(-1 / (knob("PJ_AGCT", 4) * 1e-3 * fs_));
   kTurbIn_ = knob("PJ_TURBIN", 4);  // jet turbulence gain (it now passes the jet's low-pass)
-  kEdge_ = knob("PJ_EDGE", 4);      // direct edge hiss
+  kEdge_ = knob("PJ_EDGE", 4) * inst.noise;  // direct edge hiss (x the instrument's breath noise)
   kSpread_ = knob("PJ_SPREAD", 0.1);
   kJetLp_ = knob("PJ_JETLP", 2);
   kEtaMax_ = knob("PJ_ETAMAX", 3) * 1e-3 * inst.emb;  // a hard limit for safety (PJ_AGC limits the swing)

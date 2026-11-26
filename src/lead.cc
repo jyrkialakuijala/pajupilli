@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,6 +21,55 @@ namespace {
 constexpr double kBoltzmannQ = 8.617333e-5;  // k / q (V/K)
 double thermalVoltage(double tempC) { return kBoltzmannQ * (tempC + 273.15); }
 const double kVT25 = thermalVoltage(25.0);
+
+// 2^(k/64), k = 0..63 (the bits): the table of the ladder's tanh.
+constexpr uint64_t kExp2Tab[64] = {
+    0x3ff0000000000000ull, 0x3ff02c9a3e778061ull, 0x3ff059b0d3158574ull, 0x3ff0874518759bc8ull,
+    0x3ff0b5586cf9890full, 0x3ff0e3ec32d3d1a2ull, 0x3ff11301d0125b51ull, 0x3ff1429aaea92de0ull,
+    0x3ff172b83c7d517bull, 0x3ff1a35beb6fcb75ull, 0x3ff1d4873168b9aaull, 0x3ff2063b88628cd6ull,
+    0x3ff2387a6e756238ull, 0x3ff26b4565e27cddull, 0x3ff29e9df51fdee1ull, 0x3ff2d285a6e4030bull,
+    0x3ff306fe0a31b715ull, 0x3ff33c08b26416ffull, 0x3ff371a7373aa9cbull, 0x3ff3a7db34e59ff7ull,
+    0x3ff3dea64c123422ull, 0x3ff4160a21f72e2aull, 0x3ff44e086061892dull, 0x3ff486a2b5c13cd0ull,
+    0x3ff4bfdad5362a27ull, 0x3ff4f9b2769d2ca7ull, 0x3ff5342b569d4f82ull, 0x3ff56f4736b527daull,
+    0x3ff5ab07dd485429ull, 0x3ff5e76f15ad2148ull, 0x3ff6247eb03a5585ull, 0x3ff6623882552225ull,
+    0x3ff6a09e667f3bcdull, 0x3ff6dfb23c651a2full, 0x3ff71f75e8ec5f74ull, 0x3ff75feb564267c9ull,
+    0x3ff7a11473eb0187ull, 0x3ff7e2f336cf4e62ull, 0x3ff82589994cce13ull, 0x3ff868d99b4492edull,
+    0x3ff8ace5422aa0dbull, 0x3ff8f1ae99157736ull, 0x3ff93737b0cdc5e5ull, 0x3ff97d829fde4e50ull,
+    0x3ff9c49182a3f090ull, 0x3ffa0c667b5de565ull, 0x3ffa5503b23e255dull, 0x3ffa9e6b5579fdbfull,
+    0x3ffae89f995ad3adull, 0x3ffb33a2b84f15fbull, 0x3ffb7f76f2fb5e47ull, 0x3ffbcc1e904bc1d2ull,
+    0x3ffc199bdd85529cull, 0x3ffc67f12e57d14bull, 0x3ffcb720dcef9069ull, 0x3ffd072d4a07897cull,
+    0x3ffd5818dcfba487ull, 0x3ffda9e603db3285ull, 0x3ffdfc97337b9b5full, 0x3ffe502ee78b3ff6ull,
+    0x3ffea4afa2a490daull, 0x3ffefa1bee615a27ull, 0x3fff50765b6e4540ull, 0x3fffa7c1819e90d8ull,
+};
+// tanh for the ladder's pairs and the OTA (eleven a sample, each waiting for the one before:
+// the sample's time is their chain), inline and without a branch: tanh(x) = (e - 1) / (e + 1),
+// e = exp(2 x) as 2^(k/64) from the table times a short polynomial of the rest (|r| < ln 2 /
+// 128). Within ~2e-16 of tanh in absolute terms (the library's exp gave the same); a NaN stays
+// a NaN. The argument comes unscaled, x = a s2 / 2, with |a| held under lim (x under 19) and
+// sk = s2 64 / ln 2: the table's index is then ready one multiplication sooner.
+inline double ladderTanh(double a, double lim, double s2, double sk) {
+  a = std::min(std::max(a, -lim), lim);
+  const double z = a * s2;
+  const double kd = std::nearbyint(a * sk);
+  const double r = z - kd * (M_LN2 / 64);
+  const int64_t ki = int64_t(kd);
+  const uint64_t bits = kExp2Tab[ki & 63] + (uint64_t(ki >> 6) << 52);
+  double s;
+  std::memcpy(&s, &bits, sizeof s);
+  const double r2 = r * r;
+  const double q = r + r2 * ((0.5 + r * (1.0 / 6)) + r2 * (1.0 / 24 + r * (1.0 / 120)));
+  const double em1 = (s - 1) + s * q;
+  return em1 / (em1 + 2);
+}
+// sin(2 pi p) for a phase p in 0..1 (the chorus's slow LFOs, two a sample): folded to a quarter
+// turn, its series to x^15 (within 1e-11).
+inline double sinTurn(double p) {
+  const double t = p - 0.5, a = std::fabs(t);
+  const double x = 2 * M_PI * std::min(a, 0.5 - a), x2 = x * x;
+  const double y = x * (1 + x2 * (-1.0 / 6 + x2 * (1.0 / 120 + x2 * (-1.0 / 5040 + x2 * (1.0 / 362880 + x2 * (-1.0 / 39916800 +
+                   x2 * (1.0 / 6227020800.0 + x2 * (-1.0 / 1307674368000.0))))))));
+  return std::copysign(y, -t);
+}
 
 // Every note is just a control voltage: no fingerings.
 const NoteInfo kLeadNotes[61] = {
@@ -337,6 +387,10 @@ Lead::Lead(const Instrument& inst) : Tube(inst) {
   for (const LeadPatch& p : kPatches)
     if (std::strcmp(p.name, inst.name) == 0) patch_ = &p;
   simple_ = patch_ == &kPatches[0];
+  dt_ = 1 / fs_;
+  shaped_ = patch_->scat > 0 || patch_->breath > 0 || patch_->formants > 0 || patch_->drive > 0 || patch_->fold > 0 ||
+            patch_->hpf > 0;
+  flipflops_ = patch_->sub > 0 || patch_->sub2 > 0 || patch_->ring > 0;
   if (!simple_) {
     comb_.assign(4096, 0.0f);
     bbd_.assign(2048, 0.0f);
@@ -378,6 +432,7 @@ void Lead::seed(unsigned s) {
   const bool nominal = s == 0;
   auto tol = [&](double v, double t) { return nominal ? v : v * (1 + t * urand()); };
   C_ = tol(1e-9, 0.05);
+  invC_ = 1 / C_;
   r3_ = tol(100e3, 0.01);
   r4_ = tol(574.5e3, 0.01);
   vref_ = tol(2.257, 0.005);
@@ -393,7 +448,7 @@ void Lead::seed(unsigned s) {
   for (double& o : vos_) o = r(1e-3);
   if (nominal) { vos_[0] = 0.8e-3; vos_[1] = -0.5e-3; vos_[2] = 0.3e-3; vos_[3] = -0.9e-3; vos_[4] = 0.4e-3; }
   ft_ = nominal ? 0.02 : 0.03 * urand();
-  bleed_ = std::pow(10, -75 / 20.0) * (nominal ? 1 : 1 + 0.5 * urand());
+  bleed_ = fastPow(10, -75 / 20.0) * (nominal ? 1 : 1 + 0.5 * urand());
   cvNoise_ = 0;
   fcWander_ = resWander_ = Wander();
   // The LFO: where it is at power-on. (Its rate is set per note, by the
@@ -791,7 +846,7 @@ void Lead::controlStep() {
         for (int m = 0; m < 3; ++m) {
           const double f = fNow * kTune[k] * kMode[m];
           if (f > 0.45 * fs_) continue;
-          const double th = 2 * M_PI * f / fs_, t60 = 4.0 / std::pow(kMode[m], 0.6);
+          const double th = 2 * M_PI * f / fs_, t60 = 4.0 / fastPow(kMode[m], 0.6);
           pR_[n] = std::exp(-6.9078 / (t60 * fs_));
           pC_[n] = std::cos(th);
           pS_[n] = std::sin(th);
@@ -830,7 +885,7 @@ void Lead::controlStep() {
       // (a few % over seconds: the halo's shimmer); their widths this
       // attack's (cBwMul_).
       static const double bw[kCasc] = {80, 100, 140, 200, 260};
-      const double a = std::clamp(ctl_.vel, 0.0, 1.0), sc = std::pow(f0 / 220, 0.12), T = 1 / fs_;
+      const double a = std::clamp(ctl_.vel, 0.0, 1.0), sc = fastPow(f0 / 220, 0.12), T = 1 / fs_;
       for (int k = 0; k < kCasc; ++k) {
         cWander_[k] += std::sqrt(blockDt) * 0.05 * urand() - blockDt / 2.5 * cWander_[k];
         // The key's own formant (cF_), a hard key ~8 % higher, a soft one lower.
@@ -850,7 +905,7 @@ void Lead::controlStep() {
       const double t = std::tan(M_PI * 180 * std::exp2(4.64 * u) / fs_);
       apA_ = (t - 1) / (t + 1);
     }
-    {  // the chiff's resonator: ~4 x the note, Q 6
+    if (P.chiff > 0) {  // the chiff's resonator: ~4 x the note, Q 6
       const double fc = std::clamp(4 * f0, 900.0, 0.4 * fs_);
       chiffG_ = std::tan(M_PI * fc / fs_);
     }
@@ -876,7 +931,7 @@ void Lead::controlStep() {
       // "oo" (soft) .. "ah" (hard); the formants follow the note a little.
       static const double oo[4] = {320, 800, 2300, 3300}, ah[4] = {750, 1150, 2600, 3500};
       static const double q[4] = {7, 9, 11, 13};
-      const double a = std::clamp(ctl_.vel, 0.0, 1.0), sc = std::pow(f0 / 220, 0.12);
+      const double a = std::clamp(ctl_.vel, 0.0, 1.0), sc = fastPow(f0 / 220, 0.12);
       for (int k = 0; k < 4; ++k) {
         const double f = std::min(sc * (oo[k] + a * (ah[k] - oo[k])), 0.45 * fs_);
         fmG_[k] = std::tan(M_PI * f / fs_);
@@ -909,7 +964,7 @@ void Lead::controlStep() {
 }
 
 double Lead::coreStep(double& out) {
-  const double dt = 1 / fs_;
+  const double dt = dt_;
   Board& b = board();
   double avail = dt;
   if (dead_ > 0) {
@@ -919,7 +974,7 @@ double Lead::coreStep(double& out) {
   }
   // The others' resets through the wires: a charge into the summing node (the
   // integrator's output steps by -Q / C).
-  v_ -= b.take(id_) / C_;
+  v_ -= b.take(id_) * invC_;
   // The ground under the expo transistor's base, lifted by the outputs'
   // currents: its collector current follows exp(dV / VT).
   const double slope = (slope_ * (1 + kAnalog_ * 0.5e-3 * b.sumIout / kVT25) + xtalk_);
@@ -954,42 +1009,48 @@ double Lead::coreStep(double& out) {
 // The comparator (a pulse) and the flip-flops on the core's events, band-
 // limited like the ramp's reset (polyBLEP, one sample late, as the ramp).
 double Lead::events(double slope, double vStart, double vPre, double d, bool reset) {
-  const double dt = 1 / fs_;
-  const double th = vloNow_ + pw_ * (vhiNow_ - vloNow_);
-  double cp = 0, cc = 0;
-  auto edge = [&](double h, double dd) {
-    dd = std::clamp(dd, 0.0, 1.0);
-    cp += h * dd * dd / 2;
-    cc -= h * (1 - dd) * (1 - dd) / 2;
-  };
-  // Rising: the ramp crosses the threshold (before a reset, or after it).
-  if (vStart < th && vPre >= th) edge(2, (vPre - th) / (slope * dt));
-  if (reset) {
-    if (vPre >= th) edge(-2, d);  // the reset: the comparator falls
-    if (v_ >= th) edge(2, (v_ - th) / (slope * dt));
-  }
-  pulseHi_ = v_ >= th ? 1 : -1;
-  pulseOut_ = pulseNext_ + cp;
-  pulseNext_ = pulseHi_ + cc;
-  // The flip-flops: the first toggles on every reset, the second on the first's rising edge.
-  double c1p = 0, c1c = 0, c2p = 0, c2c = 0;
-  if (reset) {
-    const double dd = std::clamp(d, 0.0, 1.0);
-    const double h1 = -2 * ff1_;
-    c1p = h1 * dd * dd / 2;
-    c1c = -h1 * (1 - dd) * (1 - dd) / 2;
-    ff1_ = -ff1_;
-    if (ff1_ > 0) {
-      const double h2 = -2 * ff2_;
-      c2p = h2 * dd * dd / 2;
-      c2c = -h2 * (1 - dd) * (1 - dd) / 2;
-      ff2_ = -ff2_;
+  const double dt = dt_;
+  // (The comparator and the flip-flops only where the patch listens to them: sound() reads
+  // pulseOut_ with pulse > 0, ff1Out_ and ff2Out_ with sub, sub2 or ring > 0.)
+  if (patch_->pulse > 0) {
+    const double th = vloNow_ + pw_ * (vhiNow_ - vloNow_);
+    double cp = 0, cc = 0;
+    auto edge = [&](double h, double dd) {
+      dd = std::clamp(dd, 0.0, 1.0);
+      cp += h * dd * dd / 2;
+      cc -= h * (1 - dd) * (1 - dd) / 2;
+    };
+    // Rising: the ramp crosses the threshold (before a reset, or after it).
+    if (vStart < th && vPre >= th) edge(2, (vPre - th) / (slope * dt));
+    if (reset) {
+      if (vPre >= th) edge(-2, d);  // the reset: the comparator falls
+      if (v_ >= th) edge(2, (v_ - th) / (slope * dt));
     }
+    pulseHi_ = v_ >= th ? 1 : -1;
+    pulseOut_ = pulseNext_ + cp;
+    pulseNext_ = pulseHi_ + cc;
   }
-  ff1Out_ = ff1Next_ + c1p;
-  ff1Next_ = ff1_ + c1c;
-  ff2Out_ = ff2Next_ + c2p;
-  ff2Next_ = ff2_ + c2c;
+  // The flip-flops: the first toggles on every reset, the second on the first's rising edge.
+  if (flipflops_) {
+    double c1p = 0, c1c = 0, c2p = 0, c2c = 0;
+    if (reset) {
+      const double dd = std::clamp(d, 0.0, 1.0);
+      const double h1 = -2 * ff1_;
+      c1p = h1 * dd * dd / 2;
+      c1c = -h1 * (1 - dd) * (1 - dd) / 2;
+      ff1_ = -ff1_;
+      if (ff1_ > 0) {
+        const double h2 = -2 * ff2_;
+        c2p = h2 * dd * dd / 2;
+        c2c = -h2 * (1 - dd) * (1 - dd) / 2;
+        ff2_ = -ff2_;
+      }
+    }
+    ff1Out_ = ff1Next_ + c1p;
+    ff1Next_ = ff1_ + c1c;
+    ff2Out_ = ff2Next_ + c2p;
+    ff2Next_ = ff2_ + c2c;
+  }
   // The second core: its own ramp, reset at its top; soft sync: at the first
   // core's reset, if it is within the window of its top, it fires then.
   if (core2_) {
@@ -1002,8 +1063,8 @@ double Lead::events(double slope, double vStart, double vPre, double d, bool res
     v2_ += slope2_ * avail;
     double p2 = 0, q2 = 0;
     bool fired = false;
-    const double td = (vhiNow_ - vloNow_) / slew_;
     if (v2_ >= vhiNow_) {
+      const double td = (vhiNow_ - vloNow_) / slew_;
       const double over = std::min((v2_ - vhiNow_) / slope2_, dt), dd = over / dt, rem = over - td;
       const double before = v2_;
       if (rem >= 0) v2_ = vloNow_ + slope2_ * rem;
@@ -1053,7 +1114,7 @@ void Lead::scatFormants(double dt, double f0, double* F, double* G) {
     tgt[k] = V[scV_][k] + sm * (V[scV2_][k] - V[scV_][k]);
     gain[k] = Gv[scV_][k] + sm * (Gv[scV2_][k] - Gv[scV_][k]);
   }
-  const double sc = std::pow(std::max(f0, 80.0) / 220, 0.1);  // a higher voice, higher formants
+  const double sc = fastPow(std::max(f0, 80.0) / 220, 0.1);  // a higher voice, higher formants
   if (t < 0) {  // the closure: the voice bar
     srcGain_ = 0.12;
     F[0] = 250; F[1] = locus[scC_][1]; F[2] = locus[scC_][2]; F[3] = 3400;
@@ -1097,6 +1158,7 @@ double Lead::sound(double saw) {
     const double w = std::max(0.0, (ph - 0.8) / 0.2);
     m += P.bow * half * 0.6 * w * w * whiteNoise();
   }
+  if (!shaped_) return m;  // (none of the shapers below: the strings, most pads)
   if (P.scat > 0) {
     m *= srcGain_;
     if (burst_ > 1e-3) {  // the stop's release: a few ms of noise
@@ -1145,7 +1207,7 @@ double Lead::sound(double saw) {
     // The overdrive: a preamp's gain into an asymmetric diode pair (a soft
     // knee one way, harder the other), then the mid scoop.
     const double x = (1 + 7 * P.drive) * m / half;
-    const double y = x > 0 ? std::tanh(x + 0.2) - std::tanh(0.2) : x / std::pow(1 + std::pow(-x, 2.5), 0.4);
+    const double y = x > 0 ? std::tanh(x + 0.2) - std::tanh(0.2) : x / fastPow(1 + std::pow(-x, 2.5), 0.4);
     m = 0.8 * half * y;
     if (P.notch > 0) {
       const double in = m;
@@ -1346,8 +1408,8 @@ double Lead::post(double y) {
         // (The delayed whole no lower than 0.7 x the source: at an attack it
         // is still silence, and every gain would leap to its limit.)
         const double tot = std::max(double(cTotRing_[(cTotPos_ - back + 2 * kTotRing) % kTotRing]), 0.7 * cEnvSrc_);
-        const double own = std::pow((0.7 * cEnvSrc_ + 1e-6) / (cEnv_[k] + 1e-6), 1.0 / 3.0);
-        const double whole = std::pow((cEnvSrc_ + 1e-6) / (tot + 1e-6), 0.75 * kWhole);
+        const double own = fastPow((0.7 * cEnvSrc_ + 1e-6) / (cEnv_[k] + 1e-6), 1.0 / 3.0);
+        const double whole = fastPow((cEnvSrc_ + 1e-6) / (tot + 1e-6), 0.75 * kWhole);
         // Whatever the gains say, a resonator's lifted contribution stays
         // under 1.5 x the source (the five stages cannot pile up).
         const double cap = std::max(0.5, 1.5 * (cEnvSrc_ + 1e-6) / (cEnv_[k] + 1e-6));
@@ -1371,7 +1433,7 @@ double Lead::post(double y) {
       // key's own excess taken out, the slow swing of the formants' turns
       // mostly kept. PJ_HALOLEVEL: the 0.75 (0: none).
       static const double kLevP = knob("PJ_HALOLEVEL", 0.75);
-      cLevT_ = kLevP > 0 ? std::clamp(std::pow((1.8 * cEnvSrc_ + 1e-6) / (cEnvTot_ + 1e-6), kLevP), 0.5, 2.0) : 1.0;
+      cLevT_ = kLevP > 0 ? std::clamp(fastPow((1.8 * cEnvSrc_ + 1e-6) / (cEnvTot_ + 1e-6), kLevP), 0.5, 2.0) : 1.0;
     }
     static const double aL = 1 - std::exp(-1 / (0.05 * fs_));
     cLev_ += aL * (cLevT_ - cLev_);
@@ -1407,19 +1469,25 @@ double Lead::post(double y) {
     const int n = int(bbd_.size());
     bbdLp_ += 0.5 * (y - bbdLp_);
     bbd_[bbdPos_] = float(bbdLp_);
-    chPh1_ += 0.6 / fs_;
-    chPh2_ += 0.83 / fs_;
+    chPh1_ += 0.6 * dt_;
+    chPh2_ += 0.83 * dt_;
     if (chPh1_ > 1) chPh1_ -= 1;
     if (chPh2_ > 1) chPh2_ -= 1;
+    // (The taps lie 5..13 ms back, less than the line: the index wraps once at most.)
+    const float* line = bbd_.data();
+    const double msToSamples = 1e-3 * fs_;
     auto tap = [&](double ms) {
-      const double rp = bbdPos_ - ms * 1e-3 * fs_;
-      const int i0 = int(std::floor(rp));
-      const double fr = rp - i0;
-      const double a = bbd_[(i0 + 2 * n) % n], b = bbd_[(i0 + 1 + 2 * n) % n];
+      const double rp = bbdPos_ - ms * msToSamples;
+      const double fl = std::floor(rp);
+      const double fr = rp - fl;
+      int i0 = int(fl);
+      if (i0 < 0) i0 += n;
+      const int i1 = i0 + 1 == n ? 0 : i0 + 1;
+      const double a = line[i0], b = line[i1];
       return a + fr * (b - a);
     };
-    const double w = tap(7 + 1.5 * std::sin(2 * M_PI * chPh1_)) + tap(11 + 1.8 * std::sin(2 * M_PI * chPh2_));
-    bbdPos_ = (bbdPos_ + 1) % n;
+    const double w = tap(7 + 1.5 * sinTurn(chPh1_)) + tap(11 + 1.8 * sinTurn(chPh2_));
+    bbdPos_ = bbdPos_ + 1 == n ? 0 : bbdPos_ + 1;
     y = 0.7 * y + P.chorus * 0.45 * w;
   }
   return y;
@@ -1453,19 +1521,30 @@ float Lead::sample() {
   const double ka = kAnalog_;
   const double x = (simple_ ? (saw - mid) : sound(saw)) * kIn + testDp_;  // (tests: a drive into the ladder)
   testDp_ = 0;
-  for (int k = 0; k < 2; ++k) {
-    const double fb = 0.5 * (y_[3] + y4Prev_);
-    y4Prev_ = y_[3];
-    // (Each differential pair with its offset: its tanh not centred: even harmonics.)
-    const double in = fastTanh((x - 4 * res_ * fb + ka * vo[0]) / vt2_);
-    y_[0] += vt2_ * g_ * (in - w_[0]);
-    w_[0] = fastTanh((y_[0] + ka * vo[1]) / vt2_);
-    y_[1] += vt2_ * g_ * (w_[0] - w_[1]);
-    w_[1] = fastTanh((y_[1] + ka * vo[2]) / vt2_);
-    y_[2] += vt2_ * g_ * (w_[1] - w_[2]);
-    w_[2] = fastTanh((y_[2] + ka * vo[3]) / vt2_);
-    y_[3] += vt2_ * g_ * (w_[2] - w_[3]);
-    w_[3] = fastTanh((y_[3] + ka * vo[4]) / vt2_);
+  // (The state and the block's constants in locals: the stores to y_ and w_ would otherwise
+  // make every one of them be read again; one reciprocal of VT for the ten tanh.)
+  {
+    const double ivt = 2 / vt2_, isk = ivt * (64 / M_LN2), lim = 19 * vt2_, vg = vt2_ * g_, r4 = 4 * res_;
+    const double o0 = ka * vo[0], o1 = ka * vo[1], o2 = ka * vo[2], o3 = ka * vo[3], o4 = ka * vo[4];
+    double y0 = y_[0], y1 = y_[1], y2 = y_[2], y3 = y_[3], w0 = w_[0], w1 = w_[1], w2 = w_[2], w3 = w_[3];
+    double yp = y4Prev_;
+    for (int k = 0; k < 2; ++k) {
+      const double fb = 0.5 * (y3 + yp);
+      yp = y3;
+      // (Each differential pair with its offset: its tanh not centred: even harmonics.)
+      const double in = ladderTanh(x - r4 * fb + o0, lim, ivt, isk);
+      y0 += vg * (in - w0);
+      w0 = ladderTanh(y0 + o1, lim, ivt, isk);
+      y1 += vg * (w0 - w1);
+      w1 = ladderTanh(y1 + o2, lim, ivt, isk);
+      y2 += vg * (w1 - w2);
+      w2 = ladderTanh(y2 + o3, lim, ivt, isk);
+      y3 += vg * (w2 - w3);
+      w3 = ladderTanh(y3 + o4, lim, ivt, isk);
+    }
+    y_[0] = y0; y_[1] = y1; y_[2] = y2; y_[3] = y3;
+    w_[0] = w0; w_[1] = w1; w_[2] = w2; w_[3] = w3;
+    y4Prev_ = yp;
   }
   // The amplifier: an OTA, gain from its bias current (the envelope), a soft
   // limit on its input.
@@ -1478,7 +1557,7 @@ float Lead::sample() {
   // The OTA: its gain from the envelope's bias current; when closed it still
   // leaks the always-running oscillator; its control feedthrough steps with
   // the bias (the DC blocker makes it a thump); hum picked up on the way out.
-  double vca = level_ * 2.0 * fastTanh(0.5 * y) + ka * (bleed_ * y + ft_ * level_) + board().hum;
+  double vca = level_ * 2.0 * ladderTanh(y, 38, 1, 64 / M_LN2) + ka * (bleed_ * y + ft_ * level_) + board().hum;
   if (!simple_ && patch_->pipes > 0) vca += pipeMid_;  // the pipes, past the amplifier
   // Into the mixer's 1 kohm: the ground's current. (A NaN stays in this voice:
   // it resets itself; the board must not keep it.)
@@ -1532,7 +1611,7 @@ void Lead::glassControl(double dt) {
   for (int k = 0; k < kGlassModes && k < kGlassMax; ++k) {
     const double f = f1 * kGlassRatio[k];
     if (f > 0.45 * fs_) break;  // (the ratios ascend)
-    double t60 = std::max(0.25, 6.0 * std::pow(double(kGlassRatio[k]), -0.7));
+    double t60 = std::max(0.25, 6.0 * fastPow(double(kGlassRatio[k]), -0.7));
     if (!ctl_.gate) t60 = std::min(t60, 1.5);
     gR_[k] = std::exp(-6.9078 / (t60 * fs_));
     gG_[k] = 1 - gR_[0];  // the bow's force into the mode: the same for all (the first mode's peak gain 1)
@@ -1835,7 +1914,7 @@ void LeadPlayer::render(float* out, int n) {
     {
       auto smooth = [](double x) { x = std::clamp(x, 0.0, 1.0); return x * x * (3 - 2 * x); };
       const double t = sinceOnClock_ - noteVibDelay_;
-      c.vibDepth = 2 * vibDepth_ * noteVibDepth_ * std::pow(smooth(t / noteVibFade_), noteVibCurve_);
+      c.vibDepth = 2 * vibDepth_ * noteVibDepth_ * fastPow(smooth(t / noteVibFade_), noteVibCurve_);
       c.vibRate = vibRate_ * noteVibRate_ *
                   (noteVibStart_ + (1 - noteVibStart_) * smooth(t / (1.5 * noteVibFade_)));
     }
@@ -1871,7 +1950,7 @@ void LeadPlayer::render(float* out, int n) {
     // General MIDI curve's ~30 dB from 16 to 127 (tools/velcurve.py); the
     // other leads keep a synth's gentle velocity, +-20 %.)
     const bool drum = std::strcmp(lead_.instrument().family, "tom") == 0 || std::strcmp(lead_.instrument().family, "drum") == 0;
-    c.level = amp_.v * (0.4 + 0.6 * dyn) * (drum ? std::pow(std::max(velAmt_, 0.01), 1.6) : 0.6 + 0.4 * velAmt_);
+    c.level = amp_.v * (0.4 + 0.6 * dyn) * (drum ? fastPow(std::max(velAmt_, 0.01), 1.6) : 0.6 + 0.4 * velAmt_);
     {
       // Singers: the brightness knob is the vowel, u (0.3) o a (rest, 1.0) e i
       // (2.5); PJ_VOWEL (0..4) fixes it; the air knob is their breath.

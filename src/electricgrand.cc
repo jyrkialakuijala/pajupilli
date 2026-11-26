@@ -6,6 +6,7 @@
 
 #include "knob.h"
 #include "pianoinst.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -78,7 +79,7 @@ PianoDesign electricGrandDesign() {
     // of it, 2..4 kHz -27 dB and less); the grand's felt here gave -8, -15.
     // A softer bass hammer matches all three bands.
     const double w = std::clamp((19 - key) / 13.0, 0.0, 1.0);  // 1 up to key 6 (D1), 0 from key 19 (D#2)
-    s.K *= std::pow(kBassHam, w);
+    s.K *= fastPow(kBassHam, w);
     // The wound strings lose their upper partials twice as fast as the
     // grand's: in the recordings A1..G#2's partials at 0.5 .. 4 kHz die at
     // 10 .. 18 dB/s (2 .. 4 kHz faster still), their lowest ones as the
@@ -91,7 +92,7 @@ PianoDesign electricGrandDesign() {
     s.loss = 0.12 * std::exp2(3.5 * (key - 1) / 87.0);
     s.b2 = 3.5e-4;
     s.b3 = 3e-8;
-    s.b2 *= std::pow(kWoundLoss, std::clamp((32 - key) / 8.0, 0.0, 1.0));  // x 3 up to key 24 (G#2), x 1 from key 32 (E3)
+    s.b2 *= fastPow(kWoundLoss, std::clamp((32 - key) / 8.0, 0.0, 1.0));  // x 3 up to key 24 (G#2), x 1 from key 32 (E3)
     s.hasDamper = key <= 80;
     // (No felt nap: the hammers as fitted to the recordings, the grand's of
     // 2026-11-15 midday; urethane and leather have none.)
@@ -153,7 +154,7 @@ ElectricGrandCircuit::ElectricGrandCircuit(double fs) : fs_(fs) {
 void ElectricGrandCircuit::shelf(Biquad* q, double fc, double db, bool high) {
   // A first-order shelf, bilinear with the corner prewarped: unity at the
   // far end, 10^(db/20) at the shelf.
-  const double g = std::pow(10.0, db / 20), k = std::tan(M_PI * std::min(fc, 0.45 * fs_) / fs_);
+  const double g = fastPow(10.0, db / 20), k = std::tan(M_PI * std::min(fc, 0.45 * fs_) / fs_);
   const double a0 = 1 + k;
   if (high) {  // H(s) = (g s + w) / (s + w)
     q->b0 = (g + k) / a0;
@@ -179,7 +180,7 @@ void ElectricGrandCircuit::setMiddle(double m) {
   if (m == middleSet_) return;
   middleSet_ = m;
   // A peak (RBJ's peaking biquad), 1.5 octaves wide.
-  const double A = std::pow(10.0, 10 * m / 40), w = 2 * M_PI * 340 / fs_;
+  const double A = fastPow(10.0, 10 * m / 40), w = 2 * M_PI * 340 / fs_;
   const double bw = 1.5, alpha = std::sin(w) * std::sinh(std::log(2.0) / 2 * bw * w / std::sin(w));
   const double a0 = 1 + alpha / A;
   middle_.b0 = (1 + alpha * A) / a0;

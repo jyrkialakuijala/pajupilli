@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -68,7 +69,7 @@ ElectricBassModel::ElectricBassModel(const Instrument& inst)
     // parallel, taken at 1.2 kHz (exact closed and open; between, near the coil's resonance
     // where it matters [E]).
     const double t = std::clamp(knob("PJ_PBASS_TONE", 1.0), 0.0, 1.0);
-    const double rs = 250e3 * (std::pow(10.0, 2 * t) - 1) / 99, ct = 0.047e-6, w = 2 * M_PI * 1200;
+    const double rs = 250e3 * (fastPow(10.0, 2 * t) - 1) / 99, ct = 0.047e-6, w = 2 * M_PI * 1200;
     const double x = w * ct * rs, gp = w * ct * x / (1 + x * x);
     pots = 1 / (1 / 250e3 + gp);
     coilC += ct / (1 + x * x);
@@ -89,7 +90,7 @@ ElectricBassModel::ElectricBassModel(const Instrument& inst)
     const double bas = slap == 2 ? knob("PJ_SLAP2_BASS", 4) : knob("PJ_SLAP_BASS", 0);
     // (RBJ shelves, S = 1.)
     auto shelf = [&](Shelf& b, double f, double db, bool high) {
-      const double A = std::pow(10.0, db / 40), w = 2 * M_PI * f / inst.fs, cw = std::cos(w), al = std::sin(w) / 2 * std::sqrt(2.0);
+      const double A = fastPow(10.0, db / 40), w = 2 * M_PI * f / inst.fs, cw = std::cos(w), al = std::sin(w) / 2 * std::sqrt(2.0);
       const double sA = 2 * std::sqrt(A) * al;
       double b0, b1, b2, a0, a1, a2;
       if (high) {
@@ -256,9 +257,9 @@ void ElectricBassPlayer::strike(int s, int fret, const Asked& a) {
   const bool quick = sinceNote_ < 0.4;
   finger_ = quick ? 1 - finger_ : 0;
   const double v = std::clamp(a.velocity, 1, 127) / 127.0;
-  const double depth = (0.4e-3 + 4.6e-3 * std::pow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
+  const double depth = (0.4e-3 + 4.6e-3 * fastPow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
                        (finger_ ? 1.06 : 1.0) * (0.93 + 0.14 * ur());
-  const double from = std::clamp(0.10 * std::pow(2.0, 1 - brightness_) * (1.05 - 0.15 * v) + (finger_ ? 0.006 : 0.0) +
+  const double from = std::clamp(0.10 * std::exp2(1 - brightness_) * (1.05 - 0.15 * v) + (finger_ ? 0.006 : 0.0) +
                                      0.008 * (ur() - 0.5),
                                  0.04, 0.3);
   // A rest stroke: along the body and a little into it (the finger ends on the next string).
@@ -278,8 +279,8 @@ PickBassPlayer::PickBassPlayer(ElectricBassModel& m) : BassLinePlayer(m) {
   // thickness cubed or so (0.6 mm ~2 kN/m, 1.0 ~6, 1.5 ~20); a thin one lets the string past
   // more slowly.
   const double mm = std::clamp(knob("PJ_PICK_MM", 1.0), 0.4, 3.0);
-  kp_ = std::clamp(6000 * std::pow(mm, 2.6), 1500.0, 40000.0);
-  slip_ = std::clamp(0.00015 * std::pow(mm, -1.36), 0.00008, 0.0005);
+  kp_ = std::clamp(6000 * fastPow(mm, 2.6), 1500.0, 40000.0);
+  slip_ = std::clamp(0.00015 * fastPow(mm, -1.36), 0.00008, 0.0005);
   mute_ = std::clamp(knob("PJ_PICK_MUTE", 0), 0.0, 1.0);
   felt_ = knob("PJ_PICK_FELT", 0) > 0.5 ? knob("PJ_PICK_FELTDEPTH", 2.0) : 0;
   ringOn_ = knob("PJ_PICK_CHORDS", 0) > 0.5;
@@ -305,7 +306,7 @@ void PickBassPlayer::strike(int s, int fret, const Asked& a) {
   // one as far as a heavy pick holds it: v40 0.6, v80 1.6, v120 3.1). The up stroke lifts the
   // string a little out of the body, and the pickup hears less of it: the player digs ~30 % deeper
   // (PJ_PICK_UP), and it still comes out 2-3 dB weaker. Each stroke its own (+-7 %).
-  const double depth = (0.2e-3 + 3.2e-3 * std::pow(v, velExp_)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
+  const double depth = (0.2e-3 + 3.2e-3 * fastPow(v, velExp_)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
                        (up_ ? upGain_ : 1.0) * (0.93 + 0.14 * ur());
   // How quickly: a hard stroke is a fast one (12 ms at pp, 3 at ff, +-20 %); and the string
   // runs off the tip the faster, the faster the hand goes (the slip as the square root of the
@@ -314,7 +315,7 @@ void PickBassPlayer::strike(int s, int fret, const Asked& a) {
   const double speed = std::max(depth, 1e-4) / push;
   const double slip = slip_ * std::sqrt(0.3 / speed);
   // Where: 10 cm from the saddle, over the pickup's bridge end (+-6 mm a stroke).
-  const double from = std::clamp(place_ * std::pow(2.0, 1 - brightness_) + 0.012 * (ur() - 0.5), 0.03, 0.3);
+  const double from = std::clamp(place_ * std::exp2(1 - brightness_) + 0.012 * (ur() - 0.5), 0.03, 0.3);
   // Down along the body and a little into it; up along it and a little out (+-0.05 rad).
   const double angle = (up_ ? M_PI + 0.18 : 0.25) + 0.1 * (ur() - 0.5);
   // The palm on the string near the saddle (lifted a little on accents), or the felt.
@@ -556,9 +557,9 @@ void SlapBassPlayer::strike(int s, int fret, const Asked& a) {
   if (t == kPop) {
     // The pop: the finger hooks under the string between the neck's end and the neck pickup,
     // pulls it out from the body and lets it slip off its callus; it slams back onto the frets.
-    const double depth = (prog_ == 2 ? 0.6e-3 + 6.5e-3 * std::pow(v, 1.6) : 0.5e-3 + 6.0e-3 * std::pow(v, 1.6)) * dynK *
+    const double depth = (prog_ == 2 ? 0.6e-3 + 6.5e-3 * fastPow(v, 1.6) : 0.5e-3 + 6.0e-3 * fastPow(v, 1.6)) * dynK *
                          (0.9 + 0.2 * ur());
-    const double from = std::clamp((prog_ == 2 ? 0.20 : 0.215) * std::pow(2.0, 0.35 * (1 - brightness_)) + 0.02 * (ur() - 0.5), 0.12, 0.3);
+    const double from = std::clamp((prog_ == 2 ? 0.20 : 0.215) * std::exp2(0.35 * (1 - brightness_)) + 0.02 * (ur() - 0.5), 0.12, 0.3);
     const double angle = -1.45 + 0.16 * (ur() - 0.5);
     const double width = prog_ == 2 ? 0.003 : 0.006;
     const double slip = prog_ == 2 ? 0.0003 - 0.0001 * v : 0.00035 - 0.0002 * v;
@@ -575,9 +576,9 @@ void SlapBassPlayer::strike(int s, int fret, const Asked& a) {
   // (The thinner strings struck as hard sound weaker, 10 dB from the E to the G: the player
   // digs in a little more on them, kLight^PJ_SLAP_THUMBLIGHT (0.5): their lightness to the 1/8.)
   static const double kLight[kStrings] = {1.0, 1.11, 1.23, 1.47};
-  const double speed = (0.4 + 2.9 * std::pow(v, 1.4)) * thumbV_ * dynK * (0.93 + 0.14 * ur()) * (up_ ? 0.65 : 1.0) *
-                       std::pow(kLight[s], thumbLight_);
-  const double from = std::clamp(thumbAt_ * std::pow(2.0, 0.35 * (1 - brightness_)) + 0.016 * (ur() - 0.5), 0.15, 0.4);
+  const double speed = (0.4 + 2.9 * fastPow(v, 1.4)) * thumbV_ * dynK * (0.93 + 0.14 * ur()) * (up_ ? 0.65 : 1.0) *
+                       fastPow(kLight[s], thumbLight_);
+  const double from = std::clamp(thumbAt_ * std::exp2(0.35 * (1 - brightness_)) + 0.016 * (ur() - 0.5), 0.15, 0.4);
   const double angle = up_ ? -thumbAngle_ + 0.16 * (ur() - 0.5) : thumbAngle_ + 0.16 * (ur() - 0.5);
   // A slow heavy note: a rest stroke (the thumb goes on and lies on the next string).
   const bool rest = !up_ && s < 3 && sinceNote_ > 0.35 && v > 0.6 && chord_ == 1;

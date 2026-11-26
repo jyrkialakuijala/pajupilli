@@ -9,6 +9,7 @@
 #include <string>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -382,13 +383,13 @@ double TomPlayer::stickSpeed(int velocity, double dynamics) {
   // linear in the stick's speed; a harder stick is a little brighter).
   static const double top = knob("PJ_TOM_VMAX", 4.0), ex = knob("PJ_TOM_VEXP", 1.5);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 double TomPlayer::brushSpeed(int velocity, double dynamics) {
   static const double ex = knob("PJ_TOM_BEXP", 1.5);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return (0.12 + 2.6 * std::pow(v, ex)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
+  return (0.12 + 2.6 * fastPow(v, ex)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void TomPlayer::noteOn(int midi, int velocity) {

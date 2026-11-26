@@ -97,6 +97,34 @@ class Performer {
   void setBrightness(double b) { brightness_ = b; }  // jet offset / reed opening
   void setFlutter(double depth) { flutter_ = depth; }  // 0 .. 1
   void setHardness(double h) { hardness_ = h; }  // attack: 0.5 soft .. 2 hard
+  // The syllable a brass or reed player says into the instrument ("da", "ta", "te", "ti", "to",
+  // "du"; "-": the player's own). The consonant is the tongue: -1 a soft "d" (a slower release,
+  // the breath rising slower) .. 1 a hard "t". The vowel is the mouth, shaped by the tongue into
+  // a resonance held through the note (Embouchure::tract): u 350, o 450, a 650, e 1100, i 1800 Hz.
+  // Which of these colours a note carries at which dynamics: tools/colours.py.
+  void setSyllable(double consonant, double vowelHz, double amount = 1) {
+    sylHard_ = consonant;
+    vowelHz_ = vowelHz;
+    vowelAmt_ = vowelHz > 0 ? amount : 0;
+  }
+  bool setSyllable(const char* s) {
+    double c = 0, hz = 0;
+    for (; *s; ++s) {
+      switch (*s) {
+        case 'd': c = -1; break;
+        case 't': c = 1; break;
+        case 'u': hz = 350; break;
+        case 'o': hz = 450; break;
+        case 'a': hz = 650; break;
+        case 'e': hz = 1100; break;
+        case 'i': hz = 1800; break;
+        case '-': break;
+        default: return false;
+      }
+    }
+    setSyllable(c, hz);
+    return true;
+  }
   void setRelease(double s) { release_ = s; }    // breath release time (s)
   void setFormantSpread(double s) { formantSpread_ = s; }  // synths: each key its own filter (0..1)
 
@@ -206,6 +234,7 @@ class Performer {
   bool blowing_ = false, hold_ = false;
   double pressScale_ = 1;
   double dyn_ = 0.5, breathCtl_ = 0, vibDepth_ = 0.0, vibRate_ = 5.0, roll_ = 0;
+  double sylHard_ = 0, vowelHz_ = 0, vowelAmt_ = 0;  // (setSyllable)
   double noiseCtl_ = 1, brightness_ = 1, air_ = 0.35, wander_ = 1;
   double flutter_ = 0, hardness_ = 1, release_ = 0.030, formantSpread_ = 0;
   bool ear_ = false;

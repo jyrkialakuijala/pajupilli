@@ -127,10 +127,14 @@ const NoteInfo kOboeNotes[] = {
     {"oxxooxoxooxoxoxoo", 2},  // 84 C6 (-0 c passive)
     {"oxoooxoxooxoxoxoo", 2},  // 85 C#6 (+13 c passive)
 };
-// (2026-11-24, by ear: the lips a rounder cushion on the blades, their damping 0.9 -> 1.45: the
-// partials 4-12 1-1.6 dB down in the low and middle registers, as steady; the level made up in
-// the instrument's gain, 0.35 -> 0.47; the breath vibrato half the other winds', vibScale)
-const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 1.45, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.75, 0, 0.5, 0, 0.15, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
+// (2026-11-24, by ear: the lips a rounder cushion on the blades; the breath vibrato half the
+// other winds', vibScale. The darker tone first came from the reed's damping, 0.9 -> 1.45, but
+// that reed lost its modes: C4 and D4 swinging 10 dB, G#5 and B5 sharp by 50-100 c. Now the
+// damping is 0.9 again and the blades meet gradually instead (from 55 % of the closure, a soft
+// contact 0.2): the high partials as dark (H5-10 against H1-2: -1.6 dB, against -0.2 for the
+// old reed), 2 notes of 84 unsteady (C#6 loud, as before) against 14; the gain 0.33 keeps its
+// level.)
+const Design kOboeDesign = {kOboeBore, 7, kOboeHoles, 17, kOboeNotes, 3.73, 623.7, false, nullptr, 0, {0.007, 0.00025, 4.8e+07, 3000, 0.9, 9e-05, 0, 4.5e-06, 5000, 7000, 0, 0.55, 0.2, 0.5, 0, 0.15, 0.5}, {0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
 // English horn in F, written Bb3..C#6
 // A narrow cone and a double reed; octave vents for the second register,
@@ -1033,7 +1037,7 @@ const Design kBaritoneSaxDesign = {kBaritoneSaxBore, 6, kBaritoneSaxHoles, 22, k
 
 extern const Instrument kDesigned[] = {
     {"clarinet", -2, 52, 84, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kClarinetDesign, "clarinet"},
-    {"oboe", 0, 58, 85, 1, 1, 1, 48000, 0, false, false, 0, 0.47, Kind::kDoubleReed, &kOboeDesign, "oboe"},
+    {"oboe", 0, 58, 85, 1, 1, 1, 48000, 0, false, false, 0, 0.33, Kind::kDoubleReed, &kOboeDesign, "oboe"},
     {"english-horn", -7, 58, 85, 1.5, 1, 1, 48000, 0, false, false, 0, 0.4, Kind::kDoubleReed, &kEnglishHornDesign, "oboe"},
     {"bassoon", 0, 34, 63, 1, 1, 1, 24000, 0, false, false, 0, 0.6, Kind::kDoubleReed, &kBassoonDesign, "bassoon"},
     {"duduk", 0, 57, 73, 1, 1, 1, 48000, 0, false, false, 0, 0.3, Kind::kDoubleReed, &kDudukDesign, "duduk"},
@@ -1041,7 +1045,7 @@ extern const Instrument kDesigned[] = {
     {"shehnai", 0, 60, 79, 1, 1, 1, 48000, 0, false, false, 0, 0.25, Kind::kDoubleReed, &kShehnaiDesign, "shehnai"},
     {"bagpipe", 0, 67, 81, 1, 1, 1, 48000, 0, false, false, 0, 0.2, Kind::kDoubleReed, &kBagpipeDesign, "bagpipe", 33},  // (drones down to A1)
     {"recorder", 0, 65, 88, 1, 1, 1, 48000, 0, false, false, 0, 1, Kind::kDuct, &kRecorderDesign, "recorder"},
-    {"baroque-flute", 0, 62, 93, 1, 1, 0.85, 48000, 0, false, false, 0, 1, Kind::kFlute, &kBaroqueFluteDesign, "flute"},
+    {"baroque-flute", 0, 62, 93, 1, 1, 0.85, 48000, 0, false, false, 0, 1, Kind::kFlute, &kBaroqueFluteDesign, "flute", -1, 0.5},
     {"whistle", 0, 74, 93, 1, 1, 0.8, 96000, 0, false, false, 0, 0.8, Kind::kDuct, &kWhistleDesign, "whistle"},
     {"shakuhachi", 0, 62, 85, 1, 1, 1.3, 48000, 0, false, false, 0, 1, Kind::kEndBlown, &kShakuhachiDesign, "shakuhachi"},
     {"ocarina", 0, 69, 89, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kDuct, &kOcarinaDesign, "ocarina"},

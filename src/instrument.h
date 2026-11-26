@@ -192,6 +192,9 @@ struct Instrument {
   // tuned each to its one pitch under the chanter's range); -1: none (a
   // note below lo is folded up by octaves).
   int droneLo = -1;
+  // The breath's noise (a flute's: the jet's turbulence and the hiss at its edge), x this: 1 as
+  // the model makes it; the Baroque flute's narrow jet and small hole, 0.5 (-6 dB).
+  double noise = 1;
   bool reed() const { return kind == Kind::kReed || kind == Kind::kDoubleReed; }
   bool lip() const { return kind == Kind::kLip; }
   bool circuit() const { return kind == Kind::kCircuit; }

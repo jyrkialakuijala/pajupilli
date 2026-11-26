@@ -9,6 +9,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -172,7 +173,7 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
             const double a = (lf - std::log(s_.fixF[i])) / (std::log(s_.fixF[i + 1]) - std::log(s_.fixF[i]));
             c = std::exp((1 - a) * std::log(s_.fixMul[i]) + a * std::log(s_.fixMul[i + 1]));
           }
-      plate_.setLoss(k, plate_.loss(k) * std::pow(c, kFix));
+      plate_.setLoss(k, plate_.loss(k) * fastPow(c, kFix));
     }
     plate_.retune();
   }
@@ -196,11 +197,11 @@ Cymbal::Cymbal(double fs, const CymbalSpec& spec, uint32_t seed)
   // (tools/gmcompare.py kits), where the ride's and the toms' are 8-10 dB under
   // theirs. PJ_CYM_CRASHBRUSHDB 5: ~9 dB under.)
   static const double kRideBrushDb = knob("PJ_CYM_BRUSHDB", 13), kCrashBrushDb = knob("PJ_CYM_CRASHBRUSHDB", 5);
-  brushGain_ = float(std::pow(10.0, (spec.ride ? kRideBrushDb : kCrashBrushDb) / 20));
+  brushGain_ = float(fastPow(10.0, (spec.ride ? kRideBrushDb : kCrashBrushDb) / 20));
   // (And a swirl, the brush lying on the plate, at its own level against
   // the strokes: PJ_CYM_SWIRLDB more.)
   // (A crash's swirl stays where it was: what its strokes gave up, back.)
-  swirlGain_ = float(std::pow(10.0, (knob("PJ_CYM_SWIRLDB", 12) + (spec.ride ? 0 : kRideBrushDb - kCrashBrushDb)) / 20));
+  swirlGain_ = float(fastPow(10.0, (knob("PJ_CYM_SWIRLDB", 12) + (spec.ride ? 0 : kRideBrushDb - kCrashBrushDb)) / 20));
   feel_.reset(new Feel(plate_));
   brush_.reset(new Brush(fs, *feel_, bs, seed));
   if (const char* tr = std::getenv("PJ_CYM_TRACE")) trace_ = std::fopen(tr, "wb");
@@ -509,7 +510,7 @@ float CymbalModel::sample() {
   static const float g = float(knob("PJ_CYM_OUT", 1.0 / 3));
   // The highs 3 dB down (from ~4 kHz up: a first-order shelf at 3 kHz, PJ_CYM_HIGHS -4.3 dB: -3 dB over 6-14 kHz): the cymbals heard
   // from a little further off, not from over the drummer's shoulder (by ear, the user's).
-  static const float kHi = float(std::pow(10.0, knob("PJ_CYM_HIGHS", -4.3) / 20) - 1);
+  static const float kHi = float(fastPow(10.0, knob("PJ_CYM_HIGHS", -4.3) / 20) - 1);
   static const float kA = float(1 - std::exp(-2 * M_PI * 3000 / fs_));
   const float x = cym_.sample(), sd = cym_.side();
   shelfM_ += kA * (x - shelfM_);
@@ -589,7 +590,7 @@ double CymbalPlayer::stickSpeed(int velocity, double dynamics) {
   // whisper on the bow) .. 5 m/s (a crash).
   static const double top = knob("PJ_CYM_VMAX", 5.0), ex = knob("PJ_CYM_VEXP", 1.9);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return (0.06 + top * std::pow(v, ex)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
+  return (0.06 + top * fastPow(v, ex)) * (0.7 + 0.6 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 double CymbalPlayer::bowPlace() {
@@ -662,7 +663,7 @@ void CymbalPlayer::noteOn(int midi, int velocity) {
   Cymbal& c = m_.cymbal();
   if (midi == 84) {  // the swirl, held
     static const double kLoad = knob("PJ_CYM_SWIRLLOAD", 1.0);
-    swLoad_ = kLoad * (0.15 + 0.85 * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
+    swLoad_ = kLoad * (0.15 + 0.85 * fastPow(std::clamp(velocity, 1, 127) / 127.0, 1.3)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0));
     if (!swirl_) {
       swirl_ = true;
       swirling_ = false;
@@ -710,7 +711,7 @@ void CymbalPlayer::noteOn(int midi, int velocity) {
       // a stick is), ~velocity^1.3, 0.45 .. 2.65 m/s before the slowing.
       const double w = lean(velocity);
       static const double kBv = knob("PJ_CYM_BRUSHVMAX", 2.2), kBe = knob("PJ_CYM_BRUSHVEXP", 1.3);
-      double v = (0.45 + kBv * std::pow(std::clamp(velocity, 1, 127) / 127.0, kBe)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
+      double v = (0.45 + kBv * fastPow(std::clamp(velocity, 1, 127) / 127.0, kBe)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) *
                  (1 + 0.05 * (ur() - 0.5));
       static const bool kBeat = knob("PJ_CYM_BEAT", 1) > 0;
       if (SongClock::get().valid && kBeat) v *= 0.8 + 0.4 * w;
@@ -825,7 +826,7 @@ void CymbalPlayer::swirl(double dt) {
                        (1 + swNow_.pull * std::cos(ph - swNow_.at));
   // (... and the whole a little lighter, PJ_CYM_SWIRLUNDER x the variety: it stays just under the plain swirl)
   static const double kUnder = knob("PJ_CYM_SWIRLUNDER", 0.4);
-  const double even = (quick > 1 ? std::pow(quick, -kEven) : 1.0) * (1 - kUnder * kVary);
+  const double even = (quick > 1 ? fastPow(quick, -kEven) : 1.0) * (1 - kUnder * kVary);
   const double load = swLoad_ * (0.8 + 0.4 * std::pow(0.5 + 0.5 * std::sin(ph), 2)) * (0.35 + 0.8 * std::min(r / R, 1.0)) * swNow_.load * even;
   static const double kShare = knob("PJ_CYM_SWIRLFAN", 0.25);
   if (!swirling_ || b.up()) {

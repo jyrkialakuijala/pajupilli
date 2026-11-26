@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -151,7 +152,7 @@ float Kick::sample() {
     const double pen = h - zb_;
     if (pen > 0) {
       const double rate = vh - vb_;
-      F = float(std::max(0.0, s_.feltK * std::pow(pen, s_.feltAlpha) * (1 + s_.feltLoss * rate)));
+      F = float(std::max(0.0, s_.feltK * fastPow(pen, s_.feltAlpha) * (1 + s_.feltLoss * rate)));
       touch_ = true;
       hit_ = true;
     } else {
@@ -274,7 +275,7 @@ double KickPlayer::beaterSpeed(int velocity, double dynamics) {
   // (20 .. 70) 0.2 .. 1.1 m/s, a bomb 4.5 m/s.
   static const double top = knob("PJ_KICK_VMAX", 4.5), ex = knob("PJ_KICK_VEXP", 1.25);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void KickPlayer::setHold(bool h) {

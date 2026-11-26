@@ -4,6 +4,7 @@
 
 #include "flute.h"
 #include "performer.h"
+#include "slurs.h"
 
 #include <cstdint>
 
@@ -60,7 +61,8 @@ class Player : public Performer {
   double sinceOn_ = 0;
   double velAccent_ = 0;
   int keyVel_ = 64;
-  double regKick_ = 0, kLipClose_ = 0.012, kKickP_, kKickW_, kKickT_, kKickDyn_, kSlurKick_ = 1.9, kVentKickDyn_ = 0,
+  bool kLipCloseAll_ = true;
+  double regKick_ = 0, kLipClose_ = 0.012, kRelTune_ = 0, lungHeld_ = 0, kKickH_ = 0, kKickY_ = 0, kGeoH_ = 0.5, kGeoY_ = 1, kKickP_, kKickW_, kKickT_, kKickDyn_, kSlurKick_ = 1.9, kVentKickDyn_ = 0,
          kVentKickT_ = 0.04, kickT_ = 0.06;
   double slurKick(int to);  // the register kick for a slur up to `to` (sets its duration)
   double kDynH_, kDynP_, kVelDyn_;
@@ -70,6 +72,15 @@ class Player : public Performer {
   double w1a_ = 0, w1b_ = 0, w2a_ = 0, w2b_ = 0, w3a_ = 0, w3b_ = 0;
   double urand() { rng_ = rng_ * 1664525u + 1013904223u; return (rng_ >> 8) * (2.0 / 16777216.0) - 1; }
   double velDyn_ = 0, velDynTarget_ = 0;  // dynamics offset from key velocity
+  // A practised slur (src/slurs.h; tools/slurs.py, kind 'jet'): on top of the register kick, the
+  // air pushed or eased at the change, the lips' jet shortened (up) or lengthened (down) and
+  // settling, the fingers' speed, the lips and air going first (lead), or a soft tongue ("d").
+  SlurGesture gesture_;
+  bool practised_ = false;
+  int slurDir_ = 0;
+  double slurAir_ = 0, slurLip_ = 0, slurDip_ = 0, slurAirT_ = 0.03, slurLipT_ = 0.03, slurDipT_ = 0.08, sinceSlur_ = 1e9;
+  double leadLeft_ = 0, leadSpeed_ = 1, tongueFloor_ = 0;
+  const char* leadHoles_ = nullptr;
 };
 
 }  // namespace pajupilli

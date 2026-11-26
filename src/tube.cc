@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 namespace {
@@ -53,7 +54,7 @@ Tube::Tube(const Instrument& inst) : inst_(inst), fs_(inst.fs), bore_(inst.fs) {
   {
     const double r = 48000 / fs_;
     noiseNorm_ = std::sqrt(1 / r);
-    dcPole_ = float(std::pow(0.99935, r));
+    dcPole_ = float(fastPow(0.99935, r));
   }
   kOut_ = knob("PJ_OUT", 0.3);
   kSeries_ = knob("PJ_SERIES", 1);  // closed holes' series length t_a (Dubos)
@@ -241,7 +242,7 @@ Branch Tube::holeBranch(const Hole& h) const {
   if (h.perforated) {  // Dalmont 2001: the perforation shortens the pad's effect
     const double q = 3.4e-3, e = 3.6e-3;
     const double de = 1.64 * h.b / q - 0.15 * h.b / h.padR - 1.1 + e * h.b / (q * q);
-    dpad /= 1 + 5 * std::pow(de, -1.35) * std::pow(hp / h.b, -0.2);
+    dpad /= 1 + 5 * fastPow(de, -1.35) * fastPow(hp / h.b, -0.2);
   }
   const double ts = h.tSeries + dpad;
   br.g = sh / (kRho * ts);

@@ -7,6 +7,7 @@
 
 #include "knob.h"
 #include "slurs.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -159,8 +160,9 @@ bool ReedPlayer::rings(int from, int to) const {
 ReedPlayer::Attack ReedPlayer::slurPlan(int from, Attack a, bool plain) {
   ringing_ = practised_ = false;
   ringT_ = kRingT_;
+  const bool trill = trillSense_.at(from, note_, sinceOn_);
   if (a != kSlur || bag_ || !plain || from < 0 || from == note_) return a;
-  if (slurGesture(inst_.name, from, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &gesture_)) {
+  if (slurGesture(inst_.name, from, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &gesture_, sinceOn_, trill)) {
     if (gesture_.fails) return kDu;
     practised_ = true;
     if (gesture_.tongue <= 0) return kSlur;
@@ -187,6 +189,11 @@ void ReedPlayer::applyNote(Attack a) {
     slurAirT_ = std::max(1e-3f, gesture_.airT);
     slurLipT_ = std::max(1e-3f, gesture_.lipT);
     slurDipT_ = std::max(1e-3f, gesture_.dipT);
+    setFirm_ = gesture_.firm;
+    setFocus_ = gesture_.focus;
+    setVowel_ = gesture_.vowel;
+    setVowelAt_ = gesture_.vowelAt;
+    setT_ = std::max(1e-3f, gesture_.setT);
     sinceSlur_ = 0;
     if (gesture_.tongue > 0) tongueFloor_ = std::clamp(double(gesture_.floor), 0.0, 1.0);
   }
@@ -203,7 +210,13 @@ void ReedPlayer::applyNote(Attack a) {
   earClock_ = 0;
   lastCross_ = -1;
   switch (a) {
-    case kSlur: return;
+    case kSlur:
+      // (a practised start's slow or quick breath is the start's alone: left on, the trumpet's
+      // soft E3, begun on a breath 4.8 times slower, slurred to B3 on that slow breath and
+      // landed 47 c flat)
+      lungAttack_ /= riseX_;
+      riseX_ = 1;
+      return;
     case kBreath:  // the reed starts on the breath alone: a slow push, no tongue
       tongueClosed_ = 0;
       tongueRelease_ = 0.001;
@@ -223,6 +236,29 @@ void ReedPlayer::applyNote(Attack a) {
       break;
     }
   }
+  // The start as practised for this note (src/slurs.h): the tongue, the breath, the lips' set.
+  // (Not the bag's piper, nor a slur's own touch of the tongue.)
+  riseX_ = 1;
+  AttackGesture ag;
+  if (!bag_ && !ringing_ && attackGesture(inst_.name, note_, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &ag)) {
+    tongueRelease_ *= ag.release;
+    lungAttack_ *= ag.rise;
+    riseX_ = ag.rise;
+    slurAir_ = ag.push;
+    slurAirT_ = std::max(1e-3f, ag.pushT);
+    slurLip_ = ag.lip;
+    slurLipT_ = std::max(1e-3f, ag.lipT);
+    slurDip_ = 0;
+    setFirm_ = ag.firm;
+    setFocus_ = 0;
+    setVowel_ = ag.vowel;
+    setVowelAt_ = ag.vowelAt;
+    setT_ = std::max(1e-3f, ag.setT);
+    sinceSlur_ = 0;
+  }
+  // (the syllable's consonant, Performer::setSyllable: a "d" slower, a "t" quicker)
+  tongueRelease_ *= std::exp(-0.6 * sylHard_);
+  lungAttack_ *= std::exp(-0.4 * sylHard_);
   tongueRelease_ *= 1 + 0.15 * wander_ * urand();
   lungAttack_ *= 1 + 0.15 * wander_ * urand();
   tongueClock_ = 0;
@@ -267,7 +303,7 @@ void ReedPlayer::render(float* out, int n) {
       const double lo = noteFrequency(inst_.lo), hi = noteFrequency(inst_.hi);
       const double fw = glideFrequency() * std::exp2(-inst_.transpose / 12.0);
       const double u = std::clamp(std::log(fw / lo) / std::log(hi / lo), 0.0, 1.0);
-      const double p0 = rp.press * std::pow(rp.pressHi / rp.press, u);
+      const double p0 = rp.press * fastPow(rp.pressHi / rp.press, u);
       // (The attack's accent no higher than the note's loudest calibrated
       // pressure: past it, a low oboe note breaks into its octave and stays.)
       const double hiP = std::exp(kDynP_ * (std::max(dynLo[note_], dynHi[note_]) - dyn));
@@ -288,7 +324,16 @@ void ReedPlayer::render(float* out, int n) {
       e.reed = lip;
       // The top notes: the lips rolled out (less lip on the blades).
       const int top = inst_.hi + inst_.transpose;
-      e.reedDamp = std::pow(rp.roll, std::clamp((note_ - (top - 2)) / 2.0, 0.0, 1.0));
+      e.reedDamp = fastPow(rp.roll, std::clamp((note_ - (top - 2)) / 2.0, 0.0, 1.0));
+      // The set through a practised slur: the lips' damping on the reed, the vowel.
+      setNow_ = sinceSlur_ < 8 * setT_ ? std::exp(-(sinceSlur_ / setT_) * (sinceSlur_ / setT_)) : 0;
+      e.reedDamp *= std::exp(setFirm_ * setNow_);
+      e.tract = setVowel_ * setNow_;
+      e.tractHz = noteFrequency(note_) * std::exp2(setVowelAt_);
+      if (vowelAmt_ > e.tract) {  // (the syllable's vowel, held through the note)
+        e.tract = vowelAmt_;
+        e.tractHz = vowelHz_;
+      }
     }
     // Lungs: a fast push, a slower release.
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
@@ -321,8 +366,8 @@ void ReedPlayer::render(float* out, int n) {
     }
     e.lung = lung_ * (1 + (1 - jaw) * vib * sv) * (1 + 0.04 * wander_ * w1b_);
     e.glottis = 1.5e-4;
-    e.noise = 0.01 * noiseCtl_;
-    e.air = air_;
+    e.noise = 0.01 * noiseCtl_ * std::exp(-setFocus_ * setNow_);
+    e.air = air_ * std::exp(-setFocus_ * setNow_);
     reed_.setEmbouchure(e);
     reed_.process(out + i, m);
     // The drones, from the same bag (their level against the chanter's:

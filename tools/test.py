@@ -124,7 +124,7 @@ def slurs():
         check('slurs: src/slur_data.h is what tools/slurs.py emit writes', f.read() == S.emit(write=False))
     for inst, max_fail, max_settle in (('oboe', 14, 90), ('clarinet', 3, 110), ('horn', 8, 260)):
         S.warm(inst)
-        rows = [S.job_slur((inst, a, b, d, None, 64, S.HOLD, 't%d' % i)) for i, (a, b, d) in enumerate(S.grid(inst))]
+        rows = [S.job_slur((inst, a, b, d, None, S.occasions(a, S.SLOW, False)[0], 't%d' % i)) for i, (a, b, d) in enumerate(S.grid(inst))]
         played = [r for r in rows if not r.get('skip')]
         ok = [r['settle'] for r in played if r['ok']]
         fails = len(played) - len(ok)

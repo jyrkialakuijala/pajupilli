@@ -6,6 +6,7 @@
 
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -88,7 +89,7 @@ MetalPercModel::MetalPercModel(const Instrument& inst)
         // T60: about 3 s through the 1 - 6 kHz (the recorded open triangle's
         // 2 - 3 s, its sample cut short), shorter above (the air, the rod's own
         // loss): 1.2 s at 10 kHz, 0.7 s at 15 kHz.
-        const double t = f < 6000 ? std::min(5.0, 3.0 * std::pow(2000 / f, 0.25)) : 2.28 * std::pow(6000 / f, 1.3);
+        const double t = f < 6000 ? std::min(5.0, 3.0 * std::pow(2000 / f, 0.25)) : 2.28 * fastPow(6000 / f, 1.3);
         def.t60[k] = float(t * knob("PJ_TRI_T60", 1.0));
         // A thin rod radiates its low modes poorly (a line dipole, ka << 1).
         def.rad[k] = float(std::min(2.0, std::pow(f / 2000, 0.5)));
@@ -115,7 +116,7 @@ MetalPercModel::MetalPercModel(const Instrument& inst)
       // levels.
       // (The walls' modes 12 dB up: what the stick's ~0.1 ms contact gives
       // them less than the recording's harder or sharper stroke, fitted.)
-      def.rad[k] = float(std::pow(10.0, kBellDb[k] / 20) / kBellRatio[k] * (k >= 4 ? 4.0 : 1.0));
+      def.rad[k] = float(fastPow(10.0, kBellDb[k] / 20) / kBellRatio[k] * (k >= 4 ? 4.0 : 1.0));
       h = h * 1664525u + 1013904223u;
       def.side[k] = float(0.4 * def.rad[k] * (((h >> 9) & 1) ? 1 : -1));
     }
@@ -210,7 +211,7 @@ double MetalPercPlayer::speed(int velocity, double dynamics) {
   // contact this stiff hardly brightens with speed: the level alone carries it).
   static const double top = knob("PJ_MP_VMAX", 3.0), ex = knob("PJ_MP_VEXP", 1.65);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void MetalPercPlayer::noteOn(int midi, int velocity) {

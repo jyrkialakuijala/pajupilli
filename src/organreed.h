@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "rng.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -79,15 +80,15 @@ class ReedPipe {
     for (size_t i = 0; i < k_.size(); ++i) {
       const int k = k_[i];
       const double fk = f * k * (1 + 0.002 * (k - 1));
-      const double q = std::min(v_.qCap, v_.q1 * std::pow(double(k), v_.qRise));
+      const double q = std::min(v_.qCap, v_.q1 * fastPow(double(k), v_.qRise));
       const double r = std::exp(-M_PI * fk / (q * fs_)), w = 2 * M_PI * fk / fs_;
       a1_[i] = float(2 * r * std::cos(w));
       a2_[i] = float(-r * r);
       b0_[i] = float((1 - r * r) / 2);  // (a constant-peak band-pass: its gain 1 at its centre)
-      z_[i] = float(v_.zeta * std::pow(double(k), -v_.modeTilt));
+      z_[i] = float(v_.zeta * fastPow(double(k), -v_.modeTilt));
       const double fo = v_.formantHz > 0 ? std::log2(fk / v_.formantHz) / v_.formantOct : 0;
       const double formant = 1 + v_.formantGain * std::exp(-fo * fo);
-      w_[i] = float(std::pow(double(k), v_.bright) * (fk > v_.rollHz ? std::pow(v_.rollHz / fk, 2) : 1.0) * formant);
+      w_[i] = float(fastPow(double(k), v_.bright) * (fk > v_.rollHz ? std::pow(v_.rollHz / fk, 2) : 1.0) * formant);
     }
     // (the topmost modes' radiation faded out, a raised cosine over the last
     // six: cut off hard, the last one rang the harmonic above it, a narrow
@@ -199,7 +200,7 @@ class ReedPipe {
     // the gap the stopped tongue leaves open does not hiss; a new press rebuilds it over ~20 ms)
     float turb = float(v_.noise);
     if (releaseNoise_ > 0) {
-      if (!on_) turbState_ = std::min(turbState_, std::pow(std::clamp(foot_ / std::max(wind, 1e-3f), 0.0f, 1.0f), releaseNoise_));
+      if (!on_) turbState_ = std::min(turbState_, fastPow(std::clamp(foot_ / std::max(wind, 1e-3f), 0.0f, 1.0f), releaseNoise_));
       else if (turbState_ < 1) turbState_ = std::min(1.0f, turbState_ + (1 - turbState_) * float(1 / (0.02 * fs_)) + 1e-6f);
       turb *= turbState_;
     }

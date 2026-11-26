@@ -8,6 +8,7 @@
 
 #include "knob.h"
 #include "songclock.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -54,7 +55,7 @@ GuitarModel::GuitarModel(const Instrument& inst) : Tube(inst), g_(inst.fs, specF
     // strip, whose levels are the amp's own, to the common loudness, the rest in levels_data.h.)
     constexpr double kJazzLevel = 74.0;
     kAmpOut_ = float(kJazzLevel * knob("PJ_EGTR_OUT", 1.0));
-    kAcoustic_ = float(kJazzLevel * kAcousticCal_ * std::pow(10.0, knob("PJ_JAZZ_ACOUSTIC", 0) / 20));
+    kAcoustic_ = float(kJazzLevel * kAcousticCal_ * fastPow(10.0, knob("PJ_JAZZ_ACOUSTIC", 0) / 20));
     return;
   }
   // The amp: a clean clean 2x12 combo for GM 28; with a compressor in front for GM 29; a British stack
@@ -352,7 +353,7 @@ void GuitarPlayer::play() {
     // fingers come one after another; a loud chord nearly together.
     const double v = std::clamp(a.velocity, 1, 127) / 127.0;
     const bool thumb = (order == 0 && count > 1) || best < 3;
-    const double depth = (0.25e-3 + 2.6e-3 * std::pow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.9 + 0.2 * ur());
+    const double depth = (0.25e-3 + 2.6e-3 * fastPow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.9 + 0.2 * ur());
     // Flesh alone when soft; a little nail from the middle; much, and its knock, at the hardest.
     const double e = std::clamp((v - 0.32) / 0.5, 0.0, 1.0), ease = e * e * (3 - 2 * e);
     const double nail = std::clamp((thumb ? 0.5 : 0.8) * ease + 0.2 * (hardness_ - 1), 0.0, 1.0);
@@ -385,7 +386,7 @@ void GuitarPlayer::play() {
       // (He means them equally loud unless the velocities say otherwise:
       // further from the bridge or on the flesh the string is pulled deeper
       // for the same loudness.)
-      if (repeats_ > 0) depthNow *= std::pow(where, 0.9) * (1 + 1.1 * std::max(0.0, nail - nailNow));
+      if (repeats_ > 0) depthNow *= fastPow(where, 0.9) * (1 + 1.1 * std::max(0.0, nail - nailNow));
       lastMidi_ = a.midi;
       lastVel_ = a.velocity;
     } else {
@@ -429,7 +430,7 @@ void GuitarPlayer::play() {
       // together. Going down the bass strings get a little more; coming up
       // the middle strings do, and the hand is gentle with the highest.
       const double vs = 0.3 + 0.5 * (together ? chordVel : strumVel_);
-      depthNow = (0.2e-3 + 2.0e-3 * std::pow(vs, 1.3)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.95 + 0.1 * ur());
+      depthNow = (0.2e-3 + 2.0e-3 * fastPow(vs, 1.3)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.95 + 0.1 * ur());
       const double mid = 1 - std::fabs(best - 2.5) / 2.5;
       depthNow *= down ? 1.0 + 0.15 * (5 - best) / 5.0 : 1.05 * (1 + 0.12 * mid) * (best == 5 ? 0.82 : 1.0);  // (the soft pad needs more of the string for its sound)
       if (together) delay = place * (0.0105 / handSpeed_) * (0.9 + 0.2 * ur());   // the strings 10.5 mm apart
@@ -458,7 +459,7 @@ void GuitarPlayer::play() {
         // its depth the chord's evened velocity, up strokes 2 dB under.
         const double dynK = (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (0.92 + 0.16 * ur());
         if (strum) {
-          depthNow = (0.2e-3 + 2.0e-3 * std::pow(vv, 1.3)) * dynK * (way > 0 ? 1.0 : 0.8);
+          depthNow = (0.2e-3 + 2.0e-3 * fastPow(vv, 1.3)) * dynK * (way > 0 ? 1.0 : 0.8);
           where = 1.3 * (0.95 + 0.1 * ur());
           // (a hand taking more strings moves faster: 8.6 ms a string at three, 5.5 at six)
           if (together) delay = (strumWay_ > 0 ? order : int(count) - 1 - order) * (0.0105 / (handSpeed_ * (1 + 0.12 * (double(count) - 3)))) * (0.9 + 0.2 * ur());
@@ -643,7 +644,7 @@ void GuitarPlayer::render(float* out, int n) {
         const Due& d = due_[j];
         g.fret(d.string, d.fret);
         // Where the hand plucks: 12 cm from the bridge, nearer for a brighter sound.
-        const double from = std::clamp(0.12 * std::pow(2.0, 1 - brightness_) * d.where, 0.03, 0.24);
+        const double from = std::clamp(0.12 * std::exp2(1 - brightness_) * d.where, 0.03, 0.24);
         if (steel_) g.pick(d.string, d.depth, from, d.angle, d.nail);
         else if (electric_) {
           // (The palm lies across all six: the strings not played do not ring along either.)
@@ -755,7 +756,7 @@ void HarmonicsPlayer::play() {
     const double ear = std::fabs(std::sin(n * M_PI * pu.at[s] / len)) * std::fabs(std::sin(n * M_PI * where / len));
     const double weak = 0.967 * fret - 6 - 0.046 * (midi - 76) + 0.73 * 20 * std::log10(std::max(ear, 0.05)) +
                         (n == 3 ? 1.98 : n == 4 ? 4.03 : fret == 0 ? 1.76 : 0.0);
-    const double dig = knob("PJ_GHARM_EVEN", 1.0) > 0 ? std::clamp(std::pow(10.0, -weak / 20), 0.12, 2.2) : 1.0;
+    const double dig = knob("PJ_GHARM_EVEN", 1.0) > 0 ? std::clamp(fastPow(10.0, -weak / 20), 0.12, 2.2) : 1.0;
     // Single notes down and up in turn while they come quickly; a chord one sweep down.
     int way = 1;
     if (count == 1) { pickWay_ = gap_ < 0.3 ? -pickWay_ : 1; way = pickWay_; }

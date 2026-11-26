@@ -13,6 +13,7 @@
 #include "band.h"
 #include "ensemble.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -41,6 +42,14 @@ const ChoirVariant kChoirVariants[] = {
     // it was full only after ~0.5 s: an attack of 774 ms against the SoundFonts' 40-80,
     // research/gm_compare.md p053; rhythmic "ooh" parts dragged.)
     {"voice-oohs", {0.7, 0.6, 0.5, 0.3, 0.2, 0.2}, 2, 0.055, 0.2, 0.5, 1.3, 0.8, 1.1, 0x3f, 60, 0.4, 0, 0},
+    // 92 Pad 4 (choir), sung by the same singers: a soft, half-hummed [ʊ] .. [u], coming in slowly
+    // (the lungs' tau ~0.3 s) and dying away slowly, breathy, little vibrato, the entries widely
+    // scattered: a bed of voices, no start to hear.
+    {"choir-pad", {1.2, 1.1, 1.0, 0.9, 0.7, 0.7}, 2, 0.30, 0.6, 0.8, 1.3, 0.5, 1.8, 0x3f, 128, 0, 0.35, -2},
+    // 86 Lead 6 (voice): a few singers of the choir as a lead voice, at most four in all (those
+    // most at ease on the line): a clear [ɑ], a firm start with a soft "d", full vibrato, little
+    // scatter (they sing as one), a little forward of the choir.
+    {"voice-lead", {3, 3, 3, 3, 3, 3}, -1, 0.035, 0.10, 0, 0.8, 1.3, 0.4, 0x3f, 128, 0.3, 0, 3, 4},
 };
 
 const NoteInfo kChoirNotes[128] = {
@@ -86,6 +95,8 @@ double smooth(double x, double x0, double x1) {
 extern const Instrument kChoirInstruments[] = {
     {"choir", 0, 31, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kChoirDesign, "choir"},
     {"voice-oohs", 0, 31, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kChoirDesign, "choir"},
+    {"choir-pad", 0, 31, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kChoirDesign, "choir"},
+    {"voice-lead", 0, 31, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kChoirDesign, "choir"},
 };
 extern const int kNumChoirInstruments = int(sizeof kChoirInstruments / sizeof kChoirInstruments[0]);
 
@@ -123,6 +134,7 @@ void SingerModel::resetAir() {
 void SingerModel::controlStep() {
   if (asleep_) return;
   const double dt = 16 / fs_;
+  g_.setEffort(c_.effort);
   g_.control(c_.f0, c_.vowel, c_.lung, c_.breath, c_.vibDepth, c_.vibRate, 60, dt);
   if (c_.hum > 0 || hum_.amount() > 0) hum_.control(c_.hum, dt);
 }
@@ -237,11 +249,11 @@ void SingerPlayer::render(float* out, int n) {
     // 1.4 x an octave above the part's middle.
     const double note = cur_ >= 0 ? cur_ : noteNow_;
     static const double kVelExp = knob("PJ_CHOIR_VELEXP", 1.7);
-    const double L = std::clamp(std::pow(vel_ / 127.0, kVelExp) + 0.6 * (dyn_ - 0.5) + breathCtl_, 0.03, 1.15);
+    const double L = std::clamp(fastPow(vel_ / 127.0, kVelExp) + 0.6 * (dyn_ - 0.5) + breathCtl_, 0.03, 1.15);
     const double mid = 0.5 * (std::max(part_.lo, 40) + part_.hi);  // (the bass as from E2: the oktavists' depths aside)
-    double press = 400 * std::pow(3500.0 / 400, L) * (1 - 0.3 * V.softness);
-    press *= std::clamp(std::pow(1.4, (note - mid) / 12), 0.6, 2.0);
-    press = std::min(press, 5000.0);
+    double press = 400 * fastPow(3500.0 / 400, L) * (1 - 0.3 * V.softness);
+    const double pitchMul = std::clamp(fastPow(1.4, (note - mid) / 12), 0.6, 2.0);
+    press = std::min(press * pitchMul, 5000.0);
     const bool on = cur_ >= 0 && !releasing_ && !breathing_;
     const double target = on ? press : 0;
     double tau;
@@ -289,11 +301,12 @@ void SingerPlayer::render(float* out, int n) {
     }
     m_.singer().setJaw(jaw + jawJit_ + openJaw);
     // The level: the seat's; a strong voice +4 dB at f and ff.
-    const double gain = std::pow(10.0, (levelDb_ + (strong_ ? 4 * smooth(L, 0.7, 0.9) : 0) + V.gainDb + keyTrimDb(noteNow_)) / 20);
+    const double gain = fastPow(10.0, (levelDb_ + (strong_ ? 4 * smooth(L, 0.7, 0.9) : 0) + V.gainDb + keyTrimDb(noteNow_)) / 20);
     SingerModel::Controls c;
     c.f0 = f0;
     c.vowel = vowel;
     c.lung = lung_;
+    c.effort = pitchMul;  // (a high note needs the pressure: it is not sung harder for it)
     c.breath = breath;
     c.vibDepth = vib;
     c.vibRate = vibRate_;
@@ -338,6 +351,7 @@ struct ChoirState {
   const ChoirVariant* var;
   struct Seat {
     int slot, part;
+    int wantWho = 0, lastWho = -1;  // (the shared choir: whose key it is to sing; whose it last sang)
     int cur = -1, want = -1;  // the key it sings; the key it is to sing (-1: none)
     double at = 0;            // ... from when
     int vel = 64;
@@ -346,6 +360,12 @@ struct ChoirState {
     double x = 0;             // where it stands across the stage (m, from the audience: - left)
   };
   std::vector<Seat> seats;
+  // One choir for a file's choir parts (Ensemble::joinChoir): the parts are its clients (the
+  // first: this ensemble's own), each with its variant (its vowel, its onsets, how many sing),
+  // its level and its fader; a held key is the client's that pressed it last.
+  struct Client { const ChoirVariant* var; float gain; float fader; float comp = 1; };
+  std::vector<Client> clients;
+  int owner[128] = {};
   int held[128] = {};
   double tune[128] = {};      // each sung note's tuning (c; choirTune)
   bool sounding[128] = {};    // ... the notes it tuned last
@@ -429,6 +449,7 @@ void Ensemble::initChoir(const Instrument& inst, const RoomSpec* room, int role,
   s.hi = hi_;
   s.gain = float(knob("PJ_CHOIR_GAIN", 0.25) * levelTrim(inst));
   s.stops = true;
+  C.clients.assign(1, ChoirState::Client{C.var, s.gain, 1.0f});
   kids_.push_back(std::move(s));
   unsigned seat = 0;
   for (Slot& f : kids_[0].ens->f_) {
@@ -449,21 +470,23 @@ void Ensemble::choirAssign() {
   int lo = 127, hi = 0;
   for (int p = 0; p < kChoirParts; ++p)
     if (C.role >= 0 ? p == C.role : V.parts >> p & 1) lo = std::min(lo, kChoirPart[p].lo), hi = std::max(hi, kChoirPart[p].hi);
-  int vel[128] = {};
+  int vel[128] = {}, own[128] = {};
   for (int k = 0; k < 128; ++k)
     if (C.held[k] > 0) {
       int f = k;
       while (f < lo) f += 12;
       while (f > hi) f -= 12;
+      if (C.held[k] > vel[f]) own[f] = C.owner[k];
       vel[f] = std::max(vel[f], C.held[k]);
     }
   std::vector<int> keys;
   for (int k = lo; k <= hi; ++k)
     if (vel[k] > 0) keys.push_back(k);
   const int n = int(keys.size());
-  auto allowed = [&](int p, int k) {
+  auto allowed = [&](int p, int k) {  // (by the way of the client whose key it is)
     const ChoirPart& d = kChoirPart[p];
-    return (V.parts >> p & 1) && k >= d.lo && k <= d.hi && (d.female || k < V.menBelow);
+    const ChoirVariant& vk = *C.clients[own[std::clamp(k, 0, 127)]].var;
+    return (vk.parts >> p & 1) && k >= d.lo && k <= d.hi && (d.female || k < vk.menBelow);
   };
   auto easy = [&](int p, int k) { return allowed(p, k) && k >= kChoirPart[p].easyLo && k <= kChoirPart[p].easyHi; };
   int seatsOf[kChoirParts] = {};
@@ -558,6 +581,7 @@ void Ensemble::choirAssign() {
           ++have[j];
           ChoirState::Seat& s = C.seats[spare[q]];
           const bool fresh = s.want < 0;
+          s.wantWho = own[keys[ks[j]]];
           s.want = keys[ks[j]] + (up ? 12 : 0);
           s.vel = std::clamp(vel[keys[ks[j]]] + int(13 * C.rnd()) - 6 - (up ? 25 : 0), 1, 127);  // (the doubling under them)
           s.at = now_ + std::max(0.0, spread * ((fresh ? enter() : 0.06 * C.rnd()) + s.habit + partAt));
@@ -568,6 +592,30 @@ void Ensemble::choirAssign() {
       if (s.want < 0) continue;
       s.want = -1;
       s.at = now_ + spread * std::clamp(0.03 + 0.03 * C.gauss(), 0.0, 0.12);
+    }
+  }
+  // A client of a few singers (a lead voice: ChoirVariant::singers): on its keys only so many
+  // sing, shared over them, those most at ease there (the same ones every time); the others rest.
+  for (size_t c = 0; c < C.clients.size(); ++c) {
+    const int cap = C.clients[c].var->singers;
+    if (cap <= 0) continue;
+    std::vector<int> ck;
+    for (int k : keys)
+      if (own[k] == int(c)) ck.push_back(k);
+    for (size_t j = 0; j < ck.size(); ++j) {
+      const size_t allow = size_t(cap) / ck.size() + (j < size_t(cap) % ck.size() ? 1 : 0);
+      std::vector<int> on;
+      for (int i = 0; i < int(C.seats.size()); ++i)
+        if (C.seats[i].want == ck[j] || C.seats[i].want == ck[j] + 12) on.push_back(i);
+      auto ease = [&](int i) {
+        const ChoirPart& d = kChoirPart[C.seats[i].part];
+        return std::fabs(C.seats[i].want - 0.5 * (d.easyLo + d.easyHi));
+      };
+      std::stable_sort(on.begin(), on.end(), [&](int a, int b) { return ease(a) < ease(b); });
+      for (size_t q = allow; q < on.size(); ++q) {
+        C.seats[on[q]].want = -1;
+        C.seats[on[q]].at = now_;
+      }
     }
   }
 }
@@ -694,17 +742,57 @@ void Ensemble::choirTune() {
 }
 
 void Ensemble::choirOn(int key, int velocity) {
-  choir_->held[std::clamp(key, 0, 127)] = std::clamp(velocity, 1, 127);
+  if (choirHost_) { choirHost_->choirKey(choirClient_, key, velocity); return; }
+  choirKey(0, key, velocity);
+}
+
+void Ensemble::choirOff(int key) {
+  if (choirHost_) { choirHost_->choirKey(choirClient_, key, 0); return; }
+  choirKey(0, key, 0);
+}
+
+// A client's key down (velocity > 0) or up, on the choir it sings in.
+void Ensemble::choirKey(int who, int key, int velocity) {
+  key = std::clamp(key, 0, 127);
+  int& h = choir_->held[key];
+  if (velocity > 0) {
+    h = std::clamp(velocity, 1, 127);
+    choir_->owner[key] = who;
+  } else {
+    if (h == 0 || choir_->owner[key] != who) return;
+    h = 0;
+  }
   choirAssign();
   choirTune();
 }
 
-void Ensemble::choirOff(int key) {
-  int& h = choir_->held[std::clamp(key, 0, 127)];
-  if (h == 0) return;
-  h = 0;
-  choirAssign();
-  choirTune();
+// (-play) The file's choir parts are one choir: this part's keys are sung by `host`'s singers,
+// its own way (its variant: the aahs, the oohs, the pad, the lead voice's few), at its own
+// level; its own singers go home. Not a choir in sections (setChoirRole).
+bool Ensemble::wholeChoir() const { return choir_ && choir_->role < 0 && !choirHost_ && !kids_.empty(); }
+
+void Ensemble::joinChoir(Ensemble& host) {
+  if (&host == this || !wholeChoir() || !host.wholeChoir()) return;
+  choirClient_ = int(host.choir_->clients.size());
+  host.choir_->clients.push_back(ChoirState::Client{choir_->var, kids_[0].gain, 1.0f});
+  choirHost_ = &host;
+  kids_.clear();
+}
+
+// The lead singer's place: the seat nearest the middle of the stage.
+void Ensemble::setLeadFeed(std::function<void(float*, int)> f) {
+  if (!choir_ || kids_.empty() || choir_->seats.empty()) return;
+  const ChoirState::Seat* mid = &choir_->seats[0];
+  for (const ChoirState::Seat& s : choir_->seats)
+    if (std::fabs(s.x) < std::fabs(mid->x)) mid = &s;
+  kids_[0].ens->setFeed(mid->slot, std::move(f));
+}
+
+bool Ensemble::sharedPart() const { return share_ || choirHost_ || (choir_ && choir_->clients.size() > 1); }
+
+void Ensemble::choirFader(float g) {
+  if (choirHost_) choirHost_->choir_->clients[choirClient_].fader = g;
+  else if (choir_ && !choir_->clients.empty()) choir_->clients[0].fader = g;
 }
 
 void Ensemble::setChoirRole(int part, int index, int count) {
@@ -770,20 +858,49 @@ bool Ensemble::choirEar(double dt) {
 }
 
 double Ensemble::choirKey(int key, bool share) const {
+  if (choirHost_) return choirHost_->choirKey(key, share);  // (the choir it sings in)
   const ChoirState& C = *choir_;
   if (!C.heard[key]) return 0;
   return share ? C.share[key] : C.tune[key];
 }
 
 void Ensemble::choirRender(float* left, float* right, int n) {
+  if (choirHost_) {  // (its keys are sung in the host's choir, heard there)
+    std::fill(left, left + n, 0.0f);
+    std::fill(right, right + n, 0.0f);
+    return;
+  }
   if (listens() && choirEar(n / 48000.0)) choirTune();
   Ensemble& kid = *kids_[0].ens;
-  const float g = kids_[0].gain;
+  // (a shared choir: each singer at its client's level, the part's fader its singers' own)
+  const bool shared = choir_->clients.size() > 1;
+  const float g = shared ? 1.0f : kids_[0].gain;
+  // A client that shares the singers has fewer of them than the part alone would (the whole
+  // choir, or its own few): the file's balance was written for the part alone, so its singers
+  // are turned up to make the same power together (PJ_CHOIR_SHARE_COMP, 1; at most 10 dB).
+  if (shared) {
+    static const double kComp = knob("PJ_CHOIR_SHARE_COMP", 1.0);
+    for (size_t c = 0; c < choir_->clients.size(); ++c) {
+      int has = 0;
+      for (const ChoirState::Seat& t : choir_->seats) has += t.want >= 0 && t.wantWho == int(c);
+      const int cap = choir_->clients[c].var->singers;
+      const int alone = cap > 0 ? std::min(cap, int(choir_->seats.size())) : int(choir_->seats.size());
+      if (has > 0) choir_->clients[c].comp = float(std::pow(std::clamp(double(alone) / has, 1.0, 10.0), 0.5 * kComp));
+    }
+  }
   hitL_.resize(n);
   hitR_.resize(n);
   for (int done = 0; done < n;) {
     for (ChoirState::Seat& s : choir_->seats) {
+      if (shared && s.lastWho >= 0)
+        kid.f_[s.slot].sg = choir_->clients[s.lastWho].gain * choir_->clients[s.lastWho].fader * choir_->clients[s.lastWho].comp;
       if (s.want == s.cur || now_ < s.at) continue;
+      if (shared && s.want >= 0) {  // the way of the client whose key it takes
+        const ChoirState::Client& c = choir_->clients[s.wantWho];
+        if (auto* sp = dynamic_cast<SingerPlayer*>(&kid.f_[s.slot].v->player())) sp->setVariant(*c.var);
+        kid.f_[s.slot].sg = c.gain * c.fader * c.comp;
+        s.lastWho = s.wantWho;
+      }
       // To its new key before it leaves the old one: a slur.
       if (s.want >= 0) kid.drive(s.slot, s.want, s.vel, true);
       if (s.cur >= 0) kid.drive(s.slot, s.cur, 0, false);

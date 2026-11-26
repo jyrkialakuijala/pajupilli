@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 namespace {
@@ -30,9 +31,9 @@ Reed::Reed(const Instrument& inst) : Tube(inst), rp_(inst.design->reed) {
   const Design& d = *inst.design;
   {
     const double r = 48000 / fs_;
-    glotA_ = 1 - std::pow(1 - 0.35, r);
-    noiseA_ = 1 - std::pow(1 - 0.55, r);
-    noiseHpA_ = 1 - std::pow(1 - 0.026, r);
+    glotA_ = 1 - fastPow(1 - 0.35, r);
+    noiseA_ = 1 - fastPow(1 - 0.55, r);
+    noiseHpA_ = 1 - fastPow(1 - 0.026, r);
   }
   kNoise_ = knob("PJ_REEDNOISE", 0.02);   // turbulence in the slit, x the flow
   kSweep_ = knob("PJ_REEDSWEEP", 1);      // the reed's swept flow
@@ -68,7 +69,7 @@ Reed::Reed(const Instrument& inst) : Tube(inst), rp_(inst.design->reed) {
 
 void Reed::resetAir() {
   Tube::resetAir();
-  x_ = v_ = dp_ = u_ = pm_ = 0;
+  x_ = v_ = dp_ = u_ = pm_ = ut_ = 0;
   glotLp_ = noiseLp_ = noiseHp_ = 0;
 }
 
@@ -79,6 +80,8 @@ void Reed::settle() {
   cur_.glottis = target_.glottis;
   cur_.reed = target_.reed;  // the lips on the reed
   cur_.reedDamp = target_.reedDamp;
+  cur_.tract = target_.tract;
+  cur_.tractHz = target_.tractHz;
   cur_.noise = target_.noise;
   cur_.air = target_.air;
 }
@@ -92,12 +95,14 @@ void Reed::controlStep() {
   glide(cur_.reedDamp, target_.reedDamp);
   glide(cur_.noise, target_.noise);
   glide(cur_.air, target_.air);
+  cur_.tract += (1 - std::exp(-blockDt / 0.004)) * (std::clamp(target_.tract, 0.0, 1.0) - cur_.tract);
+  cur_.tractHz *= std::exp((1 - std::exp(-blockDt / 0.004)) * std::log(std::max(target_.tractHz, 50.0) / std::max(cur_.tractHz, 50.0)));
   cur_.glottis += (1 - std::exp(-blockDt / 0.0005)) * (target_.glottis - cur_.glottis);
   tongue_ += (1 - std::exp(-blockDt / 0.001)) * (target_.tongue - tongue_);
   // The lips: more force closes the reed (smaller rest opening) and stiffens
   // and damps it; the tongue on the reed damps it further.
   const double lip = std::clamp(cur_.reed, 0.2, 3.0);
-  H_ = rp_.h0 * std::pow(lip, -kLipH_);
+  H_ = rp_.h0 * fastPow(lip, -kLipH_);
   const double fr = rp_.fr * kFr_;
   const double wr = 2 * M_PI * fr * std::pow(lip, 0.25);
   const double mu = rp_.k / (2 * M_PI * fr) / (2 * M_PI * fr);  // mass per area (kg/m^2)
@@ -183,7 +188,13 @@ float Reed::sample() {
   const double vg = gIn * (cur_.lung - pm_) / ag;
   glotLp_ += glotA_ * (whiteNoise() - glotLp_);
   const double hiss = kGlotNoise_ * 0.5 * kRho * vg * vg * glotLp_;
-  pm_ = (cm / dt * pm_ + gIn * (cur_.lung + hiss) - u_) / (cm / dt + gIn);
+  // The vowel (Embouchure::tract; as src/horn.cc): the mouth tuned by the tongue.
+  static const double kTractQ = knob("PJ_TRACTQ", 6);
+  const double w = cur_.tract;
+  const double wt = 2 * M_PI * std::min(cur_.tractHz, 0.12 * fs_);
+  const double mt = 1 / (wt * wt * cm), rt = std::sqrt(mt / cm) / kTractQ;
+  ut_ = (ut_ + dt / mt * (cur_.lung + hiss - pm_)) / (1 + dt * rt / mt);
+  pm_ = (cm / dt * pm_ + (1 - w) * gIn * (cur_.lung + hiss) + w * ut_ - u_) / (cm / dt + (1 - w) * gIn);
   // --- The bore, then the mouthpiece cell with the reed flow (trapezoidal).
   float pOld, jIn;
   stepBore(&pOld, &jIn);
@@ -200,7 +211,7 @@ float Reed::sample() {
     if (x_ > xc) {
       const double open = std::max(0.0, (H_ - x_) / (H_ - xc + 1e-12));
       sweep *= open;
-      width *= std::pow(open, meet_);
+      width *= fastPow(open, meet_);
     }
   }
   const double ur = sweep * v_;

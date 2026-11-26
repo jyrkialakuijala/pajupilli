@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -30,7 +31,7 @@ FreeReedBuild harmonicaReed(double hz) {
   b.plate = 1.05e-3;
   b.width = std::min(b.width, 2.8e-3);
   b.cell = 0.35e-6 * b.len / 13e-3;
-  b.closeP = 2600 * std::pow(hz / 262, 0.17);
+  b.closeP = 2600 * fastPow(hz / 262, 0.17);
   return b;
 }
 
@@ -267,7 +268,7 @@ HarmonicaPlayer::HarmonicaPlayer(HarmonicaModel& m) : Performer(m), m_(m) {}
 // chokes, and the player feels it and holds back.
 double HarmonicaPlayer::pressure(int vel) const {
   const double v = std::clamp(vel / 127.0 + breathCtl_, 0.0, 1.0);
-  return 300 * std::pow(9.0, v);
+  return 300 * fastPow(9.0, v);
 }
 
 void HarmonicaPlayer::decide(bool attack) {

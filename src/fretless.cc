@@ -9,6 +9,7 @@
 #include "band.h"
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -369,8 +370,8 @@ void FretlessBassPlayer::start(size_t k) {
   // to 15-25 dB down at 0.2-0.4 s). A bright, snapping stroke leaves the board nothing to add.
   finger_ = sinceNote_ < 0.4 ? 1 - finger_ : 0;
   const int finger = finger_;
-  double depth = (0.4e-3 + 4.6e-3 * std::pow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (finger ? 1.06 : 1.0) * (0.93 + 0.14 * ur());
-  const double from = std::clamp(place_ * std::pow(2.0, 1 - brightness_) * (1.05 - 0.15 * v) + (finger ? 0.006 : 0.0) + 0.008 * (ur() - 0.5), 0.04, 0.3);
+  double depth = (0.4e-3 + 4.6e-3 * fastPow(v, 1.4)) * (0.7 + 0.6 * std::clamp(dyn_, 0.0, 1.0)) * (finger ? 1.06 : 1.0) * (0.93 + 0.14 * ur());
+  const double from = std::clamp(place_ * std::exp2(1 - brightness_) * (1.05 - 0.15 * v) + (finger ? 0.006 : 0.0) + 0.008 * (ur() - 0.5), 0.04, 0.3);
   const double angle = angle_ - 0.1 + 0.2 * ur();
   if (hn) {
     // A natural harmonic: the fingertip on the node from the stroke to 40-60 ms after; dug in harder.

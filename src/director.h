@@ -62,6 +62,7 @@ struct DirInput {
   bool minor = false;
   bool ridden[16] = {};  // the channel has its own expression (CC 11, 1, 2 or pressure)
   bool wind[16] = {};    // the channel is a wind player's (a flute, a reed, a brass: it speaks and breathes)
+  bool pluck[16] = {};   // ... a harpsichord's (a plucked keyboard: its expression is time, not velocity)
   bool flute[16] = {};   // ... a flute's (a transverse flute, a recorder, a pan pipe: its high notes blown hard)
 };
 

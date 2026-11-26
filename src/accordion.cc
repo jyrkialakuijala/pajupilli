@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -331,7 +332,7 @@ AccordionPlayer::AccordionPlayer(AccordionModel& m)
 // just speak) to ~2.2 kPa fortissimo [design; research/free_reeds.md §2.3].
 double AccordionPlayer::pressure(int velocity) const {
   const double v = std::clamp(velocity / 127.0 + breathCtl_, 0.0, 1.2);
-  return 220 * std::pow(10.0, v);
+  return 220 * fastPow(10.0, v);
 }
 
 void AccordionPlayer::noteOn(int midi, int velocity) {

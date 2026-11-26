@@ -5,6 +5,7 @@
 
 #include "knob.h"
 #include "uprightboard_data.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -29,14 +30,14 @@ PianoDesign uprightDesign() {
     s.strings = key <= 8 ? 1 : key <= kWound ? 2 : 3;
     if (key <= kWound) {  // copper-wound: the tension chosen, the winding the mass
       const double t = (key - 1) / double(kWound - 1);
-      s.len = 1.19 * std::pow(0.98 / 1.19, t);
+      s.len = 1.19 * fastPow(0.98 / 1.19, t);
       s.tension = lerp(1100, 850, t);
       s.mu = s.tension / ((2 * s.len * f) * (2 * s.len * f));
       s.B = key <= 13 ? std::exp(lerp(std::log(kB0), std::log(kBmid), (key - 1) / 12.0))
                       : std::exp(lerp(std::log(kBmid), std::log(kB1), (key - 13) / double(kWound - 13)));
     } else if (key < 52) {  // plain, 1.10 mm at C3 thinning as the grand's; shorter than the grand's
       const double dia = lerp(1.10e-3, 0.775e-3, (key - 28) / 60.0);
-      s.len = 1.03 * std::pow(gLen52 / 1.03, (key - 28) / 24.0);
+      s.len = 1.03 * fastPow(gLen52 / 1.03, (key - 28) / 24.0);
       s.mu = kRho * M_PI * dia * dia / 4;
       s.tension = s.mu * (2 * s.len * f) * (2 * s.len * f);
       s.B = M_PI * M_PI * M_PI * kE * dia * dia * dia * dia / (256 * s.mu * f * f * s.len * s.len * s.len * s.len);

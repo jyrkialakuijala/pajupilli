@@ -38,6 +38,14 @@ int Ensemble::windEar(const Instrument& in) {
   // (The lips and the reeds blown: the free reeds are organs' family, synth brass a circuit.)
   if (in.lip() && fam == kBandBrass) return kBandBrass;
   if (in.reed() && (fam == kBandReed || fam == kBandClarinet)) return fam;
+  // (The bowed strings, a stopping finger: the violin, the viola, the cello, alone or in the
+  // string ensembles; src/bassinst.cc BowPlayer::render. Not the double bass, the band's ground.)
+  static const bool kStrings = knob("PJ_STRING_EAR", 1) > 0;
+  if (kStrings && fam == kBandStrings &&
+      (std::strcmp(in.name, "violin") == 0 || std::strcmp(in.name, "viola") == 0 || std::strcmp(in.name, "cello") == 0 ||
+       std::strcmp(in.name, "strings") == 0 || std::strcmp(in.name, "slow-strings") == 0 ||
+       std::strcmp(in.name, "tremolo-strings") == 0 || std::strcmp(in.name, "pizzicato-strings") == 0))
+    return kBandStrings;
   return -1;
 }
 
@@ -52,12 +60,15 @@ void Ensemble::setBand(const SoundingSet* band, int self, int fam) {
   rollFeed_ = fam >= 0 && !brass_ && !f_.empty() && f_[0].v->instrument().lip();
   if (brass_)  // (the brass section's players: its seats listen)
     for (Section& k : kids_) k.ens->setBand(band, self, fam);
+  if (strings_) stringsBand(band, self, fam);  // (the string ensemble's players, src/stringsect.cc)
 }
 
 // The band's pull on the voice in `slot` playing `note` (c, before the weight's share), and its
 // weight: its own template against the others' (bandPull), in the order of hearing.
 double Ensemble::bandHear(int slot, int note, double* weight, double* earShare) const {
-  (void)slot;
+  // (a shared string orchestra's player: the part whose key it plays, src/stringsect.cc)
+  // (the choir asks for its singers, which are not this ensemble's own voices: no slot of ours)
+  const int self = slot >= 0 && slot < int(f_.size()) && f_[slot].earSelf >= -1 ? f_[slot].earSelf : self_;
   const double f0 = 440 * std::exp2((note - 69) / 12.0);
   double pl[16], pw[16], pk[16];
   int np = 0;
@@ -68,7 +79,7 @@ double Ensemble::bandHear(int slot, int note, double* weight, double* earShare) 
     ++np;
   }
   BandListener me;
-  me.self = self_;
+  me.self = self;
   me.f0 = f0;
   me.pl = pl;
   me.pw = pw;
@@ -77,7 +88,7 @@ double Ensemble::bandHear(int slot, int note, double* weight, double* earShare) 
   me.pitch = note;
   // (Its note's onset; a note of its own the band does not have, a voicing's added note in the
   // brass section: as new, hearing every note before it.)
-  const BandNote* own = band_->find(self_, note);
+  const BandNote* own = band_->find(self, note);
   me.at = own ? own->at : band_->now();
   if (own) me.pitch = own->pitch;
   double we = 0;

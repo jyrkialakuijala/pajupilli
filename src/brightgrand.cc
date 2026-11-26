@@ -5,6 +5,7 @@
 
 #include "knob.h"
 #include "brightboard_data.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -22,11 +23,14 @@ PianoDesign brightGrandDesign() {
   static const double kA0 = knob("PJ_BRIGHTGRAND_A0", 1.66), kE2 = knob("PJ_BRIGHTGRAND_E2", 1.16);
   static const double kF2 = knob("PJ_BRIGHTGRAND_F2", 0.76);       // the lowest plain string, x the grand's length
   static const double kGauge = knob("PJ_BRIGHTGRAND_GAUGE", 0.96);  // its wire, x the grand's diameter (to 1 at C5)
-  static const double kHard = knob("PJ_BRIGHTGRAND_HARD", 2.0);    // the felt's stiffness at C4, x the grand's
-  static const double kHardTop = knob("PJ_BRIGHTGRAND_HARDTOP", 2.5);  // ... from C6 up
-  // (the felt's loose outer layer half the grand's: pressed dense, only its shoulders needled; it
-  // is what keeps a middling blow dark, research/piano.md 11: the brightness's main lever here)
-  static const double kNap = knob("PJ_BRIGHTGRAND_NAP", 0.5);      // the nap, x the grand's thickness
+  // (The felt 2 / 2.5 x the grand's and its loose outer layer half as thick made every blow bright,
+  // the soft ones too: one colour at any touch, a toy's. A soft note is to be soft here as well,
+  // the brightness a shade over the grand's that comes with the blow: research/bright_grand.md 11.)
+  static const double kHard = knob("PJ_BRIGHTGRAND_HARD", 1.3);    // the felt's stiffness at C4, x the grand's
+  static const double kHardTop = knob("PJ_BRIGHTGRAND_HARDTOP", 1.5);  // ... from C6 up
+  // (the felt's loose outer layer a little thinner than the grand's: pressed denser; it is what
+  // keeps a middling blow dark, research/piano.md 11: the brightness's main lever here)
+  static const double kNap = knob("PJ_BRIGHTGRAND_NAP", 0.85);     // the nap, x the grand's thickness
   static const double kNapK = knob("PJ_BRIGHTGRAND_NAPK", 1.0);    // ... and its stiffness, x the grand's
   static const double kColour = knob("PJ_BRIGHTGRAND_COLOUR", 0.0);  // the felt's hardening under a hard blow, + the grand's
   static const double kMass = knob("PJ_BRIGHTGRAND_MASS", 1.0);     // the hammers' mass, x the grand's
@@ -34,14 +38,14 @@ PianoDesign brightGrandDesign() {
     PianoKey& s = d.key[key - 1];
     const double f = 440 * std::exp2((key - 49) / 12.0);
     if (key <= 20) {  // copper-wound: the grand's core and tension on a shorter string: B ~ 1 / L^2
-      const double len = kA0 * std::pow(kE2 / kA0, (key - 1) / 19.0);
+      const double len = kA0 * fastPow(kE2 / kA0, (key - 1) / 19.0);
       s.B *= (s.len / len) * (s.len / len);
       s.len = len;
       s.mu = s.tension / ((2 * s.len * f) * (2 * s.len * f));
     } else if (key < 52) {  // plain: the grand's wire (a little thinner low down), shorter: B ~ d^2 / L^4
       const double t = (key - 21) / 31.0;
       const double dia = lerp(1.2e-3, 0.775e-3, (key - 21) / 67.0) * lerp(kGauge, 1.0, t);
-      s.len *= kF2 * std::pow(1 / kF2, t);
+      s.len *= kF2 * fastPow(1 / kF2, t);
       s.mu = kRho * M_PI * dia * dia / 4;
       s.tension = s.mu * (2 * s.len * f) * (2 * s.len * f);
       s.B = M_PI * M_PI * M_PI * kE * dia * dia * dia * dia / (256 * s.mu * f * f * s.len * s.len * s.len * s.len);
@@ -60,7 +64,7 @@ PianoDesign brightGrandDesign() {
   // grand's against middle C and the hard treble hammers 3-5 dB over: measured as played in the
   // room, A-weighted, velocities 48, 80 and 112, smoothed over nine keys).
   static const double kEven = knob("PJ_BRIGHTGRAND_EVEN", 1);
-  static constexpr double kEvenDb[16] = {-3.6, -1.1, 2.3, 3.8, 3.2, 3.0, 0.8, -1.6, -2.7, -1.3, -3.5, -5.0, -5.4, -3.2, -2.0, -2.7};
+  static constexpr double kEvenDb[16] = {-4.5, -2.2, 0.1, 2.1, 3.3, 4.5, 3.4, 0.8, -1.7, -1.5, -5.0, -4.9, -2.9, -1.3, -1.5, -2.2};  // (measured again with the softer felt, 2026-11-25)
   for (int key = 0; key < 88; ++key) {
     const int i = std::min(key / 6, 14);
     const double t = std::min((key - 6 * i) / 6.0, 1.0);

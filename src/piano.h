@@ -27,6 +27,8 @@
 //     after its own distance and by its angle.
 #pragma once
 
+#include <cstdio>
+
 #include <cstdint>
 #include <vector>
 
@@ -55,6 +57,15 @@ struct PianoKey {
   // its tip and flies: that let-go is the sound. The string leaves upward
   // and, by the plectrum's slope, sideways (pluckSide of the upward force).
   double pluckK = 0, pluckLimit = 0, pluckSide = 0;
+  // The plectrum's tip, rounded and thin: its force grows as the square of its push over the
+  // first pluckSoft (m), not at its full stiffness from the first touch (0: a sharp corner).
+  double pluckSoft = 0;
+  // The quill's snap off the string: at the release, the modes above ~1.5 kHz (fully from 5 kHz) are
+  // given pluckSnap samples' worth of the release force at once: the sharp corner the string
+  // leaves the tip with, a bright, short-lived click (most in the long bass strings; 0: none).
+  double pluckSnap = 0;
+  double pluckSnapLo = 1500, pluckSnapHi = 5000;  // ... the modes it kicks: none below, all above (Hz)
+  double pluckSnapTilt = 0;  // ... and more of the highest: x (1 + tilt) from 5 x pluckSnapHi up, rising from twice pluckSnapHi
   double top = 0;                  // this key's modes up to here (Hz; 0: the design's rule by key number)
   double loss = 0, b2 = 0, b3 = 0; // the wire's own loss: loss + b2 f + b3 f^2 (1/s)
   bool hasDamper = true;
@@ -117,6 +128,7 @@ struct PianoDesign {
   // bridge's share of it.
   double tilt = 0.4, sideTuneCents = 1.0, sideLoad = 0.4;
   double top = 10000, topTreble = 20000;  // modes up to here (Hz): the bass, from about key 40 up
+  double symTop = 0;  // (Hz: a string not played, ringing in sympathy, has its modes only to here; 0: all of them)
   double hammerWidth = 0.010;             // the felt's width on the string (m)
   // The concert grand's own voicing (designFor sets these; what is built on the grand keeps
   // the plain values): the treble bridge's admittance above ~1 kHz at the top key, the top
@@ -214,6 +226,9 @@ class Piano {
   // design's damperFall, each time a little its own).
   // `loud`: x its landing's push (the pedal let go: PianoDesign::pedalUp).
   void damper(int key, bool down, double speed = -1, double loud = 1);
+  // (a key whose strings do not ring in sympathy: a harpsichord's row switched off, its dampers
+  // taken as holding. Not computed until it is itself played.)
+  void sympathetic(int key, bool on) { key_[key].noSym = !on; }
   // The sustain pedal's trapwork: the lift rail rising (down: the pedal pressed) or falling back
   // onto its stop at `speed` (m/s); its knock reaches the board. (The dampers are the player's.)
   void pedal(bool down, double speed);
@@ -258,6 +273,11 @@ class Piano {
   struct Str {
     int key, off, n;      // its modes: [off, off + n) of the arrays
     int live = 0;         // (those under the top: the rest, padding to 16, stay at rest)
+    // (A string nobody plays rings only in sympathy: computed to the design's symTop alone, sym
+    // modes; use: those computed now, in whole 16s. Struck or plucked it has them all, until its
+    // damper has brought the ones above down 40 dB from their peak: hiPeak.)
+    int sym = 0, use = 0;
+    float hiPeak = 0;
     float tanH;           // the hammer meets it a little off the vertical
     float comply;         // its displacement under the hammer per unit force, one sample on (m/N)
     float dPrev = 0;      // the felt's compression at the last sample (m)
@@ -265,6 +285,7 @@ class Piano {
     float tack = 0;           // (... its metal's sharp knock: peak force per m/s of the hammer (N s/m))
     float tickAmp = 0;        // (... the knock under way: its peak (N), samples left)
     float dampR = 0;          // (the damper's felt, its friction on this string pressed in (N s/m))
+    float dG[4][4] = {};      // (... a push at quarter r of the felt into the speed read at quarter q, per N)
     int tickLeft = 0, tickN = 1;
     bool active = false;
     // Its stretching (research/piano.md 3): nl lengthwise modes, each as the transverse ones
@@ -294,11 +315,15 @@ class Piano {
     float rin[kMaxStr * kRear] = {}, rout[kMaxStr * kRear] = {}, rdrive[kMaxStr * kRear] = {};
     float lenGain = 1;    // (the long string's sound at the bridge, x; what comes back from the bridge / it)
     float inBack = 1;     // (under its damper the bridge's motion reaches the strings in full: x this)
+    bool lin = false;     // (its damper seated on barely moving strings: taken as linear, Piano::linearWatch)
+    int linQuiet = 0;     // (samples the swing at the felt has been small)
+    float invLenGain = 1, grip = 0;  // (1 / lenGain; the damper's grip on the up-and-down swing, per engage)
     float nap = 0, napK = 0, napPack = 0;  // the felt's nap: thickness (m), stiffness (N/m a string), packing
-    float pluckK = 0, pluckLimit = 0, pluckSide = 0;  // a plectrum in the hammer's place
+    float pluckK = 0, pluckLimit = 0, pluckSide = 0, pluckSoft = 0, pluckSnap = 0, pluckSnapLo = 1500, pluckSnapHi = 5000, pluckSnapTilt = 0;  // a plectrum in the hammer's place
     float eta = 0, vh = 0, force = 0;  // its place (m, from the strings' rest) and speed
     bool hammerOn = false;
     bool hasDamper = true, damperDown = true;
+    bool noSym = false;
     float engage = 1;     // the damper's felt: 0 lifted .. 1 resting on the strings
     float acc = 0;        // how far the bridge moved at its strings in the last sample (m)
     bool active = false;
@@ -312,6 +337,8 @@ class Piano {
     bool seated = true;  // (the strings' rest is where its weight holds them: their motion counted from there)
   };
   void damperContact(Key& k);
+  void feltSums(const Str& s, float* uq, float* udq) const;
+  void linearWatch(Key& k);
   void build();
   void hammer(Key& k);
   void bloomStep(Key& k);
@@ -355,9 +382,13 @@ class Piano {
   float *dk_;             // a force on the damper's felt into the mode's velocity (x dt / mass)
   // The damper's felt as kDPts contacts along its length (each a quarter of it): per contact,
   // the mode's shape there (the mean over its quarter), / omega (the place from x), and x dt / mass.
-  static constexpr int kDPts = 4;
+  static constexpr int kDPts = 4;  // (Str::dG and damperContact are written for four)
   float *dsh_[kDPts], *dshw_[kDPts], *dkp_[kDPts];
   bool dContact_ = false;
+  float dLin_ = 0;        // (the swing at a seated felt, of what would lift it, under which it is taken as linear)
+  int dLinN_ = 0;
+  FILE* dump_ = nullptr;  // (a diagnostic: one key's force on the bridge written out)
+  int dumpKey_ = -1;
   float dFeltK_ = 300;    // the damper felt's stiffness (N/m a string: thick, soft wool, the strings sunk ~1 mm into it)
   float dHold_ = 0;       // the drag on its head's motion (N s/m: the guide rail's bushings, the underlever)
   float *nw_;             // n / omega: the mode's x to its slope's share (n a_n, m)

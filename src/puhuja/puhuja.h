@@ -1,0 +1,844 @@
+// puhuja: a small streaming formant speech synthesizer.
+//
+// Source-filter model with an aerodynamic source:
+//
+//   lungs --> glottis (area Ag) --> mouth cavity (pressure Po) --> constriction
+//                                                   |             (area Ac)
+//                                                   +--> nasal port (area An)
+//
+// Each phoneme sets targets for the three areas, which move smoothly like
+// articulators. The mouth pressure follows from the airflow in through the
+// glottis and out through the mouth and nose, and drives everything else:
+//
+//   voicing: triangle wave, its strength set by the pressure drop across a
+//            nearly closed glottis; pitch rises with that drop. The
+//            vibration builds up over a few cycles whenever it starts.
+//   breath noise at the glottis (h, aspiration): from the glottal opening
+//   noise at the constriction (fricatives, bursts): from mouth pressure and
+//            the constriction opening, shaped per place of articulation
+//   release transient: the change in airflow out of the mouth
+//
+// So at p t k the voice stops because pressure builds behind the closure,
+// the burst is the trapped air escaping, and voicing returns once the
+// pressure has fallen and the glottis has closed again.
+//
+//   voicing + breath noise --> nasal pole/zero --> F5..F1 --> radiation --+--> out
+//   constriction noise (labials: into the tract) -------------------------+
+//
+// The mixed output goes through a 250 Hz high-pass (-6 dB/octave).
+//
+// Slow parameters: each phoneme places keyframes (parameter targets) on a
+// timeline. Between keyframes the formant frequencies, bandwidths, nasal
+// zero, voicing amplitude, trill depth and pitch follow Catmull-Rom splines,
+// passing exactly through each target. Resonator coefficients are recomputed
+// every sample.
+//
+// Input: Finnish spelling or IPA, as UTF-8 (see pushText). The stream holds
+// one phoneme back (to merge "kk", "aa", "ng" and to know which vowel a
+// plosive releases into), and a spline segment needs one keyframe of
+// lookahead. Call finish() at end of input.
+#pragma once
+
+#include <limits>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "filters.h"
+#include "larynx.h"
+#include "line.h"
+#include "tract.h"
+
+namespace puhuja {
+
+class ProsodyGuide;  // prosody.h
+
+enum class Ph : uint8_t {
+  // Vowels: Finnish (and shared), then the English-only ones
+  // ɪ ɛ ʊ ɔ ʌ ɑ ɒ ɜ.
+  A, E, I, O, U, Y, AE, OE, Schwa,
+  IH, EH, UH, AO, AH, AA, OH, ER,
+  // Plosives, then the affricates ʧ ʤ (a plosive released into a fricative).
+  P, T, K, B, D, G, CH, JH,
+  // Nasals.
+  M, N, NG,
+  // Liquids and glides (RR: English approximant ɹ; R is the trilled r).
+  L, R, J, V, RR, W,
+  // Fricatives (Z, TH, DH, VV: English z θ ð v; V above is the Finnish
+  // approximant ʋ).
+  S, SH, ZH, F, Z, TH, DH, VV, H,
+  // Silence.
+  Stop,
+  Count
+};
+
+// Indices into the parameter vector that the splines interpolate.
+enum Param {
+  kF1, kF2, kF3,  // formant frequencies (Hz)
+  kB1, kB2, kB3,  // formant bandwidths (Hz)
+  kFNZ,           // nasal zero (Hz); equal to the nasal pole when oral
+  kAV,            // voicing amplitude
+  kTrill,         // depth of the r trill amplitude modulation
+  kF0Mul,         // pitch relative to the base pitch
+  kNumParams
+};
+
+struct Params {
+  float v[kNumParams] = {500, 1500, 2500, 80, 100, 150, 270, 1, 0, 1};
+  float& operator[](int i) { return v[i]; }
+  float operator[](int i) const { return v[i]; }
+};
+
+struct Keyframe {
+  Params p;
+  double t;  // time in samples
+  bool vowel = false;  // a vowel's target
+  bool edge = false;   // a held target's edge: not a formant point (see splineAt)
+  float f0Mod = 1;     // micro-intonation on top of the pitch line
+  Ph ph = Ph::Stop;    // the phoneme it belongs to (the sentence planner's demands)
+};
+
+// Articulatory event: starts movements of the airway openings at time t,
+// and/or changes the constriction noise.
+struct Event {
+  double t;  // time in samples
+  float planAir = 0;  // air this sound was planned to use (cm^3), for the drain scale
+  // Area targets (cm^2), each with its movement time (ms). < 0: no change.
+  float ac = -1, ag = -1, an = -1;
+  float acMs = 0, agMs = 0, anMs = 0;
+  float acLog = 0;  // SH agent30: the ac glide's geometric share (0: the raised-cosine path in area)
+  float shFall = -1;  // SH agent30: >= 0: a voiceless s / ʃ -> vowel offset window starts here (its class: 1 s, 1.25 ʃ)
+  // Constriction noise: spectrum, strength, and the share of its energy
+  // that goes through the vocal tract (the cavity behind the constriction
+  // resonating); the rest is added in parallel (the front cavity).
+  bool setNoise = false;
+  FricShape shape{};
+  float noiseGain = 0;
+  float noiseTract = 0;
+  float noiseTractGain = 1;  // gain of the tract part
+  float noisePost = 1;  // level after the turbulence ceiling (English per-phoneme level)
+  // Strength of the release transient (pop) from now on; < 0: no change.
+  float pop = -1;
+  // Relative lung pressure (phrase endings ease off), reached over pressMs;
+  // < 0: no change.
+  float press = -1, pressMs = 0;
+  float aspGain = -1;  // breath-noise strength from now on (< 0: unchanged)
+  float lineAspMul = -1;  // the glottal noise gain factor on the line (a stop's puff; < 0: unchanged)
+  float liqShelf = -1;  // LIQ agent31: the source shelf's extra dB share from now on (an ɹ / l; < 0: unchanged)
+  float vqcs = -1;  // VQCS agent33: the connected-speech voice quality target from now on (0 / 1; < 0: unchanged)
+  float lineGlotFc = -1;  // the glottal noise band's corner x this on the line (an h's breath colour, LINE_H_GFC; < 0: unchanged)
+  float lineHBreath = -1;  // an h's unthresholded breath gain on the line (x LINE_ASP; LINE_H_BREATH; < 0: unchanged)
+  float lineExpandLp = -2;  // the voiced closure's expansion low-pass (Hz; -1: LINE_EXPAND_LP again; < -1: unchanged; BDG-Z agent20)
+  float lineHumpNorm = -2;  // the hump's sampling norm power on the line (-1: LINE_HUMP_NORM again; < -1: unchanged; P agent 10)
+  float linePuffLpr = -1;  // the glottal noise low-pass ratio on the line during a stop's puff (0: off; < 0: unchanged)
+  float lineFricFade = -1;  // the frication source's fade-out areas x this (voiced fricatives; < 0: unchanged)
+  float lineFricReBoth = -1;  // > 0: the jet's Reynolds number low-passed both ways, 0: only its rise (LINE_Z_RE_BOTH; < 0: unchanged)
+  float lineFricReSmooth = -1;  // the frication jet's Re pulled this share toward its pitch-period mean (LINE_V_RE_SMOOTH; < 0: unchanged)
+  float lineFricReMul = -1;  // the frication jet's Reynolds number x this (LINE_Z_RE_SCALE; < 0: unchanged)
+  float lineFricMul = -1;  // the slit noise gain factor on the line (v; < 0: unchanged)
+  float lineLevel = -1;  // the prosodic level as a lung-pressure factor on the line (< 0: unchanged)
+  float lineSqueeze = -1;  // the sealed cavity squeezed: this inflow (cm^3/s) behind the closure (0: none; < 0: unchanged)
+  float lineRaise = -1;  // the larynx raised by this many cm from this token on (< 0: unchanged)
+  float lineSoft = -1, lineExtra = -1;  // a voiced closure's softness and extra length on the line (< 0: unchanged)
+  float lineExpand = -1;  // a voiced closure's expansion flow on the line (cm^3/s; 0: the shared knobs; < 0: unchanged)
+  float lineSink = -1;  // a sink flow through an open (fricative) tract on the line, the cavity walls yielding (cm^3/s; 0: none; < 0: unchanged)
+  float lineHw = -1, lineLip = -1;  // the constriction's half-width and lip cap on the line (< 0: unchanged / none)
+  float lineAspHp = -1;  // the aspiration's high-pass on the line (Hz; 0: LINE_ASP_HP; < 0: unchanged)
+  float lineNoiseLp = -1;  // the turbulence noise's low-pass on the line (Hz; 0: the voice's default; < 0: unchanged; BLEND agent28)
+  float gapOn = -1;  // > 0: a vowel -> voiceless fricative onset envelope starts here (GAP agent29; its class: 1 s ʃ, 2 f θ)
+  double gapAt = 0;  // ... the fricative's start (samples), the envelope's time origin
+  float lineFricLpr = -1;  // the frication band's low-pass ratio on the line (0: LINE_NOISE_LPR; < 0: unchanged)
+  float lineJetD = -1;  // the frication jet's thickness for its noise band on the line (cm; 0: slit area / width; < 0: unchanged)
+  float lineJetMix = 1;  // ... how much of that fixed thickness the jet uses (1: fixed; 0: the slit's height; between: geometric blend), applied with lineJetD
+  float lineSlitScale = 1;  // ... x the slit's height when it is followed, applied with lineJetD
+  float lineJetSmoothMs = -1;  // ... the noise corner's smoothing for this jet (ms; < 0: the global LINE_NOISE_ST_SMOOTH_F_MS), applied with lineJetD
+  float lineJetFcMin = 0, lineJetFcMax = 0;  // ... and the corner's range for this jet (Hz; 0: the global 200 / LINE_NOISE_FC_MAX), applied with lineJetD
+  float lineX = -1;    // the constriction's place for the line tract (share of its length; < 0: keep)
+  bool lineXClosure = false;  // the place is a closure's (a stop, a nasal): LINE_X_SNAP_CLOSURES
+  bool lineXShut = false;  // an unburst release into a fricative: the closure moves to the new place while shut
+  bool aspBurst = false;  // an aspirated release: the puff's noise starts
+  float creak = -1;       // creaky voice from now on (0..1; < 0: unchanged)
+  // NASAL agent32: the nasal walls' radiation scale / the nasal HF loss bandwidth from now on; lineNasGeom 1: the
+  // connected-speech nasal areas (NAS_*_A_CS, NAS_END_X_CS), 0: the base ones (< 0: unchanged)
+  float lineNasRad = -1, lineNasHf = -1, lineNasGeom = -1;
+  float lineNasSin = -1;  // NASAL2 agent33: 1 the connected-speech sinus scales (NAS_SIN*_CS), 0 the base ones
+  float lineNasK = -1;  // NASAL2 agent33: the velum's coupling point (share of the oral tract; 2: back to the base one; < 0: unchanged)
+  float endQ = -1, endQMs = 0;  // round AC CREAK agent31: the phrase-end voice quality envelope target (0..1) and its ramp (ms); < 0: unchanged
+  float noiseFadeMs = -1;  // with setNoise: fade-in from silence (< 0: the default)
+  // Cavity compliance multiplier (active expansion during voiced closures),
+  // reached over expandMs; < 0: no change.
+  float expand = -1, expandMs = 0;
+  // Breathe in over this many ms (lungs refill, inhaling noise); 0: no.
+  float inhaleMs = 0;
+  bool inhaleSnatched = false;  // the quick between-words breath (see breathPoint)
+  float aspBurstGain = 1;        // the aspiration puff's strength (a stressed word's initial p t k)
+  // Speech level target: 0 at a pause (fades out exponentially), 1 when
+  // speaking; < 0: no change.
+  float speech = -1;
+  float speechAttackMs = -1;  // with speech: its rise time (< 0: the default)
+};
+
+// How the formants move between the phonemes' targets: a Catmull-Rom spline
+// through the keyframes (each target reached on time), or a critically
+// damped follower (a spring and damper chasing the current target, as
+// articulators do: short sounds undershoot, nothing overshoots).
+// Spline: the keyframe spline as it is. Damped: through a critically damped
+// follower per formant. Planned: a sentence-level iterative planner (see
+// planSentence) replaces the formant and pitch paths by optimised ones.
+// The vocal tract: the formant cascade (filters.h resonators on the voice
+// source), or the transmission line (line.h; Jyrki 2026-11-01, the fresh
+// start): the folds' flow runs through 64 sections of the airway shaped by
+// the fitted vowel shapes and the consonant's constriction.
+enum class Tract { Formant, Line };
+
+enum class FormantMotion { Spline, Damped, Planned };
+
+// Speaker presets. Male is calibrated to a Finnish male reader (CSS10);
+// female to the female speakers of FLEURS Finnish.
+enum class VoicePreset { Male, Female };
+
+struct Voice {
+  float f0;              // base pitch (Hz)
+  float formant[3];      // scale of F1, F2, F3 (shorter vocal tract: higher)
+  float highFormants;    // scale of F4, F5 and the higher tract resonances
+  float rate;            // duration multiplier (< 1: faster)
+  float doubledVowel;    // length of "aa" relative to "a"
+  float breathiness;     // multiplier of the breath noise in voicing
+  float gain;            // output level
+  float treble;          // output treble shelf above 2.5 kHz (dB)
+  float air;             // multiplier of the high breath noise (above ~4 kHz)
+  float bw[3];           // scale of the F1-F3 bandwidths
+  float noiseScale = 1;  // frequency scale of the fricative noise shapes (shorter front cavity)
+  float shGain = 1;      // ʃ ʒ noise multiplier
+  float glottalGap = 0;  // posterior glottal gap kept open while voicing (cm^2)
+  float f4 = 3500, f5 = 4500;  // F4, F5 (Hz) at a neutral F3 and the base pitch
+  float microGain = 3;         // the folds' slow micro-variation (kMicro2Gain scale)
+  float cycleJitter = 1, cycleShimmer = 1;  // scale of the per-cycle jitter and shimmer (kCycleJitter, kCycleShimmer)
+  float sourceTiltDb = -2, sourceUpperCutDb = -1.5f, sourceMidLiftDb = 4;  // the physical source's spectral shaping (dB)
+};
+
+class Synth {
+ public:
+  explicit Synth(float sampleRate = 48000, float baseF0 = 0);  // 0: the voice preset's pitch
+
+  void setCarrier(Carrier c);  // (the shaped pulse gets its own treble shelf)
+  void setFormantMotion(FormantMotion m) { motion_ = m; }
+  void setTract(Tract t);
+  // Plans the formant and pitch paths of the keyframes queued since the last
+  // call (one sentence; the English reader calls it at each sentence end).
+  void planSentence();
+
+  // Select a speaker preset (pitch, formant scaling, tempo, breathiness).
+  // Call before pushing text; setBaseF0 afterwards overrides the pitch.
+  void setVoice(VoicePreset preset);
+  void setBaseF0(float f0) { baseF0_ = f0; }
+  // (pajupilli, singing: CHANGES.md 2026-11-25) The folds' pitch controller for this voice: the share of the pitch
+  // error corrected per cycle, and the flow fluctuation (cm^3/s) from which it learns. A singer holds the pitch
+  // asked; a speaker's loose control (PITCH_CONTROL 0.30, kPitchLearnVib 98) does not engage at sung pitches, where
+  // the folds swing less. < 0: the speaker's.
+  void setPitchControl(float share, float learnVib) { pitchControl_ = share; pitchLearnVib_ = learnVib; }
+  // (pajupilli, singing: CHANGES.md 2026-11-25) What the singer knows of the folds' tension by pitch, so a note
+  // starts near its pitch and the controller (the ear) only trims: x[i] multiplies the tension at loHz x 2^(i/12),
+  // between the entries by the pitch's logarithm, the end ones beyond. Empty: nothing known (1).
+  void setTensionMap(float loHz, std::vector<float> x) { tensionLoHz_ = loHz; tensionMap_ = std::move(x); }
+  // ... and the controller's correction right now (1: none), to learn that map from: sing each pitch, read this
+  // once it has settled.
+  float pitchCorrection() const;
+  // (pajupilli, singing: CHANGES.md 2026-11-25) The larynx's place: lowerCm, the whole tract this much longer (a
+  // singer's low larynx); raiseScale x the consonants' larynx rise (LINE_RAISE_*; 0: it stays where it is through
+  // s k g r). 0 and 1: the speaker's.
+  void setLarynx(float lowerCm, float raiseScale) { larynxLow_ = lowerCm; larynxRaiseX_ = raiseScale; }
+  // Kokoro mode: a reference reading's profile guides rhythm, pitch and level (prosody.h); nullptr: puhuja's own.
+  void setProsodyGuide(ProsodyGuide* g) { prosodyGuide_ = g; }
+  // Kokoro mode: the reference's gap after the given input word (1-based as setWord; 0: before the first word), ms; < 0: none.
+  float prosodyPauseMs(int sourceWord) const;
+  float baseF0() const { return baseF0_; }
+
+  // Part of the source that bypasses the formant cascade, relative to the
+  // cascade's low-frequency gain of 1. 0 is a pure cascade; 0.03 keeps the
+  // highs about 35 dB down instead of vanishing.
+  void setLeak(float leak) { leak_ = leak; }
+
+  // Queue one phoneme. wordStart marks the first phoneme of a word
+  // (used for the Finnish-like raised first syllable). Two equal phonemes
+  // in a row ("kk", "aa") become one long phoneme: a doubled vowel is 1.7x
+  // a single one (female voice 1.45x), a doubled consonant 1.4x (plosives:
+  // longer closure); ː makes a sound 1.55x.
+  void push(Ph ph, bool wordStart = false);
+  // The input word number the next pushed phonemes belong to (labels carry it).
+  void setWord(int w) { curWord_ = w; }
+  // (CSW agent32) the words left in the reader's phrase from the next pushed word on (itself included; 0: unknown):
+  // a lookahead for CSW_FIRST (the first word of a phrase of 2+ words counts as connected speech).
+  void setPhraseLeft(int n) { phraseLeft_ = n; }
+
+  // Finnish spelling merges in push(): "ng" -> long ŋ, "nk" -> ŋk, "np" ->
+  // mp, "tʃ"/"dʒ" -> affricates. On by default; the English reader turns
+  // them off since its phonemes are already exact.
+  void setSpellingRules(bool on) { spellingRules_ = on; }
+
+  // Intonation: pitch of the next pushed phoneme (if a vowel), in semitones
+  // relative to the base pitch. Overrides the built-in stress / first-syllable
+  // pitch for that vowel; the English reader sets every vowel this way.
+  // The shared table's formant k (0-2) of a phoneme.
+  static float tableFormant(Ph ph, int k);
+  void setPitch(float semitones) { nextPitch_ = semitones; }
+  // A second pitch for the next vowel, reached at 3/4 of it (a fall
+  // inside a final accented word).
+  void setPitchEnd(float semitones) { nextPitchEnd_ = semitones; }
+  static constexpr float kNoPitch = -1000.0f;
+
+  // Adjust the next pushed phoneme only (language-specific variants of the
+  // shared table): formant targets (0 = keep), duration and level factors.
+  struct Shape {
+    float f1 = 0, f2 = 0, f3 = 0;
+    float length = 1;  // duration multiplier
+    float level = 1;   // voicing (and frication noise) multiplier
+    float prosody = 1;  // the prosodic part of the level alone (arc, accent, stress, function word): the line's lung-pressure factor
+    float ms = 0;      // absolute duration (plosives: closure), 0 = table
+    float wordMs = 0;  // the planned total of the word's tokens (same units; Kokoro mode's word rhythm, 0 unknown)
+    float press = 1;   // vowels: glottal opening multiplier (< 1 pressed, > 1 lax)
+    bool flap = false;  // a d said as a tap (English t/d between vowels)
+    unsigned char dctx = 0;  // a d's context for the line's d knobs (english.cc, D agent9 round J; 0: none)
+    bool tMed = false;  // a t between a vowel and an unstressed vowel of its word (english.cc; TD-MED agent27: LINE_TM_*)
+    unsigned char eyctx = 0;  // eɪ's context bits for the line's eɪ knobs (english.cc, EY agent10 round K): 1 closed
+                              // syllable (a consonant follows in the word), 2 that consonant a nasal, 4 word-initial
+    unsigned char nctx = 0;  // the line's final-n knobs (english.cc, N agent13 round L): 1 an unstressed vowel right before
+                             // its word's final n, 2 that final n; 4 (BDG-Z agent20 round R) an n or m right before
+                             // its word's final d ("band", "fund", "claimed"); 8 (FN-PLACE agent27 round Y) a word-final
+                             // n after a vowel
+    unsigned char erctx = 0;  // a word-initial ER0 before a vowel said ə + ɹ (english.cc EN_ER_INIT / EN_ER_INIT_AH,
+                              // ER-INITIAL agent13 round L): 1 its ə, 2 its ɹ; a word-medial one (EN_ER_MED, ER-UNSTR
+                              // agent25 round W): 3 its first part, 4 its ɹ
+    bool ermStop = false;  // a p t k right before a word-medial ER0 + vowel (english.cc EN_ER_MED, ER-UNSTR agent25 round W)
+    unsigned char ihctx = 0;  // a standalone ɪ's context for the line's ɪ knobs (english.cc, IH-STRESSED agent14 round M):
+                              // 1 stressed, 2 an l next in its word, 4 an n / m next, 8 after l ɹ w, 16 after m n,
+                              // 32 a one-vowel word, 128 a voiced obstruent next (IH-EY agent25); on the l / n / m after
+                              // a stressed ɪ: 64
+    unsigned char owctx = 0;  // oʊ's context for the line's oʊ knobs (english.cc, OW-2 agent26 round X): 1 its o, 2 its
+                              // ʊ; 4 an l next in its word, 8 a vowel next in its word, 16 word-final, 32 unstressed;
+                              // on the vowel right after an oʊ of its word: 64
+    bool bzFinal = false;  // a b d g right before its word's final z ("tubes", "sides", "dogs"; english.cc, BDG-Z agent20
+                           // round R: the line's LINE_BZ_* knobs; not the medial ɪgz of "example")
+    unsigned char gctx = 0;  // the line's initial-g knobs (english.cc, G-INITIAL agent14 round M): 1 a word-initial g
+                             // before a vowel (LINE_GI_*)
+    unsigned char axctx = 0;  // an unstressed ə before a nasal of its word, not word-initial (english.cc, AX-NASAL agent14
+                              // round M): 1 always; 2 it is the word's first vowel after one consonant ("Commands"),
+                              // 4 after t or d ("Sutton", "Garden"), 8 after a vowel ("Lions", "Ian")
+    unsigned char hnctx = 0;  // the hiatus before a nasal (english.cc, UNSTR-N agent20 round R): 1 an unstressed vowel
+                              // after a vowel, before a nasal of its word ("being", "Ian"), 2 that nasal, 4 the vowel before
+    float pitchDip = 0;  // (PROS2 agent29) semitones: the pitch line dips this far under the vowel's pitch at its onset (EN_ACC_DIP_ST)
+    bool redFn = false;  // (REDUCE agent34) a vowel of an unaccented word in connected speech (english.cc; RED_FN)
+    float pitchAt = -1;  // (PROS2 agent29) a vowel's pitch anchor as a share of it (english.cc EN_ACC_PITCH_AT; < 0: 0.5)
+    // (pajupilli, singing: CHANGES.md 2026-11-25) a sung vowel with setPitch and setPitchEnd: its pitch is reached at
+    // this share of it and left at that one (< 0: a falling word's, 0.25 and 0.9), so a note holds its pitch from
+    // just after its beginning to just before its end and the move to the next note is in the consonant.
+    float sungAt = -1, sungEndAt = -1;
+  };
+  void shapeNext(const Shape& s) { nextShape_ = s; }
+  bool female() const { return female_; }
+
+  // Level of fricative noise (not plosive bursts) relative to the
+  // per-phoneme levels, which are calibrated to Piper's Finnish voice.
+  // The English reader uses 4.5 (+13 dB), measured on an English voice-over.
+  void setFricationGain(float g) { fricationGain_ = g; }
+  // Dark (velarised) l, as in English: the tongue back holds its own
+  // position, so l follows the neighbouring vowels much less.
+  void setDarkL(bool on) { darkL_ = on; }
+  // English: voiceless plosives before a vowel or approximant are
+  // aspirated (the glottis closes slowly after the release), except after s.
+  void setAspiration(bool on) { aspirate_ = on; }
+  // h between voiced sounds: extra breath noise (x the h gain).
+  void setVoicedHNoise(float g, float ag = 0.125f) { voicedHNoise_ = g; voicedHAg_ = ag; }
+  // h takes the next vowel's formants early (the vowel whispered).
+  void setHTakesVowel(bool on) { hTakesVowel_ = on; }
+  // English: a consonant's formants are ranges, not targets. Each formant
+  // runs on the line from the previous vowel's to the next vowel's value
+  // and is only kept inside the consonant's range (see kFormantRanges), so
+  // the formants do not swing to a consonant target and back.
+  void setFormantRanges(bool on) { formantRanges_ = on; }
+  // Strength of the open-glottis breath noise, x default: in aspiration and
+  // the other sounds, and in h.
+  void setAspirationGain(float g, float h) { aspirationGain_ = g; hAspirationGain_ = h; }
+
+  // Make the most recently pushed phoneme long (IPA "ː").
+  void lengthen();
+
+  // Queue UTF-8 text; may be split anywhere, even inside a character.
+  //   Finnish letters: a e i o u y ä ö å p t k b d g m n l r s š h j v f
+  //                    (also c q w x z), "ng" = long ŋ, "nk" = ŋk.
+  //   IPA: æ ø œ ɑ ɛ ɔ ɪ ʊ ə ɐ ɜ ɚ ʌ ɒ ɨ ɯ ŋ ɡ ʃ ʒ ʧ ʤ ʋ ɾ ʀ, ː or ':' for
+  //   length. "tʃ" and "dʒ" are merged into the affricates ʧ and ʤ. The
+  //   English vowels ɪ ɛ ʊ ɔ ʌ ɑ ɒ ɜ have their own targets.
+  //   Stress: ˈ (primary) and ˌ (secondary) raise the pitch of the syllable
+  //   that follows and lengthen its vowels a little; ˌ also inserts an
+  //   extra 60 ms pause before it.
+  //   Once any stress mark has been seen, unmarked syllables are no longer
+  //   raised.
+  //   ' ' and newline: 15 ms pause. ',' ';': 195 ms (and a breath when the
+  //   air runs low). '.' '!' '?': 150 ms and a breath (180-600 ms).
+  //   '-': word boundary without a pause.
+  void pushText(std::string_view text);
+
+  // A place where the speaker may breathe in: before a sentence always
+  // (sentence = true), at a comma only when the lungs are running low. The
+  // inhalation (longer the more air was used) is added as a pause with a soft
+  // breathing-in noise. The first sentence gets one automatically.
+  // snatched: between words, with no good place for it (a quick, sharper breath).
+  // planned: the reader's breath plan asked for it (no air threshold).
+  void breathPoint(bool sentence, bool paragraph = false, bool snatched = false, bool planned = false);
+  float plannedAir() const { return planVolume_; }  // lung volume planned so far (cm^3)
+  // For the reader's breath planner: the lungs' capacity, the volume below
+  // which the pressure sags and the one where it collapses (cm^3), the air
+  // a phoneme takes (cm^3/s of its planned duration) and the learned ratio
+  // of the larynx's real drain to that table.
+  float lungMax() const;
+  float lungFloor() const;
+  float lungEmpty() const;
+  static float airRate(Ph ph);
+  float airScale() const;  // x airRate: the line tract's folds pass more air than the table (kLineAirScale)
+  float drainScale() const;  // the planner's air scale (SYNTH_DRAIN_SCALE until learned)
+  // The next vowel starts with a glottal onset (folds pressed, then released).
+  void glottalOnset() { glottalOnsetNext_ = true; }
+  // The next vowel ends in creaky voice (a low statement ending).
+  void creakyEnd() { creakNext_ = true; }
+
+  // End of input: lets the last phonemes be rendered.
+  void finish();
+
+  // PUHUJA_SEED (main.cc): the randomness of a render, the folds' jitter and micro-variation and the formant path's
+  // noise (rng_, shared) and the line's frication noise, starts from seed instead of the built-in states, so two
+  // draws of the same text differ by a seed, not by a nudge to an unrelated knob (review dsp.md 3, evaluation.md).
+  void seedNoise(uint64_t seed);
+  // ... and starts over at each input line, from the seed and the line (key: a hash of its text), when the line's
+  // sounds begin: a word's random numbers no longer depend on the words before it in its shard. Its waveform still
+  // does (the folds' state carries over): the same 20 words after two other prefixes, per-word SNR 7-10 dB with or
+  // without it; a seed change, 1.3 dB. words1000: sd ~10 words (m+f) over seeds as over shard counts (2026-11-11).
+  void markInputLine(uint64_t key);
+
+  // Render up to n mono float32 samples. Returns how many were written;
+  // fewer than n means more input (or finish()) is needed.
+  size_t pull(float* out, size_t n);
+
+  float sampleRate() const { return fs_; }
+
+  // Phoneme timing of the rendered audio: start and end in seconds from the
+  // first output sample, and the IPA symbol ("_" for a pause, "ː" appended
+  // when long). Complete after finish() and pulling all audio.
+  struct Label {
+    double start, end;
+    std::string symbol;
+    bool wordStart = false;  // the first phoneme of a word
+    bool wordJoin = false;   // ... shared with the previous word: a long consonant across the boundary
+    int word = -1;           // the input word it belongs to (setWord), -1 unknown
+  };
+  std::vector<Label> labels() const;
+
+  // The articulation of the rendered audio (the line tract only), for animation and analysis: every frameMs
+  // a snapshot of what the tract does. t: seconds from the first output sample (as labels()); f0 (Hz);
+  // glottis: the glottal opening (cm^2; ~0 voicing, 0.1-0.3 breathy / voiceless, 0.6 the open h and puffs);
+  // velum: the velopharyngeal port (cm^2; ~0 shut, nasals open); place: the consonant constriction's place
+  // (share of the tract length from the glottis; < 0 none) and constriction: its area (cm^2; 0 closed, >= 1
+  // none); length: the oral tract (cm); areas: the oral area function (cm^2), glottis to lips, sections of
+  // length/areas.size() -- the tongue's shape is in it and the lips' opening is its last sections.
+  // Call recordArticulation before synthesising; complete after finish() and pulling all audio.
+  struct ArticulationFrame {
+    double t;
+    float f0, glottis, velum, place, constriction, length;
+    std::vector<float> areas;
+  };
+  void recordArticulation(float frameMs) { artFrameMs_ = frameMs; }
+  std::vector<ArticulationFrame> articulation() const;
+
+ private:
+  struct Token {
+    Ph ph;
+    bool isLong;
+    bool wordStart;
+    uint8_t stress;  // stress mark before this phoneme: 0 none, 1 ˌ, 2 ˈ
+    bool doubled = false;  // long because the same vowel was written twice
+    float pitch = kNoPitch;  // semitones from the base pitch (vowels; set by setPitch)
+    Shape shape;             // per-phoneme adjustment (shapeNext)
+    float pitchEnd = kNoPitch;  // a vowel's second pitch, reached at 3/4 of it (setPitchEnd)
+    bool wordJoin = false;  // a word boundary falls inside this long consonant ("this century")
+    int word = -1;          // the input word (setWord)
+    int phraseLeft = 0;     // (CSW agent32) the reader phrase's words left from this word on (setPhraseLeft; 0: unknown)
+  };
+
+  void pushCodepoint(uint32_t cp);
+  void emit(const Token& tok, const Ph* next);
+  void emitPlosive(const Token& tok, const Ph* next);
+  void coarticulate(Params& p, Ph ph, const Ph* next) const;
+  float nextVowelF(Ph next, int k) const;
+  void emitAffricate(const Token& tok, const Ph* next);
+  void addKeyframe(const Params& p, double t, bool vowel = false);
+  void addHeld(const Params& p, double t0, double dur, double a, double b, bool vowel = false);
+  void addEvent(const Event& e, int srcLine = __builtin_LINE());
+  void addEventAt(const Event& e);
+  void addPressPulse(double peak, double lowBound, float amount, float riseMs = -1, float fallMs = -1);
+  double syllOnsetT_ = -1;  // the start of the current syllable's onset consonants (samples; -1: none)
+  bool startSegment();
+  float splineAt(int param, double t) const;
+  void resolveF1(float target, double tTarget);
+  void addLabel(const Token& tok);
+  // Kokoro mode (prosody.h): a reference reading's rhythm and melody imposed on
+  // the tokens through the guide, for comparison. The hook is prosodyOverride.
+  void prosodyOverride(Token* tok);
+  ProsodyGuide* prosodyGuide_ = nullptr;
+  float prosodyWordScale_ = 1.0f;  // the current word's rhythm factor (the words layer)
+  int prosodyWord_ = -1;           // the word whose span is open (registered for the warp when the next one starts)
+  double prosodyWordT0_ = 0;       // ... and its first token's timeline (samples)
+  float prosodyLevelDb_ = 0;       // the level layer, smoothed (PROSODY_LEVEL_MS)
+  float prosodyF0St_ = 0;          // the pitch layer, smoothed (PROSODY_F0_MS) and held through the reference's unvoiced frames
+  double prosodyF0HeldT_ = -1;     // ... since this render time (samples); -1: no value
+  double prosodyPauseT0_ = -1;     // the open run of pause tokens: its start on the timeline (samples), -1 none
+  int prosodyLastWord_ = 0;        // the last word started (1-based), for the gap after it
+  void prosodyCloseWord();
+  float noise();
+  float tick();
+
+  void setFixedResonances();
+
+  float fs_;
+  bool female_ = false;  // the voice preset (the female's stop puffs are scaled by LINE_PUFF_FEMALE)
+  float baseF0_;
+  Voice voice_;
+
+  // Keyframes: k_[0] is the one before the current segment, k_[1]..k_[2]
+  // span the current segment, k_[3] is the one after.
+  std::deque<Keyframe> k_;
+  // Pitch line: the last vowel centre's time (samples, -1: none) and pitch.
+  double pitchAnchorT_ = -1;
+  float pitchAnchor_ = 1;
+  std::deque<Event> events_;  // sorted by time
+  double timeline_ = 0;       // where the next phoneme starts (samples)
+
+  // Current segment as cubic polynomials in s in [0,1):
+  // p(s) = c0 + c1 s + c2 s^2 + c3 s^3, per parameter.
+  float c_[4][kNumParams] = {};
+  bool inSegment_ = false;
+  double segStart_ = 0, segLen_ = 1, t_ = 0;
+  bool finished_ = false;
+  double outputStart_ = -1;  // timeline position of the first output sample
+  std::vector<std::pair<double, std::string>> labelStarts_;  // (samples, symbol)
+  std::vector<char> labelWordStarts_;  // parallel to labelStarts_: 0, 1 word start, 2 shared consonant
+  std::vector<int> labelWords_;        // parallel: the input word number
+  int curWord_ = -1;
+
+  // Input state.
+  uint32_t utf8Cp_ = 0;
+  int utf8Need_ = 0;
+  bool atWordStart_ = true;
+  bool hasPending_ = false;
+  Token pending_{};
+  uint8_t stressMark_ = 0;  // stress mark waiting for the next phoneme
+  float nextPitch_ = kNoPitch;  // setPitch() value waiting for the next phoneme
+  float nextPitchEnd_ = kNoPitch;  // setPitchEnd() value
+  Shape nextShape_;   // shapeNext() value waiting for the next phoneme
+  Shape nextShape2_;  // the shape of the sound after the one being emitted
+  bool nextWordStart_ = false;  // the sound after the one being emitted starts a word
+
+  // Prosody / context state.
+  int syllable_ = 0;
+  bool prevWasVowel_ = false;
+  bool zBeforePause_ = false;  // the last sound before these pause tokens was a z (LINE_Z_RE_SCALE)
+  float sPauseFric_ = -1.0f;  // a final s's hiss gain through the pause's tokens (LINE_FINAL_S_FRIC; < 0: none)
+  float zPauseFric_ = 1.0f;  // a final z's hiss gain, kept through the pause's tokens (LINE_FINAL_Z_FRIC, LINE_Z_FRIC)
+  bool prevWasPlosive_ = false;
+  bool vlInitPrev_ = false;  // the last plosive was a word-initial k / g before l ɹ (LINE_VL_*, VELAR-L agent15 round N)
+  Ph lastPlosivePh_ = Ph::Stop;  // the last plosive emitted (LINE_RB_*: an ɹ after b d g, R-L agent19 round Q)
+  bool twInitPrev_ = false;  // ... a word-initial t / k before w (LINE_TW_W_*)
+  bool trInitPrev_ = false;  // the last plosive was a word-initial t / d before ɹ (LINE_TR_*, CL-INIT agent20 round R)
+  bool plInitPrev_ = false;  // the last plosive was a word-initial p before l ɹ (LINE_PL_*, PL-INITIAL agent17 round O)
+  bool jIni_ = false;  // the last token was an initial j (Y-INIT agent25: LINE_JI_*)
+  bool nIni_ = false;  // the last token was a word-initial n (N-INIT agent26: LINE_NI_*)
+  bool jAfterStop_ = false;  // the last token was a j released from a plosive (LINE_U_AFTER_STOP_J)
+  bool prevWasNasal_ = false;
+  bool prevWasPause_ = false;  // the last emitted phoneme was a pause
+  int wordsSincePause_ = 0;  // (TRANS3 agent30) words begun since the last pause token: >= 2 is connected speech
+  int phraseLeft_ = 0, curPhraseLeft_ = 0;  // (CSW agent32) setPhraseLeft's value; the current word's (emit)
+  bool csSpeech_ = false;  // (STOP agent31) the sound being emitted is in connected speech (word 2+ of a phrase)
+  bool nasPressed_ = false;  // NASAL agent32: the last sound was a nasal eased by NAS_PRESS_CS
+  float nasSinNow_ = 0.0f;
+  float nasKNow_ = -1.0f;  // NASAL2 agent33: the coupling point last set (< 0: base)
+  float nasRadNow_ = 1.0f, nasHfNow_ = -1.0f, nasGeomNow_ = 0.0f;  // NASAL agent32: the nasal radiation scale / HF bandwidth last set
+  bool lastFi_ = false, afterFi_ = false;  // the last emitted phoneme was a word-initial f before a vowel (LINE_FI_OFF_MS, F-INIT agent26); afterFi_: this phoneme follows one
+  bool lastShV_ = false;  // the last emitted phoneme was a ʃ before a full vowel (LINE_SH_V_OFF_MS)
+  bool vAfterFric_ = false;  // this v follows a fricative (LINE_V_FRIC_AFTER_FRIC)
+  double oyEndT_ = -1;  // the end of the last ɔɪ's ɪ (samples; LINE_PAUSE_RUN_OY)
+  float lastVowelF_[3] = {0, 0, 0};  // previous vowel's own targets (for sharpening)
+  // Lungs: air left for speaking (cm^3), as planned while phonemes are
+  // queued (for breathing decisions) and as simulated while rendering.
+  float planVolume_, lungVolume_;
+  // Breath planning learns the larynx's real thirst: the air used since the
+  // last breath as planned (per-class table) and as simulated, and the
+  // scale on the table from their ratio (the 2x2x6 block folds drew 3 x the
+  // two-mass model's flow and drained the lung mid-phrase, 2026-10-31).
+  float planUsed_ = 0, actualUsed_ = 0, drainScale_ = -1;  // < 0: SYNTH_DRAIN_SCALE on first use
+  bool hasSpoken_ = false;     // the first sentence's breath has been taken
+  bool spokeSinceBreath_ = false;
+  float nextInhaleMs_ = 0;     // inhalation for the next emitted pause
+  bool nextInhaleSnatched_ = false, inhaleSnatched_ = false;
+  float inhaleLeft_ = 0, inhaleLen_ = 0, inhaleRate_ = 0;  // samples, cm^3/sample
+  int inhaleCount_ = 0;  // (PROS agent28) inhalations started; the first one is the utterance's opening breath
+  FricationFilter inhaleFilter_;  // airy breath-in noise (bypasses the tract)
+  FricationFilter inhaleSnatchFilter_;  // the quick breath's brighter noise
+  float speechEnv_ = 1, speechTarget_ = 1;  // fade-out at pauses
+  float speechAttackNow_ = 0;  // rise rate in use (per sample)
+  float aspBurst_ = 1, kAspBurstDecay_ = 1;  // p t k puff: x aspirationGain_, back to 1
+  float kSpeechDecay_ = 0, kSpeechAttack_ = 0;
+  bool prevVoiced_ = false;
+  int prevVoicedObstruent_ = 0;  // the previous phone was a voiced fricative (1) or plosive (2) (LINE_GD_VOICED_CTX)
+  bool inAffricate_ = false;  // emitting the frication part of ʧ / ʤ
+  bool lastLInit_ = false;  // the last phoneme was an l after a pause (LINE_L_INIT_OFF_MS)
+  bool lastZhOwn_ = false;  // the last ʒ was a standalone one, not a ʤ's frication (LINE_ZH_OFF_MS)
+  int jhPos_ = -1;  // the ʤ being emitted: 0 after a pause, 1 medial, 2 before a pause (-1: none; LINE_JH_INIT_* ...)
+  bool jhNextH_ = false;  // the j in work is followed by an h (LINE_JH_H_AG)
+  double hissFadeEnd_ = -1;
+  float lineAcTo_ = -1;  // the constriction area the last event asked for
+  double lineXHoldUntil_ = -1;  // the place stays until this sample (LINE_X_REL_HOLD_MS)
+  bool lineXShutGo_ = false;
+  bool lineXShutEv_ = false;  // the last place event may move its closure while shut  // a shut closure is on its way to another articulator (LINE_X_ARTIC_SHUT_MS)  // a final affricate's hiss fades until here (samples; LINE_FRIC_PAUSE_FADE_MS)
+  float jhRelFric_ = -1;  // the ʤ release's hiss gain (LINE_JH_RAMP_MS, LINE_JH_DECAY)
+  int afterJh_ = -1;  // the sound after a ʤ: its jhPos_ (-1: not after a ʤ; LINE_JH_OFF_MS, LINE_JH_ADDUCT_*, LINE_JH_ONSET_DIP)
+  float lastJhFric_ = -1;  // the last ʤ release's hiss gain (LINE_JH_TAIL_MS)
+  bool chInit_ = false;  // the ʧ being emitted is word-initial (LINE_CHI_*)
+  bool afterChi_ = false;  // the sound after a word-initial ʧ (LINE_CHI_OFF_MS, _ADDUCT_*, _TAIL_MS)
+  float lastChiFric_ = -1;  // that ʧ release's hiss gain (LINE_CHI_TAIL_MS)
+  float chRelFric_ = -1;  // its release's hiss gain (LINE_CHI_BURST / _RAMP_MS / _DECAY)
+  bool jhPressed_ = false;  // LINE_JH_PRESS eased the breath through a ʤ: restore it on the next sound
+  double gapT0_ = -1;  // GAP agent29: where the current onset envelope started (samples; < 0: none)
+  double shFallT_ = -1;  // SH agent30: where the current s / ʃ -> vowel offset window started (samples; < 0: none)
+  float shFallCls_ = 0;
+  bool lastShFricAffr_ = false;  // SH agent30: the last token was inside an affricate (tʃ: not an s / ʃ offset)
+  int shOffTok_ = 0;  // SH agent30: this token is a vowel after an s (1) / ʃ (2)
+  float gapCls_ = 0;
+  double gapAt_ = 0;
+  float gapOutMul_ = 1, gapPsMul_ = 1;  // GAP agent29: this sample's output and lung-pressure factors
+  float lineFricMulS_ = 1.0f;  // LINE_FRIC_GLIDE_MS: the frication gain on its way to lineFricMul_
+  bool closurePressEased_ = false;  // LINE_CLOSURE_PRESS eased the breath for the current closure
+  double phonemeStart_ = 0;   // where the previous phoneme started (samples)
+  // Once the input uses stress marks, they decide the raised syllables
+  // instead of the Finnish first-syllable rule.
+  bool explicitStress_ = false;
+  uint8_t curStress_ = 0;  // stress waiting for the next syllable's vowel
+  uint8_t sylStress_ = 0;  // stress of the current syllable
+  Params last_;  // last keyframe target
+
+  // Aerodynamics.
+  Gesture ac_, ag_, an_;  // constriction, glottis, nasal port areas (cm^2)
+  Gesture press_;         // relative lung pressure (phrase endings)
+  float pressTo_ = 1.0f;  // ... the target it last started towards
+  double pulseEnd_ = -1;  // the end of the last planned diaphragm push (LINE_PULSE)
+  Gesture expand_;        // cavity compliance multiplier (1 = rigid walls)
+  float po_ = 0;          // mouth pressure relative to the lungs (0..1)
+  float flowGain_;        // pressure change per sample per unit flow
+  float prevOralFlow_ = 0;
+  float popScale_ = 1, popTarget_ = 1;
+  double pauseStartT_ = -1;  // time of the last pause not yet followed by a pitched vowel
+  Ph lastPh_ = Ph::Stop;  // the previous phoneme (micro-intonation)
+  Ph prevPh2_ = Ph::Stop;  // the one before it (POST-L-STOP agent22: the vowel before a coda ɹ)
+  bool vmPrevZvMed_ = false;  // the previous phoneme was a z / v between two vowels inside a word (MED-Z agent24)
+  int prevIhCtx_ = -1;  // the previous phoneme was a standalone ɪ: its Shape::ihctx, else -1 (IH-EY agent25)
+  bool fricCsRe_ = false;  // (FRIC agent32) a FRIC_CS_*_RE is in force
+  bool fricCsPress_ = false;  // (FRIC agent32) a FRIC_CS_*_PRESS is in force: the next sound restores the pressure
+  bool vmPrevDhMed_ = false;  // the previous phoneme was a ð between two vowels inside a word (VFRIC-MED agent22)
+  bool glottalOnsetNext_ = false;
+  bool creakNext_ = false;
+  bool hasPendingRelease_ = false, hasPendingCreak_ = false;
+  Event pendingCreak_{0};
+  Event pendingRelease_{0};
+  float kPopSmooth_ = 0.01f;  // one-pole speed of popScale_ (set from fs: ~2 ms)
+  float tension_ = 0;     // slow trace of glottal abduction (raises pitch)
+  float kTension_;
+  float vibAmp_ = 0;      // current vocal fold vibration amplitude (0..1)
+  Biquad physTilt_;       // treble tilt of the physical source
+  Biquad physUpperCut_;   // cut around F3 (physical source)
+  Biquad physMidLift_;    // lift between F1 and F2 (physical source)
+  float physTiltGain_ = 0;
+  float kVibGrowth_, kVibDecay_;
+
+  // Constriction noise: two filter slots, crossfaded when the shape changes.
+  FricationFilter nf_;
+  // Constriction noise: one filter whose shape and gains glide from the
+  // previous sound's to the next one's (see tick).
+  struct NoiseState {
+    FricShape shape{1000, 8000, 3000, 1000, 0};
+    float gain = 0, tract = 0, tractGain = 1, post = 1;
+  };
+  NoiseState nFrom_, nTo_, nNow_;
+  float nGlide_ = 1, nGlideStep_ = 0;  // progress 0..1 and its step per sample
+  float nLevel_ = 0, nPeak_ = 0;       // recent turbulence strength and its peak
+  float kNoiseLevelFollow_ = 0, kNoisePeakDecay_ = 1;
+  float trillPhase_ = 0;
+  float trillAmp_ = 0;    // current trill depth (follows the airflow)
+  float kTrillDecay_ = 0, kTrillAttack_ = 0;
+
+  // Voicing source state.
+  Carrier carrier_ = Carrier::String;  // the default voice source (Jyrki 2026-11-01: "make line and string the defaults")
+  std::unique_ptr<Larynx> larynx_;     // the voice source (larynx.h)
+  const PulseShape* pulse_ = nullptr;  // the voice's drawn pulse (set with the voice)
+  FormantMotion motion_ = FormantMotion::Damped;
+  Tract tract_ = Tract::Line;
+  VocalTractLine line_;        // the line tract (Tract::Line)
+  float artFrameMs_ = 0;       // recordArticulation: the frame (ms; 0: off)
+  double artNext_ = 0;         // the next frame's time (samples, t_)
+  std::vector<ArticulationFrame> art_;  // t in samples (t_) until articulation() converts it
+  float lineX_ = 0.86f, lineXTarget_ = 0.86f;  // the constriction's place, smoothed
+  bool lineXSnapOk_ = true;  // the last place event allows the snap (LINE_X_SNAP_CLOSURES)
+  bool lineXArtic_ = false;  // the place moves to the other articulator (LINE_X_ARTIC_MS)
+  Event pendingAspEnd_{0};  // a stop's puff: its hiss ends once the folds have closed
+  bool hasPendingAspEnd_ = false;
+  float lineAspMul_ = 1.0f;  // the glottal noise gain factor (a stop's puff)
+  float lineFricFade_ = 1.0f;
+  float lineFricMul_ = 1.0f;  // the slit noise gain factor (LINE_V_FRIC during a v)
+  float thPauseCarry_ = -1.0f;  // the θ's hiss gain carried through the pause after it (LINE_TH_PAUSE_CARRY; < 0: none)
+  bool thPauseLpr_ = false;  // the pause after a θ is low-passed (LINE_TH_PAUSE_LPR)
+  float thCarry_ = -1.0f;  // the θ's hiss gain carried into the next token / pause (LINE_TH_FRIC_CARRY; < 0: none)
+  bool lineHSpec_ = false;  // an h set its own breath colour / gain / press (LINE_H_GFC, LINE_H_BREATH, LINE_H_LPR, LINE_H_PRESS): the next sound resets them
+  float lineHBreath_ = 0;
+  bool lineHAsp_ = false;  // a voiceless h set lineAspMul: the next sound resets it
+  float lineLevel_ = 1.0f, lineLevelTarget_ = 1.0f;  // the prosodic level (shape.level) as a lung-pressure factor on the line
+  float lineLevelPowIn_ = std::numeric_limits<float>::quiet_NaN(), lineLevelPow_ = 1;  // pow(lineLevel_, kLineLevelExp), cached
+  float lineAcPrev_ = 0.0f;  // the constriction area a sample ago (LINE_X_ARTIC_OPEN_AREA)
+  float lineRaise_ = 0.0f, lineRaiseTgt_ = 0.0f;  // the larynx raised (cm, eased) and its target
+  float lineSoft_ = 1.0f, lineExtra_ = 0.0f, lineExpand_ = 0.0f, lineSink_ = 0.0f;
+  double lineVbarFrom_ = -1;  // when the current voiced closure began (LINE_VBAR_MS; < 0: none)
+  double lineCloseFrom_ = -1;  // when the current closure (any) began (LINE_VSTOP_VBAR_MS; < 0: open)
+  float lineHw_ = 1.0f, lineHwTarget_ = 1.0f, lineLip_ = 0.0f, lineLipTarget_ = 0.0f;  // its half-width and lip cap (0: none)
+  float lineXFollow_ = 0;
+  int lineCount_ = 0;
+  float lineOut_ = 0;
+  // The line's articulation: a shape per vowel (and per w, j) at the middle
+  // of its sound, interpolated in time (log areas), instead of a blend looked
+  // up from the formant path (the blend of shapes is not the shape of the
+  // blend: an aʊ offglide came out as an ɪ, 2026-11-02).
+  struct LineKey { double t; TractShape s; };
+  Event pendingRelax_;  // a pause's mouth opening, after the breath has stopped
+  bool hasPendingRelax_ = false;
+  double relaxAt_ = -1;  // when the current pause's mouth relaxes (samples; -1: none due)
+  double pauseEventT_ = -1;  // the current pause's first event (samples)
+  Event pendingKick_;  // the glottis closing back after a voiced stop's release kick
+  bool hasPendingKick_ = false;
+  std::deque<LineKey> lineKeys_;
+  TractShape lastKeyShape_;  // the last shape pushed (a pause holds it until the voice stops)
+  bool haveLastKeyShape_ = false;
+  // Tract shape planner (FormantMotion::Planned with the line): each sound
+  // demands a shape over a time window, only in the channels that matter to
+  // it; a phrase at a time (at every pause) the path of all channels is
+  // solved at once by iterative optimization (planShapes), and the line
+  // reads the planned path. Channels: kShapeChannels in puhuja.cc.
+  static constexpr int kShapeCh = 14;
+  struct ShapeDemand { double tA, tB; float x[kShapeCh], w[kShapeCh]; };
+  std::vector<ShapeDemand> shapeDemands_;
+  std::vector<float> shapePlan_;  // kShapeCh values per frame, from t = 0
+  double shapePlanEnd_ = 0;       // the planned horizon (samples)
+  std::vector<std::pair<double, double>> transCons_;  // (TRANS_SM_CONS_MASK) consonant intervals (samples)
+  std::vector<double> transRel_;  // (TRANS_SM_REL_MS) plosive release times (samples), in order
+  void addShapeDemand(double tA, double tB, const TractShape& s, Ph ph, float wScale, float placeFloor = 0.0f);
+  void planShapes(double tEnd);
+  bool shapePlanAt(double t, TractShape* s) const;
+  // Sentence planner state: dense log2 F1, F2, F3 and the pitch multiplier
+  // per plan frame from planStartT_; keyframes from planFromT_ on are not yet
+  // planned. curPh_ tags the keyframes with their phoneme.
+  Ph curPh_ = Ph::Stop;
+  double planFromT_ = 0, planStartT_ = -1;
+  float planHop_ = 240;
+  std::vector<float> plan_[4];
+  bool planAt(double t, float out[4]) const;
+  float formPos_[3] = {0, 0, 0}, formVel_[3] = {0, 0, 0};
+  bool formInit_ = false;
+  float leak_ = 0.03f;
+  float phase_ = 0;
+  bool spellingRules_ = true;
+  float fricationGain_ = 1;
+  bool darkL_ = false;
+  bool aspirate_ = false;
+  float voicedHNoise_ = 1, voicedHAg_ = 0.125f;  // h between voiced sounds: noise, glottis
+  bool hTakesVowel_ = false;
+  bool formantRanges_ = false;
+  const Token* rangeTok_ = nullptr;  // the consonant being emitted, if its formants are ranges
+  struct RangePending {
+    double t;
+    Ph ph;
+    float centre[3];  // its tuned (coarticulated) F1-F3
+    bool f1Line;      // its F1 is drawn by resolveF1 (m n ŋ, an initial ɹ)
+  };
+  std::vector<RangePending> rangePending_;  // consonant keyframes waiting for the next vowel
+  float rangePrevF_[3] = {0, 0, 0};  // previous vowel's formants (as keyframed) ...
+  double rangePrevT_ = -1;          // ... and the end of its held part (< 0: none)
+  void resolveRanges(const float* nextF, double tNext);
+  double hKeyframeT_ = -1;  // time of the h keyframe the next vowel redraws
+  float aspirationGain_ = 1, hAspirationGain_ = 1;
+  float aspGainTarget_ = 1, aspGainNow_ = 1;  // smoothed toward the target
+  float kAspGainFollow_ = 0;
+  double kLookAheadSamples_ = 0;  // how far ahead the targets are read
+  float pitchControl_ = -1, pitchLearnVib_ = -1;  // (setPitchControl; < 0: the speaker's)
+  float tensionLoHz_ = 0;  // (setTensionMap)
+  std::vector<float> tensionMap_;
+  float larynxLow_ = 0, larynxRaiseX_ = 1;  // (setLarynx)
+  float creakTarget_ = 0, creakNow_ = 0, kCreakFollow_ = 0;  // creaky irregularity
+  float liqShelfNow_ = 0, liqShelfTarget_ = 0;  // LIQ agent31: extra source shelf share in an ɹ / l (LIQ_R_SHELF ...)
+  bool liqShelfSet_ = false;
+  float vqcsNow_ = 0, vqcsTarget_ = 0;  // VQCS agent33: the connected-speech voice quality amount (eased) and its target
+  float vqcsSet_ = 0;  // the last amount sent
+  // Round AC CREAK agent31: the phrase-end envelope (ramps to endTarget_ by endStep_ per sample), the post-pause
+  // onset envelope (1 at the resume, decaying while voicing), their shaped values, the phrase start (samples).
+  float endTarget_ = 0, endNow_ = 0, endStep_ = 0, onNow_ = 0, endE_ = 0, onO_ = 0;
+  double phraseStart_ = 0; int phraseWord_ = 0; bool lastPhraseLong_ = false;
+  float shelfOpen_ = 1;  // round AA VQ2: the source shelf's openness gate (LARYNX_SRC_SHELF_OPEN)
+  float hfOpen_ = 1;  // the eased openness for LINE_HF_BW_CONS
+  float hpOpen_ = 0; unsigned hpTick_ = 0;  // OUT_HP_HZ_CONS: the eased openness, a coefficient update counter
+  float aspOnsetMs_ = 1e6f;  // ms since the glottis was last open past breathy (LINE_ASP_ONSET_MS)
+  bool aspirating_ = false;  // the last plosive's release is closing the glottis
+  Event pendingNoise_{0};  // a voiced fricative's noise, after the glottis closed
+  bool hasPendingNoise_ = false;
+  bool prevUnreleased_ = false;
+  bool bdgZ_ = false;  // the last plosive was a b d g after a vowel before a z (BDG-Z agent20 round R: its z's knobs)
+  // F1 through l r d: their keyframes waiting for the next vowel, and the
+  // last vowel's F1 and time.
+  std::vector<std::pair<double, float>> f1Pending_;  // time, least share of the next vowel's F1
+  float f1MinShare_ = 0;
+  bool f1Transparent_ = false;
+  float f1Prev_ = -1;
+  double f1PrevT_ = -1;  // the last plosive ran its closure into this one
+  float jitter_ = 1;
+  float drift_ = 0;   // slow pitch drift
+  float pitch1_ = 0, pitch2_ = 0;  // smoothed pitch multiplier (two stages)
+  float kPitchLag_ = 0;
+  float duty_ = 0.5f;  // carrier duty for the current cycle
+  uint64_t rng_ = 0x123456789abcdef1ull;
+  uint64_t seed_ = 0;  // PUHUJA_SEED (seedNoise; 0: none)
+  std::deque<std::pair<double, uint64_t>> reseeds_;  // (plan time, line key): markInputLine's reseeds, applied in tick()
+
+  Biquad outHp_;  // output high-pass (kOutputHighPassHz, -6 dB/octave)
+  Biquad lowCut_;  // and a 2nd-order cut at kLowCutHz
+  float nasLp_ = 0, kNasLp_ = 0;  // the nasal murmur's low cut
+  float roomLp1_ = 0, roomLp2_ = 0, kRoomLp_ = 0;  // room-tone floor
+  Biquad shelf_;  // treble shelf on the voice
+  Biquad trebleShelf_;  // per-voice output treble (Voice::treble)
+  Biquad polesHigh_[3];  // higher-pole correction (physical source)
+  Biquad headShelf_;    // head diffraction (physical source)
+  Biquad lineEqShelf_, lineEqPeak_;  // the line tract's output EQ (LINE_EQ_*)
+  Biquad chestLp_;      // the voice heard straight from the chest (kChestDirect)
+  Biquad midCut_;  // low-mid cut on the voice
+  Biquad presence_;  // presence lift on the voice
+  Biquad breathLp_;  // keeps breath noise out of the highs
+  Biquad hbHp1_, hbHp2_;  // the high breath noise's high-pass
+  float aspLp_ = 0, kAspLp_ = 1;  // aspiration source tilt (one pole)
+  float aspHpState_ = 0, kAspHp_ = 0;  // and its low cut (one pole)
+  Biquad airHp1_, airHp2_, airLp_;  // high breath noise: ~4-8 kHz
+  BandPass body_[3];  // body (subglottal) resonances of voiced sound
+  float shelfGain_ = 0;
+  AntiResonator nz_;
+  Resonator np_, r1_, r2_, r3_, r4_, r5_;
+  Resonator tube_[17];     // the tract's resonances above F5 (see puhuja.cc)
+  Resonator cavPole_[10];  // nose / sinus cavities: resonances...
+  AntiResonator cavZero_[10];  // ...and their anti-resonances
+  float prevTract_ = 0, lipGain_ = 1;  // lip radiation differentiator
+};
+
+}  // namespace puhuja

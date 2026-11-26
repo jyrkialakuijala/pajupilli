@@ -6,6 +6,7 @@
 
 #include "instrument.h"
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -108,7 +109,7 @@ double SurdoPlayer::malletSpeed(int velocity, double dynamics) {
   // softer for a soft stroke: a little less than linear in level).
   static const double top = knob("PJ_SURDO_VMAX", 5.0), ex = knob("PJ_SURDO_VEXP", 1.3);
   const double v = std::clamp(velocity, 1, 127) / 127.0;
-  return top * std::pow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
+  return top * fastPow(v, ex) * (0.75 + 0.5 * std::clamp(dynamics, 0.0, 1.0));
 }
 
 void SurdoPlayer::noteOn(int midi, int velocity) {

@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -114,11 +115,11 @@ void AtmosphereModel::keyOn(int midi, int velocity) {
   const double f0 = 440 * std::exp2((midi - 69) / 12.0);
   // The voicing: the top octave's few, short modes are lifted (a gain for the scaling of its
   // strings and board, not modelled).
-  n.voice = std::max(1.0, std::pow(f0 / 2093.0, 1.8));
+  n.voice = std::max(1.0, fastPow(f0 / 2093.0, 1.8));
   // The plectrum: it presses the string aside (a softer touch, longer) and slips off it (the
   // harder, the quicker: the brighter; K3 x 3 .. 1/3).
   n.push = (0.008 - 0.005 * v);
-  n.slip = (0.0004 - 0.0003 * v) * std::pow(3.0, 1 - 2 * pluck_);
+  n.slip = (0.0004 - 0.0003 * v) * fastPow(3.0, 1 - 2 * pluck_);
   const double beta = kPluckAt + 0.02 * (urand() - 0.5);
   // The course: three strings a few cents apart (K4 0 .. 2x), the middle one near the note.
   const double d = (0.5 + 1.0 * urand()) * 2 * chorus_;
@@ -132,7 +133,7 @@ void AtmosphereModel::keyOn(int midi, int velocity) {
   // sustains on the middle string, the others beating with it, slowly)
   const double magnet[kStrings] = {0.35, 1.0, 0.3};
   const double centre = std::clamp((midi - 64) / 40.0, -0.4, 0.4);
-  const double t1 = std::clamp(9.0 * std::pow(f0 / 261.6, -0.35), 3.0, 16.0);
+  const double t1 = std::clamp(9.0 * fastPow(f0 / 261.6, -0.35), 3.0, 16.0);
   for (int k = 0; k < kStrings; ++k) {
     String& s = n.str[k];
     s.f = fr[k];
@@ -165,7 +166,7 @@ void AtmosphereModel::keyOn(int midi, int velocity) {
   // swing; the octave's (K2) where it holds the second mode at a share of that (one channel
   // alone would not do: the fundamental, saturating it, starves the octave).
   // (the bass's magnets set weaker: its pluck rings long by itself)
-  n.bass = std::clamp(std::pow(f0 / 261.6, 0.3), 0.5, 1.0);
+  n.bass = std::clamp(fastPow(f0 / 261.6, 0.3), 0.5, 1.0);
   for (String& s : n.str) {
     const Mode& m1 = s.mode[0];
     const double a1 = n.fpk * m1.pl / (m1.w * m1.w);

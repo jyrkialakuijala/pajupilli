@@ -503,7 +503,7 @@ Direction direct(const DirInput& in) {
   std::vector<std::vector<int>> trillRuns;
   int takaTrills = 0;
   for (int i = 0; i < n; ++i) {
-    if (trillAt[i] || !(speaks(nt[i].ch) || flutes(nt[i].ch)) || (prevIn[i] >= 0 && trillAt[prevIn[i]])) continue;
+    if (trillAt[i] || !(speaks(nt[i].ch) || flutes(nt[i].ch) || (d.acts && in.pluck[nt[i].ch])) || (prevIn[i] >= 0 && trillAt[prevIn[i]])) continue;
     auto quick = [&](int q) {
       const long d = nt[q].tickOff - nt[q].tick;
       return d <= div / 2 && double(d) / div * lenAt(in.tempo, double(nt[q].tick) / div) < 0.18;
@@ -531,20 +531,52 @@ Direction direct(const DirInput& in) {
   d.onShift.assign(n, 0);
   d.offShift.assign(n, 0);
   int quickened = 0;
-  if (kQuicken > 0 && (d.acts || d.gridded))
-    for (const std::vector<int>& run : trillRuns) {
-      const long t0 = nt[run.front()].tick, D = nt[run.back()].tickOff - t0;
-      if (D <= 0) continue;
-      auto g = [&](long t) {
-        const double u = std::clamp(double(t - t0) / double(D), 0.0, 1.0);
-        return t0 + long(std::lround(double(D) * ((1 + kQuicken) * u - kQuicken * u * u)));
-      };
+  // The kinds of trill (PJ_TRILL_SHAPE, 1; the players rehearse each: tools/slurs.py trillways):
+  //   - a short one (under 8 notes): steady in level, quickening from its start as above;
+  //   - a long one: steady at first, then quickening towards its end; and in level
+  //       linked on into a higher note: growing into it (a crescendo);
+  //       linked on otherwise (a cadence's trill): an emphasis three quarters of the way in;
+  //       the last of its phrase: dying away (a decrescendo);
+  //       else: an emphasis half-way.
+  // (trillDyn[i]: the note's level offset; the shapes ~ +-0.05 of the dynamics' 0..1)
+  static const double kTrillShape = knob("PJ_TRILL_SHAPE", 1.0);
+  std::vector<float> trillDyn(n, 0.0f);
+  int trillKinds[5] = {};  // steady, growing, late emphasis, dying away, emphasis half-way
+  for (const std::vector<int>& run : trillRuns) {
+    const long t0 = nt[run.front()].tick, D = nt[run.back()].tickOff - t0;
+    if (D <= 0) continue;
+    const bool isLong = run.size() >= 8 && kTrillShape > 0;
+    const int after = nextIn[run.back()];
+    const bool linked = after >= 0 && nt[after].tick <= nt[run.back()].tickOff + div / 8;
+    // (past the trill's held end note, if it has one: the note the phrase goes on to)
+    const int main = std::min(nt[run[0]].key, nt[run[1]].key);
+    int kind = 0;
+    if (isLong) kind = linked ? (nt[after].key > main + 2 ? 1 : 2) : 3;
+    if (isLong && !linked && after >= 0 && nt[after].tick <= nt[run.back()].tickOff + 2 * div) kind = 4;
+    ++trillKinds[kind];
+    if (kind > 0) {
+      const double depth = 0.05 * kTrillShape * kAll;
       for (int q : run) {
-        d.onShift[q] = g(nt[q].tick) - nt[q].tick;
-        d.offShift[q] = g(nt[q].tickOff) - nt[q].tickOff;
+        const double u = std::clamp(double(nt[q].tick - t0) / double(D), 0.0, 1.0);
+        auto peak = [u](double at) { return std::max(0.0, 1 - std::fabs(u - at) / (u < at ? at : 1 - at)); };
+        const double v = kind == 1 ? 2 * u - 1 : kind == 2 ? 1.5 * peak(0.75) - 0.5 : kind == 3 ? 0.6 - 1.6 * u : 1.5 * peak(0.5) - 0.5;
+        trillDyn[q] = float(depth * v);
       }
-      ++quickened;
     }
+    if (!(kQuicken > 0 && (d.acts || d.gridded))) continue;
+    // (a long one: the first 40 % steady, the slower rate; then quickening, more so)
+    const double u0 = isLong ? 0.4 : 0.0, k = isLong ? 1.6 * kQuicken : kQuicken;
+    auto g = [&](long t) {
+      const double u = std::clamp(double(t - t0) / double(D), 0.0, 1.0);
+      const double c1 = 1 + k * (1 - u0) * (1 - u0), v = std::max(0.0, u - u0);
+      return t0 + long(std::lround(double(D) * (c1 * u - k * v * v)));
+    };
+    for (int q : run) {
+      d.onShift[q] = g(nt[q].tick) - nt[q].tick;
+      d.offShift[q] = g(nt[q].tickOff) - nt[q].tickOff;
+    }
+    ++quickened;
+  }
   // --- Notes inégales (-style french, or PJ_INEGALES 1 in any Baroque reading; Hotteterre 1719,
   // Couperin, Quantz XI.12): in French music the running eighths by step are played unequal,
   // long-short, the first of each pair taking PJ_INEGALES_RATIO of the two (0.6; up to 2:1), every
@@ -656,7 +688,40 @@ Direction direct(const DirInput& in) {
       if (res) { resolves[nx] = 1; ++resolved; }
     }
   }
-  int breaths = 0, leapsUp = 0;
+  // --- The harpsichord's chords rolled (PJ_HPSI_ROLL, 1; the director acting): a chord struck at
+  // once on a plucked keyboard is a thud. Three notes or more begun together on its channels,
+  // from the bass up:
+  //   - in the music's flow, a quick roll (8 ms a note, to 40 ms) ending on the beat: the top note,
+  //     the melody's, where it is written, the others just before it;
+  //   - a chord that opens or closes a phrase, or is held two beats or more, broadly, from the
+  //     beat (35 ms a note, to 180 ms; slower in a slow piece): the pillar arpeggio.
+  static const double kRoll = knob("PJ_HPSI_ROLL", 1.0);
+  int rolled = 0, broad = 0;
+  if (d.acts && kRoll > 0 && baroque)
+    for (int i = 0; i < n;) {
+      int j = i;
+      while (j < n && nt[j].tick == nt[i].tick) ++j;
+      std::vector<int> ch;
+      for (int q = i; q < j; ++q)
+        if (in.pluck[nt[q].ch] && !trillAt[q]) ch.push_back(q);
+      if (ch.size() >= 3) {
+        std::sort(ch.begin(), ch.end(), [&](int a, int b) { return nt[a].key < nt[b].key; });
+        const long t = nt[i].tick;
+        long longest = 0;
+        for (int q : ch) longest = std::max(longest, nt[q].tickOff - t);
+        const double q1 = lenAt(in.tempo, double(t) / div);  // (a quarter, s)
+        const int p = phraseOf(t);
+        const bool pillar = t == d.phrases[p].first || longest >= 2 * div || t + longest >= d.phrases[p].second - div / 4;
+        const double per = kRoll * (pillar ? std::min(0.035 * (q1 > 0.75 ? 1.4 : 1.0), 0.18 / (ch.size() - 1)) : std::min(0.008, 0.04 / (ch.size() - 1)));
+        const long step = long(std::lround(per / q1 * div));
+        for (size_t k = 0; k < ch.size(); ++k)
+          d.onShift[ch[k]] += pillar ? long(k) * step : -long(ch.size() - 1 - k) * step;
+        ++rolled;
+        broad += pillar;
+      }
+      i = j;
+    }
+  int breaths = 0, leapsUp = 0, hpsiHeld = 0;
   long sinceBreath[16];
   std::fill(sinceBreath, sinceBreath + 16, -1L);
   const double vibBase = baroque ? 0.5 : romantic ? 1.0 : 0.8;
@@ -720,13 +785,46 @@ Direction direct(const DirInput& in) {
       acc += kTaka * (taka[i] == 1 ? 0.08 : -0.1);
       len = std::min(len, taka[i] == 1 ? 0.9 : 0.82);
     }
+    // A repeated note ends the legato (PJ_DIRECTOR_REPEATLIFT, 1): a line that comes back to the
+    // key it is on asks the slur to stop there. The note before the repeat is let go, not cut at
+    // the last instant: a lift of 15 % of it, at most 70 ms, and never slurred into the next.
+    static const double kRepLift = knob("PJ_DIRECTOR_REPEATLIFT", 1.0);
+    const bool repeatNext = !chord && nx >= 0 && nt[nx].key == x.key && gapless && !trillAt[i];
+    if (repeatNext && kRepLift > 0) {
+      const double lift = std::min(0.15 * dur, 0.07 / std::max(1e-3, lenAt(in.tempo, double(x.tickOff) / div)) * div);
+      len = std::min(len, 1 - kRepLift * lift / dur);
+    }
+    // The harpsichord's touch (PJ_HPSI_TOUCH, 1; Baroque, the director acting): its loudness is
+    // time. A little daylight between notes (speech's consonants), the strong beats fuller and
+    // held, the weak ones lighter and more detached; a dissonance held its whole value, its
+    // resolution let go early; a broken chord's tones held on past their value (over-legato: the
+    // harmony blooming in the case, the fingers its pedal), to the half bar, never past the same
+    // key's next note.
+    static const double kTouch = knob("PJ_HPSI_TOUCH", 1.0);
+    if (d.acts && baroque && in.pluck[x.ch] && kTouch > 0 && !chord && !trillAt[i]) {
+      if (gapless && !lastOfPhrase && dur <= 2 * div)
+        len = std::min(len, 1 - kTouch * (w >= 0.6 ? 0.03 : w >= 0.35 ? 0.07 : 0.13));
+      if (diss[i] > 0) len = std::max(len, 1.0);
+      if (resolves[i]) len = std::min(len, 1 - kTouch * 0.15);
+      const int nx2 = nextIn[i];
+      if (nx2 >= 0 && dur <= div && gapless) {
+        const int leap = std::abs(nt[nx2].key - x.key);
+        if (leap >= 3 && leap <= 9 && leap != 6) {
+          long until = (x.tick / (bar / 2) + 1) * (bar / 2);  // (to the half bar)
+          for (int q = nx2; q >= 0 && nt[q].tick < until; q = nextIn[q])
+            if (nt[q].key == x.key) { until = nt[q].tick - div / 32; break; }
+          const double over = double(until - x.tick) / dur;
+          if (over > 1.05) { len = 1 + kTouch * (std::min(over, 4.0) - 1); ++hpsiHeld; }
+        }
+      }
+    }
     const bool harm = diss[i] > 0 || resolves[i];
     if (diss[i] > 0) acc += 0.3 * diss[i];  // (the dissonance leaned on; its resolution softer)
     if (resolves[i]) acc -= 0.2 * kHarm;
     if (repAt[i]) { acc += repShape[i].acc; len = std::min(len, double(repShape[i].len)); }  // (portato, shaped)
     if (speech || leapUp >= 3 || trillAt[i] || repAt[i] || harm) c.v[kCueAccent] = float(std::clamp(acc * kAcc, -1.0, 1.0));
     c.v[kCueLength] = float(1 + (len - 1) * std::min(1.0, kAll));
-    c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && !taka[i] && !repAt[i] && len > 0.9 ? 1.0f : 0.0f;
+    c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && !taka[i] && !repAt[i] && !repeatNext && len > 0.9 ? 1.0f : 0.0f;
     c.v[kCuePhraseEnd] = lastOfPhrase ? 1.0f : 0.0f;
     c.v[kCueMute] = muted[p] ? 1.0f : 0.0f;
     // Vibrato: none on Baroque passagework, an ornament on its long notes; light in the
@@ -895,8 +993,8 @@ Direction direct(const DirInput& in) {
     }
   }
   for (int i = 0; i < n; ++i) {
-    d.cues[i].v[kCueLevel] = levelAt(d.level[nt[i].ch], nt[i].tick);
-    d.cues[i].v[kCueLevelEnd] = levelAt(d.level[nt[i].ch], nt[i].tickOff);
+    d.cues[i].v[kCueLevel] = std::clamp(levelAt(d.level[nt[i].ch], nt[i].tick) + trillDyn[i], 0.05f, 0.95f);
+    d.cues[i].v[kCueLevelEnd] = std::clamp(levelAt(d.level[nt[i].ch], nt[i].tickOff) + trillDyn[i], 0.05f, 0.95f);
   }
 
   // (the winds' own reading ends here: the time, the mutes and the other parts are the file's)
@@ -914,6 +1012,11 @@ Direction direct(const DirInput& in) {
     if (quickened || dissonant || dance != kNoDance) {
       std::snprintf(b2, sizeof b2, "\n  %d trills played alive, %d dissonances leaned on, %d resolutions eased%s%s",
                     quickened, dissonant, resolved, dance != kNoDance ? ", a " : "", kDanceName[dance]);
+      d.summary += b2;
+    }
+    if (trillKinds[1] + trillKinds[2] + trillKinds[3] + trillKinds[4] > 0) {
+      std::snprintf(b2, sizeof b2, "\n  long trills: %d growing into the next note, %d with a late emphasis, %d dying away, %d with an "
+                    "emphasis half-way (%d short ones steady)", trillKinds[1], trillKinds[2], trillKinds[3], trillKinds[4], trillKinds[0]);
       d.summary += b2;
     }
     if (takaTrills + leapsUp + repeats > 0) {
@@ -1004,9 +1107,16 @@ Direction direct(const DirInput& in) {
                          kStyle[d.style], gStyle >= 0 ? " (-style)" : "", baroque ? "terraced dynamics" : "hairpins to each phrase's climax", bars, barBeats, np,
                          echoes ? (", " + std::to_string(echoes) + " echoes").c_str() : "", melody + 1,
                          bass >= 0 ? (", bass on " + std::to_string(bass + 1)).c_str() : "");
+  if (rolled || hpsiHeld)
+    nb += std::snprintf(buf + nb, sizeof buf - nb, "  harpsichord: %d chords rolled (%d broadly, as pillars), %d broken-chord tones held on\n",
+                        rolled, broad, hpsiHeld);
   if (quickened || unequal)
     nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d trills played alive (slower to quicker), %d eighth pairs unequal (notes inegales)\n",
                         quickened, unequal);
+  if (trillKinds[1] + trillKinds[2] + trillKinds[3] + trillKinds[4] > 0)
+    nb += std::snprintf(buf + nb, sizeof buf - nb, "  long trills: %d growing into the next note, %d with a late emphasis, %d dying away, "
+                        "%d with an emphasis half-way (%d short ones steady)\n",
+                        trillKinds[1], trillKinds[2], trillKinds[3], trillKinds[4], trillKinds[0]);
   if (compound || dance != kNoDance || dissonant)
     nb += std::snprintf(buf + nb, sizeof buf - nb, "  %s%s%s%s; %d dissonances leaned on, %d resolutions eased\n",
                         compound ? "compound metre" : "simple metre", dance != kNoDance ? ", a " : "", kDanceName[dance],

@@ -89,6 +89,7 @@ void Singer::reset() {
   std::fill(p_, p_ + kN, 0.0f);
   std::fill(u_, u_ + kN + 1, 0.0f);
   iL_ = uLipPrev_ = 0;
+  gLp_ = 0;
   nLp_ = nHp_ = 0;
   fLp_ = fHp_ = 0;
   cArea_ = cTarget_ = 0;
@@ -207,7 +208,8 @@ void Singer::control(double f0, double vowel, double lung, double breath, double
   // Louder: more of the folds' length opens, the open phase shortens and
   // the closing gets quicker (more high harmonics).
   // (Sung: a singer's lungs, pp ~250 Pa .. ff ~3.5 kPa, on a log scale.)
-  const double loud = sung_ ? std::clamp(std::log(std::max(lung_, 1.0) / 250) / std::log(14.0), 0.0, 1.3)
+  static const double kEffort = knob("PJ_SUNG_EFFORT", 1);  // 0: the effort from the whole pressure, as before
+  const double loud = sung_ ? std::clamp(std::log(std::max(lung_ * (kEffort > 0 ? effort_ : 1.0), 1.0) / 250) * (1 / std::log(14.0)), 0.0, 1.3)
                             : std::clamp(lung_ / 1000, 0.0, 1.5);
   aMax_ = (0.10 + 0.08 * loud) * 1e-4 * (1 - whisper_);
   oq_ = 0.68 - 0.18 * std::min(loud, 1.0);
@@ -215,7 +217,18 @@ void Singer::control(double f0, double vowel, double lung, double breath, double
   if (sung_) {  // (a singer's range: pp nearly sinusoidal, ff a quick closure; research/choir.md 5.3)
     static const double kOq = knob("PJ_SUNG_OQ", 0.3), kCq = knob("PJ_SUNG_CQ", 0.36);
     oq_ = 0.72 - kOq * std::min(loud, 1.1);
-    cq_ = 0.46 - kCq * std::min(loud, 1.1);
+    // (A choir's ff is not a pressed voice: the closing no quicker than PJ_SUNG_CQMIN of the open
+    // phase; and the folds do not shut at a corner: the opening's last part is rounded off (the
+    // return phase), over PJ_SUNG_TA_SOFT ms at pp .. PJ_SUNG_TA_LOUD at ff: 6 dB / octave less
+    // above 1 / (2 pi Ta).)
+    static const double kCqMin = knob("PJ_SUNG_CQMIN", 0.2);
+    static const double kTaSoft = knob("PJ_SUNG_TA_SOFT", 0.3) * 1e-3, kTaLoud = knob("PJ_SUNG_TA_LOUD", 0.08) * 1e-3;
+    cq_ = std::max(kCqMin, 0.46 - kCq * std::min(loud, 1.1));
+    static const double kLnTa = std::log(std::max(kTaLoud, 1e-12) / std::max(kTaSoft, 1e-9));
+    const double ta = kTaSoft * std::exp(kLnTa * std::min(loud, 1.0));
+    gK_ = ta > 0 ? 1 - std::exp(-dts_ / ta) : 1;
+  } else {
+    gK_ = 1;
   }
 }
 
@@ -358,7 +371,8 @@ double Singer::sample() {
     double g = 0;
     if (phase_ < op) g = 0.5 * (1 - std::cos(kPi * phase_ / op));
     else if (phase_ < oq_) g = std::cos(0.5 * kPi * (phase_ - op) / (oq_ - op));
-    const double a = aMax_ * shim_ * g + (0.015 + 0.09 * breath_ + 0.5 * whisper_) * 1e-4;
+    gLp_ += gK_ * (g - gLp_);
+    const double a = aMax_ * shim_ * gLp_ + (0.015 + 0.09 * breath_ + 0.5 * whisper_) * 1e-4;
     // --- Turbulence: past a critical Reynolds number (of the slit), noise
     // ~ (Re^2 - Rc^2) / Rc^2, band-passed (~300 Hz .. 6 kHz).
     const double wn = urand();

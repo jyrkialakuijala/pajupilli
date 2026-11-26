@@ -8,6 +8,7 @@
 #include <string>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -263,7 +264,7 @@ HarmoniumPlayer::HarmoniumPlayer(HarmoniumModel& m) : Performer(m), m_(m) {}
 // cells, just speak) to ~2.2 kPa fortissimo (§8.3).
 double HarmoniumPlayer::pressure(int velocity) const {
   const double v = std::clamp(velocity / 127.0 + breathCtl_, 0.0, 1.2);
-  return 300 * std::pow(7.3, v);
+  return 300 * fastPow(7.3, v);
 }
 
 void HarmoniumPlayer::noteOn(int midi, int velocity) {

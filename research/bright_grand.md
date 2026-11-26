@@ -266,3 +266,29 @@ Calibrated again, as played from a MIDI file in the room, A-weighted, against th
   dated from before the grand's changes and left the bright piano ~8 dB under the grand in a mix.
 After: the smoothed key balance within 2 dB of the grand's, the velocity response within ~2 dB
 from velocity 24 up (median of C2-C6).
+
+## 11. Soft notes soft, the brightness a shade (2026-11-25)
+
+The owner: the bright piano sounded toyish beside the grand; soft notes should be soft on it too,
+and the difference in brightness a subtlety, not a caricature. Measured (single notes, dry, and as
+played in the room):
+
+- One colour at any touch: 2-4 kHz from velocity 50 to 110 rose 31 dB on the grand's C3 and 6 dB
+  on the bright piano's (G3 27 / 3, C4 29 / 9). The felt 2-2.5 x the grand's with half its nap
+  was through at a gentle blow. Now `PJ_BRIGHTGRAND_HARD` 1.3, `HARDTOP` 1.5, `NAP` 0.85 (were
+  2.0, 2.5, 0.5): the share above max(1.5 kHz, 3.5 f0) over the grand's, mean of G2-D6, at
+  velocity 35 / 60 / 85 / 115: +8.6 / +10.0 / +4.5 / +4.2 dB -> +1.2 / +4.4 / +3.3 / +3.3; the
+  rise from 35 to 115 as the grand's. The nap from 0.85 to 1.0 changes under 1 dB more: what is
+  left is the scale, the board and the close microphones.
+- The top two octaves died in half the grand's time (G6 dry: -20 dB in 0.15 s, the grand 0.5):
+  the concert grand's `topBridge` 4.8 on a board that already moves more at those bridge points.
+  `PJ_BRIGHTGRAND_TOPBRIDGE` 1.5: C6 1.1 s, D6 1.1, E6 0.7, F#6 0.4, G#6 0.5 (the grand 1.3, 0.8,
+  0.5, 0.7, 0.5); the levels unchanged.
+- Calibrated again against the grand: `kEvenDb` (the 9-key mean within ~0.5 dB of the grand's
+  balance), src/velgain_data.h's row (within ~1 dB from velocity 40, 0.3 dB from 56; the softest
+  two velocities 2-3 dB over), src/levels_data.h 10.7.
+
+Kept its own: the shorter scale and its stiffness (1.5-2.6 x the grand's from G2 to C4), the
+board, the close microphones. Not changed: single low partials missing at some keys (C2's third,
+C5's third); E5-A#5 still fall to -20 dB in ~1.2 s against the grand's 1.6-2.2 s. Octaves were
+checked and are in tune (2:1 within ~4 cents on both).

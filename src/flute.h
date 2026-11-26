@@ -35,6 +35,12 @@ struct Embouchure {
   double reed = 1;          // (reeds) lip force on the reed, x mezzo-forte
   double reedDamp = 1;      // (reeds) the lips' damping on the reed, x (less: rolled out)
   double lipPress = 1;      // (brass) the lips pressed together: their rest opening, x
+  double lipQ = 1;          // (brass) the lips' firmness: their Q, x (firmer: less damped)
+  // (brass, reeds) The vowel: the tongue shapes the mouth into a resonance (the throat's
+  // inertance on the mouth's volume, src/horn.cc), tractHz; tract 0: the open mouth (a plain
+  // volume, fed through the airway), 1: tuned. The players use it in a slur (src/slurs.h).
+  double tract = 0;
+  double tractHz = 1000;
 };
 
 class Flute : public Tube {

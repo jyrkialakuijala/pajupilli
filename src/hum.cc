@@ -1,4 +1,5 @@
 #include "hum.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -47,7 +48,7 @@ void Hum::coefs() {
   res(fz, a, b, c);
   za_ = 1 / a, zb_ = -b / a, zc_ = -c / a;
   lpMix_ = amt_;
-  g_ = std::pow(10.0, amt_ * p_.levelDb / 20);
+  g_ = fastPow(10.0, amt_ * p_.levelDb / 20);
 }
 
 }  // namespace pajupilli

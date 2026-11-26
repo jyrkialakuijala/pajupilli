@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -62,7 +63,7 @@ void EchoesModel::resetAir() {
   side_.clear();
   // A blank tape, already running at the knob's speed.
   const double h = 1 / instrument().fs;
-  speed_ = kSpeedLo * std::pow(kSpeedSpan, rate_);
+  speed_ = kSpeedLo * fastPow(kSpeedSpan, rate_);
   tapeM_.assign(kTape, 0.0f);
   tapePos_.assign(kTape, 0.0);
   n_ = kTape;
@@ -137,7 +138,7 @@ void EchoesModel::keyOn(int midi, int velocity) {
   const double t60[kModes] = {std::clamp(20 * std::pow(f / 261.63, -0.5), 3.0, 40.0),
                               std::clamp(0.8 * std::pow(f * kRatio[1] / 1640, -0.5), 0.08, 3.0),
                               std::clamp(0.35 * std::pow(f * kRatio[2] / 4590, -0.5), 0.04, 1.5)};
-  const double tDamp = std::clamp(0.2 * std::pow(f / 261.63, -0.2), 0.1, 0.4);
+  const double tDamp = std::clamp(0.2 * fastPow(f / 261.63, -0.2), 0.1, 0.4);
   for (int k = 0; k < kModes; ++k) {
     n.sFree[k] = 6.91 / t60[k];
     n.sDamp[k] = 6.91 / (k ? 0.08 : tDamp);
@@ -152,10 +153,10 @@ void EchoesModel::keyOn(int midi, int velocity) {
   tune(n);
   // The hammer: its speed from the key; the felt's contact time at 1 m/s (shorter for the small
   // treble forks), the felt stiffening as it is squeezed (Hertz: F ~ compression^2.5).
-  n.vh = 0.02 + 3 * std::pow(v, 1.4);
+  n.vh = 0.02 + 3 * fastPow(v, 1.4);
   n.yh = 0;
   n.mh = 0.25;
-  const double tc = std::clamp(1.2e-3 * std::pow(261.63 / f, 0.7), 0.1e-3, 5e-3);
+  const double tc = std::clamp(1.2e-3 * fastPow(261.63 / f, 0.7), 0.1e-3, 5e-3);
   n.kh = n.mh * (M_PI / tc) * (M_PI / tc);
   n.dref = std::sqrt(n.mh / n.kh);  // (the compression at 1 m/s on a linear felt)
   n.hammer = true;
@@ -236,7 +237,7 @@ float EchoesModel::sample() {
 
   // --- The tape.
   const double wear = 0.2 + 3.2 * wear_ * wear_;
-  speed_ += (kSpeedLo * std::pow(kSpeedSpan, rate_) - speed_) * h / kMotor;
+  speed_ += (kSpeedLo * fastPow(kSpeedSpan, rate_) - speed_) * h / kMotor;
   {
     const double kn = 1 - std::exp(-kTwoPi * 30 * h), nsig = std::sqrt(3 * (2 - kn) / kn);
     scrape_ += kn * (nsig * (2 * urand() - 1) - scrape_);

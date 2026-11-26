@@ -63,6 +63,7 @@
 #include "performer.h"
 #include "singer.h"
 #include "tube.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -371,6 +372,11 @@ class Lead : public Tube {
   // The core's state.
   double v_ = 0.3, dead_ = 0, blepNext_ = 0, prevOut_ = 0;
   double slope_ = 0;  // dV/dt this block
+  // Kept for the per-sample code: the sample's time, 1 / C, whether the patch has any of the
+  // shapers after the mix (scat, breath, formants, drive, fold, the high-pass), whether it
+  // uses the flip-flops (sub, sub2, ring).
+  double dt_ = 1.0 / 48000, invC_ = 1e9;
+  bool shaped_ = false, flipflops_ = false;
   // Autotune: cents per C (MIDI 0, 12, ... 120), interpolated.
   double tune_[11] = {};
   // Ladder (4 stages, 2x oversampled), amplifier.
@@ -389,7 +395,7 @@ class LeadPlayer : public Performer {
   void setHold(bool h) override;
   void seed(unsigned s) override;
   // The resonance knob (K3, 0..1) to the ladder's resonance (0..1.05).
-  static double resonance(double knob) { return 1.05 * std::pow(std::clamp(knob, 0.0, 1.0), 0.6); }
+  static double resonance(double knob) { return 1.05 * fastPow(std::clamp(knob, 0.0, 1.0), 0.6); }
 
  private:
   void gate(bool on, bool retrigger);

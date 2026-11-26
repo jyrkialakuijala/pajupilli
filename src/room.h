@@ -126,6 +126,7 @@ class Room {
   std::vector<float> line_;     // [line][kLineRing]
   int len_[kLines], pos_ = 0;
   float b0_[kLines], a1_[kLines], lp_[kLines] = {};
+  float bassC_[kLines] = {}, bass_[kLines] = {}, bassA_ = 0;  // (the bass's longer decay: a low shelf in each line's loop)
   float inGain_, micGain_ = 1, micDiffuse_ = 1;
   double directShare_ = 1;
   // The microphones' pattern a + (1 - a) cos (0.6: between omni and cardioid,

@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -67,7 +68,7 @@ double bandPartial(int fam, double f0, int k) {
     case kBandBass: {
       // (FluidR3's recorded fretless, E1 at 30 ms: dB under the fundamental, research/fretless_bass.md 7.3)
       static const double kDb[16] = {0, -13, -11, -11, -12, -13, -15, -17, -19, -22, -24, -27, -31, -35, -38, -44};
-      return k <= 16 ? std::pow(10.0, kDb[k - 1] / 20) : 0.0;
+      return k <= 16 ? fastPow(10.0, kDb[k - 1] / 20) : 0.0;
     }
     default: return 1.0 / k;
   }
@@ -131,7 +132,7 @@ void SoundingSet::step(double dt) {
   t_ += dt;
   const size_t before = n_.size();
   for (BandNote& n : n_)
-    if (n.fall > 0) n.level *= std::pow(10.0, -n.fall * dt / 20);
+    if (n.fall > 0) n.level *= fastPow(10.0, -n.fall * dt / 20);
   // (-40 dB under a velocity-127 note: gone)
   n_.erase(std::remove_if(n_.begin(), n_.end(), [](const BandNote& n) { return n.level < 0.01; }), n_.end());
   if (n_.size() != before) ++version_;

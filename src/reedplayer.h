@@ -40,9 +40,12 @@ class ReedPlayer : public Performer {
   // A practised slur (src/slurs.h): its gesture, kept from slurPlan for applyNote.
   Attack slurPlan(int from, Attack a, bool plain);
   SlurGesture gesture_;
+  TrillSense trillSense_;
   bool practised_ = false;
   double ringT_ = 0.002, tongueFloor_ = 0;
   double slurAir_ = 0, slurLip_ = 0, slurDip_ = 0, slurAirT_ = 0.03, slurLipT_ = 0.03, slurDipT_ = 0.08, sinceSlur_ = 1e9;
+  // ... the embouchure's set through the change (src/slurs.h: firm .. setT)
+  double setNow_ = 0, setFirm_ = 0, setFocus_ = 0, setVowel_ = 0, setVowelAt_ = 0, setT_ = 0.06;
   double leadLeft_ = 0, leadSpeed_ = 1;
   const char* leadHoles_ = nullptr;
 
@@ -51,6 +54,7 @@ class ReedPlayer : public Performer {
   int stackTop_ = 0, stack_[16];
   int keyVel_ = 64;
   double lung_ = 0, lungAttack_ = 0.008, sinceOff_ = 1e9, sinceOn_ = 0;
+  double riseX_ = 1;  // (a practised start's breath rise, x the plain one: undone at the next slur)
   // A bagpipe: the bag's steady pressure, no lips, no tongue; notes split by grace notes.
   bool bag_ = false;
   // Its drones: a pipe for each low key held (below the chanter), tuned to it.

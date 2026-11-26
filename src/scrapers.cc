@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -87,7 +88,7 @@ ScraperModel::ScraperModel(const Instrument& inst) : Tube(inst), dt_(1 / inst.fs
     for (int i = 0; i <= nTop + 1; ++i) {
       r = r * 1664525u + 1013904223u;
       const double a = std::min(1.0, double(i) / std::max(1, nTop));
-      gNotchHz_.push_back(900 * std::pow(2400.0 / 900, a) * (1 + 0.06 * ((r >> 8) / 16777216.0 - 0.5)));
+      gNotchHz_.push_back(900 * fastPow(2400.0 / 900, a) * (1 + 0.06 * ((r >> 8) / 16777216.0 - 0.5)));
     }
   }
   // The cuica's head.
@@ -439,7 +440,7 @@ void ScraperPlayer::noteOn(int midi, int velocity) {
       // Soft strokes are joined (the stick stays on, the next goes on from
       // where it is); harder ones are separate, the stick lifted between them.
       static const double kJoin = knob("PJ_GUIRO_JOIN", 50);
-      m_.scrape(len, dur, (0.005 + 4.0 * std::pow(v, 2.3)) * j, velocity <= kJoin);
+      m_.scrape(len, dur, (0.005 + 4.0 * fastPow(v, 2.3)) * j, velocity <= kJoin);
       break;
     }
     case ScraperModel::Kind::kCuica: {
@@ -450,7 +451,7 @@ void ScraperPlayer::noteOn(int midi, int velocity) {
       // (The grip grows with the cloth's speed, as a bow's force must with its
       // speed: too light for the speed, the stick slips twice a period, an
       // octave up, or slides without catching.)
-      const double speed = (0.01 + 0.32 * std::pow(v, 1.8)) * j, grip = (0.6 + 24 * speed) * j;
+      const double speed = (0.01 + 0.32 * fastPow(v, 1.8)) * j, grip = (0.6 + 24 * speed) * j;
       if (open) m_.rub(speed, grip, 0.34 * j, 1.0, 1.33, 1.0);
       else m_.rub(speed, grip, 0.13 * j, 1.9, 2.0, 3.0);
       break;

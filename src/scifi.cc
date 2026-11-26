@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -50,8 +51,8 @@ void SciFiModel::keyOn(int midi, int velocity) {
   // The discharge. The drive: 1 (a sine, barely folded) .. the fold knob's 1.5 .. 30, by the
   // touch. The drop: 0.7 .. 3 octaves by the touch, starting no higher than 5 kHz; quicker high
   // up (12 .. 120 ms). The collapse: the drive falls e-fold in 60 ms (top) .. 1.2 s (bottom).
-  const double gMax = 1.5 * std::pow(20.0, fold_);
-  const double z0 = 1 + (gMax - 1) * std::pow(v, 1.3);
+  const double gMax = 1.5 * fastPow(20.0, fold_);
+  const double z0 = 1 + (gMax - 1) * fastPow(v, 1.3);
   n.drop = std::min(0.7 + 2.3 * v, std::max(0.0, std::log2(5000 / n.f0)));
   const double tauP = std::clamp(0.045 * std::exp2(-oct / 3), 0.012, 0.12);
   const double tauZ = std::clamp(0.35 * std::exp2(-oct / 2.5), 0.06, 1.2);
@@ -67,7 +68,7 @@ void SciFiModel::keyOn(int midi, int velocity) {
   // The ping. The modulator's ratio (0.05 .. 4, the knob; drifting 6 % per three octaves off
   // middle C), the FM index by the touch (0.25 .. 1.75), the cutoff's deviation that makes,
   // held under 0.9 of the note and under what keeps the sidebands below 0.45 fs.
-  const double r = 0.05 * std::pow(80.0, ratio_) * std::pow(1.06, oct / 3);
+  const double r = 0.05 * fastPow(80.0, ratio_) * fastPow(1.06, oct / 3);
   n.ratio = r;
   // (below a ratio of 1 the deviation shrinks as the ratio squared: a low ratio is a pure ping
   // with a slight shimmer, not a siren)
@@ -75,7 +76,7 @@ void SciFiModel::keyOn(int midi, int velocity) {
   n.dev = std::clamp(std::min(0.9, beta * r * std::min(1.0, r)), 0.0, std::max(0.0, 0.45 * fs / n.f0 - 1 - 2 * r));
   // Damping from the ring time: T60 = Q ln(1000) / (pi f) held (0.25 .. 64 s at middle C,
   // halving every three octaves up); released at most 0.35 s (quicker high up).
-  const double t60 = std::clamp(0.25 * std::pow(256.0, ring_) * std::exp2(-oct / 3), 0.05, 120.0);
+  const double t60 = std::clamp(0.25 * fastPow(256.0, ring_) * std::exp2(-oct / 3), 0.05, 120.0);
   const double t60r = std::min(t60, 0.35 * std::exp2(-oct / 4));
   n.kHeld = 6.908 / (M_PI * n.f0 * t60);
   n.kRel = 6.908 / (M_PI * n.f0 * t60r);
@@ -88,7 +89,7 @@ void SciFiModel::keyOn(int midi, int velocity) {
   std::complex<double> X = 0;
   for (int i = 0; i < n.pulseLen; ++i) X += pulseAt(i, n.pulseLen) * std::polar(1.0, -w * i);
   const double g = std::tan(0.5 * w);
-  n.pingAmp = (0.15 + 0.85 * std::pow(v, 1.2)) / (2 * g * std::max(1e-9, std::abs(X)));
+  n.pingAmp = (0.15 + 0.85 * fastPow(v, 1.2)) / (2 * g * std::max(1e-9, std::abs(X)));
   n.psi = 0.25;  // (the modulator at its crest's zero crossing: the ping starts on the note)
   // The balance: by the key (the bass mostly the discharge, the treble mostly the ping), or K3.
   n.mix = balance_ >= 0 ? balance_ : std::clamp(0.5 + 0.25 * oct / 3.5, 0.2, 0.8);

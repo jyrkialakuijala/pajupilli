@@ -1,4 +1,5 @@
 #include "plate.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -113,7 +114,7 @@ Plate::Plate(double fs, const PlateSpec& spec) : spec_(spec), fs_(fs), dt_(1 / f
     norm_[k] = float(md.norm); c0_[k] = float(md.c0); s0_[k] = float(md.s0);
     const double w = 2 * kPi * md.f;
     w2_[k] = float(w * w);
-    alpha_[k] = float((spec.lossA * std::pow(w, 0.6) + spec.lossB) * (1 + spec.felt * md.mid / std::max(midMean * n_ / 8, 1e-12)));
+    alpha_[k] = float((spec.lossA * fastPow(w, 0.6) + spec.lossB) * (1 + spec.felt * md.mid / std::max(midMean * n_ / 8, 1e-12)));
   }
   coefs();
 }

@@ -2,6 +2,7 @@
 
 #include "knob.h"
 #include "organ.h"
+#include "vmath.h"
 
 #include <algorithm>
 #include <cmath>
@@ -635,7 +636,7 @@ OrganPlan planOrgan(const std::vector<OrganNote>& notes, int tpq, long barTicks,
     for (size_t k = 0; k < idx.size(); ++k) {
       const Phrase& f = ph[idx[k]];
       const double pos = idx.size() > 1 ? double(k) / (idx.size() - 1) : 1.0;
-      double want = start + (peak - start) * std::pow(pos, 1.2);
+      double want = start + (peak - start) * fastPow(pos, 1.2);
       if (f.density > 1.3 * median && f.voices >= 3 && !pleno) want += 0.7;
       if (f.voices <= 1 && pedal >= 0 && !f.pedal) want -= 1;
       int target = int(std::lround(want));

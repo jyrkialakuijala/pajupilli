@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 
@@ -98,7 +99,7 @@ void setRot(double w, double sigma, double dt, double& c, double& s, double& d) 
 // RBJ biquads.
 void rbj(double* b, double* a, int type, double f, double q, double gainDb, double fs) {
   const double w = 2 * M_PI * f / fs, cw = std::cos(w), sw = std::sin(w), al = sw / (2 * q);
-  const double A = std::pow(10, gainDb / 40);
+  const double A = fastPow(10, gainDb / 40);
   double b0, b1, b2, a0, a1, a2;
   if (type == 0) {  // low-pass
     b0 = (1 - cw) / 2, b1 = 1 - cw, b2 = (1 - cw) / 2, a0 = 1 + al, a1 = -2 * cw, a2 = 1 - al;
@@ -169,7 +170,7 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
       s.mass = K.m[0].mass;
       setRot(s.w, 6.91 / t60[0], dt_, s.c, s.s, s.d);
       setRot(s.w, 6.91 / t60[0], dt_ / kSub, s.cs, s.ss, s.ds);
-      K.sideShare = std::pow(10, kSideDb / 20) * (urand(h) > 0 ? 1 : -1) * (0.6 + 0.4 * std::fabs(urand(h)));
+      K.sideShare = fastPow(10, kSideDb / 20) * (urand(h) > 0 ? 1 : -1) * (0.6 + 0.4 * std::fabs(urand(h)));
     }
     // The tonebar: its own mode, 10 .. 25 x the tine's mass, driven by the tine's root (the
     // inertial shear of mode 1: w^2 rhoA L sigma/beta per m of tip displacement).
@@ -189,7 +190,7 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
     K.w = K.gap + 1e-3;
     K.delta = std::max(0.0, (fund ? 0.8 : 0.45) * K.w * kDelta + wear * 0.15e-3 * urand(h));
     K.p = kP;
-    K.sens = std::pow(10, wear * 1.5 * urand(h) / 20);  // the magnet's strength
+    K.sens = fastPow(10, wear * 1.5 * urand(h) / 20);  // the magnet's strength
     K.damp = 6.91 / through(kRelease, 5, midi);
     // The hammer: Hunt-Crossley (alpha 2.8, Sonderbo's k scaled by the tip's modulus), mass 8 g.
     K.alpha = 2.8;
@@ -213,7 +214,7 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
         for (int n = 0; n < T.nm; ++n) ys += T.m[n].phiS * T.m[n].re, vs -= T.m[n].phiS * T.m[n].w * T.m[n].im;
         const double c = T.xh - ys;
         if (c > 0) {
-          const double F = std::max(0.0, T.k * std::pow(c, T.alpha) * (1 + T.mu * (T.vh - vs)));
+          const double F = std::max(0.0, T.k * fastPow(c, T.alpha) * (1 + T.mu * (T.vh - vs)));
           for (int n = 0; n < T.nm; ++n) T.m[n].im -= F * T.m[n].phiS / T.m[n].mass * dts / T.m[n].w;
           T.vh -= F / T.M * dts;
         } else if (T.vh < 0) {
@@ -326,7 +327,7 @@ float TinePianoModel::sample() {
         }
         const double c = K.xh - ys;
         if (c > 0) {
-          double F = K.k * std::pow(c, K.alpha) * (1 + K.mu * (K.vh - vs));
+          double F = K.k * fastPow(c, K.alpha) * (1 + K.mu * (K.vh - vs));
           F = std::max(F, 0.0);
           for (int n = 0; n < K.nm; ++n) {
             Mode& m = K.m[n];
@@ -382,7 +383,7 @@ float TinePianoModel::sample() {
     const double w = std::max(0.25e-3, K.w - y);
     const double u = (x + K.delta) / w;
     const double q = 1 + u * u;
-    const double dPdu = -2 * K.p * u * std::pow(q, -K.p - 1);
+    const double dPdu = -2 * K.p * u * fastPow(q, -K.p - 1);
     const double dPdt = dPdu * (v / w + u / w * vy);  // (du/dt = v / w - (x + delta) / w^2 * dw/dt, dw/dt = -vy)
     emf -= K.sens * dPdt;
     // asleep?
@@ -463,7 +464,7 @@ void TinePianoPlayer::noteOn(int midi, int velocity) {
   blowing_ = true;
   // The hammer's speed: 0.1 .. 1.6 m/s (the mezzo-forte C3's tine swinging ~3 mm at its tip).
   static const double kVmax = knob("PJ_TINEPIANO_VMAX", 1.6);
-  const double v = kVmax * std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.3) * hardness_;
+  const double v = kVmax * fastPow(std::clamp(velocity, 1, 127) / 127.0, 1.3) * hardness_;
   m_.strike(midi - TinePianoModel::kLowest, std::max(0.03, v));
 }
 
@@ -481,7 +482,7 @@ void TinePianoPlayer::setHold(bool h) {
 
 bool TinePianoPlayer::setKnob(int k, double x) {
   if (k == 2) {  // K3: the vibrato's speed (2.0 .. 6.6 Hz, the Peterson's range)
-    rate_ = 2.0 * std::pow(3.3, x);
+    rate_ = 2.0 * fastPow(3.3, x);
     return true;
   }
   if (k == 3) {  // K4: its intensity

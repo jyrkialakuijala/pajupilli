@@ -9,6 +9,7 @@
 #include <cmath>
 
 #include "knob.h"
+#include "vmath.h"
 
 namespace pajupilli {
 namespace {
@@ -47,7 +48,15 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
+  // The register kick's jet shape (besides PJ_KICKP's pressure and PJ_KICKW's shorter jet): the
+  // opening narrowed (PJ_KICKH) and the aim moved in (PJ_KICKY), x the kick. 0: as before.
+  kKickH_ = knob("PJ_KICKH", 0);
+  kKickY_ = knob("PJ_KICKY", 0);
+  kGeoH_ = knob("PJ_SLURGEO_H", 0.5);
+  kGeoY_ = knob("PJ_SLURGEO_Y", 1);
   kLipClose_ = knob("PJ_FLUTE_LIPCLOSE", 0.012);
+  kLipCloseAll_ = knob("PJ_FLUTE_LIPCLOSE_ALL", 1) > 0;  // (the first register's notes too)
+  kRelTune_ = knob("PJ_FLUTE_RELTUNE", 0.08);
   kTrillCover_ = knob("PJ_TRILLCOVER", 1);  // 0: no lip correction on trill notes
   kTrillTune_ = knob("PJ_TRILLTUNE", 0.05);  // s; 0: the lips do not listen
   kTrillHeld_ = 0.3;                          // s on the trill key: report the tuning
@@ -100,6 +109,7 @@ void Player::noteOn(int midi, int velocity) {
   }
   keyClock_ = 0;
   lastKey_ = midi;
+  const int from = note_;
   note_ = midi;
   keyVel_ = velocity;
   // research/playing_techniques.md 5.1: overlap = slur; a short gap = "du";
@@ -114,11 +124,26 @@ void Player::noteOn(int midi, int velocity) {
   // A slurred note moves there over ~60 ms; a new attack starts there. (A
   // glide's soft key is its sign, not a diminuendo.)
   if (art != kArtGlide) velDynTarget_ = kVelDyn_ * (velocity - 64) / 63.0;
-  if (a != kSlur) velDyn_ = velDynTarget_;
+  // A slur this player has practised (src/slurs.h): its gesture; one found unplayable is tongued
+  // lightly ("du"), as is one practised with a touch of the tongue (a soft "d" on a wide leap).
+  // None practised (the modern flutes): the old way, the register kick alone.
+  practised_ = false;
+  Attack a1 = a;
+  if (a == kSlur && art == kArtSlur && !trill_ && from >= 0 && from != midi &&
+      slurGesture(inst_.name, from, midi, std::clamp(dyn_ + breathCtl_ + velDynTarget_, 0.0, 1.0), &gesture_, sinceOn_)) {
+    if (gesture_.fails) {
+      a1 = kDu;
+    } else {
+      practised_ = true;
+      slurDir_ = midi > from ? 1 : -1;
+      if (gesture_.tongue > 0) a1 = kDu;
+    }
+  }
+  if (a1 != kSlur) velDyn_ = velDynTarget_;
   // Accent: a pressure overshoot growing with velocity above ~50 (tongued only).
   const double over = std::max(0.0, (velocity - 50) / 77.0);
-  velAccent_ = a == kAccent ? 1.2 * over : a == kTu ? over : 0;
-  applyNote(a);
+  velAccent_ = a1 == kAccent ? 1.2 * over : a1 == kTu ? over : 0;
+  applyNote(a1);
 }
 
 void Player::noteOff(int midi) {
@@ -196,7 +221,7 @@ const char* Player::holesFor(int midi) {
   // Key 1 = the D trill key (hole 2), key 2 = the D# trill key (hole 1).
   std::strncpy(trillHoles_, info(trillBase_)->holes, kHoles);
   for (const char* k = trill_->keys; *k; ++k) trillHoles_[*k == '1' ? 1 : 0] = 'o';
-  trillCover_ = std::pow(trill_->cover, kTrillCover_);
+  trillCover_ = fastPow(trill_->cover, kTrillCover_);
   say(stderr, "%s\n", trill_->name);
   return trillHoles_;
 }
@@ -207,7 +232,29 @@ void Player::applyNote(Attack a) {
   flute_.selectPipe(note_);
   const char* ov = std::getenv("PJ_HOLES");  // any fingering (experiments)
   flute_.setGlide(takeHoleGlide());
-  flute_.setHoles(ov && *ov ? ov : holesFor(note_), std::exp2((keyVel_ - 64) / 63.0));
+  const char* holes = ov && *ov ? ov : holesFor(note_);
+  const double fingerSpeed = std::exp2((keyVel_ - 64) / 63.0) * (practised_ ? gesture_.fingers : 1);
+  leadLeft_ = 0;
+  tongueFloor_ = 0;
+  if (practised_) {
+    slurAir_ = gesture_.air;
+    slurLip_ = gesture_.lip;
+    slurDip_ = gesture_.dip;
+    slurAirT_ = std::max(1e-3f, gesture_.airT);
+    slurLipT_ = std::max(1e-3f, gesture_.lipT);
+    slurDipT_ = std::max(1e-3f, gesture_.dipT);
+    sinceSlur_ = 0;
+    if (gesture_.tongue > 0) tongueFloor_ = std::clamp(double(gesture_.floor), 0.0, 1.0);
+  }
+  if (practised_ && gesture_.lead > 0) {  // the lips and the air first: the fingers follow
+    leadLeft_ = gesture_.lead;
+    leadHoles_ = holes;
+    leadSpeed_ = fingerSpeed;
+  } else {
+    flute_.setHoles(holes, fingerSpeed);
+  }
+  const bool soft = practised_ && gesture_.tongue > 0;
+  practised_ = false;
   blowing_ = true;
   // A new note: the lips start from its calibrated place; the ear takes over.
   if (!gliding()) earCorr_ = 0;
@@ -221,8 +268,8 @@ void Player::applyNote(Attack a) {
       lungAttack_ = 0.005;
       glottisClock_ = 0;
       break;
-    case kDu:  // soft tongue: short seal, gentle release
-      tongueClosed_ = 0.002;
+    case kDu:  // soft tongue: short seal, gentle release (a practised slur's "d": its own length)
+      tongueClosed_ = soft ? gesture_.tongue : 0.002;
       tongueRelease_ = 0.008;
       lungAttack_ = 0.005;
       break;
@@ -267,6 +314,8 @@ void Player::render(float* out, int n) {
     const double bdt = m / fs_;
     keyClock_ += bdt;
     tick(bdt);
+    sinceSlur_ += bdt;
+    if (leadLeft_ > 0 && (leadLeft_ -= bdt) <= 0) flute_.setHoles(leadHoles_, leadSpeed_);
     if (gliding()) glideEar();
     double lipTarget = trillCover_;
     const bool trillEar = onTrillKey_ && trill_;
@@ -304,6 +353,18 @@ void Player::render(float* out, int n) {
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
       e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[en] * (1 - kKickW_ * regKick_);
+      // (a practised slur's lips, the flutist's way into another register: not harder blowing but
+      // the jet's shape. Going up the lips come forward (a shorter jet, it reaches the edge
+      // sooner), the opening narrows (a thinner, faster jet for the same breath, and quieter) and
+      // the air is aimed deeper into the hole; coming down the reverse. geo in log units, signed
+      // with the slur: leading, then settling from the other side. The opening by
+      // PJ_SLURGEO_H of it (0.5), the aim by PJ_SLURGEO_Y (1).)
+      double geo = 0;
+      if (sinceSlur_ < 2) {
+        const double el = std::exp(-sinceSlur_ / slurLipT_);
+        geo = slurDir_ * (slurLip_ * el - slurDip_ * (std::exp(-sinceSlur_ / slurDipT_) - el));
+        e.jetLen *= std::exp(-geo);
+      }
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
       const double t = std::clamp(std::log(fw / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
@@ -318,6 +379,11 @@ void Player::render(float* out, int n) {
         ct = std::exp(ct) * glideCover(en, dyn);
       }
       e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_);
+      // As the breath dies at a release the jet slows and the note sags flat; the lips follow it
+      // out (uncovering more, as on a diminuendo) so the end stays within ~15 c. PJ_FLUTE_RELTUNE:
+      // the uncovered width x (held breath / breath now)^this (0.08; 0: the lips stay).
+      if (!blowing_ && kRelTune_ > 0 && lungHeld_ > 0 && lung_ > 0)
+        e.uncovered *= fastPow(std::clamp(lungHeld_ / lung_, 1.0, 20.0), kRelTune_);
       // The face and lips load the window more as the pitch rises (Dickens
       // 2007, fitted to played flutes: ~ 2.937 ln m - 11.63, x4.5 from C4 to
       // C7); A4 keeps the constant 2 mm. Without it the third octave ran sharp
@@ -334,20 +400,23 @@ void Player::render(float* out, int n) {
       // Airy: a wider, less focused lip opening for the same breath (more
       // flow, turbulence and edge hiss; the jet spreads before the edge).
       const double airy = 1 + 0.5 * (air_ - 0.35);
-      e.lipH = 0.75e-3 * ke * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_);
+      e.lipH = 0.75e-3 * ke * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_) *
+               (1 - kKickH_ * regKick_) * std::exp(-kGeoH_ * geo);
       // At the release of an overblown note (its second register or higher) the lips close as the
       // breath stops: the jet ends with the air. Left open while the breath fades, the slowing jet
       // falls into the lower register, the note dropping an octave as it dies (no flutist's
       // ending). PJ_FLUTE_LIPCLOSE: their time constant (s; 0: they stay as they were).
-      if (!blowing_ && kLipClose_ > 0 && note_ >= 0 && played(note_) && played(note_)->harmonic > 1)
+      if (!blowing_ && kLipClose_ > 0 && note_ >= 0 && played(note_) && (kLipCloseAll_ || played(note_)->harmonic > 1))
         e.lipH *= std::exp(-sinceOff_ / kLipClose_);
       e.lipWidth = (7 + 4 * dyn) * 1e-3 * ke * airy;
       e.air = air_;
       // Jet offset at the edge: players aim further off-centre on low notes,
       // where the jet swings further (even harmonics need offset ~ swing).
-      e.y0 = kY0_ * ke * std::pow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_);
-      e.noise = breath_ * noiseCtl_ * (0.4 + 1.7 * air_);
+      e.y0 = kY0_ * ke * fastPow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_) *
+             (1 - kKickY_ * regKick_) * std::exp(-kGeoY_ * geo);
+      e.noise = breath_ * noiseCtl_ * inst_.noise * (0.4 + 1.7 * air_);
       if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * pressScale_ * (1 + kKickP_ * regKick_);
+      if (blowing_ && sinceSlur_ < 2) lungTarget *= std::max(0.1, 1 + slurAir_ * std::exp(-sinceSlur_ / slurAirT_));
       if (flute_.duct()) {
         // A duct: the windway and the window are fixed; the player has only the
         // breath. It sets the pitch (the calibration's "cover" is the breath
@@ -356,7 +425,7 @@ void Player::render(float* out, int n) {
         const JetParams& j = inst_.design->jet;
         const double lo = noteFrequency(inst_.lo), hi = noteFrequency(inst_.hi);
         const double u = std::clamp(std::log(fw / lo) / std::log(hi / lo), 0.0, 1.0);
-        const double p0 = j.press * std::pow(j.pressHi / j.press, u);
+        const double p0 = j.press * fastPow(j.pressHi / j.press, u);
         e.y0 = j.y0 + 0.1e-3 * (brightness_ - 1) * (1 + 0.3 * wander_ * w2b_);
         // The top notes: ocarina players tuck the chin (head down) to steady
         // the hard breath and cut the wind noise: half the breath noise in the
@@ -384,12 +453,14 @@ void Player::render(float* out, int n) {
     // Lungs: fast push (5 ms), slower release (30 ms).
     const double tc = lungTarget > lung_ ? lungAttack_ : release_;
     lung_ += (1 - std::exp(-bdt / tc)) * (lungTarget - lung_);
+    if (blowing_) lungHeld_ = lung_;  // (the breath the note was held with: its release measured against it)
     // Tongue: closed for 4 ms while the mouth fills, then opens.
     tongueClock_ += bdt;
     sinceOn_ += bdt;
     sinceOff_ += bdt;
     if (tongueClock_ < tongueClosed_) e.tongue = 0;
     else e.tongue = std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
+    if (tongueFloor_ > 0 && tongueClock_ < tongueClosed_ + tongueRelease_) e.tongue = std::max(e.tongue, tongueFloor_);
     e.tongue *= tongueStop();  // a staccato note ends with the tongue
     // Flutter tongue: the tongue tip trills against the ridge (~27 Hz).
     if (flutter_ > 0) {
@@ -417,7 +488,7 @@ void Player::render(float* out, int n) {
     double ag = std::min(1.5e-4, aj * std::sqrt((1 - d) / d));
     // "h" attack: the glottis opens from a slit (3 mm^2) over ~40 ms.
     glottisClock_ += bdt;
-    if (glottisClock_ < 0.040) ag = std::min(ag, 3e-6 * std::pow(ag / 3e-6, glottisClock_ / 0.040));
+    if (glottisClock_ < 0.040) ag = std::min(ag, 3e-6 * fastPow(ag / 3e-6, glottisClock_ / 0.040));
     e.glottis = ag;
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
