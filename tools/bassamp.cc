@@ -1,12 +1,13 @@
 // The bass presets of the amp module (src/guitaramp.cc; research/bass_amps.md 10.6) on their own:
 // the pickup's network under each load, the James stacks, the low end of the amp's path, the
 // cabinets, the DI and the mic blended, the studio compressor on a held E1, the cost.
-//   g++ -O3 -march=native -ffast-math -std=c++17 -Isrc tools/bassamp.cc src/guitaramp.cc -o bassamp && ./bassamp
+//   g++ -O3 -march=native -ffast-math -std=c++17 -Isrc tools/bassamp.cc src/guitaramp.cc src/bassspeaker.cc src/heard.cc -o bassamp && ./bassamp
 // Each line ok/FAIL (as tools/test.py prints them); exit status 1 on a failed check.
 #include <chrono>
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include "guitaramp.h"
@@ -118,16 +119,15 @@ int main() {
   }
   // 4. The cabinets (4.3), against 200 Hz.
   {
-    const auto cab = [](int c) {
-      GuitarAmp::Preset p = GuitarAmp::fliptopDi();
-      p.cabinet = c;
-      return GuitarAmp(kFs, p);
-    };
-    const GuitarAmp c3 = cab(3), c4 = cab(4), c5 = cab(5);
+    // (Each with its own head: the physical speakers know what drives them.)
+    const GuitarAmp c3(kFs, GuitarAmp::bassStack()), c4(kFs, GuitarAmp::fliptopDi()), c5(kFs, GuitarAmp::slapDi());
+    if (std::getenv("PJ_BASSAMP_CURVES"))
+      for (double f : {30., 35., 40., 45., 50., 58., 70., 80., 100., 150., 300., 500., 1000., 2000., 3000., 4000., 5000., 8000.})
+        std::printf("  %5.0f Hz: 8x10 %+6.1f  1x15 %+6.1f  4x10 %+6.1f\n", f, rel(c3, 2, f), rel(c4, 2, f), rel(c5, 2, f));
     const double a = rel(c3, 2, 40), b = rel(c3, 2, 58), c = rel(c3, 2, 5000), e = rel(c4, 2, 40), f = rel(c4, 2, 5000), g = rel(c5, 2, 40), h = rel(c5, 2, 5000);
-    std::snprintf(d, sizeof d, "8x10 %+.1f / %+.1f / %+.1f dB at 40 Hz / 58 / 5 kHz (-11, -3, -20); 1x15 %+.1f / %+.1f at 40 / 5 kHz (-4, -23); 4x10+horn %+.1f / %+.1f (-5.5, -1.6)", a, b, c, e, f, g, h);
-    check(std::fabs(a + 11) < 1 && std::fabs(b + 3) < 1 && std::fabs(c + 20) < 1 && std::fabs(e + 4) < 1 && std::fabs(f + 23) < 1 && std::fabs(g + 5.5) < 1 &&
-              std::fabs(h + 1.6) < 1,
+    std::snprintf(d, sizeof d, "8x10 %+.1f / %+.1f / %+.1f dB at 40 Hz / 58 / 5 kHz (the 810E's -10, -3; -20); 1x15 %+.1f / %+.1f at 40 / 5 kHz (-4, -23); 4x10+horn %+.1f / %+.1f (-5.5, -1.6)", a, b, c, e, f, g, h);
+    check(std::fabs(a + 10) < 1 && std::fabs(b + 3) < 1 && std::fabs(c + 20) < 1 && std::fabs(e + 4) < 1 && std::fabs(f + 23) < 2 && std::fabs(g + 5.5) < 1 &&
+              std::fabs(h + 1.6) < 2,  // (the physical speakers: the 1x15 on its tube head a little brighter, the 4x10 a little duller, than the fitted filters)
           "the cabinets", d);
   }
   // 6. The blend: the DI and the mic (fliptop-di; bassStack) no weaker than the louder alone at 40-200 Hz,

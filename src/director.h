@@ -69,6 +69,11 @@ struct DirInput {
   bool wind[16] = {};    // the channel is a wind player's (a flute, a reed, a brass: it speaks and breathes)
   bool pluck[16] = {};   // ... a harpsichord's (a plucked keyboard: its expression is time, not velocity)
   bool flute[16] = {};   // ... a flute's (a transverse flute, a recorder, a pan pipe: its high notes blown hard)
+  // For the jazz reading: the drum channel's strokes (tick, key), the programs that play notes,
+  // and src/midifile.cc's jazz-trio rule (a piano and an upright bass).
+  std::vector<std::pair<long, int>> drums;
+  bool program[128] = {};
+  bool jazzBand = false;
 };
 
 struct Direction {
@@ -93,7 +98,14 @@ struct Direction {
   std::vector<std::pair<long, double>> fermatas;      // (tick, hold factor)
   std::vector<std::pair<long, bool>> mutes;           // (tick, on): where the mutes go on and come off
   std::string summary;                                // what it decided, to print
+  // Is it jazz (whatever else the reading says: the style above is the classical one's): the
+  // players choose their own ways from it (the electric bass's DI share). What it heard, to print.
+  bool jazz = false;
+  std::string jazzWhy;
 };
+
+// The director's verdict on the piece being played: jazz or not (false until a file is read).
+bool& jazzPiece();
 
 // -director on|off|auto (default auto). False: not one of those.
 bool setDirectorMode(const std::string& mode);

@@ -852,6 +852,10 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       const int ch = e.status & 15, kind = e.status & 0xf0;
       if (kind == 0xc0) pr[ch] = e.a;
       if ((kind == 0xb0 && (e.a == 11 || e.a == 1 || e.a == 2)) || kind == 0xd0) di.ridden[ch] = true;
+      if (kind == 0x90 && e.b > 0) {
+        if (ch == 9) di.drums.push_back({long(e.tick), e.a});
+        else di.program[pr[ch] & 127] = true;
+      }
       if (ch == 9 || (kind != 0x90 && kind != 0x80)) continue;
       auto it = open.find(ch * 128 + e.a);
       if (it != open.end()) { spans[it->second].off = i; open.erase(it); }
@@ -875,8 +879,11 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       const Event& on = song.ev[spans[k].on];
       di.notes.push_back({long(on.tick), long(song.ev[spans[k].off].tick), on.status & 15, on.a, on.b});
     }
+    di.jazzBand = jazzBand;
     dir = direct(di);
     std::fprintf(stderr, "%s\n", dir.summary.c_str());
+    jazzPiece() = dir.jazz;
+    std::fprintf(stderr, "  (the director: %s)\n", dir.jazzWhy.c_str());
     // The flutes of a Baroque piece played on the Baroque flute (PJ_BAROQUE_FLUTE, 1; 0: never,
     // 2: always where it can): the director read the piece as Baroque, or the file is named by a
     // Baroque catalogue (BWV, HWV, TWV, BuxWV, RV: Bach, Handel, Telemann, Buxtehude, Vivaldi). Only

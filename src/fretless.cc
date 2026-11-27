@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "band.h"
+#include "ebass.h"
 #include "instrument.h"
 #include "knob.h"
 #include "vmath.h"
@@ -49,7 +50,9 @@ FretlessBassModel::FretlessBassModel(const Instrument& inst) : Tube(inst), g_(in
     hpA_ = std::exp(-2 * M_PI * 150 / inst.fs);
   }
   if (knob("PJ_EBASS_DI", 0) > 0) return;
-  amp_.reset(new GuitarAmp(inst.fs, GuitarAmp::fretlessDi()));
+  GuitarAmp::Preset ap = GuitarAmp::fretlessDi();
+  ap.blend = knob("PJ_FRETLESS_BLEND", bassDiShare());
+  amp_.reset(new GuitarAmp(inst.fs, ap));
   amp_->connect({L, R, coilC, pots}, cable);
 }
 

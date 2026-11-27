@@ -784,6 +784,142 @@ the clip voltage. All numbers are **[E]** unless marked.
 
 ---
 
+## 13. The amp and the speaker as the instrument (2026-11-28)
+
+The owner: "e-bass needs an amplifier and a loudspeaker that produces the sound -- the bass doesn't
+do much by itself". Up to here the cabinets were fixed filters fitted to the speakers' measured
+curves (4.3): right in small signal, but nothing in them changed with level or with the head in
+front. Built: `src/bassspeaker.h/.cc`, used by `GuitarAmp` for cabinets 3, 4, 5 (`Preset::physical`,
+`PJ_BAMP_SPEAKER=0` the old filters).
+
+### 13.1 The model
+
+- **The head as a source:** open-circuit voltage (the power stage's output, `volts` V peak at its
+  limit) behind its output impedance, nominal / damping factor. A tube head's damping factor of a
+  few: the speaker's own impedance curve shapes what it gets (more at the box's resonance and in
+  the treble, where the coil's inductance raises it). The SVT's damping factor was not found: 6
+  **[E]**; the fliptop's 3 **[E]**; a solid-state head ~200 **[L]**.
+- **The output transformer** (tube heads): the core's flux the integral of the voltage, the
+  magnetizing current through the tubes' open-loop resistance (8 Ohm at the secondary **[E]**), a
+  3 Hz high-pass while small; the current rising as (1 + (phi / phi_sat)^4) toward saturation
+  (phi_sat 0.25 V s: full power at 35 Hz **[E]**). The SVT's big interleaved transformer **[S, the
+  owner's notes]**.
+- **Each driver (Thiele-Small)** from 4.1/4.2's data sheets: coil Re, Le; Bl from Qes; mass from
+  Fs and Vas; Rms from Qms. On the box's air as a spring (sealed), or the box and a port's air
+  mass (ported). Bl falls to 70 % at Xmax (the coil leaving the gap), its rest 0.5 mm off centre
+  (even harmonics); the suspension 1.5x as stiff at Xmax **[E, typical of 10" bass drivers]**.
+  The trapezoid at the base rate, the motor and suspension frozen where the cone is each sample.
+- **The wiring:** the 810E's eight 8 Ohm drivers two in series, four strings (4 Ohm).
+- **Out:** the cone's acceleration (a close mic's pressure: on axis near a piston at ka << 1 it is
+  jw rho u (sqrt(z^2 + a^2) - z), the acceleration's shape, as far away), plus the port's in a
+  ported box. Then the old filters without their high-passes (the cone's break-up, the mic), and a
+  zero at Re / 2 pi Le: the measured curves had the coil's inductance in them already.
+
+### 13.2 The boxes, checked (tools/bassamp.cc, against 200 Hz)
+
+| | 40 Hz | 58 Hz | 100 Hz | 2 kHz | 5 kHz |
+|---|---|---|---|---|---|
+| 810E, ~30 l a driver sealed, on the SVT | -9.3 | -2.7 | +1.1 | +6.2 | -19.6 |
+| 810E manual **[T]** | -10 | -3 | | | |
+| the old filters | -11.4 | -3.3 | +1.9 | +5.0 | -20.3 |
+| 1x15, 150 l ported at 38 Hz, on the fliptop | -4.4 | +1.3 | +1.3 | +8.7 | -21.6 |
+| 4x10 + horn, 50 l a driver ported at 40 Hz, solid state | -4.7 | +0.7 | +1.0 | +0.9 | -3.1 |
+
+- The sealed 810E with the BP102's numbers lands on its manual's -3 dB at 58 Hz and -10 at 40 with
+  no fitting: the box's air is three times as stiff as the suspension (Qtc ~0.85, 0.95 on the
+  SVT's output impedance).
+- The tube heads lift the top 1-2 dB against a voltage source (the coil's rising impedance).
+- A close mic on a ported box's cone alone hears a null at the port's tuning (the cone hardly
+  moves there): -24 dB at 40 Hz with the mic hearing 30 % of the port. The mics are taken to hear
+  the port as they hear the cone (`PJ_B15_PORT`, `PJ_410_PORT`, 1).
+
+### 13.3 What it does with level
+
+- Sines through the 810E alone: at 41 Hz a third of full voltage moves the cones 1.8 mm, 4.7 %
+  THD in the sound (the harmonics fall in the box's passband, the fundamental 10 dB under it);
+  full voltage 5.5 mm (Xmax 6.2), 23-30 %. At 82 Hz full voltage 4.6 mm, 3-4 %.
+- In use: a v127 open E on the finger bass 0.9 mm, the pick bass's 2 mm.
+
+### 13.4 The SVT's power stage was at a few watts
+
+The SVT's spec, 67 dB at 1 kHz with everything up for 300 W **[T, SVT-CL]**, puts full power at
+~15 mV rms in (3.2). The stages here give 43 dB to the power stage's input, so its limit is 3.1 V
+(it was 60: 26 dB too high, the head at a few watts, its power tubes and its speakers never
+working). Then the master where the old checks want it: the pick bass 0.1 (the hardest attack 5.2
+% in its first 100 ms, a mf one under 1 %); the finger bass the volume 0.2 and master 0.16 (v100
+clean at -42 dB, v127 1.8 %).
+
+### 13.5 Who plays through what
+
+- GM 34 (finger) now on the bass stack and its 8x10 ("finger-stack": GM 35's head, treble 0.5,
+  2x oversampling, the optical compressor at 3:1, threshold 0.034 for 3 / 5 dB at mf / ff); GM 35
+  as before on it. GM 36's fretless keeps the fliptop's 1x15 and GM 37-38 the solid-state 4x10,
+  all on the physical speakers.
+- The DI's share is the bassist's (`bassDiShare()`, src/ebass.cc): **80 % when the director reads
+  the piece as jazz, 20 % otherwise** (the owner). `PJ_BAMP_BLEND` sets it; the fretless's
+  `PJ_FRETLESS_BLEND`.
+
+### 13.6 The director's jazz reading (src/director.cc readJazz)
+
+Swung off-beats (at 2/3 of the beat, not 1/2: 60 % or more of at least 16; counts twice), the
+time on the ride more than on the hi-hat (1.5x, at least 16 strokes), a walking bass (half its
+steps a beat), a jazz band's instruments (GM 27 jazz guitar, 65-68 saxes, 12 vibraphone, 60 muted
+trumpet): two of these, or the jazz trio (src/midifile.cc: a piano and an upright bass).
+`PJ_DIRECTOR_JAZZ` 1 / 0 forces it. On the owner's files: benblues.mid jazz (87 % swung, ride 483
+to 0, walking 96 %); georgia.mid and Anighting.mid jazz (the trio); walking.mid not (a played pop
+arrangement, straight eighths: 9 % swung, its bass 61 % quicker than the beat).
+
+### 13.6b The owner's ear (2026-11-28)
+
+"The new bass is better in both 80 % and 20 %, for pick bass 20 % was very good" (the finger and
+pick lines, base = the fixed filters at the old levels; benblues base / jazz 80 % / forced 20 %).
+Kept as the default.
+
+### 13.8 Microphonics (the owner: "the simplest possible, very conservative")
+
+The head on its cabinet: V1's electrodes shaken by the cones' sound (their acceleration, the
+last sample's: the loop closed), ringing at three resonances, 1.7 / 3.3 / 5.1 kHz, Q 30 / 40 /
+50, shares 0.6 / 1 / 0.5 **[E; the owner's notes: high-Q, 1-6 kHz, worst in V1]**. The ring is
+added at V1's grid (3e-5 V per m/s^2), and the same ring moves V1's gain (2e-4 per m/s^2: the
+note's sidebands at f -+ the ring's, faint ghost notes). Not on the DI (the splitter is before the
+head). On the tube heads only (the bass stack, the fliptop).
+- At the defaults a v127 open E's ring is 64-69 dB under the bass at V1's grid (the fliptop 85).
+- The loop's margin: linear to x30; past x300 (the pick bass, the finger bass) it runs away (the
+  squeal): ~50 dB. `PJ_AMP_MICRO` scales it (0 off).
+- Left out: the bias modulated at the bass's own frequencies (the boom or dip near the box's
+  resonance) and the rattle of loose parts on hard low attacks.
+
+### 13.9 The two channels (the owner's pointer: Piazza's drawing of the VT-40 preamp, 1971)
+
+drtube.com/schematics/ampeg/vt40pre-jp.gif, read here **[E, reading]**: Channel One "Bright": the
+jack through 0.005 uF into 220 k (a 145 Hz high-pass), V1 12AX7 (390 k plate; the Input Sens.
+cathode switch 6.8 k / 33 k / 10 uF), the volume 1 M lin with 120 pF and 0.001 uF across it (the
+Ultra-High switch), the second triode (68 k, 3.3 k), the Bass/Treble module (1 M log each), the
+6K11 stages, the inductor mid (8910001, 0.033 / 0.15 uF, 50 k lin), the 12DW7 cathode follower.
+Channel Two "Normal": the jack straight to the grid (5.6 M), the same first stage and volume, a
+6CG7 driving the reverb's delay line and a 12AX7 recovering it, rejoining through 270 k: no
+Bass/Treble of its own.
+
+Built (`GuitarAmp::svtChannel`): channel 1 the bass stack as it was with the 145 Hz input; channel
+2 without the James stack, its volume 22 dB lower (the stack's insertion: the third stage driven
+as before), no reverb. The bassist chooses (`bassChannel`, src/ebass.cc): the pick bass outside
+jazz channel 1; the fingers, and everything in jazz, channel 2. `PJ_BAMP_CHANNEL` 1 / 2 (0: the
+earlier chain, channel one's Normal input of 1972).
+
+### 13.10 The owner's ear on 13.8-13.9 (2026-11-28)
+
+"Bright and normal are more interesting than base, new is better than new2 and base": the two
+channels kept (the pick bass on Bright, the rest on Normal), the earlier chain only behind
+`PJ_BAMP_CHANNEL=0`; the microphonics kept at their default (x10 worse, none worse).
+
+### 13.7 Not done
+- The negative feedback's loss of control as the tubes clip (the output impedance rising), the
+  rectifier and supply's own dynamics beyond the sag already there.
+- The eight cones' mutual coupling and the mic between cones; Le(x); the box's air nonlinearity.
+- Corrections to the owner's pasted notes: the 810E has two sealed chambers (top and bottom 4x10,
+  as its stereo mode splits it), not four **[T, 810E manual]**; Piazza's 1972 drawing has a 6C4
+  cathode follower driving the power amp, not the pasted 12DW7 inverter into 12BH7s (3.2).
+
 ## 12. References
 
 - **[SVT-CL]** Ampeg, *Owner's Guide for the SVT-CL Bass Amplifier* (front panel and technical

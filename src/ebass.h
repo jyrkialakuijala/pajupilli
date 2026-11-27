@@ -12,9 +12,10 @@
 //     spacing); both full up: two coils in parallel, the scooped "both up" sound (the notch
 //     near the open E's 8th harmonic). A coil 3.3 H, 7.4 kOhm, ~90 pF; 250 k pots (two volumes,
 //     one tone), the cable 700 pF, into a 1 MOhm input: a resonance near 4.4 kHz, Q ~1.7 (3.3).
-//   - What comes out (research/bass_amps.md 10.1, src/guitaramp.h's "fliptop-di"): the pickups on a
-//     splitter into an active DI and an fliptop bass amp (0.9 MOhm between them), the fliptop's 1x15
-//     miked with an broadcast dynamic microphone, the two blended half and half (lined up), then an optical compressor at 3:1.
+//   - What comes out (research/bass_amps.md 10.1, 13; src/guitaramp.h's "finger-stack"): the
+//     pickups on a splitter into an active DI and the bass stack (0.9 MOhm between them), its 8x10
+//     as physical speakers (src/bassspeaker.h) miked close, the two blended (lined up: the DI 80 %
+//     in jazz, 20 % otherwise, bassDiShare), then an optical compressor at 3:1.
 //     PJ_EBASS_DI=1: the DI alone, as it was (the coils into 1 MOhm, nothing after).
 // The bassist: each note to a string and fret (low on the neck, open strings welcome, near the
 // hand); the index and middle fingers in turn while notes come quickly, rest strokes between the
@@ -47,6 +48,8 @@ bool electricBassInstrument(const Instrument& inst);  // the finger bass, the pi
 bool pickBassInstrument(const Instrument& inst);
 int slapBassInstrument(const Instrument& inst);  // 1: GM 37, 2: GM 38, 0: neither
 GuitarSpec twoPickupBass();
+double bassDiShare();
+int bassChannel(bool pick);  // the bass stack's channel: 1 "Bright", 2 "Normal" (the bassist's)  // the DI's share of the record: 0.8 in jazz (the director's verdict), else 0.2
 GuitarSpec splitCoilBass();
 
 class ElectricBassModel : public Tube {

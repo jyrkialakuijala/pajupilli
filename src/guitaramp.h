@@ -77,12 +77,20 @@
 //   - After the blend a studio compressor: an RMS detector (two 10 ms poles: it does not follow a
 //     41 Hz wave), a 6 dB soft knee; an optical compressor's opto cell (half its gain reduction quick, half a
 //     slow charge that lets go over seconds) or a FET compressor's FET (attack under a millisecond).
-// Bass presets: "fliptop-di" (GM 34), "bass-stack" (GM 35), "slap-di" (GM 37), "slap-squash" (GM 38).
+//   - The cabinets as physical speakers (src/bassspeaker.h; research/bass_amps.md 13): the head's
+//     voltage behind its output impedance, a tube head's transformer, the drivers on their box's
+//     air (Bl and the suspension changing with the cone's travel); the filters then only the cone's
+//     break-up and the mic.
+// Bass presets: "finger-stack" (GM 34), "bass-stack" (GM 35), "fliptop-di" and "fretless-di" (GM
+// 36), "slap-di" (GM 37), "slap-squash" (GM 38); the DI's share each the bassist's (src/ebass.cc).
 #pragma once
 
 #include <complex>
 #include <cstdint>
+#include <memory>
 #include <vector>
+
+#include "bassspeaker.h"
 
 namespace pajupilli {
 
@@ -167,12 +175,34 @@ class GuitarAmp {
     double presDb = 0, presHz = 3400, presQ = 0.8, speak = 0, presRef = -40, presLo = -4, presHi = 7;
     double presAttack = 0.001, presRelease = 0.08;
     double scRatio = 1, scAt = -30, scKnee = 10, scAttack = 0.01, scRelease = 0.25;
+    // The bass cabinets as physical speakers (src/bassspeaker.h; research/bass_amps.md 13): the
+    // head's voltage, its transformer, the drivers on their box's air; the cabinet's filters then
+    // only the cone's break-up and the mic above a few hundred Hz (and the coil's inductance,
+    // which the measured curves had in them, taken back out of them). PJ_BAMP_SPEAKER=0: the
+    // fixed filters alone, as before.
+    bool physical = false;
+    BassSpeaker::Spec spk{};
+    // Microphonics (research/bass_amps.md 13.8): the head on its cabinet, its first preamp tube's
+    // electrodes shaken by the cones' sound and ringing at their own resonances (three, 1-6 kHz,
+    // high Q), the ring a voltage at its grid: so many V per m/s^2 of the cones' acceleration (0:
+    // none); and the electrodes' spacing moving with it, the stage's gain by microMod per m/s^2
+    // (the note's sidebands at its frequency -+ the ring's: faint ghost notes). Kept tiny, far
+    // under where the loop would howl. PJ_AMP_MICRO scales both (0: off).
+    double micro = 0, microMod = 0;
+    // A bright input's coupling capacitor into its grid leak (Hz: a first-order high-pass before
+    // the first stage; 0: none).
+    double inHp = 0;
   };
   static Preset cleanCombo();
   static Preset cleanComboComp();
   static Preset crunchStack();
   static Preset slo();
   static Preset fliptopDi();       // GM 34: a two-pickup bass's DI and an fliptop bass amp, optical compressor
+  // The bass stack's two channels (the Ampeg preamps of 1971-72: research/bass_amps.md 13.9): 1
+  // "Bright" (the input through 0.005 uF into 220 k, a 145 Hz cut, then the Bass/Treble stack and
+  // the mid), 2 "Normal" (the input full, no Bass/Treble stack). The bassist's choice (src/ebass.cc).
+  static Preset svtChannel(Preset p, int channel);
+  static Preset fingerStack();       // GM 34: a two-pickup bass, fingerstyle, into the bass stack and its 8x10, the DI, optical compressor
   static Preset bassStack();         // GM 35: a Precision with a pick, an bass stack and an 8x10, the DI, FET compressor
   static Preset slapDi();      // GM 37: the DI first, a clean solid-state head and a 4x10, FET compressor
   static Preset slapSquash();  // GM 38: as 37, the DI 80 %, the FET compressor 4:1 with a slower attack (no squash)
@@ -245,7 +275,7 @@ class GuitarAmp {
   Biquad input_, cab_[10], up_[4], down_[4], post_[2];
   int nCab_ = 0, nPost_ = 0;
   Tube t_[kMaxStages];
-  OnePole pot_, hpOut_;
+  OnePole pot_, hpOut_, inHp_;
   // The tone stack: third order, direct form (transposed).
   double tb_[4] = {}, ta_[4] = {}, tz_[3] = {};
   // The James stack: two biquads (at the stages' rate); the fixed filters after the stages.
@@ -285,6 +315,14 @@ class GuitarAmp {
   bool tone_ = false;
   double ib_[4] = {}, ia_[4] = {}, iz_[3] = {};
   double input3(double x);
+  // The physical speaker, and the coil's inductance taken back out of the measured curve.
+  std::unique_ptr<BassSpeaker> spk_;
+  OnePole coil_;
+  // The microphonic tube: its resonance (a band-pass, 0 dB at its peak), the cones' last
+  // acceleration, the farthest its voltage went (for PJ_AMP_PEAKS).
+  Biquad microRes_[3];
+  double microW_[3] = {}, microMod_ = 0;
+  double micro_ = 0, coneLast_ = 0, microPeak_ = 0, inPeak_ = 0;
   // The speaking strip: its band-pass, the band's envelope, the lift now (dB), the compressor's
   // detector and gain reduction, their rates.
   double strip(double x);
@@ -293,6 +331,8 @@ class GuitarAmp {
   double presEnv_ = 0, presGain_ = 0, presAtk_ = 0, presRel_ = 0, presSmooth_ = 0;
   double scMs1_ = 0, scMs2_ = 0, scGr_ = 0, scAtk_ = 0, scRel_ = 0;
  public:
+  // (For the checks: the cone's farthest excursion (m; 0: no physical speaker).)
+  double excursion() const { return spk_ ? spk_->excursion() : 0; }
   // (For the checks: the strip's last lift (dB) and gain reduction (dB).)
   double presence() const { return presGain_; }
   double reduction() const { return scGr_; }

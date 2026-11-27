@@ -64,8 +64,73 @@ float levelAt(const std::vector<std::pair<long, float>>& c, long tick) {
   return float(lo->second + a * (hi->second - lo->second));
 }
 
+bool& jazzPiece() {
+  static bool jazz = false;
+  return jazz;
+}
+
+// Jazz, from what a listener hears first (research/bass_amps.md 13.6): swung eighths (the off-beat
+// at two thirds of the beat, not at half: in a file played or written with its swing), the time
+// kept on the ride cymbal more than on the hi-hat, a walking bass (a line of quarter notes), the
+// jazz band's instruments (a jazz guitar, saxophones, a vibraphone, a muted trumpet). Two of
+// those, the swing counting twice, or src/midifile.cc's trio (a piano and an upright bass).
+// PJ_DIRECTOR_JAZZ: 1 always, 0 never (-1: read).
+static void readJazz(const DirInput& in, Direction& d) {
+  const long div = std::max(1, in.div);
+  int half = 0, twoThirds = 0;
+  const auto offbeat = [&](long tick) {
+    const double f = double(tick % div) / double(div);
+    half += std::fabs(f - 0.5) < 0.06;
+    twoThirds += std::fabs(f - 2.0 / 3) < 0.06;
+  };
+  for (const DirNote& x : in.notes) offbeat(x.tick);
+  int ride = 0, hat = 0;
+  for (const auto& [t, k] : in.drums) {
+    offbeat(t);
+    ride += k == 51 || k == 59 || k == 53;
+    hat += k == 42 || k == 46;
+  }
+  const int offs = half + twoThirds;
+  const double swing = offs ? double(twoThirds) / offs : 0;
+  // The bass: the lowest channel with a line of its own; walking, if most of its steps are a beat.
+  int chN[16] = {};
+  double chKey[16] = {};
+  for (const DirNote& x : in.notes) { ++chN[x.ch]; chKey[x.ch] += x.key; }
+  int bass = -1;
+  for (int c = 0; c < 16; ++c)
+    if (chN[c] >= 16 && chKey[c] / chN[c] < 52 && (bass < 0 || chKey[c] / chN[c] < chKey[bass] / chN[bass])) bass = c;
+  double walk = 0, eighths = 0;
+  if (bass >= 0) {
+    long last = -1;
+    int steps = 0, beats = 0, halves = 0;
+    for (const DirNote& x : in.notes) {
+      if (x.ch != bass || x.tick == last) continue;
+      if (last >= 0) {
+        ++steps;
+        beats += std::labs(x.tick - last - div) <= div / 8;
+        halves += x.tick - last < div * 7 / 8;
+      }
+      last = x.tick;
+    }
+    walk = steps ? double(beats) / steps : 0;
+    eighths = steps ? double(halves) / steps : 0;
+  }
+  const bool swung = offs >= 16 && swing >= 0.6, rides = ride >= 16 && ride >= 1.5 * hat, walks = walk >= 0.5;
+  const bool band = in.program[26] || in.program[64] || in.program[65] || in.program[66] || in.program[67] || in.program[11] || in.program[59];
+  const int score = 2 * swung + rides + walks + band;
+  d.jazz = in.jazzBand || score >= 2;
+  static const int kForce = int(knob("PJ_DIRECTOR_JAZZ", -1));
+  if (kForce >= 0) d.jazz = kForce > 0;
+  char why[240];
+  std::snprintf(why, sizeof why, "%s: off-beats swung %.0f %% (of %d), ride %d against hi-hat %d, the bass (channel %d) in beats %.0f %%, quicker %.0f %%%s%s%s",
+                d.jazz ? "jazz" : "not jazz", 100 * swing, offs, ride, hat, bass + 1, 100 * walk, 100 * eighths, band ? ", a jazz band's instruments" : "",
+                in.jazzBand ? ", a piano and an upright bass" : "", kForce >= 0 ? " (PJ_DIRECTOR_JAZZ)" : "");
+  d.jazzWhy = why;
+}
+
 Direction direct(const DirInput& in) {
   Direction d;
+  readJazz(in, d);
   const std::vector<DirNote>& nt = in.notes;
   const int n = int(nt.size());
   d.cues.assign(n, Cue{{0.5f, 0.5f, 0, 0.5f, 0, 1, 0, 1, 1, 0, 0, 0}});

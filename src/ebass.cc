@@ -1,5 +1,6 @@
 #include "ebass.h"
 #include "heard.h"
+#include "director.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,18 @@ bool pickBassInstrument(const Instrument& inst) { return std::strcmp(inst.name, 
 int slapBassInstrument(const Instrument& inst) {
   return std::strcmp(inst.name, "slap-bass-1") == 0 ? 1 : std::strcmp(inst.name, "slap-bass-2") == 0 ? 2 : 0;
 }
+// The bassist's choice of how much of the record is the DI (the user: an electric bass is its amp
+// and its speaker; in jazz the clean, close DI): the director read the piece as jazz, 80 %; else
+// 20 %, the miked 8x10 the sound and the DI only the lowest octave the sealed box loses.
+// PJ_BAMP_BLEND sets it.
+double bassDiShare() { return knob("PJ_BAMP_BLEND", jazzPiece() ? 0.8 : 0.2); }
+
+// The bassist's channel on the bass stack (the user: the bass player picks it): the pick bass
+// outside jazz on channel one, "Bright" (the lows left to the DI, the attack cutting through);
+// the fingers, and everything in jazz, on channel two, "Normal" (full range, no tone stack).
+// PJ_BAMP_CHANNEL 1 / 2 sets it.
+int bassChannel(bool pick) { return int(knob("PJ_BAMP_CHANNEL", pick && !jazzPiece() ? 1 : 2)); }
+
 bool electricBassInstrument(const Instrument& inst) {
   return std::strcmp(inst.name, "electric-bass") == 0 || pickBassInstrument(inst) || slapBassInstrument(inst);
 }
@@ -118,9 +131,13 @@ ElectricBassModel::ElectricBassModel(const Instrument& inst)
   a2_ = (A * c * c - Bq * c + D) / a0;
   out_ = knob("PJ_EBASS_OUT", 1.0);
   // The amp and the studio after it (unless PJ_EBASS_DI): told the same coils, pots and cable.
-  // GM 34 the fliptop and the DI, an optical compressor; GM 35 the bass stack and its 8x10 with the DI, a FET compressor.
+  // GM 34 and 35 the bass stack and its 8x10 with the DI (an optical compressor; a FET one); the
+  // slap basses a solid-state head and a 4x10. The DI's share the bassist's (bassDiShare).
   if (knob("PJ_EBASS_DI", 0) > 0) return;
-  amp_.reset(new GuitarAmp(inst.fs, pick ? GuitarAmp::bassStack() : slap == 1 ? GuitarAmp::slapDi() : slap == 2 ? GuitarAmp::slapSquash() : GuitarAmp::fliptopDi()));
+  GuitarAmp::Preset ap = pick ? GuitarAmp::bassStack() : slap == 1 ? GuitarAmp::slapDi() : slap == 2 ? GuitarAmp::slapSquash() : GuitarAmp::fingerStack();
+  if (!slap) ap = GuitarAmp::svtChannel(ap, bassChannel(pick));
+  ap.blend = bassDiShare();
+  amp_.reset(new GuitarAmp(inst.fs, ap));
   amp_->connect({L, R, coilC, pots}, cable);
 }
 

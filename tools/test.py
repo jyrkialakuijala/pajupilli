@@ -1937,7 +1937,7 @@ def electric_bass_amp():
     import numpy as np
     from scipy.io import wavfile
     exe = os.path.join(ROOT, 'tools', '.bassamp')
-    b = subprocess.run(['g++', '-O3', '-march=native', '-ffast-math', '-std=c++17', '-Isrc', 'tools/bassamp.cc', 'src/guitaramp.cc', 'src/heard.cc', '-o', exe],
+    b = subprocess.run(['g++', '-O3', '-march=native', '-ffast-math', '-std=c++17', '-Isrc', 'tools/bassamp.cc', 'src/guitaramp.cc', 'src/bassspeaker.cc', 'src/heard.cc', '-o', exe],
                        capture_output=True, text=True, cwd=ROOT)
     if b.returncode:
         check('bass amp: tools/bassamp.cc builds', False, b.stderr.strip()[-300:])
@@ -1962,7 +1962,7 @@ def electric_bass_amp():
     fs, cur, _ = render('on 28 100 wait 1.5 off 28', amp_only)
     _, lin, _ = render('on 28 100 wait 1.5 off 28', dict(amp_only, PJ_AMP_LINEAR='1'))
     res = rms(cur - lin, fs, 0.05, 1.4) - rms(lin, fs, 0.05, 1.4)
-    check('electric-bass: the fliptop is clean', res < -40, f'v100 open E: the curves add {res:.1f} dB ({100 * 10 ** (res / 20):.2f} %)')
+    check('electric-bass: the amp is clean', res < -40, f'v100 open E: the curves add {res:.1f} dB ({100 * 10 ** (res / 20):.2f} %)')
     worst = 0.0
     for seq in ('on 28 127 wait 1 off 28', 'on 55 127 wait 1 off 55'):
         _, _, err = render(seq, {'PJ_AMP_PEAKS': '1'})

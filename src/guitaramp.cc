@@ -142,6 +142,53 @@ GuitarAmp::Preset GuitarAmp::slo() {
   return p;
 }
 
+namespace {
+// The bass cabinets' drivers and boxes (research/bass_amps.md 13; [T] the data sheets of 4.1-4.2,
+// [E] what was not published). A 10" bass driver (the BP102's numbers: Fs 35 Hz, Qts 0.43, Vas
+// 91 l, Xmax 6.2 mm; Le ~0.7 mH, Qms 5 [E]).
+BassSpeaker::Spec tenInch() {
+  BassSpeaker::Spec s;
+  s.re = 5.6; s.le = 0.7e-3; s.fs = 35; s.qms = 5; s.qes = 0.47; s.vas = 0.091; s.sd = 0.035; s.xmax = 6.2e-3;
+  return s;
+}
+// The 8x10 (810E: two sealed chambers of four, ~30 l of air a driver; 8 Ohm drivers two in series,
+// four strings: 4 Ohm) on the bass stack's 300 W (49 V peak into 4 Ohm), its damping factor ~6 and
+// its big transformer (3 Hz; saturating near full power at 35 Hz) [E]. Its small-signal response:
+// -2.9 dB at 58 Hz and -9.5 at 40 (the 810E's -3 and -10).
+BassSpeaker::Spec svt810() {
+  BassSpeaker::Spec s = tenInch();
+  s.vb = knob("PJ_SVT_VB", 0.03);
+  s.series = 2; s.parallel = 4; s.nominal = 4;
+  s.volts = knob("PJ_SVT_VOLTS", 50);
+  s.damping = knob("PJ_SVT_DF", 6);
+  s.otHz = 3; s.otR = 8; s.otSat = 0.25 * knob("PJ_SVT_OTSAT", 1);
+  return s;
+}
+// The fliptop's 1x15 (ported, ~150 l, tuned near 38 Hz [E]: -4 dB at 40 Hz, research 4.3's target;
+// the mic at ~15 cm hears the port as it hears the cone); a 15" driver (CB15: Fs 34, Qts 0.34;
+// Vas ~280 l, Xmax 4 mm, Le 1 mH [E]); two 6L6s' ~30 W into 8 Ohm (22 V peak), a damping factor ~3,
+// a smaller transformer that saturates sooner [E].
+BassSpeaker::Spec fliptop115() {
+  BassSpeaker::Spec s;
+  s.re = 5.6; s.le = 1.0e-3; s.fs = 34; s.qms = 5; s.qes = 0.37; s.vas = 0.28; s.sd = 0.085; s.xmax = 4e-3;
+  s.vb = knob("PJ_B15_VB", 0.15); s.fb = knob("PJ_B15_FB", 38); s.sp = 0.012; s.portHeard = knob("PJ_B15_PORT", 1.0);
+  s.nominal = 8; s.volts = 22; s.damping = 3;
+  s.otHz = 4; s.otR = 16; s.otSat = 0.1;
+  return s;
+}
+// A 4x10 with a horn (ported, ~50 l a driver, tuned near 40 Hz [E]: -2.4 dB at 45 Hz, -4.7 at 40,
+// the 410HLF's -3 at 48 [S]; the port heard as the cones are); 8 Ohm drivers two by two (8
+// Ohm); a solid-state head (300 W, 49 V peak; damping factor ~200: a voltage source, no
+// transformer).
+BassSpeaker::Spec ss410() {
+  BassSpeaker::Spec s = tenInch();
+  s.vb = knob("PJ_410_VB", 0.05); s.fb = knob("PJ_410_FB", 40); s.sp = 0.006; s.portHeard = knob("PJ_410_PORT", 1.0);
+  s.series = 2; s.parallel = 2; s.nominal = 8;
+  s.volts = 49; s.damping = 200; s.otHz = 0;
+  return s;
+}
+}  // namespace
+
 // GM 34: a two-pickup bass on a splitter into an active DI (10 MOhm) and an fliptop bass amp's 1966 channel
 // (1 MOhm: the pickup sees 0.9 MOhm), the two blended half and half, then an optical compressor (research/
 // bass_amps.md 10.1; the fliptop bass amp drawn by Piazza, 3.1). The amp: V1a and V1b (6SL7s, 470 k and 220
@@ -178,6 +225,10 @@ GuitarAmp::Preset GuitarAmp::fliptopDi() {
   p.sagDepth = 0.25;
   p.hpOut = 8;
   p.cabinet = 4;
+  p.physical = true;
+  p.spk = fliptop115();
+  p.micro = 3e-5;
+  p.microMod = 2e-4;
   p.oversample = 1;
   p.inputR = knob("PJ_BAMP_INPUTR", 0.9e6);
   p.blend = knob("PJ_BAMP_BLEND", 0.5);
@@ -243,12 +294,20 @@ GuitarAmp::Preset GuitarAmp::bassStack() {
   if (knob("PJ_BAMP_ULTRAHI", 0) > 0.5) p.voice[p.voices++] = {3, 8000, 0.7, 8.5};
   p.volume = knob("PJ_BAMP_VOLUME", 0.35);
   p.bright = 0;
-  p.master = knob("PJ_BAMP_MASTER", 0.5);
-  p.clip = knob("PJ_BAMP_CLIP", 60.0);
+  // (The power stage's limit from the spec: 67 dB at 1 kHz with everything up, 300 W at < 3 %:
+  // full power at ~15 mV rms in, the stages' 43 dB here to 3.1 V (research/bass_amps.md 3.2, 13.4).
+  // Before, 60 V: the head at a few watts, its tubes and its speakers never working. The master
+  // where the hardest pick attack is ~5 % in its first 100 ms, a mf one under 1 %.)
+  p.master = knob("PJ_BAMP_MASTER", 0.1);
+  p.clip = knob("PJ_BAMP_CLIP", 3.1);
   p.knee = 3;
   p.sagDepth = 0.08;
   p.hpOut = 8;
   p.cabinet = 3;
+  p.physical = true;
+  p.spk = svt810();
+  p.micro = 3e-5;
+  p.microMod = 2e-4;
   p.oversample = 4;
   p.inputR = 0.9e6;
   p.blend = knob("PJ_BAMP_BLEND", 0.35);
@@ -258,6 +317,47 @@ GuitarAmp::Preset GuitarAmp::bassStack() {
   p.stAt = knob("PJ_BAMP_THRESHOLD", 0.04);
   p.stAttack = 0.0008;
   p.stRelease = 0.15;
+  p.stMakeup = knob("PJ_BAMP_MAKEUP", 4);
+  return p;
+}
+
+// The two channels (the VT-40 preamp of 1971, drawn by Piazza: the same family as the early bass
+// stack; research/bass_amps.md 13.9). Both the same first 12AX7 and volume. Channel One "Bright":
+// the jack through 0.005 uF into 220 k (a 145 Hz cut: the pickup's lows kept out of the stages,
+// the pick's attack forward), then the second triode, the Bass/Treble stack and the inductor mid
+// (as bassStack()). Channel Two "Normal": the jack straight to its grid (5.6 M), no Bass/Treble
+// stack (its reverb path, not on a bass amp, left out); the volume lower by the stack's 22 dB
+// insertion so the stages after it are driven as on channel one.
+GuitarAmp::Preset GuitarAmp::svtChannel(Preset p, int channel) {
+  if (channel == 1) {
+    p.inHp = 1 / (2 * kPi * 220e3 * 0.005e-6);
+  } else if (channel == 2) {
+    p.stackAfter = -1;
+    p.volume *= 0.079;
+  }
+  return p;
+}
+
+// GM 34 (src/ebass.cc ElectricBassPlayer): the two-pickup bass played with the fingers into the
+// same bass stack and 8x10 as GM 35 (the user: an electric bass is its amp and its speaker), the
+// treble a little lower (the J's both-up top is brighter than the P's), the DI blended as the bass
+// player chooses (src/ebass.cc: the director's style), the optical compressor at 3:1 of GM 34's
+// fliptop days.
+GuitarAmp::Preset GuitarAmp::fingerStack() {
+  Preset p = bassStack();
+  p.name = "finger-stack";
+  p.treble = knob("PJ_BAMP_TREBLE", 0.5);
+  // (The volume lower: the preamp clean; the master where a v127 open E is 1.8 % in its attack,
+  // a v100 one clean (-42 dB).)
+  p.volume = knob("PJ_BAMP_VOLUME", 0.2);
+  p.master = knob("PJ_BAMP_MASTER", 0.16);
+  p.oversample = 2;  // (it growls little: 2x, the cost of GM 34's fliptop)
+  p.studio = int(knob("PJ_BAMP_STUDIO", 1));
+  p.stRatio = knob("PJ_BAMP_RATIO", 3);
+  p.stAt = knob("PJ_BAMP_THRESHOLD", 0.034);
+  p.stAttack = 0.01;
+  p.stRelease = 0.06;
+  p.stTail = 1.0;
   p.stMakeup = knob("PJ_BAMP_MAKEUP", 4);
   return p;
 }
@@ -286,6 +386,8 @@ GuitarAmp::Preset GuitarAmp::slapDi() {
   p.sagDepth = 0;
   p.hpOut = 8;
   p.cabinet = 5;
+  p.physical = true;
+  p.spk = ss410();
   p.oversample = 1;
   p.inputR = 0.9e6;
   p.blend = knob("PJ_BAMP_BLEND", 0.75);
@@ -511,6 +613,7 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   linear_ = int(knob("PJ_AMP_LINEAR", 0));
   peaks_ = knob("PJ_AMP_PEAKS", 0) > 0;
   hpOut_ = onePole(1, fsOs_, p.hpOut);
+  if (p.inHp > 0) inHp_ = onePole(1, fsOs_, p.inHp);
   // The pot between the stages: its share g of 1 MOhm, a capacitor C across the part above the
   // wiper: H(s) = g (1 + s Rt C) / (1 + s g Rt C), Rt = (1 - g) 1 MOhm (the treble passes whole).
   {
@@ -575,18 +678,44 @@ GuitarAmp::GuitarAmp(double fs, const Preset& p) : fs_(fs), fsOs_(fs * std::max(
   // -23 at 5 kHz; the 4x10 with its horn -5.5 at 40, -1.6 at 5 kHz. (Their cones' break-up floor
   // at 8-12 kHz, -35 dB and under, is left out. The research's numbers are the analog filters':
   // here the 8x10's and the 1x15's low-passes 5-6 % higher, the bilinear's squeeze made good.)
+  // As physical speakers (p.physical: src/bassspeaker.h; research/bass_amps.md 13) the box's and
+  // the mic's high-passes go (the drivers on their air make the low end), and the coil's
+  // inductance (Re / 2 pi Le: the measured curves were taken with it) is taken back out by a zero
+  // there; the rest stays: the cone's break-up and the mic.
+  const bool phys = p.physical && p.cabinet >= 3 && p.cabinet <= 5 && knob("PJ_BAMP_SPEAKER", 1) > 0;
   if (p.cabinet == 3) {
     // An 8x10 bass cabinet (8x10, sealed), a kick-drum microphone ~5 cm off the centre of one cone.
     const Eq e[8] = {{1, 60, 0.8, 0}, {1, 40, 0.6, 0}, {2, 95, 1.0, 3}, {2, 470, 1.4, -3}, {2, 2000, 2.5, 5}, {0, 2440, 1.0, 0}, {0, 3070, 0.7, 0}, {2, 4000, 2.0, 3}};
-    for (const Eq& q : e) cab_[nCab_++] = eq(q, fs);
+    for (int i = phys ? 3 : 0; i < 8; ++i) cab_[nCab_++] = eq(e[i], fs);
   } else if (p.cabinet == 4) {
     // The fliptop's 1x15 (ported), an broadcast dynamic microphone at ~15 cm (no proximity: its Variable-D).
     const Eq e[6] = {{1, 44, 1.0, 0}, {1, 38, 0.7, 0}, {2, 600, 1.5, -2}, {2, 1900, 3.0, 7}, {0, 2310, 1.1, 0}, {0, 2940, 0.7, 0}};
-    for (const Eq& q : e) cab_[nCab_++] = eq(q, fs);
+    for (int i = phys ? 2 : 0; i < 6; ++i) cab_[nCab_++] = eq(e[i], fs);
   } else if (p.cabinet == 5) {
     // A 4x10 with a horn (ported), the mic between a cone and the horn; the horn's L-pad at noon.
     const Eq e[7] = {{1, 48, 1.0, 0}, {1, 35, 0.6, 0}, {2, 500, 1.4, -2}, {2, 1800, 2.0, 2.5}, {0, 2600, 0.8, 0}, {3, 3800, 0.9, 12}, {0, 14000, 0.7, 0}};
-    for (const Eq& q : e) cab_[nCab_++] = eq(q, fs);
+    for (int i = phys ? 2 : 0; i < 7; ++i) cab_[nCab_++] = eq(e[i], fs);
+  }
+  if (phys) {
+    spk_.reset(new BassSpeaker(fs, p.spk));
+    const double mk = knob("PJ_AMP_MICRO", 1.0);
+    micro_ = p.micro * mk;
+    microMod_ = p.microMod * mk;
+    if (micro_ > 0 || microMod_ > 0) {
+      // The grid's wires, the plate, the mica spacers [E]: their frequency, Q, share.
+      const double kHz[3] = {1700, 3300, 5100}, kQ[3] = {30, 40, 50}, kW[3] = {0.6, 1.0, 0.5};
+      for (int i = 0; i < 3; ++i) {
+        const double w = 2 * kPi * std::min(kHz[i], 0.45 * fs) / fs, al = std::sin(w) / (2 * kQ[i]), a0 = 1 + al;
+        Biquad& b = microRes_[i];
+        b.b0 = al / a0; b.b1 = 0; b.b2 = -al / a0;
+        b.a1 = -2 * std::cos(w) / a0; b.a2 = (1 - al) / a0;
+        microW_[i] = kW[i];
+      }
+    }
+    const double wz = p.spk.re / p.spk.le, wp = 2 * kPi * std::min(16000.0, 0.4 * fs), c = 2 * fs;
+    coil_.b0 = (1 + c / wz) / (1 + c / wp);
+    coil_.b1 = (1 - c / wz) / (1 + c / wp);
+    coil_.a1 = (1 - c / wp) / (1 + c / wp);
   }
   if (p.cabinet == 6) {
     // A closed 1x15 jazz speaker (research/jazz_guitar.md 5 [E]): the closed box's resonance at
@@ -831,6 +960,7 @@ std::complex<double> GuitarAmp::ampPath(double f) const {
     for (int i = 0; i < 4; ++i) { b += tb_[i] * zk; a += ta_[i] * zk; zk *= z1; }
     return b / a;
   };
+  if (p_.inHp > 0) h *= at(inHp_, f, fsOs_);
   if (p_.stackAfter == 0) h *= stackAt();
   for (int i = 0; i < p_.stages; ++i) {
     const Stage& s = p_.stage[i];
@@ -847,6 +977,7 @@ std::complex<double> GuitarAmp::ampPath(double f) const {
   if (p_.oversample > 1)
     for (int i = 0; i < 4; ++i) h *= at(up_[i], f, fsOs_) * at(down_[i], f, fsOs_);
   for (int i = 0; i < nPost_; ++i) h *= at(post_[i], f, fs_);
+  if (spk_) h *= spk_->response(f) * at(coil_, f, fs_) / p_.clip;
   for (int i = 0; i < nCab_; ++i) h *= at(cab_[i], f, fs_);
   if (!delay_.empty()) h *= std::polar(1.0, -2 * kPi * f * (delay_.size() - 1) / fs_);
   return h;
@@ -878,7 +1009,7 @@ std::complex<double> GuitarAmp::response(int what, double f) const {
         return b / a;
       }
     case 2: {
-      std::complex<double> h = 1;
+      std::complex<double> h = spk_ ? spk_->response(f) * at(coil_, f, fs_) : 1.0;
       for (int i = 0; i < nCab_; ++i) h *= at(cab_[i], f, fs_);
       return h;
     }
@@ -972,7 +1103,10 @@ GuitarAmp::~GuitarAmp() {
   if (!peaks_) return;
   std::fprintf(stderr, "amp %s peaks:", p_.name);
   for (int i = 0; i < p_.stages; ++i) std::fprintf(stderr, " stage %d %.2f", i + 1, peak_[i]);
-  std::fprintf(stderr, " power %.2f (of the knees)\n", peak_[kMaxStages]);
+  std::fprintf(stderr, " power %.2f (of the knees)", peak_[kMaxStages]);
+  if (spk_) std::fprintf(stderr, ", the cones %.1f mm (Xmax %.1f)", 1e3 * spk_->excursion(), 1e3 * p_.spk.xmax);
+  if (micro_ > 0 || microMod_ > 0) std::fprintf(stderr, ", the microphonic ring %.1f uV at its grid (%.0f dB under the bass there)", 1e6 * microPeak_, 20 * std::log10(std::max(1e-12, microPeak_) / std::max(1e-12, inPeak_)));
+  std::fprintf(stderr, "\n");
 }
 
 void GuitarAmp::connect(const Source& s, double cable) {
@@ -1160,6 +1294,7 @@ double GuitarAmp::screamer(double x) {
 
 template <bool kPeaks>
 double GuitarAmp::chain(double x) {
+  if (p_.inHp > 0) x = inHp_.run(x);
   if (p_.tsLevel > 0) x = screamer(x);
   if (p_.stackAfter == 0) x = stack(x);
   for (int i = 0; i < p_.stages; ++i) {
@@ -1226,7 +1361,10 @@ void GuitarAmp::reset() {
     t.u1 = p_.stage[i].swing == 1 ? p_.stage[i].bias : p_.stage[i].bias / p_.stage[i].swing;
     t.F1 = p_.adaa ? triodeF(t.u1) : 0;
   }
-  pot_.z = hpOut_.z = 0;
+  pot_.z = hpOut_.z = coil_.z = inHp_.z = 0;
+  if (spk_) spk_->reset();
+  for (Biquad& b : microRes_) b.z1 = b.z2 = 0;
+  coneLast_ = 0;
   for (Biquad& b : jb_) b.z1 = b.z2 = 0;
   for (Biquad& b : voice_) b.z1 = b.z2 = 0;
   for (Biquad& b : di_) b.z1 = b.z2 = 0;
@@ -1268,6 +1406,14 @@ float GuitarAmp::process(float emf) {
   }
   // Bass: the DI taken here (after a stomp box, if any); the amp's path skipped if the DI is all.
   const double d = x;
+  // The microphonic tube's ring, at its grid (not the DI's: it is on the splitter, before the head).
+  if (micro_ > 0 || microMod_ > 0) {
+    double r = 0;
+    for (int i = 0; i < 3; ++i) r += microW_[i] * microRes_[i].run(coneLast_);
+    const double m = micro_ * r;
+    if (peaks_) { microPeak_ = std::max(microPeak_, std::fabs(m)); inPeak_ = std::max(inPeak_, std::fabs(x)); }
+    x = x * (1 + microMod_ * r) + m;
+  }
   if (bass_ && p_.blend >= 1) return float(compress(di(d)));
   if (p_.oversample <= 1) {
     x = peaks_ ? chain<true>(x) : chain<false>(x);
@@ -1286,6 +1432,10 @@ float GuitarAmp::process(float emf) {
   }
   // The power stage's resonance and presence; the speaker.
   for (int i = 0; i < nPost_; ++i) x = post_[i].run(x);
+  if (spk_) {
+    coneLast_ = spk_->run(x / p_.clip);
+    x = coil_.run(coneLast_);
+  }
   for (int i = 0; i < nCab_; ++i) x = cab_[i].run(x);
   if (strip_ && !bass_) return float(strip(x / p_.clip));
   if (!bass_) return float(x / p_.clip);
