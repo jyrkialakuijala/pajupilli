@@ -12,6 +12,9 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <dlfcn.h>
+#endif
 
 extern char** environ;
 
@@ -774,13 +777,24 @@ static void logCalibration(const Instrument& inst, const Calibration& cal, FILE*
   }
 }
 
+bool statSelf(struct stat* st) {
+  const char* self = "/proc/self/exe";
+#ifdef __APPLE__
+  // The file this function was loaded from (in an Audio Unit extension's
+  // sandbox HOME is its container, so the cache lands there).
+  Dl_info dl;
+  if (dladdr(reinterpret_cast<const void*>(&statSelf), &dl) && dl.dli_fname) self = dl.dli_fname;
+#endif
+  return stat(self, st) == 0;
+}
+
 // A calibration depends only on this binary and the PJ_* knobs: keep it in
 // ~/.cache/pajupilli keyed on both, so live startup and make test skip the ~1 s
 // of learning. PJ_NOCALCACHE=1 bypasses it.
 static std::string cachePath(const Instrument& inst, double a4, int lo, int hi) {
   const char* home = std::getenv("HOME");
   struct stat st;
-  if (std::getenv("PJ_NOCALCACHE") || !home || stat("/proc/self/exe", &st) != 0) return "";
+  if (std::getenv("PJ_NOCALCACHE") || !home || !statSelf(&st)) return "";
   uint64_t h = 1469598103934665603ull;  // FNV-1a
   auto mix = [&h](const void* d, size_t n) {
     for (size_t i = 0; i < n; ++i) h = (h ^ static_cast<const unsigned char*>(d)[i]) * 1099511628211ull;

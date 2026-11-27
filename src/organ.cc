@@ -16,10 +16,13 @@
 #include <thread>
 #include <utility>
 
+#include "calibrate.h"
 #include "knob.h"
 #include "organplan.h"
 #include "rng.h"
 #include "vmath.h"
+
+extern char** environ;
 
 namespace pajupilli {
 
@@ -1243,7 +1246,7 @@ void OrganModel::addRank(int stop) {
 static std::string organCachePath(const char* inst) {
   const char* home = std::getenv("HOME");
   struct stat st;
-  if (std::getenv("PJ_NOCALCACHE") || !home || stat("/proc/self/exe", &st) != 0) return "";
+  if (std::getenv("PJ_NOCALCACHE") || !home || !statSelf(&st)) return "";
   uint64_t h = 1469598103934665603ull;  // FNV-1a
   auto mix = [&h](const void* d, size_t n) {
     for (size_t i = 0; i < n; ++i) h = (h ^ static_cast<const unsigned char*>(d)[i]) * 1099511628211ull;
