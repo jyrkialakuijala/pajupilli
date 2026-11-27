@@ -1100,6 +1100,10 @@ void Ensemble::block(float* left, float* right, int n) {
         const int np = f_[i].v->parts();
         if (!np || !std::count(go.begin(), go.end(), i)) continue;
         if (rooms_[c]->partFrom(int(q) + 1) - rooms_[c]->partFrom(int(q)) != np) continue;  // (the room does not know them)
+        if (const int mv = f_[i].v->partsMoved(); mv != f_[i].moved) {  // (aimed anew: the parts' new places)
+          f_[i].moved = mv;
+          rooms_[c]->moveParts(int(q), f_[i].v->partPlaces(), f_[i].v->partLobes());
+        }
         const float gp = float(f_[i].vg) / k;
         for (int j = 0; j < np; ++j)
           if (const float* p = f_[i].v->part(n, j)) {

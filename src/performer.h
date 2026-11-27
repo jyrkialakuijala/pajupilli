@@ -134,8 +134,14 @@ class Performer {
   // distance (flutes).
   double coverTrim[128], coverLoTrim[128], coverHiTrim[128], dynLo[128], dynHi[128], pressTrim[128], jetTrim[128];
   int fingering[128];  // the calibration's choice of fingering (brass)
+  // An instrument's own note (NoteInfo::natural): its pitch with the lips at rest, cents off
+  // the tempered one; the ear tunes it from there (a chord's correction on top), not to the
+  // tempered pitch. 0 for every other note.
+  double ownCents[128] = {};
   void setCalibration(const Calibration& c) {
     for (int i = 0; i < 128; ++i) {
+      const NoteInfo* ni = inst_.design && i >= inst_.lo && i <= inst_.hi ? noteInfo(inst_, i) : nullptr;
+      ownCents[i] = ni && ni->natural && c.ok[i] ? c.cents[i] : 0;
       coverTrim[i] = c.cover[i];
       coverLoTrim[i] = c.coverLo[i];
       coverHiTrim[i] = c.coverHi[i];

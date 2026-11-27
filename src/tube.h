@@ -71,8 +71,8 @@ class Tube {
   // listener, z up), and each one's last n samples (taken once, in the output's units, without
   // the instrument's gain: as takeDipole). The parts add up to the output; the room gives every
   // path from the instrument each part's own length.
-  virtual int parts() const { return spread_ ? kSpread + 1 : 0; }
-  virtual const float* partPlaces() const { return spread_ ? spreadPlace_ : nullptr; }
+  virtual int parts() const { return spread_ ? kSpread + 1 : aim_ ? nRad_ : 0; }
+  virtual const float* partPlaces() const { return spread_ ? spreadPlace_ : aim_ ? aimPlace_ : nullptr; }
   virtual const float* takePart(int n, int j);
   // A drum's sound spread over its rim (spreadOn): below ~400 Hz from its middle (the last part;
   // the lows go out alike all round), above it in kSpread parts round the rim of `radius` (m), each
@@ -85,7 +85,20 @@ class Tube {
   void hit();
   // Each part's lobe (4 per part: a unit direction in the instrument's frame, as its places, and
   // a strength a: a path leaving at angle theta to it is heard x (1 + a cos theta)), or null.
-  virtual const float* partLobes() const { return spread_ ? spreadLobe_ : nullptr; }
+  virtual const float* partLobes() const { return spread_ ? spreadLobe_ : aim_ ? aimLobe_ : nullptr; }
+  // An instrument held in the hands and aimed by its player (the shakuhachi): every opening
+  // radiates from its own place as the instrument is held (aimOn), a part each (the embouchure
+  // at the lips, each tone hole, the foot), the room giving each its own paths. setPose: the
+  // instrument's axis `down` radians below the horizontal (the top at the lips, the foot ahead
+  // and below), swung `side` radians to the listener's right; the face (and the body behind the
+  // lips) turned `turn` radians. The lobes: the head behind the embouchure shadows what goes
+  // back (its lobe forward of the face), the front holes sound out of the instrument's front
+  // (the back hole, backHole, behind it), the foot along the axis. partsMoved(): counts the
+  // poses (the room asks again when it changes).
+  void aimOn(int backHole);
+  void setPose(double down, double side, double turn);
+  int partsMoved() const { return aimMoved_; }
+  bool aimed() const { return aim_; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right
@@ -206,6 +219,16 @@ class Tube {
   float spreadW_[kSpread] = {}, spreadTo_[kSpread] = {}, spreadLow_ = 0, spreadA_ = 0, spreadX_ = 0;
   uint32_t spreadRng_ = 1;
   std::vector<float> spreadBuf_[kSpread + 1], spreadOut_;
+  // (aimOn: each radiator's place along the instrument (m from the top) and kind (-1 the
+  // embouchure, -2 the foot, else its hole), its gain at 1 m, this sample's sound, its DC
+  // blocker; the parts' places and lobes as posed, their samples waiting for the room)
+  bool aim_ = false;
+  int aimBack_ = -1, aimMoved_ = 0;
+  float radX_[kMaxHoles + 2] = {}, radGain1_[kMaxHoles + 2] = {}, aimNow_[kMaxHoles + 2] = {};
+  int radKind_[kMaxHoles + 2] = {};
+  float aimDcX_[kMaxHoles + 2] = {}, aimDcY_[kMaxHoles + 2] = {};
+  float aimPlace_[3 * (kMaxHoles + 2)] = {}, aimLobe_[4 * (kMaxHoles + 2)] = {};
+  std::vector<float> aimBuf_[kMaxHoles + 2];
   int ctl_ = 0;
   double testDp_ = 0;
   const float* room_ = nullptr;

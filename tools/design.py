@@ -200,6 +200,8 @@ class Model:
             fw = nfreq(midi - self.s['transpose'])
             t = min(max(math.log(fw / 261.6) / math.log(1760 / 261.6), 0.0), 1.2)
             unc = (6.0 - 2.5 * t) * 1e-3 * self.s['emb'] * cover
+            if self.s.get('family') in ('panflute', 'bottle') and 2e3 * a > 15:  # wide rims (bass pipes, a bottle's neck): bigger lips (src/player.cc PJ_PIPELIPS)
+                unc *= (2e3 * a / 15) ** 0.7
             sw = max(4e-6 * self.s['emb'] ** 2, unc * 2 * a)
             rin = a
             sbot = math.pi * a * a
@@ -392,7 +394,8 @@ def emit(results):
         for m in range(spec['lo'], spec['hi'] + 1):
             pat, n = notes[m]
             e = errs.get(m, float('nan'))
-            out.append(f'    {{"{pat}", {n}}},  // {m} {note_name(m)} ({e:+.0f} c passive)')
+            nat = ', true' if m in spec.get('natural', ()) else ''  # (the instrument's own pitch: src/instrument.h)
+            out.append(f'    {{"{pat}", {n}{nat}}},  // {m} {note_name(m)} ({e:+.0f} c passive{"; its own pitch" if nat else ""})')
         out.append('};')
         if spec.get('pipes'):
             out.append(f"const PipeDef {cn}Pipes[] = {{")

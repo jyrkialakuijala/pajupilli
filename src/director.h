@@ -17,7 +17,8 @@
 //
 // It acts only on a file with no performance of its own (quantized, flat velocities, few tempo
 // events), or when told to (-director on); a channel with its own expression rides keeps its
-// dynamics and vibrato and gets only the shared time. PJ_DIRECTOR (0..2, default 1) scales every
+// dynamics and gets only the shared time. The vibrato it plans for every part whatever the file
+// has (Direction::vib; PJ_DIRECTOR_VIBALL 0: not): each player chooses how to make it. PJ_DIRECTOR (0..2, default 1) scales every
 // deviation; PJ_DIRECTOR_DYN, _ACCENT, _VIB, _RIT (1) one kind each; PJ_DIRECTOR_MUTE (1; 0: never,
 // 2: always) the mutes, which go on for the thin, quiet phrases of a slow piece (not Baroque); PJ_DIRECTOR_FERMATA (1.6) the
 // hold; PJ_DIRECTOR_QUANT (0.9) the quantized share needed. Deterministic: the same file, the
@@ -42,9 +43,13 @@ enum {
   kCueVibRate,    // ... x the player's own rate
   kCueLength,     // the note's sounding length x its written one (already applied to the key's release)
   kCueLegato,     // 1: bound to the next note of the part; 0: detached
-  kCuePhraseEnd,  // 1: the last note of a phrase (it tapers; a breath follows)
+  kCuePhraseEnd,  // 1: the last note of a phrase (it tapers; a breath follows); 2: of the piece's last phrase
   kCueMute,       // 1: with the mute on (con sordino: the strings' bridge mute; a trumpet's is another
                   //    instrument, so the file player changes the part's program instead)
+  kCueOnly,       // 1: a cue of the vibrato and the phrase ends only (Direction::vib: the rest as written)
+  kCueTongue,     // a fast run's tonguing, the note's place in its group: 0 none (the player's own), 1 / 2
+                  //    the front / back of a pair (ta-ka, da-ga), 3 / 4 / 5 the first / second / third of
+                  //    a three (triplets, a compound beat: da-da-ga or da-ga-ga, the player's habit)
   kCueDims
 };
 struct Cue {
@@ -69,6 +74,9 @@ struct DirInput {
 struct Direction {
   bool acts = false;
   bool self = false;  // (not acting: the wind parts' own reading only, their cues and levels; the time the file's)
+  // The vibrato reaches every part (vib), also those the reading leaves alone: a played file's
+  // parts, a channel's own expression rides; vibOnly: not acting and no wind's reading, only that.
+  bool vib = false, vibOnly = false;
   bool gridded = false;  // (the file is quantized: its note lengths are the notation's, free to articulate)
   enum Style { kUnknown, kBaroque, kClassical, kRomantic } style = kUnknown;
   std::vector<DirTempo> tempo;                        // the song's new tempo map (if acts)

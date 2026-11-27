@@ -119,17 +119,25 @@ Direction direct(const DirInput& in) {
   // (no CC 11, 1, 2 or pressure) is not blown like a machine. Its players say their notes, shape
   // their phrases to the line's high point and play with the piece's drama (below); the tempo,
   // the other parts and every other decision stay the file's (d.self, not d.acts).
+  // The vibrato is planned for every part, whatever the file has of its own: a played file (its
+  // velocities, its tempo, a channel's expression rides) keeps all of that, and its players
+  // still get the director's vibrato for each note (its depth, delay and speed; each player
+  // chooses how). Not with the director off. PJ_DIRECTOR_VIBALL (1; 0: as before, only where it
+  // reads the part).
+  d.vib = gMode >= 0 && knob("PJ_DIRECTOR_VIBALL", 1.0) > 0;
   const std::string outWhy = gMode < 0 ? "director: off" : std::string("director: stays out (the file has its own performance: ") + why + ")";
   if (!d.acts) {
     bool any = false;
     for (int c = 0; c < 16; ++c) any |= in.wind[c] && !in.ridden[c] && chNotes[c] > 0;
     if (!any || knob("PJ_WIND_SELF", 1.0) <= 0) {
       d.summary = outWhy;
-      return d;
+      if (!d.vib) return d;
+      d.vibOnly = true;  // (read on: only its vibrato is played)
+    } else {
+      d.self = true;
     }
-    d.self = true;
   }
-  const bool self = d.self;
+  const bool self = d.self || d.vibOnly;
 
   // --- The parts: which carries the melody (the highest), which the bass (the lowest).
   int melody = -1, bass = -1, channels = 0;
@@ -526,6 +534,43 @@ Direction direct(const DirInput& in) {
       for (size_t k = 0; k < run.size(); ++k) taka[run[k]] = k % 2 ? 2 : 1;
     }
   }
+  // A flute's fast run (PJ_DIRECTOR_TONGUE, 1): three notes or more, each under 0.2 s and
+  // joined (a gap under a 32nd), tongued double or triple: the note's place in its group of two
+  // (ta-ka) or of three (a triplet's, a compound beat's eighths), counted from the beat's grid
+  // (the run's own note value), so a pair's back note falls off the beat. The trills' ta-ka too.
+  // (tongue[i]: kCueTongue's value)
+  static const double kTongue = knob("PJ_DIRECTOR_TONGUE", 1.0);
+  std::vector<char> tongue(n, 0);
+  int tongueRuns = 0;
+  if (kTongue > 0)
+    for (int i = 0; i < n; ++i) {
+      const int ch = nt[i].ch;
+      if (!in.flute[ch] || tongue[i]) continue;
+      auto ioi = [&](int q) { const int nx = nextIn[q]; return nx < 0 ? -1L : nt[nx].tick - nt[q].tick; };
+      auto quick = [&](int q) {
+        const long g = ioi(q);
+        return g > 0 && g <= div / 2 && nt[nextIn[q]].tick <= nt[q].tickOff + div / 8 &&
+               double(g) / div * lenAt(in.tempo, double(nt[q].tick) / div) < 0.2;
+      };
+      std::vector<int> run{i};
+      for (int q = i; quick(q) && run.size() < 4096;) run.push_back(q = nextIn[q]);
+      if (run.size() < 3) continue;
+      std::vector<long> gs;
+      for (size_t k = 0; k + 1 < run.size(); ++k) gs.push_back(ioi(run[k]));
+      std::nth_element(gs.begin(), gs.begin() + gs.size() / 2, gs.end());
+      const long g = std::max(1L, gs[gs.size() / 2]);
+      const double per = double(div) / g;  // (notes a quarter)
+      auto near = [&](double x) { return std::abs(per - x) < 0.12 * x; };
+      const bool three = near(3) || near(6) || near(1.5) || (compound && (near(2) || near(4)));
+      const long group = three ? 3 * g : 2 * g;
+      ++tongueRuns;
+      for (int q : run) {
+        const int pos = int(std::lround(double(nt[q].tick % group) / g)) % (three ? 3 : 2);
+        tongue[q] = char(three ? 3 + pos : 1 + pos);
+      }
+    }
+  for (int i = 0; i < n; ++i)
+    if (taka[i]) tongue[i] = taka[i];
   // (the time each trill's notes are moved by, onShift/offShift, filled in below with the
   // inequality's: per input note, in ticks)
   d.onShift.assign(n, 0);
@@ -825,7 +870,8 @@ Direction direct(const DirInput& in) {
     if (speech || leapUp >= 3 || trillAt[i] || repAt[i] || harm) c.v[kCueAccent] = float(std::clamp(acc * kAcc, -1.0, 1.0));
     c.v[kCueLength] = float(1 + (len - 1) * std::min(1.0, kAll));
     c.v[kCueLegato] = gapless && !lastOfPhrase && !breathe && !taka[i] && !repAt[i] && !repeatNext && len > 0.9 ? 1.0f : 0.0f;
-    c.v[kCuePhraseEnd] = lastOfPhrase ? 1.0f : 0.0f;
+    c.v[kCuePhraseEnd] = lastOfPhrase ? (p == np - 1 ? 2.0f : 1.0f) : 0.0f;
+    c.v[kCueTongue] = float(tongue[i]);
     c.v[kCueMute] = muted[p] ? 1.0f : 0.0f;
     // Vibrato: none on Baroque passagework, an ornament on its long notes; light in the
     // Classical; always there in the Romantic; widest at the climax, wider when louder.
@@ -998,6 +1044,11 @@ Direction direct(const DirInput& in) {
   }
 
   // (the winds' own reading ends here: the time, the mutes and the other parts are the file's)
+  if (d.vibOnly) {
+    d.mutes.clear();
+    d.summary = outWhy + "\n  the vibrato planned for every part (only that: the rest is the file's)";
+    return d;
+  }
   if (self) {
     d.mutes.clear();
     int lines = 0, notes = 0, sighs = 0;
@@ -1019,8 +1070,8 @@ Direction direct(const DirInput& in) {
                     "emphasis half-way (%d short ones steady)", trillKinds[1], trillKinds[2], trillKinds[3], trillKinds[4], trillKinds[0]);
       d.summary += b2;
     }
-    if (takaTrills + leapsUp + repeats > 0) {
-      std::snprintf(b2, sizeof b2, "\n  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d accompanying repeated-note starts shaped", leapsUp, takaTrills, repeats);
+    if (takaTrills + leapsUp + repeats + tongueRuns > 0) {
+      std::snprintf(b2, sizeof b2, "\n  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d fast runs double- or triple-tongued, %d accompanying repeated-note starts shaped", leapsUp, takaTrills, tongueRuns, repeats);
       d.summary += b2;
     }
     if (lineParts > 0) {
@@ -1137,8 +1188,8 @@ Direction direct(const DirInput& in) {
     if (notes)
       nb += std::snprintf(buf + nb, sizeof buf - nb, "  winds speak: %d notes of %d lines, good and bad notes, %d sighs, %d breaths\n",
                           notes, lines, sighs, breaths);
-    if (takaTrills + leapsUp + repeats > 0)
-      nb += std::snprintf(buf + nb, sizeof buf - nb, "  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d accompanying repeated-note starts shaped\n", leapsUp, takaTrills, repeats);
+    if (takaTrills + leapsUp + repeats + tongueRuns > 0)
+      nb += std::snprintf(buf + nb, sizeof buf - nb, "  flutes: %d leaps up eased into, %d trills tongued ta-ka, %d fast runs double- or triple-tongued, %d accompanying repeated-note starts shaped\n", leapsUp, takaTrills, tongueRuns, repeats);
   }
   if (repeated) nb += std::snprintf(buf + nb, sizeof buf - nb, "  %d repeats (a bar or more said again at once): keyed long / mid / short in turn\n", repeated);
   std::snprintf(buf + nb, sizeof buf - nb, "  vibrato: %s; articulation: %s  (%s)",

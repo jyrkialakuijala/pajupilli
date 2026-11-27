@@ -64,6 +64,15 @@ Result playNote(int midi, double secs, double dyn, std::vector<float>* keep) {
   Performer& pl = v.player();
   pl.setCalibration(gCal);
   pl.setDynamics(dyn);
+  if (const char* cv = std::getenv("PJ_NOTE_VIB")) {  // (tests: the director's vibrato cue, this deep)
+    Cue c{};
+    c.v[kCueLevel] = c.v[kCueLevelEnd] = c.v[kCueSwellPeak] = 0.5f;
+    c.v[kCueLength] = c.v[kCueVibRate] = 1;
+    c.v[kCueVibDepth] = float(std::atof(cv));
+    c.v[kCueVibDelay] = 0.2f;
+    if (const char* pe = std::getenv("PJ_NOTE_END")) c.v[kCuePhraseEnd] = float(std::atof(pe));  // (a phrase's last note: 1; the piece's: 2)
+    pl.direct(c);
+  }
   const int n = int(secs * kFs);
   std::vector<float> x(n);
   pl.noteOn(midi, 90);

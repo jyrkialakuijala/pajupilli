@@ -22,8 +22,8 @@ constexpr LevelTrim kLevelTrims[] = {
     {"whistle", 6.9f},
     {"shakuhachi", 1.3f},
     {"ocarina", 1.7f},  // (levels.py measure() untrimmed: -29.9 LUFS on the breath curve, against the median -28.2; tools/levels.py -emit will redo it)
-    {"panflute", 2.9f},
-    {"bottle", 3.7f},
+    {"panflute", 5.9f},  // (by hand, 2026-11-27: 3 dB over tools/levels.py's 2.9, by ear)
+    {"bottle", 6.7f},  // (by hand, 2026-11-27: 3 dB over tools/levels.py's 3.7, as the pan flute)
     {"soprano-sax", -9.1f},
     {"alto-sax", -6.5f},
     {"tenor-sax", -2.7f},

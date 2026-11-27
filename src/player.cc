@@ -9,6 +9,7 @@
 #include <cmath>
 
 #include "knob.h"
+#include "rng.h"
 #include "vmath.h"
 
 namespace pajupilli {
@@ -47,6 +48,21 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
   kPipeLips_ = knob("PJ_PIPELIPS", 0.7);
   kP_ = knob("PJ_P", 1);
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
+  vibThroat_ = kVibThroat_;
+  kAim_ = knob("PJ_AIM", 1);
+  pipes_ = inst_.design && inst_.design->pipes;  // (a pan flute; the blown bottles, a pan flute of glass)
+  bottles_ = pipes_ && inst_.design->pipes[0].neck > 0;
+  kJugTrim_ = knob("PJ_JUGTRIM", kJugTrim_);
+  kBend_ = knob("PJ_PAN_BENDK", kBend_);
+  kBendProb_ = knob("PJ_PAN_BEND", kBendProb_);
+  kVialTrim_ = knob("PJ_VIALTRIM", kVialTrim_);
+  kPanVib_ = knob("PJ_PAN_VIB", 1.6);       // its vibrato's depth x a flute's (the nai sings with it)
+  kPanHand_ = knob("PJ_PAN_HAND", 0.35);    // the hand's usual share
+  kPanHandK_ = knob("PJ_PAN_HANDK", 3);     // the hand: log uncovered width per unit of vibrato
+  kPanEndDyn_ = knob("PJ_PAN_ENDDYN", 0.12);  // a phrase's last note: this much softer (dynamics) ...
+  kPanEndAir_ = knob("PJ_PAN_ENDAIR", 0.3);   // ... and airier (a wider, less focused lip opening)
+  kPanEndTune_ = knob("PJ_PAN_ENDTUNE", 0.17);
+  kPanEndP_ = knob("PJ_PAN_ENDP", 0.4);      // ... the breath this much lower  // ... the lips uncovering that much more (log) to keep it in tune
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
   // The register kick's jet shape (besides PJ_KICKP's pressure and PJ_KICKW's shorter jet): the
@@ -108,6 +124,10 @@ void Player::noteOn(int midi, int velocity) {
     regKick_ = trill_->keepLips && midi != trillBase_ ? slurKick(midi) : 0;
     cancelGlide();  // a trill is never a glide
   }
+  // (the aim: a phrase begins after a breath or after the director's phrase end; this note ends one)
+  if (!legato && (sinceOff_ > 0.35 || aimEnd_)) aimNew_ = true;
+  aimEnd_ = cued_ && cue_.v[kCuePhraseEnd] > 0.5f;
+  aimSince_ = 0;
   keyClock_ = 0;
   lastKey_ = midi;
   const int from = note_;
@@ -140,10 +160,40 @@ void Player::noteOn(int midi, int velocity) {
       if (gesture_.tongue > 0) a1 = kDu;
     }
   }
+  // A pan flute's (a bottle's) fast run, tongued through: its syllables from the director's
+  // groups, the front "t" / "d" and the back "g" / "k". Its tongued legato elsewhere: the tip's "l".
+  // (Not a trill on its keys, not a glide.)
+  if (pipes_ && tongueCue_ > 0 && art != kArtGlide && !trill_) {
+    const bool back = tongueCue_ == 2 || tongueCue_ == 5 || (tongueCue_ == 4 && tkk_);
+    // (the user's syllables: a pair "ta-ga", a three "da-da-ga" / "da-ga-ga"; a very soft key's
+    // pair "da-ga", an accented back syllable a "k")
+    const bool three = tongueCue_ >= 3;
+    a1 = back ? (a == kAccent ? kKu : kGu) : a == kAccent ? kAccent : !three && velocity >= 50 ? kTu : kDu;
+    practised_ = false;
+  } else if (pipes_ && art == kArtTongueLegato) {
+    a1 = kLu;
+  }
+  tongueCue_ = 0;
+  // A slur down a semitone or two: bent on the pipe at the lips (a player's choice, a semitone
+  // the likelier), and once bent, slurs within its two semitones stay on it (back up unbent).
+  {
+    const int pipe = pipeNote_;
+    pipeNote_ = midi;
+    if (pipes_ && a == kSlur && art == kArtSlur && !trill_ && pipe >= 0 && from >= 0) {
+      const int down = pipe - midi;
+      const bool bent = pipe != from;  // (the last note already bent on this pipe)
+      const double p = kBendProb_ * (down == 1 ? 0.65 : down == 2 ? 0.35 : 0);
+      if (down >= 0 && down <= 2 && (bent || 0.5 * (bendRng_.uniform() + 1) < p)) {
+        pipeNote_ = pipe;
+        a1 = kSlur;
+        practised_ = false;
+      }
+    }
+  }
   if (a1 != kSlur) velDyn_ = velDynTarget_;
   // Accent: a pressure overshoot growing with velocity above ~50 (tongued only).
   const double over = std::max(0.0, (velocity - 50) / 77.0);
-  velAccent_ = a1 == kAccent ? 1.2 * over : a1 == kTu ? over : 0;
+  velAccent_ = a1 == kAccent ? 1.2 * over : a1 == kTu ? over : a1 == kKu ? 0.6 * over : 0;
   applyNote(a1);
 }
 
@@ -164,6 +214,7 @@ void Player::noteOff(int midi) {
   if (stackTop_ > 0) {  // fall back to the last held key, slurred
     if (info(stack_[stackTop_ - 1])->harmonic > info(note_)->harmonic && !trill_) regKick_ = slurKick(stack_[stackTop_ - 1]);
     note_ = stack_[stackTop_ - 1];
+    pipeNote_ = note_;
     keyVel_ = 64;  // lifting fingers: the springs do most of the work
     applyNote(kSlur);
   } else if (!hold_) {
@@ -177,7 +228,11 @@ void Player::noteOff(int midi) {
 // firm push, with a lot of air a full kick overblows past the note (piccolo D7).
 void Player::seed(unsigned s) {
   rng_ = 4242u + 7907u * s;
+  aimRng_ = 9191u + 104723u * s;
+  aimSidePh_ = 2 * M_PI * aimRand();
   vib_.seed(s);
+  tkk_ = knob("PJ_PAN_TKK", 0) > 0;
+  bendRng_.reseed(randomSeed(3, int(s)));
   if (s == 0) return;  // the default player keeps its sequence (tests, golden files)
   for (int i = 0; i < 4; ++i) urand();
   // Players differ: vibrato rate +-8 %, depth +-15 %, flutter 23..31 Hz, all
@@ -185,6 +240,7 @@ void Player::seed(unsigned s) {
   vib_.rateMul = 1 + 0.08 * urand();
   vib_.depthMul = 1 + 0.15 * urand();
   flutterRate_ = 27 + 4 * urand();
+  tkk_ = knob("PJ_PAN_TKK", -1) >= 0 ? knob("PJ_PAN_TKK", -1) > 0 : Rng(randomSeed(2, int(s))).next() % 3 == 0;
   vib_.setPhase(M_PI * (1 + urand()));
   flutterPhase_ = M_PI * (1 + urand());
 }
@@ -230,7 +286,7 @@ const char* Player::holesFor(int midi) {
 void Player::applyNote(Attack a) {
   // Key velocity = finger speed: 64 moves a key in 10 ms, 127 in 5 ms, 1 in 20 ms;
   // a faster finger lands the pad harder (a louder key click).
-  flute_.selectPipe(note_);
+  flute_.selectPipe(pipes_ && pipeNote_ >= 0 ? pipeNote_ : note_);
   const char* ov = std::getenv("PJ_HOLES");  // any fingering (experiments)
   flute_.setGlide(takeHoleGlide());
   const char* holes = ov && *ov ? ov : holesFor(note_);
@@ -274,6 +330,24 @@ void Player::applyNote(Attack a) {
       tongueRelease_ = 0.008;
       lungAttack_ = 0.005;
       break;
+    case kLu:  // the tip flicked against the ridge: the air barely broken
+      tongueClosed_ = 0.0008;
+      tongueRelease_ = 0.006;
+      lungAttack_ = 0.005;
+      tongueFloor_ = 0.35;
+      break;
+    case kGu:  // the back of the tongue against the soft palate, gently: a rounder, later start
+      tongueClosed_ = 0.003;
+      tongueRelease_ = 0.014;
+      lungAttack_ = 0.006;
+      break;
+    case kKu: {  // ... firmly: the seal further back, its release slower and less sharp than a "t"
+      const double v = keyVel_ / 127.0;
+      tongueClosed_ = 0.004;
+      tongueRelease_ = 0.0036 + 0.02 * (1 - v);
+      lungAttack_ = 0.005 * std::exp2((64 - keyVel_) / 40.0);
+      break;
+    }
     case kTu:
     case kAccent: {  // the tongue seals, the mouth fills, the tongue lets go
       // Soft keys: a slow push and a lazy tongue (16 ms); hard keys: a fast
@@ -308,6 +382,67 @@ void Player::applyNote(Attack a) {
   sinceOn_ = 0;
 }
 
+// The director's vibrato for the next note (Performer::direct: its depth and speed). A pan
+// flutist chooses how to make it (research/panflute.md 5b): mostly the diaphragm, the hand
+// rocking the instrument for a note the director leans on (a deeper cue: more of the hand, as a
+// nai player's singing vibrato), the throat for a quicker, urgent one (a faster cue); high notes
+// take less of the hand (a small rim: a little rocking bends them far).
+void Player::direct(const Cue& c) {
+  Performer::direct(c);
+  if (!pipes_) return;
+  tongueCue_ = int(std::lround(c.v[kCueTongue]));
+  endSoft_ = c.v[kCuePhraseEnd] > 0.5f && c.v[kCuePhraseEnd] < 1.5f;  // (the piece's own end: as written)
+  vibDepth_ *= kPanVib_;
+  const double deep = std::clamp(double(c.v[kCueVibDepth]) - 0.8, -0.8, 0.7);
+  const double quick = std::clamp((double(c.v[kCueVibRate]) - 1) / 0.06, 0.0, 1.0);
+  vibHand_ = std::clamp(kPanHand_ * (1 + 1.2 * deep) * (1 + 0.3 * wander_ * urand()), 0.0, 0.7);
+  vibThroat_ = std::clamp(kVibThroat_ + 0.1 + 0.3 * quick, 0.0, 0.6);
+  if (vibHand_ + vibThroat_ > 0.9) vibHand_ = 0.9 - vibThroat_;
+}
+
+// How the instrument is held into the room (Tube::setPose). A shakuhachi player projects with
+// the instrument and the upper body: the foot comes up (towards the hall) as the playing grows
+// loud, on an accent and in the high register, and sinks for a phrase's end (over its last note)
+// and between phrases; each new phrase turns to a side, 4 .. 16 degrees, mostly the other side
+// from the last, with a slow sway (+-2.5 degrees, ~15 s) inside it; the face turns with the
+// instrument by 0.6 of its swing. The lift follows in ~0.3 s twice over (a body, not a hand), the
+// side in ~0.6 s.
+void Player::aim(double dt) {
+  const double deg = M_PI / 180;
+  aimSince_ += dt;
+  if (aimNew_) {
+    aimNew_ = false;
+    if (aimRand() < 0.75) aimSign_ = -aimSign_;
+    aimSideTo_ = aimSign_ * (4 + 12 * aimRand()) * deg;
+  }
+  const bool on = note_ >= 0 && blowing_;
+  double down = 55 * deg, side = aimSideTo_;
+  if (on) {
+    const double loud = std::clamp(dyn_ + breathCtl_ + velDyn_, 0.0, 1.0);
+    const double high = std::clamp((note_ - 69) / 17.0, 0.0, 1.0);
+    const double accent = cued_ ? std::max(0.0, double(cue_.v[kCueAccent])) : 0.0;
+    down = 50 * deg - 18 * deg * (loud - 0.5) - 6 * deg * high - 5 * deg * accent;
+    if (aimEnd_) down += 10 * deg * std::min(1.0, aimSince_ / 0.8);  // (bowing into the phrase's end)
+  } else if (sinceOff_ > 1.5) {
+    side *= 0.3;  // (a long rest: back towards the front)
+  }
+  aimSidePh_ += dt * 2 * M_PI / 15;
+  side += 2.5 * deg * std::sin(aimSidePh_);
+  down = 50 * deg + kAim_ * (std::clamp(down, 28 * deg, 72 * deg) - 50 * deg);
+  side *= kAim_;
+  const double ad = 1 - std::exp(-dt / 0.3), as = 1 - std::exp(-dt / 0.6);
+  aimDown_[0] += ad * (down - aimDown_[0]);
+  aimDown_[1] += ad * (aimDown_[0] - aimDown_[1]);
+  aimSide_[0] += as * (side - aimSide_[0]);
+  aimSide_[1] += as * (aimSide_[0] - aimSide_[1]);
+  // (the room hears a new pose once it has moved by a millimetre at the foot)
+  if (std::fabs(aimDown_[1] - aimSet_[0]) + std::fabs(aimSide_[1] - aimSet_[1]) > 0.002) {
+    aimSet_[0] = aimDown_[1];
+    aimSet_[1] = aimSide_[1];
+    flute_.setPose(aimDown_[1], aimSide_[1], 0.6 * aimSide_[1]);
+  }
+}
+
 void Player::render(float* out, int n) {
   constexpr int kBlock = 16;
   for (int i = 0; i < n; i += kBlock) {
@@ -315,6 +450,16 @@ void Player::render(float* out, int n) {
     const double bdt = m / fs_;
     keyClock_ += bdt;
     tick(bdt);
+    if (flute_.aimed()) aim(bdt);
+    {  // (a phrase's last note: the softer, airier breath grows in over ~0.15 s, goes in 50 ms)
+      // (not on the top pipes, C#7 and up from G#6: there the jet barely holds as it is)
+      const double t = endSoft_ && note_ >= 0 ? std::clamp((96 - note_) / 4.0, 0.0, 1.0) : 0.0;
+      endAir_ += (1 - std::exp(-bdt / (t > endAir_ ? 0.15 : 0.05))) * (t - endAir_);
+    }
+    {  // (a bend: the lip moves over the rim in ~50 ms)
+      const double to = pipes_ && note_ >= 0 && pipeNote_ >= 0 ? pipeNote_ - note_ : 0;
+      bend_ += (1 - std::exp(-bdt / 0.05)) * (to - bend_);
+    }
     sinceSlur_ += bdt;
     if (leadLeft_ > 0 && (leadLeft_ -= bdt) <= 0) flute_.setHoles(leadHoles_, leadSpeed_);
     if (gliding()) glideEar();
@@ -343,26 +488,35 @@ void Player::render(float* out, int n) {
       // The calibrated lips, jet and breath: the note's own, or on a third-octave
       // trill key the lower note's (the flutist keeps that embouchure; with the
       // upper note's own the flute's D6-Eb6 fell an octave).
-      const int en = onTrillKey_ && trill_ && trill_->keepLips ? trillBase_ : note_;
+      // (A bend: the pipe at the lips, its own calibration.)
+      const int en = pipes_ && pipeNote_ >= 0 && pipeNote_ != note_ ? pipeNote_
+                     : onTrillKey_ && trill_ && trill_->keepLips ? trillBase_ : note_;
       // (A glide: the pitch the fingers pass.)
       const double f = glideFrequency();
       const double fw = f * std::exp2(-inst_.transpose / 12.0);
-      // (A pan flute's bass pipes, wider than the nai's 15 mm: a bigger, looser embouchure, the
-      // lips and the uncovered rim x (d / 15 mm)^PJ_PIPELIPS (0.7), as a toyo player's.)
+      // (A pan flute's bass pipes, wider than the nai's 15 mm, and a bottle's wide neck: a bigger,
+      // looser embouchure, the lips and the uncovered rim x (rim / 15 mm)^PJ_PIPELIPS (0.7), as a toyo player's.)
       double ke = inst_.emb;
       if (inst_.design && inst_.design->pipes) {
         const Design& d = *inst_.design;
         for (int k = 0; k < d.nPipes; ++k)
-          if (d.pipes[k].midi == en - inst_.transpose && d.pipes[k].d > 15)
-            ke *= fastPow(d.pipes[k].d / 15, kPipeLips_);
+          if (d.pipes[k].midi == en - inst_.transpose) {  // (a bottle: its neck is the rim)
+            const double rim = d.pipes[k].neck > 0 ? d.pipes[k].neckD : d.pipes[k].d;
+            if (rim > 15) ke *= fastPow(rim / 15, kPipeLips_);
+          }
       }
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
-      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], std::max(dynLo[en], dynHi[en]));
+      // (a bend's air goes down into the pipe: at a semitone barely changed, at two darker,
+      // airier and weaker)
+      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_ - kPanEndDyn_ * endAir_ - 0.03 * bend_ * bend_, dynLo[en], std::max(dynLo[en], dynHi[en]));
+      const double air = air_ + kPanEndAir_ * endAir_ + 0.03 * bend_ * bend_;
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
       // is the rest, which makes W f / Uj ~ 0.087 for every note.
       e.jetLen = 100 / std::sqrt(f) * 1e-3 * kW_ * jetTrim[en] * (1 - kKickW_ * regKick_);
+      // (a phrase's end on a lower breath: the lips come forward with it, the jet's travel time kept)
+      if (endAir_ > 0) e.jetLen *= std::sqrt(std::max(0.2, 1 - kPanEndP_ * endAir_));
       // (a practised slur's lips, the flutist's way into another register: not harder blowing but
       // the jet's shape. Going up the lips come forward (a shorter jet, it reaches the edge
       // sooner), the opening narrows (a thinner, faster jet for the same breath, and quieter) and
@@ -377,7 +531,9 @@ void Player::render(float* out, int n) {
       }
       // Coltman: uncovered width 6 mm at C4 .. 3.5 mm at A6; the calibration
       // trims it per note; rolling the flute (pitch bend) covers more or less.
-      const double t = std::clamp(std::log(fw / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
+      // (a bend: the pipe's own width, the lip's cover on top)
+      const double fp = en == pipeNote_ && pipes_ ? fw * std::exp2((pipeNote_ - note_) / 12.0) : fw;
+      const double t = std::clamp(std::log(fp / 261.6) / std::log(1760 / 261.6), 0.0, 1.2);
       // The lips follow the dynamics: coverage learned soft, mezzo-forte and loud.
       double ct;
       {
@@ -388,7 +544,10 @@ void Player::render(float* out, int n) {
         else ct = cm + (ch - cm) * std::min(1.0, (dyn - 0.5) / (kCalDynHi - 0.5));
         ct = std::exp(ct) * glideCover(en, dyn);
       }
-      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_);
+      e.uncovered = (6.0 - 2.5 * t) * 1e-3 * ke * ct * trillLip_ * std::exp(0.3 * roll_ - kBend_ * bend_);
+      // (the airier phrase end sags flat: the lips uncover a little more, by ear)
+      // (a small rim bends far: x (261.6 / f)^0.5, at most 0.35; fitted C3..G6)
+      if (endAir_ > 0) e.uncovered *= std::exp(std::min(0.35, kPanEndTune_ * std::sqrt(261.6 / fw)) * endAir_ * kPanEndAir_ / 0.3);
       // As the breath dies at a release the jet slows and the note sags flat; the lips follow it
       // out (uncovering more, as on a diminuendo) so the end stays within ~15 c. PJ_FLUTE_RELTUNE:
       // the uncovered width x (held breath / breath now)^this (0.08; 0: the lips stay).
@@ -409,24 +568,28 @@ void Player::render(float* out, int n) {
       // changes most. Both scale around their mezzo-forte values (dyn 0.5).
       // Airy: a wider, less focused lip opening for the same breath (more
       // flow, turbulence and edge hiss; the jet spreads before the edge).
-      const double airy = 1 + 0.5 * (air_ - 0.35);
+      const double airy = 1 + 0.5 * (air - 0.35);
       e.lipH = 0.75e-3 * ke * std::exp(kDynH_ * (dyn - 0.5)) * airy * (1 + 0.1 * wander_ * w3b_) *
                (1 - kKickH_ * regKick_) * std::exp(-kGeoH_ * geo);
       // At the release of an overblown note (its second register or higher) the lips close as the
       // breath stops: the jet ends with the air. Left open while the breath fades, the slowing jet
       // falls into the lower register, the note dropping an octave as it dies (no flutist's
       // ending). PJ_FLUTE_LIPCLOSE: their time constant (s; 0: they stay as they were).
-      if (!blowing_ && kLipClose_ > 0 && note_ >= 0 && played(note_) && (kLipCloseAll_ || played(note_)->harmonic > 1))
+      // (Not a pan pipe's, a bottle's: they have no lower register to fall into, and closed on the
+      // offset jet they clicked, the slowing jet flapped wholly in and out by the ringing pipe:
+      // a jug's C2 +49 dB of highs at the release. Their player only stops the breath.)
+      if (!blowing_ && kLipClose_ > 0 && !pipes_ && note_ >= 0 && played(note_) && (kLipCloseAll_ || played(note_)->harmonic > 1))
         e.lipH *= std::exp(-sinceOff_ / kLipClose_);
       e.lipWidth = (7 + 4 * dyn) * 1e-3 * ke * airy;
-      e.air = air_;
+      e.air = air;
       // Jet offset at the edge: players aim further off-centre on low notes,
       // where the jet swings further (even harmonics need offset ~ swing).
       e.y0 = kY0_ * ke * fastPow(261.6 / fw, kY0Exp_) * brightness_ * 1e-3 * (1 + 0.3 * wander_ * w2b_) *
              (1 - kKickY_ * regKick_) * std::exp(-kGeoY_ * geo);
-      e.noise = breath_ * noiseCtl_ * inst_.noise * (0.4 + 1.7 * air_);
+      e.noise = breath_ * noiseCtl_ * inst_.noise * (0.4 + 1.7 * air);
       if (blowing_) lungTarget = 0.8 * f * std::exp(kDynP_ * (dyn - 0.5)) * pressTrim[en] * kP_ * pressScale_ * (1 + kKickP_ * regKick_);
       if (blowing_ && sinceSlur_ < 2) lungTarget *= std::max(0.1, 1 + slurAir_ * std::exp(-sinceSlur_ / slurAirT_));
+      lungTarget *= 1 - kPanEndP_ * endAir_;  // (a phrase's end: a lower breath through the wider lips)
       if (flute_.duct()) {
         // A duct: the windway and the window are fixed; the player has only the
         // breath. It sets the pitch (the calibration's "cover" is the breath
@@ -489,7 +652,9 @@ void Player::render(float* out, int n) {
     const double vib = vibDepth_ * vib_.depthMul * vib_.env();
     // Accented attack: a short pressure overshoot.
     const double accent = 1 + 0.25 * velAccent_ * std::exp(-sinceOn_ / 0.04);
-    const double vt = kVibThroat_ * vib, vl = (1 - kVibThroat_) * vib;
+    const double vt = vibThroat_ * vib, vh = vibHand_ * vib, vl = std::max(0.0, 1 - vibThroat_ - vibHand_) * vib;
+    // (the hand: the rim covered a little more and less as the instrument rocks; covered, flatter)
+    if (vh > 0 && note_ >= 0) e.uncovered *= std::exp(kPanHandK_ * vh * sv * (1 - 0.5 * std::clamp((note_ - 79) / 12.0, 0.0, 1.0)));
     // Throat: a glottal drop of a fraction d of the lung pressure needs an
     // area Ag = Aj sqrt((1 - d) / d) (Bernoulli, same flow as the lip jet).
     const double d = std::clamp(0.01 + 0.65 * vt * (1 - sv), 0.01, 0.6);
@@ -502,9 +667,17 @@ void Player::render(float* out, int n) {
     e.glottis = ag;
     flute_.setEmbouchure(e);
     flute_.process(out + i, m);
+    if (bottles_) {  // (the jugs up, the vials down; glided, ~40 ms: a vial's last ring not lifted with a jug's gain)
+      const int en = note_ >= 0 ? note_ - inst_.transpose : -1;
+      if (en >= 0) pipeTarget_ = fastPow(10.0, (kJugTrim_ * std::max(0, 60 - en) - kVialTrim_ * std::max(0, en - 84)) / 240.0);
+      const double a = 1 - std::exp(-1.0 / (0.040 * fs_));
+      for (int k = 0; k < m; ++k) out[i + k] *= float(pipeGain_ += a * (pipeTarget_ - pipeGain_));
+    }
     if (kTrillTune_ > 0 && note_ >= 0) {
       if (trillEar) listen(out + i, m, trillCorr_[trill_ - kTrills], 0, trillClock_, 116, kTrillTune_);
-      else if (ear_) listen(out + i, m, earCorr_, earCents_, earClock_, flute_.duct() ? 150 : 116, kTrillTune_);
+      // (an instrument's own note: tuned from its own pitch, not pulled to the tempered one by
+      // the lips; pulled, the shakuhachi's kan F5 wavered as its jet was pushed off its place)
+      else if (ear_) listen(out + i, m, earCorr_, earCents_ + ownCents[note_], earClock_, flute_.duct() ? 150 : 116, kTrillTune_);
     }
   }
 }

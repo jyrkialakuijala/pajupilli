@@ -930,6 +930,29 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       std::fprintf(stderr, "  (director: the events' times are not their ticks': it stays out)\n");
       dir.acts = false;
     }
+    // The vibrato for every note (Direction::vib): a cue of its own holding only the director's
+    // vibrato, everything else as written; where the reading below gives a note its whole cue,
+    // that replaces it. (Not the organs, with their own plans; not the drums.)
+    if (dir.vib) {
+      const size_t nq = std::min(order.size(), dir.cues.size());
+      int planned = 0;
+      for (size_t q = 0; q < nq; ++q) {
+        const Span& sp = spans[order[q]];
+        Event& on = song.ev[sp.on];
+        if ((on.status & 15) == 9 || (sp.inst && (std::strcmp(sp.inst->family, "organ") == 0 || isTonewheel(sp.inst)))) continue;
+        Cue v{};
+        v.v[kCueLevel] = v.v[kCueLevelEnd] = 0.5f;
+        v.v[kCueSwellPeak] = 0.5f;
+        v.v[kCueLength] = 1;
+        for (int k : {int(kCueVibDepth), int(kCueVibDelay), int(kCueVibRate), int(kCuePhraseEnd), int(kCueTongue)}) v.v[k] = dir.cues[q].v[k];
+        v.v[kCueOnly] = 1;
+        on.cue = int(dir.cues.size());
+        dir.cues.push_back(v);
+        ++planned;
+      }
+      std::fprintf(stderr, "  the director's vibrato and phrase ends: planned for every part's notes (%d)%s\n", planned,
+                   dir.acts ? "" : dir.self ? ", the winds' read lines their whole reading" : ", only that");
+    }
     if (dir.acts) {
       for (size_t q = 0; q < order.size(); ++q) {
         const Span& sp = spans[order[q]];
@@ -1420,6 +1443,14 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
         if (t.parts() > 0 || t.dipoleAxes()) continue;
         t.spreadOn(radius, unsigned(std::hash<std::string>()(nm)) + 977u * unsigned(q));
       }
+      p.ens->placeParts();
+    }
+  // The shakuhachi held in the hands (Tube::aimOn): each opening its own place in the room, as
+  // the player aims the instrument (src/player.cc). PJ_SHAKU_AIM=0: a point, as before.
+  if (knob("PJ_SHAKU_AIM", 1) != 0)
+    for (auto& [id, p] : parts) {
+      if (std::strcmp(p.inst->name, "shakuhachi") != 0) continue;
+      for (int q = 0; q < p.ens->size(); ++q) p.ens->model(q).aimOn(0);  // (hole 1, the thumb's: behind)
       p.ens->placeParts();
     }
   // The koto's ji, set for the piece as a player sets them (src/kotoplan.h): its part's notes read
@@ -2140,10 +2171,13 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           const long bar = song.barTicks ? song.barTicks : 4L * song.div;
           const long tk = long(e.tick);
           s.beat = tk % bar == 0 ? 1.0f : (bar % (2 * song.div) == 0 && tk % (bar / 2) == 0) ? 0.75f : tk % song.div == 0 ? 0.5f : 0.2f;
+          s.inBar = float(tk % bar) / song.div;
+          for (const auto& tp : song.tempo)  // (the tempo there: where the singer breathes in, a beat before the bar)
+            if (tp.t <= e.t || s.beatLen == 0) s.beatLen = float(tp.len);
         }
-        if ((dir.acts || dir.self) && e.cue >= 0) {
+        if ((dir.acts || dir.self || dir.vib) && e.cue >= 0) {
           s.accent = dir.cues[e.cue].v[kCueAccent];
-          s.phraseEnd = dir.cues[e.cue].v[kCuePhraseEnd] > 0.5f;
+          s.phraseEnd = dir.cues[e.cue].v[kCuePhraseEnd] > 0.5f && dir.cues[e.cue].v[kCueOnly] < 0.5f;  // (the singer's ends: the reading's)
           // (the drama, the hairpins and the vibrato are the director's for the singer too)
           const float* cv = dir.cues[e.cue].v;
           s.cued = true;
@@ -2429,7 +2463,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             continue;
           }
           if (it->second.singer) { ++it->second.played; continue; }  // (sung from the part read ahead)
-          if ((dir.acts || dir.self) && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
+          if ((dir.acts || dir.self || dir.vib) && e.cue >= 0) it->second.ens->direct(dir.cues[e.cue]);
           if (it->second.bplan)  // (the brass section: what the song says about this key)
             if (const BrassHint* bh = it->second.bplan->find(e.a, e.t)) it->second.ens->brassHint(*bh);
           // (a drum: the stroke that sounds it at the SoundFonts' level: drumkit.h)

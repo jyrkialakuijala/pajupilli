@@ -86,8 +86,14 @@ values to tune):
   the spread of velocities in each channel is small.
 - **Few tempo events:** fewer than ~1 per 4 bars, not counting a final ritardando or a fermata.
 - **No rides:** no CC11, CC1 or CC2 rides on a channel. Decide this **per channel**: a channel with
-  its own CC11 or CC1 keeps it, and the Director leaves that channel's dynamics and vibrato alone.
+  its own CC11 or CC1 keeps it, and the Director leaves that channel's dynamics alone.
   It still gets the shared timing.
+- **The vibrato is always planned** (2026-11-27). A file's own performance never blocks it: that
+  includes its velocities, tempo, rides, and event times that don't match its ticks. Every note
+  except the drums and organs gets the Director's vibrato depth, delay and rate, even where the
+  Director otherwise stays out. Each player then chooses how to make it: a pan flutist mixes the
+  hand (rocking the instrument), the diaphragm and the throat. `-director off` or
+  `PJ_DIRECTOR_VIBALL=0` turns this off.
 
 Turn it on by hand with `-director on|off|auto` (default `auto`), and set its strength with
 `PJ_DIRECTOR` (0..2, default 1, scaling every deviation it makes). Print one line saying whether it

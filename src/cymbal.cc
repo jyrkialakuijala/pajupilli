@@ -71,9 +71,10 @@ CymbalSpec cymbalSpec(int which) {
       p.radius = 0.2794; p.thickness = 1.15e-3; p.domeRadius = sphere(p.radius, 0.030);
       p.lossA = 0.0055; p.lossB = 0.5; p.split = 0.012; p.seed = 21;
       s.ride = true; s.bowAt = 0.62; s.bellR = 0.065;
-      {  // (to FluidR3's ride: 500 Hz 5.6 -> 3.8 s, 2 kHz 2.5 -> 3.9 s, ...)
+      {  // (to FluidR3's ride: 500 Hz 5.6 -> 3.8 s, 2 kHz 2.5 -> 3.9 s, ...; its highs then held
+         // ~25 % longer than the recording's, the user's: 4 kHz 0.88, 8 kHz 1.0, 12.5 kHz 1.2 were)
         const double f[7] = {250, 500, 1000, 2000, 4000, 8000, 12500};
-        const double m[7] = {1.47, 1.47, 1.15, 0.64, 0.88, 1.0, 1.2};
+        const double m[7] = {1.47, 1.47, 1.15, 0.64, 0.70, 0.80, 0.96};
         s.nFix = 7;
         std::copy(f, f + 7, s.fixF);
         std::copy(m, m + 7, s.fixMul);
@@ -85,6 +86,13 @@ CymbalSpec cymbalSpec(int which) {
       s.ride = true; s.bowAt = 0.6; s.bellR = 0.075;
       const double f[6] = {950, 1460, 2010, 2560, 3240, 3990};
       std::copy(f, f + 6, s.bellF);
+      {  // (its highs held ~25 % longer, as the first ride's: the user's)
+        const double ff[4] = {2000, 4000, 8000, 12500};
+        const double m[4] = {1.0, 0.82, 0.8, 0.8};
+        s.nFix = 4;
+        std::copy(ff, ff + 4, s.fixF);
+        std::copy(m, m + 4, s.fixMul);
+      }
       break;
     }
     case 2: {  // 16" thin crash
@@ -127,6 +135,20 @@ CymbalSpec cymbalSpec(int which) {
       std::copy(t, t + 6, s.bellT60);
       break;
     }
+  }
+  // The bloom (PlateSpec::bloomRate): the edge-struck cymbals' cascade on a hard stroke.
+  // Its threshold each plate's core energy at a velocity ~70 stroke on the edge (75: crashes
+  // 0.040 J, splash 0.022, china 0.035), x PJ_CYM_BLOOME (1): a softer stroke stays linear. Over
+  // it the core is drained at PJ_CYM_BLOOM (20 /s) of its excess (down to the geometric mean of
+  // the threshold and the stroke's energy), PJ_CYM_BLOOMPASS (0.08) of that kicked into
+  // 2.5-12 kHz (the rest goes on up, out of the modes kept), and the burst's modes lose
+  // PJ_CYM_BLOOMHI (15 /s) while it runs. A sharp burst (the user's), the tail at its own
+  // length, a little lower (the user: long cymbals for jazz); numbers in tools/test.py cymbals.
+  if (!s.ride) {
+    p.bloomRate = knob("PJ_CYM_BLOOM", 20);
+    p.bloomE = knob("PJ_CYM_BLOOME", 1) * (which == 4 ? 0.019 : which == 5 ? 0.030 : 0.035);
+    p.bloomHigh = knob("PJ_CYM_BLOOMHI", 15);
+    p.bloomPass = knob("PJ_CYM_BLOOMPASS", 0.08);
   }
   // (The cup as a piston over the mode sum: set so a bell stroke is a few dB
   // over a bow stroke of the same velocity.)

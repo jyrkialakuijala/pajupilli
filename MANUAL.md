@@ -165,8 +165,9 @@ sounding MIDI notes (`./pajupilli -inst bass -note 48`).
 | `recorder` | alto recorder in F, Baroque fingering: duct, thumb half-holed for the 2nd register | F4–G6 | 48 kHz |
 | `baroque-flute` | one-keyed Baroque flute (traverso) in D: boxwood, a cylindrical head, a contracting conical body, six small holes and a D# key; fork fingerings (F, G#, Bb, C) softer and veiled; softer and darker than the Boehm flute. `-reinstrument flute=baroque-flute` plays a file's flutes on it | D4–A6 | 48 kHz |
 | `ocarina` | alto C, 12 holes: a vessel (Helmholtz), duct | A4–F6 | 48 kHz |
-| `shakuhachi` | 1.8 (in D), end-blown: the lips cover the rim (meri / kari) | D4–D6 | 48 kHz |
-| `panflute` | chromatic nai, one stopped pipe per note | G4–C7 | 96 kHz |
+| `bottle` | blown bottles, one per note, jugs to vials (Helmholtz): a pan flute of glass, its jet, vibrato kinds, phrase ends and tonguing | C2–C8 | 96 kHz |
+| `shakuhachi` | 1.8 (in D), end-blown: the lips cover the rim (meri / kari); otsu, kan and dai-kan by overblowing | D4–A6 | 48 kHz |
+| `panflute` | chromatic nai with bass pipes (bass nai, toyo), one stopped pipe per note; the jet aims itself (a stopped pipe takes no steady flow); a hand, diaphragm and throat vibrato; airy phrase ends | C3–C7 | 96 kHz |
 | `clarinet` | in Bb (sounds a tone lower), register key | E3–C6 | 48 kHz |
 | `soprano-sax` | in Bb (a tone lower) | Bb3–F#6 | 48 kHz |
 | `alto-sax` | in Eb (a sixth lower) | Bb3–F#6 | 48 kHz |
@@ -209,7 +210,26 @@ or half-holes, a hole), key clicks, the radiation and the room. New:
   their fingerings refitted.
 - **A duct** (recorder, ocarina): the windway and window fixed, the breath alone sets the pitch,
   so louder is sharper; the calibration learns each note's breath. **End-blown** (shakuhachi,
-  pan flute): the flute's lips on the open top, the coverage bending the pitch.
+  pan flute): the flute's lips on the open top, the coverage bending the pitch. The shakuhachi's
+  own notes, the open fingerings Ro Tsu Re Chi Ri (D4 F4 G4 A4 C5), their kan octave (the same
+  fingerings overblown, D5..C6) and Ro's dai-kan (D6), are played with the lips at rest at the
+  pitch the bore gives (its length set so Ro is in tune: otsu -12..-1 c, kan +6..+12 c with
+  the jet a little shorter, as players blow the upper register, D6 +29 c), not lipped to equal
+  temperament, and a listening player (a part in a piece, the others around it) tunes them from
+  that pitch, not from the tempered one (pulled there by the lips, kan F5 wavered); the other notes are lipped (the kan's chromatic ones the otsu
+  fingering a semitone up, lipped down: meri). The kan and dai-kan fingerings that are not the
+  otsu ones overblown were found by playing every fingering in the waveguide.
+  In `-play` the shakuhachi is held in the hands and aimed into the room. Each opening sounds
+  from its own place as the instrument is held: the embouchure at the lips (the head shadows
+  what goes back), each finger hole on the bamboo's front (the thumb hole behind) and the foot
+  along the axis. The room gives each of them its own paths, direct and off the walls, and they
+  move as the player moves. The foot rests 50° below the horizontal. It comes up (towards the
+  hall) as the playing grows loud, on an accent and in the high register. It sinks over a phrase's
+  last note and between phrases. Each phrase turns 4–16° to a side, mostly the other side from
+  the last, with a slow sway inside it, and the face turns with it. The body moves in ~0.3 s for
+  the lift and ~0.6 s for the turn. What changes is the mix between the microphones and the
+  colour the room returns, not the level (`tools/test.py shakuhachi_aim`). `PJ_AIM` scales the
+  motion (0: held still); `PJ_SHAKU_AIM=0` makes the instrument one point again, as before.
 - **The calibration** also learns each note's loudest dynamics that still holds its register
   (a soft reed or a vessel breaks above it); the players stay below it.
 - **The geometry** (`tools/design.py`, `tools/instruments.py` -> `src/designs.cc`): bores, hole
@@ -2673,13 +2693,20 @@ damped and chirping upward as van den Doel models liquid sounds, their sizes fro
 their rate following each wave's crash, wash and backwash), `bird-tweet` (the syrinx's labia as a
 van der Pol valve driven by pressure and tension gestures after Gardner et al.: syllables sweeping
 down, the beak's resonance following the note), `telephone` (a polarised ringer: the 20 Hz ring
-current, 2 s on and 4 s off, turns the armature against its spring, ~19 Hz; on it a long arm,
-springy itself, whose steel ball bounces off one small steel gong into the other as it will,
-now and then striking twice, through Hertz contacts solved with the step; the swing takes a few
-cycles to build: the first strokes reach only the nearer, bigger gong, a soft key settling into
-the 40 strokes a second in ~0.3 s, a hard one in ~0.1 s; the gongs a minor third apart, each 16
-modes of 4 numbers, frequency, decay, shape at the strike, radiation: a stamped bowl's (m, n)
-families as doublets), `helicopter` (the blade-vortex slap once a blade passage, the thickness
+current, as long as the key is held, turns the armature against its spring, ~19 Hz; on it a long
+arm, springy itself, whose steel ball bounces off one small steel gong into the other as it will,
+now and then striking twice, through Hertz contacts solved with the step. The key's velocity is
+how fast the current comes up (0.3 s soft, 15 ms hard), so how soon the arm swings fully, not how
+loud: the first strokes reach only the nearer gong, unevenly, before the swing locks into 40
+strokes a second; let go, the arm coasts down through a few last uneven strokes, and at rest the
+ball lies on the nearer gong's rim, damping its partials (its fundamental too) by how much each
+swings there, while the other rings on. One key: two gongs, the key's (its fundamental two
+octaves up) and one a minor third over it; two keys: those two; three or more: the ball goes round
+all of them in pitch order, a gong a stroke. Keys changed while held: the gongs slide to the new
+keys as they ring (in pitch, 0.4 s; a key more, a new gong at once at its key; a
+key fewer, a gong rings out where it is); let go, they hold their pitch. Each gong 16 modes of 4 numbers, frequency, decay,
+shape at the strike, radiation: a stamped bowl's (m, n) families as doublets, ringing 50 % longer
+than steel's Q ~1000), `helicopter` (the blade-vortex slap once a blade passage, the thickness
 noise, the tail rotor, the turbine; spinning up and down), `applause` (an audience of up to 960
 clappers in 40 rows, each with their own hands, the air between the palms a resonance as Peltola et
 al. measured; most keep their own rhythm, some seek the beat: slower, their phases pulled toward
@@ -3253,8 +3280,15 @@ a crash; the same key 24 higher is the stroke with a brush (`PJ_CYM_BRUSH=1`: al
 a brush stroke goes continuously from the slowed tip (light: a few wire ends, off at once,
 bright) to the thrown fan (leaned on), by velocity and, in a song, by the beat: 1 and 3 leaned
 on, 2 and 4 light (the bar learnt from the ride's own pattern: 2 and 4 are where its skip notes lead). The breath (channel pressure) grabs the edge (`PJ_CYM_NOTEOFF=1`: a note-off
-does). Linear only: a hard crash is bright at once but does not bloom (no nonlinear cascade
-yet). About 5–7 % of a core each, busy.
+does). The rides' highs ring ~25 % longer than the recorded ride they were fitted to (4 kHz
+3.3 s, 8 kHz 2.1 s), and the crashes ring long (~5 s at 1 kHz): long cymbals for jazz. A hard
+stroke on the crashes, splash and china (over about velocity 70) bursts: the plate's low modes,
+pushed past their linear range, hand part of their energy up into 2.5–12 kHz, where it flares
+and dies within a few tenths of a second, and the low modes then ring on at their own length
+from a little lower (velocity 110 on the 16" crash: +5.6 dB in 3–8 kHz over the first 0.1 s,
+the tail 2.7 dB lower). A simple form of the cascade (`research/cymbal_plan.md` step 4c; the
+plate's nonlinear core is not built). `PJ_CYM_BLOOM=0`: linear, as before. About 5–9 % of a
+core each, busy.
 
     ./pajupilli -inst ride-cymbal -seq "on 51 80 wait 0.3 on 51 90 wait 0.2 on 51 60 wait 0.1 on 51 80 wait 2"
 
@@ -3585,7 +3619,7 @@ Every model idea is an environment variable (`PJ_*`, see `src/flute.cc` and
   | pan flute | all 30 | — |
   | ocarina | 20 / 21 | F5 -22 c |
   | recorder | 21 / 24 | A#5, C#6, D6 (second register: the jet barely leaves the first mode) |
-  | shakuhachi | 21 / 24 | D#4 -76 c, B5 +130 c (meri notes), D#5 silent |
+  | shakuhachi | 30 / 32 (D4–A6) | D#4 -62 c (a meri note), E5 +16 c; D6 +30 c is its own pitch (lips at rest) |
   | clarinet | 32 / 33 (E3–C6) | one note silent; the altissimo needs the player's vocal tract |
   | saxophones | soprano 26 / 29, alto 28 / 30, tenor 30 / 30, baritone 30 / 30 (the alto scaled x2) | a few top notes; palm keys above D#6 left out (the low mode wins) |
   | oboe | 22 / 28 | Bb3, G#5 silent; B3 +70 c; a few 14–22 c |

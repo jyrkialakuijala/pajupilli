@@ -140,6 +140,8 @@ struct SungNote {
   // Where it falls in the bar: 1 the bar's first beat, 0.75 its middle in an even metre, 0.5 another
   // beat, 0.2 off the beat; < 0: not known.
   float beat = -1;
+  // ... in quarter notes after the bar's first beat (< 0: not known), and a quarter note's length there (s).
+  float inBar = -1, beatLen = 0;
   bool cued = false;
   float level = 0.5f, levelEnd = 0.5f, swell = 0, swellPeak = 0.5f;
   float vibDepth = 1, vibDelay = 0.25f, vibRate = 1;
@@ -213,6 +215,7 @@ class JazzSinger {
     int first = 0, count = 0;  // its notes
     double start = 0;          // where its sound begins in the rendering (s), once rendered
     double lead = 0;           // ... and how long before its first beat that is (the breath, the consonant)
+    double breath = 0;         // ... and how much of its beginning is the breath in (s)
     std::vector<float> pcm;
     bool done = false;
   };
@@ -249,6 +252,7 @@ class JazzSinger {
   std::vector<float> sent_;  // the voice as rendered, waiting for halo()
   double compEnv_ = 0;
   double lastEnd_ = -1e9;  // when the last phrase's last note ended (s)
+  mutable double breathEnd_ = 0;  // take(): where the breath in ends in the sound it returned (s)
 };
 
 }  // namespace pajupilli

@@ -83,6 +83,10 @@ class Room {
   // lobes (4 each, or null): each part's direction and strength a: a path leaving at angle theta
   // to it carries the part x (1 + a cos theta).
   void setParts(int s, int np, const float* places, const float* lobes = nullptr);
+  // Source s's parts (setParts) moved to new places, their lobes turned (a shakuhachi aimed by
+  // its player): every path takes its new length and gain over the next process(), the gain
+  // ramped and a path whose delay changed crossfaded from the old delay into the new one.
+  void moveParts(int s, const float* places, const float* lobes = nullptr);
   // The parts' sound for the next process() ([partFrom(s) + j], n samples each; null: none).
   void setPartSignals(const float* const* p) { part_ = p; }
   int partFrom(int s) const { return partFrom_.empty() ? 0 : partFrom_[s]; }
@@ -166,6 +170,14 @@ class Room {
   std::vector<int> pDelay_;       // [part][tap of its source]
   std::vector<float> pGain_;
   std::vector<int> pTap_;         // [source] its parts' first entry in pDelay_ / pGain_
+  // (moveParts: where the paths were at the start of this process() and where they go next;
+  // [source] 1 moved since, 2 moving in this call; the call's length)
+  std::vector<int> pDelayFrom_, pDelayNext_;
+  std::vector<float> pGainFrom_, pGainNext_;
+  std::vector<char> pMove_;
+  int rampN_ = 1;
+  void partPaths(int s, int np, const float* places, const float* lobes, std::vector<int>& dl, std::vector<float>& gn) const;
+  size_t partTapAt(int s) const;
   std::vector<char> hasDip_;    // [source]
   std::vector<float> dring_;    // [3 * source + k][kSpan]
   std::vector<float> inDirDip_; // [3 * source + k][line], unit length

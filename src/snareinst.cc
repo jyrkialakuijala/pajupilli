@@ -43,6 +43,14 @@ float SnareModel::sample() {
   return finish(last_);
 }
 
+// The brush's slaps a little softer (the author, 2026-11-27: "snare slaps could be 1.5 db lower in volume"): the
+// slap stroke (key 39), the flat stroke of the brushing and the swirl's own slaps land PJ_SNARE_SLAP_DB (-1.5)
+// slower.
+static double slapGain() {
+  static const double g = std::pow(10.0, 0.8 * knob("PJ_SNARE_SLAP_DB", -1.5) / 20);  // (the sound falls 1.25 dB for each dB of speed)
+  return g;
+}
+
 SnarePlayer::SnarePlayer(SnareModel& m) : Performer(m), m_(m) {
   bpm_ = knob("PJ_SNARE_BPM", 120);
   // The pull: the hand this much faster at its middle (1: twice as fast),
@@ -156,7 +164,7 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   b.jump(r * std::cos(th), r * std::sin(th), rhAng_);
   const double v = strokeSpeed(velocity, dyn_), vel = std::clamp(velocity, 1, 127) / 127.0;
   if (midi == 39) {  // the slap: flat, pressed in, not drawn
-    b.strike(v, 0.5e-3, 3e-3, 0.035);
+    b.strike(v * slapGain(), 0.5e-3, 3e-3, 0.035);
     rhT_ = -1;
     return;
   }
@@ -186,7 +194,7 @@ void SnarePlayer::noteOn(int midi, int velocity) {
   const bool flat = brushing_ && room > 0.5 && !lastFlat_ && ur() < flatShare_;
   lastFlat_ = flat;
   if (flat) {
-    hard *= flatHard_;
+    hard *= flatHard_ * slapGain();
     spread = (0.7 + 0.6 * ur()) * 1e-3;
     follow += 0.5e-3;
     rhX_ *= 0.65; rhY_ *= 0.65;
@@ -281,7 +289,7 @@ void SnarePlayer::control(double dt) {
         const double R0 = s.batter().radius();
         const double r = (0.3 + 0.15 * ur()) * R0, th = -0.6 + 0.3 * (ur() - 0.5);
         rh.jump(r * std::cos(th), r * std::sin(th), 1.2);
-        rh.strike(strokeSpeed(55 + int(25 * ur()), dyn_), 0.5e-3, 3e-3, 0.035);
+        rh.strike(strokeSpeed(55 + int(25 * ur()), dyn_) * slapGain(), 0.5e-3, 3e-3, 0.035);
         rhT_ = -1;
         slapT_ = 0.15;
       }

@@ -116,7 +116,44 @@ Plate::Plate(double fs, const PlateSpec& spec) : spec_(spec), fs_(fs), dt_(1 / f
     w2_[k] = float(w * w);
     alpha_[k] = float((spec.lossA * fastPow(w, 0.6) + spec.lossB) * (1 + spec.felt * md.mid / std::max(midMean * n_ / 8, 1e-12)));
   }
+  if (spec.bloomRate > 0) {
+    while (nCore_ < n_ && freq_[nCore_] < spec.bloomCore) ++nCore_;
+    nTop_ = nCore_;
+    while (nTop_ < n_ && freq_[nTop_] < spec.bloomTop) ++nTop_;
+    kickShare_.assign(n_, 0.0f);
+    double sum = 0;
+    for (int k = nCore_; k < nTop_; ++k) sum += 1 / freq_[k];
+    for (int k = nCore_; k < nTop_; ++k) kickShare_[k] = float(1 / freq_[k] / sum);
+    bloomRng_ = 2654435761u * (spec.seed + 7);
+  }
   coefs();
+}
+
+// Every 16 samples: the core's energy sets its extra loss for the next 16; what the loss took in
+// the last 16 goes to the upper modes, each a kick of random size whose energy is on average its
+// share (velocity, unit modal mass: 0.5 dv^2).
+void Plate::bloom() {
+  double e = 0;
+  for (int k = 0; k < nCore_; ++k) e += 0.5 * (double(v_[k]) * v_[k] + double(w2_[k]) * q_[k] * q_[k]);
+  // (the core drained of what it holds over the threshold only; the burst's modes lose what passes
+  // on above them while the cascade runs, and for ~0.15 s after)
+  // (drained down to the geometric mean of the threshold and the stroke's own energy, its peak
+  // held ~1 s: a harder stroke keeps more of its tail)
+  bloomPeak_ = std::max(e, bloomPeak_ * std::exp(-16 * dt_ / 1.0));
+  const double floor = bloomPeak_ > spec_.bloomE ? std::sqrt(spec_.bloomE * bloomPeak_) : spec_.bloomE;
+  const double a = e > floor ? 1 - floor / e : 0.0;
+  bloomG_ = float(std::exp(-spec_.bloomRate * a * dt_));
+  bloomAct_ = std::max(a, bloomAct_ * std::exp(-16 * dt_ / 0.15));
+  highG_ = float(std::exp(-spec_.bloomHigh * bloomAct_ * dt_));
+  if (bloomTaken_ > 0) {
+    auto gauss = [this]() {
+      float t = 0;
+      for (int j = 0; j < 4; ++j) { bloomRng_ = bloomRng_ * 1664525u + 1013904223u; t += float(bloomRng_ >> 8) * (1.0f / 16777216.0f) - 0.5f; }
+      return t * 1.7320508f;  // (four uniforms: unit variance)
+    };
+    for (int k = nCore_; k < nTop_; ++k) v_[k] += float(std::sqrt(2 * spec_.bloomPass * bloomTaken_ * kickShare_[k])) * gauss();
+    bloomTaken_ = 0;
+  }
 }
 
 void Plate::coefs() {
@@ -179,9 +216,29 @@ void Plate::step() {
     v_[k] = a21_[k] * q + a22_[k] * v;
     f_[k] = 0;
   }
+  if (nCore_ > 0) {
+    if (bloomG_ < 1) {  // (the core's extra loss, on its velocities: what it takes, kept for the kicks)
+      const float g = bloomG_, l = 0.5f * (1 - g * g);
+      float taken = 0;
+      for (int k = 0; k < nCore_; ++k) {
+        taken += l * v_[k] * v_[k];
+        v_[k] *= g;
+      }
+      bloomTaken_ += taken;
+    }
+    if (highG_ < 1)
+      for (int k = nCore_; k < n_; ++k) v_[k] *= highG_;
+    if (++bloomTick_ == 16) {
+      bloomTick_ = 0;
+      bloom();
+    }
+  }
 }
 
 void Plate::reset() {
+  bloomTaken_ = 0;
+  bloomG_ = highG_ = 1;
+  bloomAct_ = bloomPeak_ = 0;
   std::fill(q_.begin(), q_.end(), 0.0f);
   std::fill(v_.begin(), v_.end(), 0.0f);
   std::fill(f_.begin(), f_.end(), 0.0f);

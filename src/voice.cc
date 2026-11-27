@@ -150,6 +150,8 @@ int Voice::parts() const { return rs_.identity() ? model_->parts() : 0; }
 const float* Voice::partPlaces() const { return rs_.identity() ? model_->partPlaces() : nullptr; }
 const float* Voice::partLobes() const { return rs_.identity() ? model_->partLobes() : nullptr; }
 
+int Voice::partsMoved() const { return rs_.identity() ? model_->partsMoved() : 0; }
+
 const float* Voice::part(int n, int j) {
   if (!rs_.identity()) return nullptr;
   return finite(model_->takePart(n, j), n);

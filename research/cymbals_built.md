@@ -76,8 +76,14 @@ session's scratchpad). `tools/test.py cymbals()` checks the main ones.
 
 ## 3. What is missing or wrong
 
-- **No bloom.** Step 4 is not built: no nonlinear core, no cascade. A crash is bright at its
-  onset and does not build over 0.1–0.3 s; a hard ride stroke does not wash up.
+- **A simple bloom only.** Step 4's nonlinear core is not built. Since 2026-11-27 the crashes,
+  splash and china have step 4c's cascade in a simple form (`PlateSpec::bloomRate`, the user's
+  "sharp burst"): over a threshold (each plate's core energy at about velocity 70) the modes
+  under 2.5 kHz are drained down to the geometric mean of the threshold and the stroke's own
+  energy, 8 % of it kicked into 2.5–12 kHz (falling as 1/f) and those modes damped while it
+  runs. At velocity 110 on the 16" crash: +5.6 dB in 3–8 kHz over the first 0.1 s, the tail
+  2.7 dB lower at its own slope (8.6 s). The 3–8 kHz band flares at once, not 0.1–0.3 s later,
+  and a hard ride stroke still does not wash up (the rides stay linear).
 - **Too little ping over the wash** (+5–7 dB against the recording's 12–19).
   - With the measured band decays (~4 s at 1–2 kHz), a linear plate struck 2–5 times a second
     holds a wash within a few dB of each stroke's energy, by energy balance alone.

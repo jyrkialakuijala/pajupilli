@@ -23,6 +23,10 @@ enum class Kind {
 struct NoteInfo {
   const char* holes;  // hole 1 .. n, 'o' open, 'x' closed, 'h' half-holed; left out: open
   int harmonic;       // which resonance of the fingering sounds (1, 2, 3, ...)
+  // An instrument's own note (the shakuhachi's open fingerings and their
+  // overblown octaves): played with the lips at rest and the breath as it
+  // comes, at the pitch the bore gives, not lipped to equal temperament.
+  bool natural = false;
 };
 
 // A point of the bore profile: x from the top of the air column (the cork face,

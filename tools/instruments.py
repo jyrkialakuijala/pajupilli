@@ -641,21 +641,39 @@ def shakuhachi():
              (0.73, 0.5 * (narrow + 17.5)), (0.88, 0.5 * (root + 17)), (1.0, root)]
         return [(u * end, d) for u, d in f]
 
+    # The registers as a player overblows them: otsu (D4..C#5) on the 1st
+    # resonance; kan (D5..C#6) on the 2nd (the 3rd costlier), by otsu's own
+    # fingering an octave down where it speaks there (cross fingerings on the
+    # 1st do not, up here); dai-kan (D6..A6) on the 3rd to 5th. The search
+    # here does not find them all: src/designs.cc carries ten by hand (D#5,
+    # E5, G#5, A#5, D6, D#6, F6, F#6, G#6, A6), found by playing every
+    # fingering (one half-hole at most) in the waveguide; the kan's chromatic
+    # ones the otsu fingering a semitone up, lipped down (meri).
     def cand(m, notes):
+        regs = (1,) if m < midi('D5') else (2, 3) if m < midi('D6') else (3, 4, 5)
+        low = notes.get(m - 12)
         out = []
         for p in itertools_product('xoh', 5):
             pat = ''.join(p)
             nh = pat.count('h')
             if nh > 1:
                 continue
-            for n in (1, 2, 3):
-                out.append((pat, n, 2 * nh + 3 * (n - 1) + sum(1 for a, b in zip(pat, pat[1:]) if a == 'o' and b == 'x')))
+            for n in regs:
+                same = n == 2 and low is not None and low[0] == pat
+                out.append((pat, n, (0 if same else 8) + 2 * nh + 3 * (n - regs[0]) +
+                            sum(1 for a, b in zip(pat, pat[1:]) if a == 'o' and b == 'x')))
         return out
-    return dict(name='shakuhachi', title='Shakuhachi 1.8 (in D), D4..C#6', family='shakuhachi', kind='end',
-                transpose=0, lo=midi('D4'), hi=midi('C#6'), fs=48000, gain=1.0, end=545, bore_fn=bore, holes=holes,
-                core=core, candidates=cand, gap=15, emb=1.3, fit='xd', extra=[('narrow', 16.5, 12.0, 20.0), ('top', 20.5, 16.0, 24.0), ('root', 21.0, 15.0, 28.0)],
+    return dict(name='shakuhachi', title='Shakuhachi 1.8 (in D), D4..A6', family='shakuhachi', kind='end',
+                transpose=0, lo=midi('D4'), hi=midi('A6'), fs=48000, gain=1.0, end=545, bore_fn=bore, holes=holes,
+                core=core, candidates=cand, gap=15, emb=1.3, fit='xd',
+                # (its own notes: the open fingerings, Ro Tsu Re Chi Ri, and their overblown octaves,
+                # Ro's two up too, played at the bore's pitch with the lips at rest: src/instrument.h)
+                natural=[midi(n) for n in ('D4', 'F4', 'G4', 'A4', 'C5', 'D5', 'F5', 'G5', 'A5', 'C6', 'D6')], extra=[('narrow', 16.5, 12.0, 20.0), ('top', 20.5, 16.0, 24.0), ('root', 21.0, 15.0, 28.0)],
                 doc="""End-blown: the lips cover part of the top's rim, which bends the pitch
-                (meri / kari); four front holes, a thumb hole.""",
+                (meri / kari); four front holes, a thumb hole.
+                (Its length, holes and all, x0.9908 of the fit's: as a maker sets it by the
+                middle joint, Ro (D4) in tune with the lips at rest; the open notes then
+                where the bore puts them, src/instrument.h's NoteInfo::natural.)""",
                 jet=dict(chimney=1.0))
 
 
@@ -747,11 +765,12 @@ def panflute():
 # wine bottle (body 70 mm, neck 20 x 60 mm) at C4 to a small vial at C6.
 
 def bottles():
-    lo, hi = midi('C4'), midi('C6')
+    lo, hi = midi('C2'), midi('C8')  # (a jug, a carboy at C2; a vial at C8)
 
-    def shape(m):
-        u = (m - lo) / (hi - lo)
-        return 70.0 * (25 / 70) ** u, 60.0 * (25 / 60) ** u, 20.0 * (10 / 20) ** u  # body d, neck length, neck d
+    def shape(m):  # (the C4..C6 bottles as they were, the same geometric run on past them)
+        u = (m - midi('C4')) / (midi('C6') - midi('C4'))
+        un = u if u <= 1 else 1 + 0.5 * (u - 1)  # (a vial's neck narrows slower: ~7 mm at C8, room to tune it by the lips)
+        return 70.0 * (25 / 70) ** u, 60.0 * (25 / 60) ** u, 20.0 * (10 / 20) ** un  # body d, neck length, neck d
 
     def pipes(spec, Model):
         out = []
@@ -773,7 +792,7 @@ def bottles():
                     b = L
             out.append((m, 0.5 * (a + b), bd, nl, nd))
         return out
-    return dict(name='bottle', title='Blown bottles (one per note), C4..C6', family='bottle', kind='end',
+    return dict(name='bottle', title='Blown bottles (one per note, jugs to vials), C2..C8', family='bottle', kind='end',
                 transpose=0, lo=lo, hi=hi, fs=96000, gain=1.0, end=200, closed=True,
                 bore=[(0, 20.0), (1000, 20.0)], holes=[], core={}, pipes_fn=pipes, emb=1.0,
                 doc="""One bottle per note, blown across the neck (a Helmholtz resonator).""",

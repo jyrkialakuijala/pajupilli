@@ -44,6 +44,14 @@ struct PlateSpec {
   double lossA = 0.0025, lossB = 0.6, felt = 3;
   double split = 0.006;       // a pair's members this far apart (a share, at random up to it)
   uint32_t seed = 1;
+  // The bloom (a hard crash: research/cymbal_plan.md step 4c, the cascade in a simple form). The
+  // plate's low modes (below bloomCore Hz), struck hard, stretch the middle surface and hand
+  // their energy on to the high ones. Here: while the core holds more than bloomE (J) it loses
+  // an extra bloomRate x e / (1 + e) (1/s, e = its energy / bloomE) besides its own loss, and
+  // exactly what that takes is given to the modes from bloomCore to bloomTop Hz as random
+  // kicks, the more to the lower of them (each x 1 / f: a falling spectrum). Struck softly, or
+  // once it has calmed, the plate is linear: the long tail is the plate's own. bloomRate 0: off.
+  double bloomRate = 0, bloomE = 1e-3, bloomCore = 2500, bloomTop = 12000, bloomHigh = 0, bloomPass = 1;
 };
 
 class Plate : public Surface {
@@ -86,6 +94,15 @@ class Plate : public Surface {
   std::vector<float> norm_, c0_, s0_, tab_;
   std::vector<float> q_, v_, f_, w2_, alpha_, a11_, a12_, a21_, a22_;
   static constexpr int kRadii = 128;
+  // (the bloom: the core's modes [0, nCore_), the kicked ones [nCore_, nTop_) and each one's share
+  // of what is handed on; the core's extra loss per sample now; the energy taken, not yet given)
+  int nCore_ = 0, nTop_ = 0, bloomTick_ = 0;
+  std::vector<float> kickShare_;
+  float bloomG_ = 1, highG_ = 1;
+  double bloomAct_ = 0, bloomPeak_ = 0;
+  double bloomTaken_ = 0;
+  uint32_t bloomRng_ = 1;
+  void bloom();
 };
 
 }  // namespace pajupilli

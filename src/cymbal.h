@@ -25,9 +25,9 @@
 //     (a Rayleigh sum over the plate; below the coincidence pitch only its
 //     edge sounds).
 //
-// Linear: the plate's nonlinearity (the cascade that makes a crash bloom,
-// cymbal_plan.md step 4) is not built. A hard crash here is a loud linear
-// plate: bright at once, no build-up over 0.1-0.3 s.
+// The plate's nonlinearity (cymbal_plan.md step 4) is not built; a hard stroke on
+// the crashes, splash and china has its cascade in a simple form (PlateSpec::
+// bloomRate): the low modes drained, a part of it a short burst in the highs.
 #pragma once
 
 #include <cstdint>

@@ -20,7 +20,7 @@ double hz(double midi) { return 440 * std::exp2((midi - 69) / 12); }
 // the pair's axes (cos m phi, sin m phi); radiation as a multipole of order
 // m-1 at ka (a = 35, 30 mm) its efficiency (ka)^(m-1) / (1 + (ka)^(m-1)).
 // Q ~1000 (the steel's, the stud's). The small gong tuned a minor third over
-// the big one (tuneGongs scales its table to exactly 2^(3/12)).
+// the big one with one key (Sfx::ringSet; each gong's table scaled to its key).
 const float kGong[2][16][4] = {
     {{1177.6f, 2.266f, 0.766f, 0.430f}, {1182.4f, 2.134f, 0.643f, 0.431f},
      {3223.5f, 0.978f, 0.375f, 0.810f}, {3242.9f, 0.921f, 0.650f, 0.812f},
@@ -51,8 +51,12 @@ const float kGong[2][16][4] = {
 // K = 4/3 E* sqrt(R) ~ 8e9.
 constexpr double kArmM = 0.020, kArmF0 = 19, kArmZeta = 0.03, kBallM = 0.004, kBallF0 = 60, kBallZeta = 0.02;
 constexpr double kGap = 1.5e-3, kGapAsym = 0.3, kGongM = 0.008, kBallK = 8e9;
-// The small gong's (2,0) a minor third over the big one's: 2^(3/12).
-constexpr double kMinorThird = 1.1892071150027210;
+// The gongs ring longer than the table's Q ~1000: hard steel, loosely held
+// on their studs (Q ~1500: their sustain 50 % longer).
+constexpr double kGongRing = 1.5;
+// The ball at rest on the big gong's rim: its damping (1/s) of a mode that
+// swings fully there (the (2,0) pair: its t60 ~3.6 s down to ~2 s).
+constexpr double kRestDamp = 3.0;
 
 // F = K (c0 - G F)^1.5 (the contact's force through this step: c0 the
 // overlap without it, G how far a unit force moves the two apart).
@@ -73,23 +77,121 @@ double hertz(double c0, double G, double K) {
 }
 }  // namespace
 
-void Sfx::tuneGongs(double scale) {
-  for (int g = 0; g < 2; ++g) {
-    Gong& G = gong_[g];
-    for (int k = 0; k < Gong::kN; ++k) {
-      const double tune = g ? kMinorThird * kGong[0][0][0] / kGong[1][0][0] : 1;
-      const double f = kGong[g][k][0] * scale * tune, t60 = kGong[g][k][1] / std::sqrt(scale * tune);
-      const double w = 2 * M_PI * std::min(f, 0.45 * fs_), s = 6.907755 / t60;
-      const double wd = std::sqrt(std::max(w * w - s * s, 1e-6)), e = std::exp(-s * dt_);
-      const double c = std::cos(wd * dt_), sn = std::sin(wd * dt_);
-      G.c00[k] = float(e * (c + s / wd * sn));
-      G.c01[k] = float(e * sn / wd);
-      G.c10[k] = float(-e * w * w * sn / wd);
-      G.c11[k] = float(e * (c - s / wd * sn));
-      G.exc[k] = kGong[g][k][2];
-      G.rad[k] = f < 0.45 * fs_ ? kGong[g][k][3] : 0;
-    }
+// A gong at `pitch` (its (2,0) at the key two octaves up: C4 rings 1047 Hz),
+// from one of the two stamped bowls' tables; its swing kept (a gliding gong
+// is retuned as it rings). Its place across: low left, high right.
+void Sfx::tuneGong(Gong& G, double pitch, int table) {
+  const double scale = hz(pitch + 24) / kGong[table][0][0];
+  G.pitch = pitch;
+  G.table = table;
+  G.pan = float(0.15 * std::clamp((pitch - 66) / 18, -1.0, 1.0));
+  for (int k = 0; k < Gong::kN; ++k) {
+    const double f = kGong[table][k][0] * scale, t60 = kGongRing * kGong[table][k][1] / std::sqrt(scale);
+    const double w = 2 * M_PI * std::min(f, 0.45 * fs_), s = 6.907755 / t60;
+    const double wd = std::sqrt(std::max(w * w - s * s, 1e-6)), e = std::exp(-s * dt_);
+    const double c = std::cos(wd * dt_), sn = std::sin(wd * dt_);
+    G.c00[k] = float(e * (c + s / wd * sn));
+    G.c01[k] = float(e * sn / wd);
+    G.c10[k] = float(-e * w * w * sn / wd);
+    G.c11[k] = float(e * (c - s / wd * sn));
+    G.exc[k] = kGong[table][k][2];
+    // (the resting ball's damping: e^(-s t), s = kRestDamp shape^2)
+    G.rest[k] = float(1 - std::exp(-kRestDamp * G.exc[k] * G.exc[k] * dt_));
+    G.rad[k] = f < 0.45 * fs_ ? kGong[table][k][3] : 0;
   }
+}
+
+// A new gong at `pitch`, silent: the quietest of those not busy[0..nBusy).
+int Sfx::newGong(double pitch, int table, const int* busy, int nBusy) {
+  int best = -1;
+  double be = 1e300;
+  for (int i = 0; i < kGongs; ++i) {
+    if (std::find(busy, busy + nBusy, i) != busy + nBusy) continue;
+    double e = 0;
+    if (gong_[i].pitch >= 0)
+      for (int k = 0; k < Gong::kN; ++k) e += gong_[i].v[k] * double(gong_[i].v[k]);
+    if (e < be) { be = e; best = i; }
+  }
+  Gong& G = gong_[best];
+  std::fill(G.q, G.q + Gong::kN, 0.0f);
+  std::fill(G.v, G.v + Gong::kN, 0.0f);
+  tuneGong(G, pitch, table);
+  G.target = pitch;
+  return best;
+}
+
+// The gongs the ball goes round, from the held keys (by pitch): one key, its
+// gong and one a minor third over it (the smaller bowl); more, a gong each.
+// The first keys' gongs are there at once; after, the gongs the ball went
+// round move to the keys, in pitch order, the least sliding in all, sliding
+// there as it rings (Sfx::sample); one more key, a new gong at once at its
+// key; one fewer, a gong left out, ringing out where it is. The ball goes on from the gong it struck last, if it is
+// still among them.
+void Sfx::ringSet() {
+  if (nHeld_ == 0) return;  // (let go: the arm coasts down on the last ones, as they are)
+  double p[kGongs];
+  int n = std::min(nHeld_, int(kGongs));
+  for (int i = 0; i < n; ++i) {  // (by pitch)
+    int j = i;
+    for (; j > 0 && p[j - 1] > held_keys_[i]; --j) p[j] = p[j - 1];
+    p[j] = held_keys_[i];
+  }
+  if (n == 1) {
+    p[1] = p[0] + 3;
+    n = 2;
+  }
+  const int last = nRing_ > 0 ? ring_[cur_] : -1;
+  // (the ones gone round, by their pitch now)
+  int old[kGongs], m = std::min(nRing_, int(kGongs));
+  for (int i = 0; i < m; ++i) {
+    int j = i;
+    for (; j > 0 && gong_[old[j - 1]].pitch > gong_[ring_[i]].pitch; --j) old[j] = old[j - 1];
+    old[j] = ring_[i];
+  }
+  // (Old gongs to keys in pitch order, the least sliding in all: the
+  // shorter list matched into the longer, each in turn to a later place.)
+  auto match = [](const double* a, int na, const double* b, int nb, int* to) {
+    double c[kGongs + 1][kGongs + 1];
+    for (int i = 0; i <= na; ++i)
+      for (int j = 0; j <= nb; ++j)
+        c[i][j] = i == 0 ? 0 : j < i ? 1e300 : std::min(c[i][j - 1], c[i - 1][j - 1] + std::fabs(a[i - 1] - b[j - 1]));
+    for (int i = na, j = nb; i > 0; --j)
+      if (j == i || c[i - 1][j - 1] + std::fabs(a[i - 1] - b[j - 1]) <= c[i][j - 1]) to[--i] = j - 1;
+  };
+  double op[kGongs];
+  for (int i = 0; i < m; ++i) op[i] = gong_[old[i]].pitch;
+  int r[kGongs], nb = 0, busy[kGongs], to[kGongs];
+  if (m == 0) {
+    for (int i = 0; i < n; ++i) {
+      r[i] = newGong(p[i], i & 1, busy, nb);
+      busy[nb++] = r[i];
+    }
+  } else if (n >= m) {
+    std::fill(r, r + n, -1);
+    match(op, m, p, n, to);
+    for (int j = 0; j < m; ++j) busy[nb++] = r[to[j]] = old[j];
+    for (int i = 0; i < n; ++i) {
+      if (r[i] >= 0) continue;
+      int nearI = -1;  // (the nearest of the old ones: the other bowl's table)
+      for (int d = 1; nearI < 0; ++d) {
+        if (i - d >= 0 && r[i - d] >= 0 && std::find(old, old + m, r[i - d]) != old + m) nearI = i - d;
+        else if (i + d < n && r[i + d] >= 0 && std::find(old, old + m, r[i + d]) != old + m) nearI = i + d;
+      }
+      r[i] = newGong(p[i], 1 - gong_[r[nearI]].table, busy, nb);
+      busy[nb++] = r[i];
+    }
+  } else {
+    match(p, n, op, m, to);
+    for (int i = 0; i < n; ++i) r[i] = old[to[i]];
+  }
+  for (int i = 0; i < m; ++i) gong_[old[i]].target = gong_[old[i]].pitch;  // (left out: as they are)
+  for (int i = 0; i < n; ++i) gong_[r[i]].target = p[i];
+  std::copy(r, r + n, ring_);
+  nRing_ = n;
+  cur_ = n - 1;
+  lastSide_ = 1;
+  for (int i = 0; i < n; ++i)
+    if (r[i] == last) cur_ = i;
 }
 
 Sfx::Sfx(Type t, double fs) : t_(t), fs_(fs), dt_(1 / fs), set_(fs) {
@@ -126,11 +228,6 @@ Sfx::Sfx(Type t, double fs) : t_(t), fs_(fs), dt_(1 / fs), set_(fs) {
       for (Bubble& b : bub_) b.on = false;
       break;
     case kPhone:
-      for (Gong& g : gong_) {
-        std::fill(g.q, g.q + Gong::kN, 0.0f);
-        std::fill(g.v, g.v + Gong::kN, 0.0f);
-      }
-      tuneGongs(1);
       break;
     case kApplause: {
       // 40 rows of 24 seats (0.5 m apart, rows 0.9 m), ordered nearest the
@@ -216,8 +313,11 @@ void Sfx::reset() {
   for (Gong& g : gong_) {
     std::fill(g.q, g.q + Gong::kN, 0.0f);
     std::fill(g.v, g.v + Gong::kN, 0.0f);
+    g.pitch = -1;
   }
-  armX_ = armV_ = ballX_ = ballV_ = ringEnv_ = 0;
+  nHeld_ = nRing_ = cur_ = 0;
+  lastSide_ = 1;
+  armX_ = armV_ = ballX_ = ballV_ = ringEnv_ = restEnv_ = 0;
 }
 
 bool Sfx::applauding() const {
@@ -251,6 +351,17 @@ void Sfx::bravo(double strength) {
 }
 
 void Sfx::noteOn(int midi, double vel) {
+  if (t_ == kPhone) {
+    // The key's velocity: how fast the ring current comes up (0.3 s soft ..
+    // 15 ms hard), so how soon the arm swings fully; not how loud. (The
+    // first key's: the others only add gongs.)
+    if (nHeld_ == 0) ringRise_ = 0.3 * std::pow(0.05, std::clamp(vel, 0.02, 1.0));
+    if (std::find(held_keys_, held_keys_ + nHeld_, midi) == held_keys_ + nHeld_ && nHeld_ < kGongs)
+      held_keys_[nHeld_++] = midi;
+    held_ = true;
+    ringSet();
+    return;
+  }
   key_ = midi;
   vel_ = std::clamp(vel, 0.02, 1.0);
   held_ = true;
@@ -275,11 +386,6 @@ void Sfx::noteOn(int midi, double vel) {
       fLo_ = fHi_ * (0.45 + 0.15 * u01());
       sylDur_ = 0.045 + 0.04 * u01();
       gap_ = 0.03 + 0.03 * u01();
-      break;
-    case kPhone:
-      // (The big gong's (2,0) at the key two octaves up: C4 rings 1047 Hz.)
-      ringT_ = 0;
-      tuneGongs(hz(midi + 24) / kGong[0][0][0]);
       break;
     case kHeli:
       rotHz_ = 4 + 2 * std::clamp((midi - 36) / 48.0, 0.0, 1.0);
@@ -307,6 +413,14 @@ void Sfx::noteOn(int midi, double vel) {
 }
 
 void Sfx::noteOff(int midi) {
+  if (t_ == kPhone) {
+    int* e = std::remove(held_keys_, held_keys_ + nHeld_, midi);
+    if (e == held_keys_ + nHeld_) return;
+    nHeld_ = int(e - held_keys_);
+    held_ = nHeld_ > 0;
+    ringSet();
+    return;
+  }
   if (midi != key_) return;
   held_ = false;
   if (t_ == kApplause)
@@ -444,43 +558,75 @@ float Sfx::sample(float* side) {
       break;
     }
     case kPhone: {
-      // The ring current: 20 Hz, 2 s on and 4 s off, through the ringer's
-      // capacitor and coils (its envelope builds and dies in ~15 ms); its
-      // force on the armature (a polarised ringer: as the current).
-      if (held_) ringT_ += dt_;
-      const bool on = held_ && std::fmod(ringT_, 6.0) < 2.0;
-      ringEnv_ += (1 - std::exp(-dt_ / 0.015)) * ((on ? 1.0 : 0.0) - ringEnv_);
+      // The ring current: 20 Hz while the key is held, through the ringer's
+      // capacitor and coils; it comes up as fast as the key was struck and
+      // dies in ~30 ms when let go; its force on the armature (a polarised
+      // ringer: as the current), the same full swing for every key. Coming
+      // up, the first strokes reach only the nearer gong, unevenly, before
+      // the swing locks in; let go, the arm coasts down through a few last,
+      // uneven strokes.
+      ringEnv_ += (1 - std::exp(-dt_ / (held_ ? ringRise_ : 0.03))) * ((held_ ? 1.0 : 0.0) - ringEnv_);
+      // At rest (~0.3 s after the keys are let go, the swing gone) the ball
+      // lies against the rim of the gong on its nearer side (with one key the
+      // key's own, the bigger) and damps it, each mode by how much it swings
+      // there: some of its partials, its fundamental too, die sooner; the
+      // others ring on.
+      restEnv_ += (1 - std::exp(-dt_ / (held_ ? 0.01 : 0.3))) * ((held_ ? 0.0 : 1.0) - restEnv_);
       ringPh_ = std::fmod(ringPh_ + 20 * dt_, 1.0);
-      // (Stronger for a harder key, the line's ringing voltage: a soft one
-      // barely builds the swing, a hard one locks into it in ~0.1 s.)
-      const double Fd = (0.095 + 0.125 * vel_) * ringEnv_ * std::sin(2 * M_PI * ringPh_);
+      // The gongs slide toward their keys while keys are held (in pitch,
+      // 0.4 s; retuned every 64 samples, ringing on); let go, they stay.
+      if (held_ && (++glideCtl_ & 63) == 0)
+        for (int i = 0; i < nRing_; ++i) {
+          Gong& G = gong_[ring_[i]];
+          const double d = G.target - G.pitch;
+          if (std::fabs(d) < 1e-4) continue;
+          tuneGong(G, std::fabs(d) < 2e-3 ? G.target : G.pitch + d * (1 - std::exp(-64 * dt_ / 0.4)), G.table);
+        }
+      const double Fd = 0.2 * ringEnv_ * std::sin(2 * M_PI * ringPh_);
       const double wa = 2 * M_PI * kArmF0, wb = 2 * M_PI * kBallF0;
       // The arm's spring between the armature and the ball.
       const double Fs = kBallM * wb * wb * (ballX_ - armX_) + 2 * kBallZeta * kBallM * wb * (ballV_ - armV_);
       armV_ += (Fd - kArmM * wa * wa * armX_ - 2 * kArmZeta * kArmM * wa * armV_ + Fs) / kArmM * dt_;
       armX_ += armV_ * dt_;
-      // The ball through this step without the gongs, each gong's rim where
-      // the ball strikes without the ball; the contacts solved with the step
-      // (a steel ball on a steel rim: ~0.1 ms).
+      // The ball through this step without the gongs, the gong it would
+      // strike on either side (the one it struck last, on the side it struck
+      // it; on the other side the next one round: with two gongs, each its
+      // side) where the ball strikes it without the ball; the contacts solved
+      // with the step (a steel ball on a steel rim: ~0.1 ms).
       const double v1 = ballV_ - Fs / kBallM * dt_, x1 = ballX_ + v1 * dt_;
-      double F[2];
-      for (int g = 0; g < 2; ++g) {
-        Gong& G = gong_[g];
-        double y = 0, cg = 0;
-        for (int k = 0; k < Gong::kN; ++k) {
-          y += G.exc[k] * (G.c00[k] * G.q[k] + G.c01[k] * G.v[k]);
-          cg += G.exc[k] * G.exc[k] * G.c01[k];
+      double F[2] = {0, 0};
+      int tg[2] = {-1, -1};
+      if (nRing_ >= 2)
+        for (int sd2 = 0; sd2 < 2; ++sd2) {
+          tg[sd2] = ring_[sd2 == lastSide_ ? cur_ : (cur_ + 1) % nRing_];
+          const Gong& G = gong_[tg[sd2]];
+          double yg = 0, cg = 0;
+          for (int k = 0; k < Gong::kN; ++k) {
+            yg += G.exc[k] * (G.c00[k] * G.q[k] + G.c01[k] * G.v[k]);
+            cg += G.exc[k] * G.exc[k] * G.c01[k];
+          }
+          const double gap = kGap * (sd2 == 0 ? 1 - kGapAsym : 1 + kGapAsym);
+          const double over = (sd2 == 0 ? x1 : -x1) - (gap + yg);
+          F[sd2] = hertz(over, cg * dt_ / kGongM + dt_ * dt_ / kBallM, kBallK);
         }
-        const double gap = kGap * (g == 0 ? 1 - kGapAsym : 1 + kGapAsym);
-        const double over = (g == 0 ? x1 : -x1) - (gap + y);
-        F[g] = hertz(over, cg * dt_ / kGongM + dt_ * dt_ / kBallM, kBallK);
-      }
       ballV_ = v1 - (F[0] - F[1]) / kBallM * dt_;
       ballX_ += ballV_ * dt_;
-      for (int g = 0; g < 2; ++g) {
+      for (int sd2 = 0; sd2 < 2; ++sd2)
+        if (F[sd2] > 0 && sd2 != lastSide_) {  // (a stroke from the other side: on round)
+          lastSide_ = sd2;
+          cur_ = (cur_ + 1) % nRing_;
+        }
+      for (int g = 0; g < kGongs; ++g) {
         Gong& G = gong_[g];
-        const float imp = float(F[g] * dt_ / kGongM);
+        if (G.pitch < 0) continue;
+        const float imp = float(((g == tg[0] ? F[0] : 0) + (g == tg[1] ? F[1] : 0)) * dt_ / kGongM);
         float o = 0;
+        if (g == tg[0] && restEnv_ > 1e-3)  // (the ball at rest: on side 0's)
+          for (int k = 0; k < Gong::kN; ++k) {
+            const float r = 1 - float(restEnv_) * G.rest[k];
+            G.q[k] *= r;
+            G.v[k] *= r;
+          }
         for (int k = 0; k < Gong::kN; ++k) {
           const float v0 = G.v[k] + imp * G.exc[k];
           const float q = G.c00[k] * G.q[k] + G.c01[k] * v0;
@@ -488,12 +634,12 @@ float Sfx::sample(float* side) {
           G.q[k] = q;
           o += G.rad[k] * G.v[k];
         }
-        // The big gong a little left, the small one right.
+        // (the low ones a little left, the high ones right)
         y += 0.5f * o;
-        sd += g ? 0.15f * o : -0.15f * o;
+        sd += G.pan * o;
       }
-      y *= 0.95f;
-      sd *= 0.95f;
+      y *= 0.83f;
+      sd *= 0.83f;
       break;
     }
     case kHeli: {

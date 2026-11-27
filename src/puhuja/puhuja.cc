@@ -10643,7 +10643,7 @@ void Synth::emitPlosive(const Token& tok, const Ph* next) {
       if (vlK && kVlKAsp != 1.0f) rel.lineAspMul *= kVlKAsp;
       // (PK-INITIAL agent19, lab; < 0: as above) LINE_K_VOT_UNSTR_INIT for a word-initial k before a vowel only (kl kɹ kw
       // kj unchanged): LINE_KV_VOT_UNSTR.
-      static const float kKvVotUnstr = param("LINE_KV_VOT_UNSTR", 0.99139919f);
+      static const float kKvVotUnstr = param("LINE_KV_VOT_UNSTR", 0.3f);  // 0.99 until 2026-11-25 (Jyrki: "k got better", "are committed": VOT 63 -> 31 ms, 11labs 33)
       // LINE_PV_VOT_UNSTR the same for a word-initial p before a vowel (unstressed initial p heard b 25 %: "Parade" -> bread).
       static const float kPvVotUnstr = param("LINE_PV_VOT_UNSTR", 1.042247f);
       const float unstrHold = tvInit && kTvVotUnstr >= 0 ? kTvVotUnstr : pvInit && kPvVotUnstr >= 0 ? kPvVotUnstr : kvInit && kKvVotUnstr >= 0 ? kKvVotUnstr : tok.ph == Ph::K && tok.wordStart && kKVotUnstrInit >= 0 ? kKVotUnstrInit : kLineVotHoldUnstressed;
@@ -12081,9 +12081,24 @@ float Synth::tick() {
         lineXArtic_ = true;
         lineXHoldUntil_ = t_ + msToSamples(kLineXRelHoldMs, fs_);
       }
+      // LINE_X_DORSUM_SLIT (0: off): a closure behind LINE_X_ARTIC_DORSUM released into a slit in front of it (k g into
+      // s z sh zh th dh) is the other articulator too. Owner 2026-11-25: "republics south, something strange happens
+      // between these words", then "republics-new-m is good"): the k's hump opened into the s's 0.043 cm^2 slit and slid, open, from the velum (x 0.63)
+      // to the ridge (0.90) on the 20 ms glide, the s's hiss sweeping up from 2.5 to 4.5 kHz over its first 50 ms (the
+      // 11labs reader: a velar burst, then the s at 4-8 kHz from its start). 1: the closure moves while still shut
+      // (LINE_X_ARTIC_SHUT_MS), the s opens at its own place; 2: the burst keeps the velum for LINE_X_REL_HOLD_MS, then
+      // goes over on LINE_X_ARTIC_MS.
+      static const float kXDorsumSlit = param("LINE_X_DORSUM_SLIT", 1.0f);  // 0 until 2026-11-26 (owner: "republics-new-m is good")
+      bool dorsumSlitShut = false;
+      if (kXDorsumSlit > 0 && kLineXArticMs >= 0 && kLineXArticDorsum > 0 && e.lineX >= kLineXArticDorsum && e.lineX < 0.94f &&
+          lineX_ < kLineXArticDorsum && lineAcPrev_ < 0.004f && e.ac > 0 && e.ac < kLineXArticOpenArea) {
+        lineXArtic_ = true;
+        if (kXDorsumSlit >= 2) lineXHoldUntil_ = t_ + msToSamples(kLineXRelHoldMs, fs_);
+        dorsumSlitShut = kXDorsumSlit < 2;
+      }
       lineXTarget_ = e.lineX;
       lineXShutGo_ = false;
-      lineXShutEv_ = e.lineXShut;
+      lineXShutEv_ = e.lineXShut || dorsumSlitShut;
       lineXSnapOk_ = !kLineXSnapClosures || e.lineXClosure;
       static const bool kXTrace = std::getenv("PUHUJA_X_TRACE") != nullptr;  // the place events as they start
       if (kXTrace) std::fprintf(stderr, "xev t %.3f x %.3f ac %.3f\n", t_ / fs_, e.lineX, e.ac);
@@ -12098,8 +12113,25 @@ float Synth::tick() {
     if (e.lineFricReMul >= 0) line_.setFricReMul(e.lineFricReMul);
     if (e.lineFricReSmooth >= 0) line_.setFricReSmooth(e.lineFricReSmooth);
     if (e.lineFricReBoth >= 0) line_.setFricReBoth(e.lineFricReBoth > 0);
+    // LINE_EXPAND_OFF_STOP (0: off, as before 2026-11-25; owner: "the last d has a strange klick-pop" in "are committed
+    // today"): an event that ends a voiced closure's softness while the tract stays shut (the next stop's closure: d -> t,
+    // ac 0) lets the wall behind it go over LINE_EXPAND_PHYS_OFF_MS, as before a fricative. Stopped in one substep, the
+    // sealed cavity went 4000 -> 7700 dyn/cm^2 in 1.5 ms: a low pop at the phrase's peak level in the silent closure
+    // ("and today" 2.1 / 6.6 x the peak RMS in one sample step, male / female). Decided here, as the sound happens: the
+    // planner's flag (setExpandOffAllowed) is overwritten by the next voiced stop it plans. A release (ac > 0) keeps the
+    // cut: fading it there took 3-8 dB from the b d g bursts.
+    // LINE_EXPAND_OFF_AC (cm^2; 0.004: the handover only, as LINE_EXPAND_OFF_STOP alone) the same when the event opens the
+    // tract only to under this (a fricative: d -> ð ac 0.084, d -> f 0.027), and LINE_EXPAND_OFF_PAUSE 1 when it closes
+    // the glottis for a pause (ag 0; ac 2 as into a vowel). Owner 2026-11-25: "around the globe, hand of God -- both have a
+    // pop in the ending d": the planner's flag for a fricative (setExpandOffAllowed) was overwritten by the g and b of
+    // "globe" before the d sounded, and a pause had no fade at all (steps 0.20-0.80 x the peak RMS at the release).
+    static const bool kExpandOffStop = param("LINE_EXPAND_OFF_STOP", 1.0f) > 0;  // 1 since 2026-11-25 (owner: "this is great")
+    static const float kExpandOffAc = param("LINE_EXPAND_OFF_AC", 0.3f);  // 0.004 until 2026-11-25 (owner: "friend-new is good")
+    static const bool kExpandOffPause = param("LINE_EXPAND_OFF_PAUSE", 1.0f) > 0;  // 0 until 2026-11-25 (owner: "God-new is good")
+    if (kExpandOffStop && e.lineSoft >= 0 && e.lineSoft <= 1.0f && lineSoft_ > 1.0f)
+      line_.setExpandOffHandover(e.ac >= 0 && (e.ac < kExpandOffAc || (kExpandOffPause && e.ag == 0.0f)));
     if (e.lineSoft >= 0) lineSoft_ = e.lineSoft;
-    if (e.lineSoft >= 0 && std::getenv("PUHUJA_LINE_TRACE")) std::fprintf(stderr, "softevent t %.3f soft %.3f\n", t_ / fs_, e.lineSoft);
+    if (e.lineSoft >= 0 && std::getenv("PUHUJA_LINE_TRACE")) std::fprintf(stderr, "softevent t %.3f soft %.3f ac %.3f ag %.3f\n", t_ / fs_, e.lineSoft, e.ac, e.ag);
     if (e.lineExtra >= 0) lineExtra_ = e.lineExtra;
     if (e.lineRaise >= 0) lineRaiseTgt_ = e.lineRaise;
     if (e.lineSqueeze >= 0) line_.setSqueeze(e.lineSqueeze);
@@ -12922,6 +12954,7 @@ float Synth::tick() {
       lc.ag *= std::max(0.0f, 1.0f + kCrEndAg * endE_ + kCrOnAg * onO_);
       lc.diplo = kCrEndDiplo * endE_;
     }
+    if (diploX_ > 0) lc.diplo = std::max(lc.diplo, diploX_);  // (setDiplo: a singer's faint subharmonic)
     // (VQCS agent33 round AE, lab; 0: off) connected-speech voice quality, x the eased amount (VQCS_ON): the posterior chink
     // + VQCS_GAP cm^2, the lung pressure x (1 + VQCS_PS), the abduction x (1 + VQCS_AG), per-cycle jitter / shimmer
     // + VQCS_JIT / VQCS_SHIM (as the creak's). _F: the female's (< -900: the male's). The shelves / rest: larynx.cc.

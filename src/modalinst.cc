@@ -878,8 +878,9 @@ int ModalPlayer::kotoFingerFor(int midi, double now) {
 // thumb's tsume furthest (4 cm), the index's 3, the middle's nearest (2.2: the brightest, the
 // thinnest); the ivory corner ~3 mm wide. The index and middle pull the string toward the player,
 // pressing into it as they go (steeper toward the board: 0.75, 0.8 rad from it); the thumb pushes
-// it away, flatter (0.45 rad, the other way along the board): more of its swing along the board,
-// rounder and longer. The left hand's bare finger, 10 cm in, 15 mm of flesh (the high partials
+// it away, the other way along the board, a little flatter (0.69 rad: 8 % under the index's; the
+// strokes either way sound nearly alike, by the owner's ear, 2026-11-27; it was 0.45, too
+// different). The left hand's bare finger, 10 cm in, 15 mm of flesh (the high partials
 // smoothed away), slower on and off the string, softer. Each stroke rests on the next string the
 // way it moves (the thumb's the lower, away; the others' the higher), taking from it, if it rang
 // with its key let go, as a re-pluck takes. PJ_KOTO_FINGERS=0: one stroke for all (the index's place, as before).
@@ -887,7 +888,7 @@ void ModalPlayer::kotoStroke(int si, int vib, int finger, double amp, int key) {
   static const bool kOn = knob("PJ_KOTO_FINGERS", 1) != 0;
   static const double kRest = std::clamp(knob("PJ_KOTO_REST", 0.6), 0.0, 1.0), kRepluck = std::clamp(knob("PJ_KOTO_REPLUCK", 0.6), 0.0, 1.0);
   struct F { double x, w, angle, rise, hold, slip, force; };
-  static const F kF[4] = {{0.040, 0.003, M_PI - 0.45, 0.002, 0.001, 0.0003, 0.9},
+  static const F kF[4] = {{0.040, 0.003, M_PI - 0.69, 0.002, 0.001, 0.0003, 0.9},
                           {0.030, 0.003, 0.75, 0.002, 0.001, 0.0003, 1.0},
                           {0.022, 0.003, 0.80, 0.002, 0.001, 0.0003, 1.05},
                           {0.100, 0.015, 0.50, 0.004, 0.002, 0.0025, 0.75}};

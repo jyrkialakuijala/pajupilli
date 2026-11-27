@@ -325,17 +325,9 @@ void Room::setAxes(int s, const float* axes) {
         tp.dg[k] = tp.gain * (axes[3 * k] * tp.n[0] + axes[3 * k + 1] * tp.n[1] + axes[3 * k + 2] * tp.n[2]);
 }
 
-void Room::setParts(int s, int np, const float* places, const float* lobes) {
-  const int ns = int(x_.size());
-  if (partFrom_.empty()) partFrom_.assign(ns + 1, 0);
-  // (parts are added source by source in order: those of later sources move up)
-  const int old = partFrom_[s + 1] - partFrom_[s];
-  if (old != 0 || np <= 0) return;
-  int ntap = 0;
-  for (const Tap& tp : early_) ntap += tp.src == s;
-  // Each part's delay and gain on each of its source's taps.
-  std::vector<int> dl;
-  std::vector<float> gn;
+// Each of source s's np parts' delay and gain on each of its taps (part by part, in early_'s order).
+void Room::partPaths(int s, int np, const float* places, const float* lobes, std::vector<int>& dl,
+                     std::vector<float>& gn) const {
   for (int j = 0; j < np; ++j) {
     const float* o = places + 3 * j;
     for (const Tap& tp : early_) {
@@ -352,20 +344,60 @@ void Room::setParts(int s, int np, const float* places, const float* lobes) {
       gn.push_back(float(lobe * tp.gain * std::max(r, 0.5) / std::max(rp, 0.5)));
     }
   }
-  // Insert after the parts of the sources before s.
-  const int at = partFrom_[s];
-  size_t tapAt = 0;  // (pDelay_ holds, per part, its source's taps)
+}
+
+// Where source s's parts' paths start in pDelay_ / pGain_.
+size_t Room::partTapAt(int s) const {
+  size_t tapAt = 0;
   for (int q = 0; q < s; ++q) {
     int nt = 0;
     for (const Tap& tp : early_) nt += tp.src == q;
     tapAt += size_t(partFrom_[q + 1] - partFrom_[q]) * nt;
   }
+  return tapAt;
+}
+
+void Room::setParts(int s, int np, const float* places, const float* lobes) {
+  const int ns = int(x_.size());
+  if (partFrom_.empty()) partFrom_.assign(ns + 1, 0);
+  // (parts are added source by source in order: those of later sources move up)
+  const int old = partFrom_[s + 1] - partFrom_[s];
+  if (old != 0 || np <= 0) return;
+  std::vector<int> dl;
+  std::vector<float> gn;
+  partPaths(s, np, places, lobes, dl, gn);
+  // Insert after the parts of the sources before s.
+  const int at = partFrom_[s];
+  const size_t tapAt = partTapAt(s);
   pDelay_.insert(pDelay_.begin() + long(tapAt), dl.begin(), dl.end());
   pGain_.insert(pGain_.begin() + long(tapAt), gn.begin(), gn.end());
+  if (!pDelayFrom_.empty()) {  // (a source already moving: its ramps move up with the rest)
+    pDelayFrom_.insert(pDelayFrom_.begin() + long(tapAt), dl.begin(), dl.end());
+    pGainFrom_.insert(pGainFrom_.begin() + long(tapAt), gn.begin(), gn.end());
+    pDelayNext_.insert(pDelayNext_.begin() + long(tapAt), dl.begin(), dl.end());
+    pGainNext_.insert(pGainNext_.begin() + long(tapAt), gn.begin(), gn.end());
+  }
   pring_.insert(pring_.begin() + long(size_t(at) * kSpan), size_t(np) * kSpan, 0.0f);
   pquiet_.insert(pquiet_.begin() + at, np, 1 << 30);
   for (int q = s + 1; q <= ns; ++q) partFrom_[q] += np;
-  (void)ntap;
+}
+
+void Room::moveParts(int s, const float* places, const float* lobes) {
+  if (partFrom_.empty()) return;
+  const int np = partFrom_[s + 1] - partFrom_[s];
+  if (np <= 0) return;
+  if (pDelayFrom_.empty()) {
+    pDelayFrom_ = pDelayNext_ = pDelay_;
+    pGainFrom_ = pGainNext_ = pGain_;
+    pMove_.assign(x_.size(), 0);
+  }
+  std::vector<int> dl;
+  std::vector<float> gn;
+  partPaths(s, np, places, lobes, dl, gn);
+  const size_t tapAt = partTapAt(s);
+  std::copy(dl.begin(), dl.end(), pDelayNext_.begin() + long(tapAt));
+  std::copy(gn.begin(), gn.end(), pGainNext_.begin() + long(tapAt));
+  pMove_[s] = 1;
 }
 
 std::string Room::lateral(int s) const {
@@ -393,7 +425,21 @@ std::string Room::lateral(int s) const {
 void Room::process(const float* const* src, int n, float* const* atSource, float* left, float* right,
                    const float* listenGain) {
   const int step = std::min(kBlock, std::min(diffLen_[0], std::min(diffLen_[1], diffLen_[2])));
+  // (parts moved since the last call: from where they were to where they are now, across this one)
+  for (size_t s = 0; s < pMove_.size(); ++s) {
+    if (pMove_[s] == 1) {
+      const int nt = int(std::count_if(early_.begin(), early_.end(), [&](const Tap& tp) { return tp.src == int(s); }));
+      const size_t a = partTapAt(int(s)), b = a + size_t(partFrom_[s + 1] - partFrom_[s]) * nt;
+      std::copy(pDelay_.begin() + long(a), pDelay_.begin() + long(b), pDelayFrom_.begin() + long(a));
+      std::copy(pGain_.begin() + long(a), pGain_.begin() + long(b), pGainFrom_.begin() + long(a));
+      std::copy(pDelayNext_.begin() + long(a), pDelayNext_.begin() + long(b), pDelay_.begin() + long(a));
+      std::copy(pGainNext_.begin() + long(a), pGainNext_.begin() + long(b), pGain_.begin() + long(a));
+      pMove_[s] = 2;
+    }
+  }
+  rampN_ = n;
   for (int o = 0; o < n; o += step) block(src, o, std::min(step, n - o), atSource, left, right, listenGain);
+  for (char& m : pMove_) if (m == 2) m = 0;
 }
 
 namespace {
@@ -405,6 +451,22 @@ inline void addRun(float* __restrict out, const float* __restrict ring, int at, 
     for (int i = 0; i < Room::kBlock; ++i) out[i] += g * r[i];
   } else {
     for (int i = 0; i < n; ++i) out[i] += g * r[i];
+  }
+}
+// out[i] += g(i) * ring[at + i], the gain going from g0 towards g1 (reached one sample past the run).
+struct RampTable {
+  alignas(64) float t[Room::kBlock];
+  RampTable() { for (int i = 0; i < Room::kBlock; ++i) t[i] = float(i) / Room::kBlock; }
+};
+const RampTable kRamp;
+inline void addRamp(float* __restrict out, const float* __restrict ring, int at, int n, float g0, float g1) {
+  const float* __restrict r = ring + at;
+  if (n == Room::kBlock) {
+    const float d = g1 - g0;
+    for (int i = 0; i < Room::kBlock; ++i) out[i] += (g0 + d * kRamp.t[i]) * r[i];
+  } else {
+    const float d = (g1 - g0) / float(n);
+    for (int i = 0; i < n; ++i) out[i] += (g0 + d * float(i)) * r[i];
   }
 }
 // The same run into left and right at once (one read of the ring for both).
@@ -612,6 +674,28 @@ void Room::block(const float* const* src, int o, int n, float* const* atSource, 
         const float* pr = &pring_[size_t(j) * kSpan];
         const int* dl = &pDelay_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
         const float* gn = &pGain_[size_t(pTap_[s] + (j - partFrom_[s]) * nt)];
+        if (!pMove_.empty() && pMove_[s] == 2) {
+          // (moving: each path's gain from where the part was to where it is, across the call; a
+          // path whose length changed crossfades its old delay into its new one)
+          const size_t q = size_t(pTap_[s] + (j - partFrom_[s]) * nt);
+          const int* d0 = &pDelayFrom_[q];
+          const float* g0 = &pGainFrom_[q];
+          const float r0 = float(o) / float(rampN_), r1 = float(o + n) / float(rampN_);
+          for (int k = 0; k < nt; ++k) {
+            if (early_[tapFrom_[s] + k].scattered) continue;
+            float* ek = e[early_[tapFrom_[s] + k].mic];
+            const float a = gl * g0[k], b = gl * gn[k];
+            if (d0[k] == dl[k] && a == b) {
+              addRun(ek, pr, (rpos_ - dl[k]) & (kRing - 1), n, b);
+            } else if (d0[k] == dl[k]) {
+              addRamp(ek, pr, (rpos_ - dl[k]) & (kRing - 1), n, a + (b - a) * r0, a + (b - a) * r1);
+            } else {
+              addRamp(ek, pr, (rpos_ - d0[k]) & (kRing - 1), n, a * (1 - r0), a * (1 - r1));
+              addRamp(ek, pr, (rpos_ - dl[k]) & (kRing - 1), n, b * r0, b * r1);
+            }
+          }
+          continue;
+        }
         for (int k = 0; k < nt; ++k)
           if (!early_[tapFrom_[s] + k].scattered)
             addRun(e[early_[tapFrom_[s] + k].mic], pr, (rpos_ - dl[k]) & (kRing - 1), n, gl * gn[k]);

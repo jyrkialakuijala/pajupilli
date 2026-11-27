@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 
 #include "knob.h"
+#include "rng.h"
 #include "vmath.h"
 
 namespace pajupilli {
@@ -99,6 +102,10 @@ Flute::Flute(const Instrument& inst) : Tube(inst) {
   // PJ_PAN_AERO 1 on; PJ_PAN_AIM the share of the player's own aim kept on top (0.25).
   kPanAero_ = knob("PJ_PAN_AERO", 1);
   kPanAim_ = knob("PJ_PAN_AIM", 0.25);
+  kGlass_ = knob("PJ_GLASS", 1);
+  kGlassHeard_ = std::pow(10, knob("PJ_GLASS_DB", 65) / 20);
+  kGlassH_ = knob("PJ_GLASS_H", 1);
+  kGlassQ_ = knob("PJ_GLASS_Q", 1);
   if (inst.design) {
     buildDesign();
   } else {
@@ -195,6 +202,70 @@ void Flute::buildPipe(int k) {
   nHoles_ = 0;
   finishHoles();
   addRadiators(true, cork_);
+  glass_[1] = glass_[0];  // (the last bottle rings on, undriven)
+  glass_[0].n = 0;
+  if (p.neck > 0 && kGlass_ > 0) buildGlass(p, p.midi);
+}
+
+void Flute::buildGlass(const PipeDef& p, int midi) {
+  // Lead crystal: E 60 GPa, rho 3100 kg/m^3, nu 0.24. Thin: the wall 1 mm on a 70 mm bottle,
+  // ~ the root of the size (1.7 mm on a jug, 0.6 mm on a vial), the base twice the wall.
+  const double E = 60e9, rho = 3100, nu = 0.24, cp = std::sqrt(E / (12 * rho * (1 - nu * nu)));
+  const double R = 0.5e-3 * p.d, L = 1e-3 * (p.len - 0.5 * p.neck);
+  const double h = kGlassH_ * 1e-3 * std::clamp(std::sqrt(p.d / 70), 0.6, 2.2), hb = 2 * h;
+  struct M { double f, beta, area, mass; };
+  M ms[32];
+  int nm = 0;
+  const double fMax = std::min(16000.0, 0.4 * fs_);
+  // The base, a clamped plate (Leissa: lambda^2 10.22, 21.26, 34.88, 39.77 for (0,1) (1,1)
+  // (2,1) (0,2)): the pressure inside pushes the axisymmetric ones whole (beta: their share of
+  // the volume), the others only through the asymmetries.
+  const double lam2[4] = {10.22, 21.26, 34.88, 39.77}, bb[4] = {0.55, 0.05, 0.03, 0.15};
+  for (int i = 0; i < 4; ++i) {
+    const double f = lam2[i] / (2 * M_PI * R * R) * hb * cp;
+    if (f < fMax) ms[nm++] = {f, bb[i], M_PI * R * R, rho * hb};
+  }
+  // The wall, a closed cylinder (Soedel): m half waves along it, n lobes round it; driven only
+  // through the asymmetries (a low order the likelier).
+  const double k0 = E / (rho * R * R * (1 - nu * nu)), t = h * h / (12 * R * R);
+  for (int m = 1; m <= 2; ++m)
+    for (int n = 2; n <= 7; ++n) {
+      const double l = m * M_PI * R / L, q = (l * l + n * n) * (l * l + n * n);
+      const double f = std::sqrt(k0 * ((1 - nu * nu) * l * l * l * l / q + t * q)) / (2 * M_PI);
+      if (f < fMax) ms[nm++] = {f, 0.04 / (n * m), 2 * M_PI * R * L, rho * h};
+    }
+  std::sort(ms, ms + nm, [](const M& a, const M& b) { return a.f < b.f; });
+  nm = std::min(nm, kGlassModes / 2);
+  // Each bottle its own: the pairs' split (0.1 .. 0.5 %) and the asymmetry's angle.
+  Rng rng(randomSeed(1, midi));
+  // A mode's velocity on resonance: v = beta p Q / (rho h w); its flow beta v A. A velocity
+  // resonator: no response at DC, little at the note far below it. So far a
+  // real bottle: its glass ~100 dB under its note, never heard. Ours is heard (PJ_GLASS_DB,
+  // 65 dB louder than that): the wall's ring under the note, and after it.
+  GlassBank& g = glass_[0];
+  g = GlassBank();
+  if (nm > 0) {
+    const double wc = std::tan(M_PI * 0.6 * ms[0].f / fs_), n = 1 / (1 + M_SQRT2 * wc + wc * wc);
+    g.hb0 = n;
+    g.hb1 = -2 * n;
+    g.ha1 = 2 * (wc * wc - 1) * n;
+    g.ha2 = (1 - M_SQRT2 * wc + wc * wc) * n;
+  }
+  for (int i = 0; i < nm; ++i) {
+    const double split = 0.003 + 0.002 * rng.uniform(), ang = 0.25 * M_PI * (1 + rng.uniform());
+    const double Q = kGlassQ_ * 900 * std::pow(1000 / ms[i].f, 0.25);
+    for (int k = 0; k < 2; ++k) {
+      const double f = ms[i].f * (k ? 1 + 0.5 * split : 1 - 0.5 * split), w = 2 * M_PI * f / fs_;
+      const double b = kGlass_ * ms[i].beta * (k ? std::sin(ang) : std::cos(ang));
+      const double r = std::exp(-w / (2 * Q));
+      g.a1[g.n] = 2 * r * std::cos(w);
+      g.a2[g.n] = r * r;
+      g.b0[g.n] = 0.5 * b / (ms[i].mass * fs_);  // (its peak b0 / (1 - r): beta p Q / (rho h w))
+      g.out[g.n] = b * ms[i].area * kGlassHeard_;
+      g.y1[g.n] = g.y2[g.n] = 0;
+      ++g.n;
+    }
+  }
 }
 
 void Flute::selectPipe(int midi) {
@@ -282,7 +353,7 @@ void Flute::jetCoefs() {
   jCg_ = std::cosh(std::min(kAlpha_ / h * W, 6.0));
   jDd_ = 4 / M_PI * std::sqrt(2 * h * W);
   y0_ = cur_.y0;
-  if (pipe_ >= 0 && kPanAero_ > 0) {
+  if (pipe_ >= 0 && kPanAero_ > 0) {  // (a pan pipe, a bottle: both stopped; the jet crosses the rim or the neck's)
     // A stopped pipe takes no steady flow: the air the jet entrains out of the pipe as it
     // crosses it must be given back, so the jet's mid-plane passes outside the far rim by h0
     // (Fletcher 2005, eqs. 1-9). The jet leaves the lips (2 b0 = h) as a top-hat, relaxes to a
@@ -325,6 +396,10 @@ void Flute::settle() {
 void Flute::resetAir() {
   Tube::resetAir();
   eq_ = el_ = ef_ = 0;
+  for (GlassBank& g : glass_) {
+    std::fill(g.y1, g.y1 + g.n, 0.0), std::fill(g.y2, g.y2 + g.n, 0.0);
+    g.x1 = g.x2 = 0, g.hz[0][0] = g.hz[0][1] = g.hz[1][0] = g.hz[1][1] = 0;
+  }
   pm_ = uj_ = 0;
   xi_ = jl1_ = jl2_ = xiLow_ = dl1_ = dl2_ = agcEnv_ = 0;
   noiseLp_ = noiseHp_ = glotLp_ = edgeLow_ = edgeBand_ = 0;
@@ -473,8 +548,40 @@ float Flute::sample() {
   xiLow_ += 2 * M_PI * kXiHp_ * dt * (xi_ - xiLow_);
   vHist_[hPos_] = float(kJetModel_ == 1 ? xi_ - xiLow_ : eq_ / esw_);
   hPos_ = (hPos_ + 1) & (kHist - 1);
+  // --- The glass wall, driven by the air in the body; its flow radiates with the neck's.
+  double qg = 0;
+  if (glass_[0].n | glass_[1].n) {
+    double pb = bore_.s.p()[bore_.footCell()];
+    {
+      GlassBank& g = glass_[0];
+      for (auto& z : g.hz) {  // (transposed direct form II)
+        const double y = g.hb0 * pb + z[0];
+        z[0] = g.hb1 * pb - g.ha1 * y + z[1];
+        z[1] = g.hb0 * pb - g.ha2 * y;
+        pb = y;
+      }
+    }
+    for (int b = 0; b < 2; ++b) {
+      GlassBank& g = glass_[b];
+      const double x = b ? 0 : pb, dx = x - g.x2;
+      g.x2 = g.x1;
+      g.x1 = x;
+      for (int k = 0; k < g.n; ++k) {
+        const double y = g.b0[k] * dx + g.a1[k] * g.y1[k] - g.a2[k] * g.y2[k];
+        g.y2[k] = g.y1[k];
+        g.y1[k] = y;
+        qg += g.out[k] * y;
+      }
+    }
+  }
   // --- Radiation: d(flow)/dt of each opening, delayed to the listener.
-  float y = radiate(eq_);
+  {  // TEMP: the window's and the glass's d(flow)/dt
+    static FILE* dump = std::getenv("GLASS_DUMP") ? std::fopen(std::getenv("GLASS_DUMP"), "wb") : nullptr;
+    static double e1 = 0, g1 = 0;
+    if (dump) { float v[2] = {float(eq_ - e1), float(qg - g1)}; std::fwrite(v, 4, 2, dump); }
+    e1 = eq_; g1 = qg;
+  }
+  float y = radiate(eq_ + qg);
   {  // Edge hiss: the turbulent jet on the labium radiates directly (a dipole,
      // intensity ~ U^6), centred near St = f h / Uj ~ 0.12, airier = more.
     // Trapezoidal state-variable band-pass, Q 0.8 (ic1 = edgeBand_, ic2 = edgeLow_);

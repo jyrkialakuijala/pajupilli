@@ -169,19 +169,25 @@ void Tube::addRadiators(bool window, double windowX) {
   // the fundamental by ~14 dB and those notes sounded thin.
   const double lx = knob("PJ_LX", 0.0), ly = knob("PJ_LY", 1.0);
   nRad_ = 0;
+  int kind = -1;
   auto addRad = [&](int cell, double x) {
     const double dist = std::hypot(x - lx, ly);
+    radX_[nRad_] = float(x);
+    radKind_[nRad_] = kind;
+    radGain1_[nRad_] = float(kRho / (4 * M_PI) * fs_);
     radCell_[nRad_] = cell;
     radDelay_[nRad_] = std::max(0, int(std::lround(dist / kC * fs_)));
     radGain_[nRad_] = float(kRho / (4 * M_PI * dist) * fs_);
     ++nRad_;
   };
   if (window) addRad(-1, windowX);
+  kind = -2;
   if (bore_.branch(bore_.footCell()).g > 0) addRad(bore_.footCell(), endX_);
   for (int i = 0; i < nHoles_; ++i) {
     if (!hole_[i].present) continue;
     bool dup = false;
     for (int j = 0; j < i; ++j) dup |= hole_[j].present && hole_[j].cell == hole_[i].cell;
+    kind = i;
     if (!dup) addRad(hole_[i].cell, hole_[i].x);
   }
 }
@@ -517,6 +523,7 @@ float Tube::radiate(double windowQ) {
       radPrev_[r] = q;
     }
     outRing_[(outPos_ + radDelay_[r]) & (kOutRing - 1)] += add;
+    if (aim_) aimNow_[r] = add * (radGain1_[r] / radGain_[r]);  // (its sound at 1 m, now)
   }
   const float y = outRing_[outPos_];
   outRing_[outPos_] = 0;
@@ -524,11 +531,25 @@ float Tube::radiate(double windowQ) {
 }
 
 float Tube::finish(float y) {
+  float ticks = 0;
   for (int m = 0; m < kTickModes; ++m) {  // key impact ticks
     const double re = tickRe_[m], im = tickIm_[m];
     tickRe_[m] = tickDecay_[m] * (re * tickCos_[m] - im * tickSin_[m]);
     tickIm_[m] = tickDecay_[m] * (re * tickSin_[m] + im * tickCos_[m]);
     y += float(im);
+    ticks += float(im);
+  }
+  if (aim_) {  // (each opening's sound for the room, DC-blocked as the output; the ticks with the last)
+    if (aimBuf_[0].size() >= 1 << 15)  // (nobody takes them: played without a room)
+      for (int r = 0; r < nRad_; ++r) aimBuf_[r].clear();
+    for (int r = 0; r < nRad_; ++r) {
+      const float v = aimNow_[r] + (r == nRad_ - 1 ? ticks : 0.0f);
+      aimNow_[r] = 0;
+      const float d = v - aimDcX_[r] + dcPole_ * aimDcY_[r];
+      aimDcX_[r] = v;
+      aimDcY_[r] = d;
+      aimBuf_[r].push_back(float(d * kOut_));
+    }
   }
   outPos_ = (outPos_ + 1) & (kOutRing - 1);
   // DC blocker (~5 Hz).
@@ -582,7 +603,47 @@ void Tube::hit() {
   for (int j = 0; j < kSpread; ++j) spreadTo_[j] = float(w[j] / sum);
 }
 
+void Tube::aimOn(int backHole) {
+  if (spread_ || nRad_ == 0) return;
+  aim_ = true;
+  aimBack_ = backHole;
+  setPose(50 * M_PI / 180, 0, 0);
+}
+
+void Tube::setPose(double down, double side, double turn) {
+  if (!aim_) return;
+  // The axis (top to foot), the instrument's front (where its front holes look: out and up),
+  // the face's forward (it bows with the instrument, by 0.7 of its tilt past 45 degrees).
+  const double cd = std::cos(down), sd = std::sin(down), cs = std::cos(side), ss = std::sin(side);
+  const double u[3] = {ss * cd, cs * cd, -sd}, f[3] = {ss * sd, cs * sd, cd};
+  const double bow = 0.7 * (down - M_PI / 4);
+  const double h[3] = {std::sin(turn) * std::cos(bow), std::cos(turn) * std::cos(bow), -std::sin(bow)};
+  for (int r = 0; r < nRad_; ++r) {
+    const int k = radKind_[r];
+    const double x = radX_[r];
+    // (a hole opens on the bore's surface, ~12 mm off its axis; the embouchure at the lips)
+    const double off = k >= 0 ? (k == aimBack_ ? -0.012 : 0.012) : 0.0;
+    const double* dir = k == -1 ? h : k == -2 ? u : f;
+    const double sg = k >= 0 && k == aimBack_ ? -1 : 1;
+    const float a = k == -1 ? 0.35f : k == -2 ? 0.25f : 0.2f;
+    for (int c = 0; c < 3; ++c) {
+      aimPlace_[3 * r + c] = float(x * u[c] + off * f[c]);
+      aimLobe_[4 * r + c] = float(sg * dir[c]);
+    }
+    aimLobe_[4 * r + 3] = a;
+  }
+  ++aimMoved_;
+}
+
 const float* Tube::takePart(int n, int j) {
+  if (aim_ && j >= 0 && j < nRad_) {
+    std::vector<float>& p = aimBuf_[j];
+    spreadOut_.assign(n, 0.0f);
+    const int have = int(p.size()), m = std::min(n, have);
+    std::copy(p.end() - m, p.end(), spreadOut_.end() - m);
+    p.clear();
+    return spreadOut_.data();
+  }
   if (!spread_ || j < 0 || j > kSpread) return nullptr;
   std::vector<float>& p = spreadBuf_[j];
   spreadOut_.assign(n, 0.0f);

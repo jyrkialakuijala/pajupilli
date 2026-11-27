@@ -325,6 +325,222 @@ def played_notes():
     check('oboe: notes played (-note) in their register and tune', not bad,
           f'{len(notes) - len(bad)}/{len(notes)} within 10 c' + (f'; {bad}' if bad else ''))
 
+# The shakuhachi's own notes (src/instrument.h NoteInfo::natural): the open fingerings Ro Tsu Re
+# Chi Ri (D4 F4 G4 A4 C5), overblown to kan (D5 F5 G5 A5 C6, the 2nd resonance) and Ro to dai-kan
+# (D6, the 4th): played with the lips at rest, at the bore's pitch, not lipped to equal temperament.
+SHAKU_NATURAL = {62: 1, 65: 1, 67: 1, 69: 1, 72: 1, 74: 2, 77: 2, 79: 2, 81: 2, 84: 2, 86: 4}
+
+
+def shakuhachi_natural():
+    """The shakuhachi's own notes and their overblown variants: (1) each kan / dai-kan note is the
+    otsu fingering an octave (two) down, on a higher resonance (src/designs.cc); (2) the
+    calibration leaves the lips at rest for every one (the uncovered width Coltman's schedule
+    gives, x1) and finds each in its register, Ro (D4, the length's anchor) within 5 c, the rest
+    within 35 c (the bore's own tuning; 2026-11-27: otsu -12..-1 c, kan, its jet a little shorter,
+    +6..+12, D6 +29); (3) played (-note, velocity
+    90), each holds that pitch (within 6 c: no ear, no lips pulling it to equal temperament) and
+    is clear."""
+    from concurrent.futures import ThreadPoolExecutor
+    src = open(os.path.join(ROOT, 'src', 'designs.cc')).read()
+    blk = src[src.index('const NoteInfo kShakuhachiNotes[] = {'):]
+    blk = blk[:blk.index('};')]
+    table = {int(m): (pat, int(n), bool(nat)) for pat, n, nat, m in
+             re.findall(r'\{"([xoh]+)", (\d+)(, true)?\},\s*// (\d+)', blk)}
+    bad = []
+    for m, n in SHAKU_NATURAL.items():
+        pat, h, nat = table.get(m, ('?', 0, False))
+        if not nat or h != n:
+            bad.append(f'{m}: {pat} resonance {h}{"" if nat else ", not natural"}')
+        base = m - 12 * {1: 0, 2: 1, 4: 2}[n]
+        if n > 1 and table.get(base, ('',))[0] != pat:
+            bad.append(f'{m}: {pat}, not {base}\'s {table.get(base, ("?",))[0]} overblown')
+    check('shakuhachi: kan and dai-kan overblow the otsu fingerings', not bad, '; '.join(bad))
+    out = run(['-inst', 'shakuhachi', '-cal']).stdout
+    cal = {}
+    for m, rest in re.findall(r'calibrate: MIDI (\d+) (.*)', out):
+        m = int(m)
+        if m not in SHAKU_NATURAL:
+            continue
+        if 'does not sound' in rest:
+            cal[m] = None
+            continue
+        mm = float(re.search(r'uncovered ([\d.]+) mm', rest).group(1))
+        c = float(re.search(r'([+-]\d+) cents', rest).group(1))
+        f = 440 * 2 ** ((m - 69) / 12)
+        t = min(max(math.log(f / 261.6) / math.log(1760 / 261.6), 0.0), 1.2)
+        cal[m] = (c, mm - (6.0 - 2.5 * t) * 1.3)  # (the shakuhachi's emb: 1.3)
+    bad = [f'{m}: silent' for m in SHAKU_NATURAL if cal.get(m) is None]
+    bad += [f'{m}: lips moved {d:+.1f} mm' for m, v in cal.items() if v and abs(v[1]) > 0.06 for d in [v[1]]]
+    bad += [f'{m}: {v[0]:+.0f} c' for m, v in cal.items() if v and abs(v[0]) > (5 if m == 62 else 35)]
+    check('shakuhachi: its own notes at the bore\'s pitch, lips at rest', not bad,
+          ' '.join(f'{m}:{v[0]:+.0f}' for m, v in sorted(cal.items()) if v) + (f'; {bad}' if bad else ''))
+
+    def one(m):
+        r = run(['-inst', 'shakuhachi', '-note', str(m)]).stdout
+        g = re.search(r'\(([+-]\d+) cents\) clarity ([\d.]+)', r)
+        return m, (int(g.group(1)), float(g.group(2))) if g else None
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(one, SHAKU_NATURAL))
+    bad = []
+    for m, g in res:
+        want = cal.get(m)
+        if g is None or want is None:
+            bad.append(f'{m}: silent')
+        elif abs(g[0] - want[0]) > 6 or g[1] < 0.9:
+            bad.append(f'{m}: {g[0]:+d} c (its own {want[0]:+.0f}), clarity {g[1]:.2f}')
+    check('shakuhachi: its own notes played as they are', not bad,
+          ' '.join(f'{m}:{g[0]:+d}' for m, g in res if g) + (f'; {bad}' if bad else ''))
+
+    # (4) In a file (-play) whose fast notes' tails take more voices than one, the players
+    # listen (Ensemble: setTuning) and tune each held note with the lips; an own note is tuned
+    # from its own pitch. (2026-11-27: pulled to the tempered pitch, kan F5's held notes broke
+    # up, 18 dB and 59 c over one; now ~3 dB, 0 c.) Three held F5s, then a phrase, repeated
+    # tongued notes and octave leaps: each held note's fundamental steady within 8 dB, 15 c.
+    import numpy as np, struct
+    def vlq(n):
+        b = [n & 0x7f]
+        n >>= 7
+        while n:
+            b.append(0x80 | (n & 0x7f))
+            n >>= 7
+        return bytes(reversed(b))
+    notes, t = [], 0.0
+    for v in (50, 80, 110):
+        notes.append((t, 77, v, 3.0))
+        t += 3.5
+    for k in (74, 77, 79, 77, 74, 77, 81, 77, 72, 77):
+        notes.append((t, k, 80, 0.55))
+        t += 0.5
+    t += 0.5
+    for i in range(8):
+        notes.append((t, 77, 70 + 5 * i, 0.2))
+        t += 0.25
+    t += 0.5
+    for k in (65, 77, 65, 77, 65, 77):
+        notes.append((t, k, 80, 0.45))
+        t += 0.4
+    ev = sorted([(a, 1, 0x90, k, v) for a, k, v, d in notes] + [(a + d, 0, 0x80, k, 0) for a, k, v, d in notes])
+    trk, last = b'\x00\xff\x51\x03\x07\xa1\x20\x00\xc0\x4d', 0  # (120 bpm; program 78, shakuhachi)
+    for a, _, st, k, v in ev:
+        tk = int(round(a * 960))
+        trk += vlq(tk - last) + bytes([st, k, v])
+        last = tk
+    trk += b'\x00\xff\x2f\x00'
+    with tempfile.TemporaryDirectory() as td:
+        mid, wav = os.path.join(td, 'f5.mid'), os.path.join(td, 'f5.wav')
+        open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+        run(['-play', mid, '-o', wav])
+        x = np.array(wav_mono(wav))
+    fs, f0, L, N = 48000, 440 * 2 ** (8 / 12), 2400, 1 << 15
+    fr = np.fft.rfftfreq(N, 1 / fs)
+    band = (fr > f0 * 0.97) & (fr < f0 * 1.03)
+    bad, said = [], []
+    for a, b in ((0.5, 2.9), (4.0, 6.4), (7.5, 9.9)):
+        lv, pc = [], []
+        for u in np.arange(a, b, 0.05):
+            seg = x[int(u * fs):int(u * fs) + L]
+            if len(seg) < L:
+                break
+            X = np.abs(np.fft.rfft(seg * np.hanning(L), N))[band]
+            i = int(np.argmax(X))
+            lv.append(20 * np.log10(X[i] + 1e-12))
+            pc.append(1200 * np.log2(fr[band][i] / f0))
+        if not lv:
+            bad.append(f'{a:.1f} s: silent')
+            continue
+        said.append(f'{np.ptp(lv):.1f} dB {np.ptp(pc):.0f} c')
+        if np.ptp(lv) > 8 or np.ptp(pc) > 15:
+            bad.append(f'{a:.1f} s: {np.ptp(lv):.1f} dB, {np.ptp(pc):.0f} c')
+    check('shakuhachi: kan F5 held steady in a listening part (-play)', not bad, ', '.join(said) + (f'; {bad}' if bad else ''))
+
+
+
+def shakuhachi_aim():
+    """The shakuhachi held in the hands and aimed into the room (-play: Tube::aimOn, the player's
+    Player::aim): each opening, the embouchure, the holes, the foot, its own place in the room as
+    the instrument is held, its paths moving as the player lifts it for the loud, high phrase,
+    bows it at the ends and turns each phrase to a side. Against it held still (PJ_AIM=0): (1)
+    the balance between the microphones moves (in some phrase by 1 dB or more: the turn heard),
+    while each phrase's level stays within 3 dB (projection, not a fader); (2) the moving paths
+    add no clicks (bursts above 14 kHz, 10 ms windows 6 dB over their neighbours' median: at most
+    3 more than held still). (2026-11-27: R-L moved -0.7, +3.6, -0.7 dB; levels within 1.6 dB;
+    bursts 24 against 27, all at the notes' changes.)"""
+    import struct, tempfile
+    import numpy as np
+    from scipy.signal import butter, sosfilt
+    from scipy.ndimage import median_filter
+    def vlq(n):
+        b = [n & 0x7f]
+        n >>= 7
+        while n:
+            b.append(0x80 | (n & 0x7f))
+            n >>= 7
+        return bytes(reversed(b))
+    notes, t = [], 0.5
+    for k, d in ((62, 1.5), (65, 1.5), (67, 1.5), (69, 2.5)):  # soft, low
+        notes.append((t, k, 40, d))
+        t += d
+    t += 1.5
+    for k, d in ((81, 1.0), (84, 1.0), (86, 1.5), (84, 1.0), (81, 2.5)):  # loud, high
+        notes.append((t, k, 115, d))
+        t += d
+    t += 1.5
+    for k, d in ((74, 2), (77, 2), (74, 4)):  # the middle, held
+        notes.append((t, k, 75, d))
+        t += d
+    ev = sorted([(a, 1, 0x90, k, v) for a, k, v, d in notes] + [(a + d - 0.02, 0, 0x80, k, 0) for a, k, v, d in notes])
+    trk, last = b'\x00\xff\x51\x03\x07\xa1\x20\x00\xc0\x4d', 0  # (120 bpm; program 78, shakuhachi)
+    for a, _, st, k, v in ev:
+        tk = int(round(a * 960))
+        trk += vlq(tk - last) + bytes([st, k, v])
+        last = tk
+    trk += b'\x00\xff\x2f\x00'
+    def stereo(path):
+        b = open(path, 'rb').read()
+        i, ch, bits = 12, 2, 32
+        while i < len(b):
+            cid, n = b[i:i + 4], struct.unpack('<I', b[i + 4:i + 8])[0]
+            if cid == b'fmt ':
+                ch, bits = struct.unpack('<H', b[i + 10:i + 12])[0], struct.unpack('<H', b[i + 22:i + 24])[0]
+            if cid == b'data':
+                d = b[i + 8:i + 8 + n]
+                x = np.frombuffer(d, np.float32) if bits == 32 else np.frombuffer(d, np.int16) / 32768
+                return x.astype(float).reshape(-1, ch)
+            i += 8 + n + (n & 1)
+        return np.zeros((0, 2))
+    x = {}
+    with tempfile.TemporaryDirectory() as td:
+        mid = os.path.join(td, 'aim.mid')
+        open(mid, 'wb').write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, 480) + b'MTrk' + struct.pack('>I', len(trk)) + trk)
+        for k, aim in (('still', '0'), ('aimed', '1')):
+            wav = os.path.join(td, k + '.wav')
+            run(['-play', mid, '-o', wav], env={'PJ_AIM': aim})
+            x[k] = stereo(wav)
+    fs = 48000
+    if any(len(v) < 25 * fs for v in x.values()):
+        check('shakuhachi: aimed into the room (-play)', False, 'no sound')
+        return
+    moved, lev, said = [], [], []
+    for a, b in ((0.8, 7.3), (9.0, 15.5), (17.5, 25.0)):
+        r = {}
+        for k, v in x.items():
+            s = v[int(a * fs):int(b * fs)]
+            r[k] = (10 * np.log10(np.sum(s[:, 1] ** 2) / np.sum(s[:, 0] ** 2)), 10 * np.log10(np.mean(s ** 2)))
+        moved.append(r['aimed'][0] - r['still'][0])
+        lev.append(r['aimed'][1] - r['still'][1])
+    said = f"R-L moved {', '.join(f'{m:+.1f}' for m in moved)} dB, levels {', '.join(f'{l:+.1f}' for l in lev)} dB"
+    check('shakuhachi: aimed into the room, the turns heard (-play)',
+          max(abs(m) for m in moved) >= 1 and max(abs(l) for l in lev) <= 3, said)
+    sos = butter(6, 14000, 'hp', fs=fs, output='sos')
+    bursts = {}
+    for k, v in x.items():
+        h = sosfilt(sos, v[:, 0])
+        w = 480
+        e = 10 * np.log10(np.array([np.sum(h[i:i + w] ** 2) for i in range(0, len(h) - w, w)]) + 1e-20)
+        bursts[k] = int(np.sum((e - median_filter(e, 21) > 6) & (e > -90)))
+    check('shakuhachi: aimed, no clicks from the moving paths', bursts['aimed'] <= bursts['still'] + 3,
+          f"bursts {bursts['aimed']} aimed, {bursts['still']} held still")
+
 # The brass (src/brass.cc): the share of the written range that must sound in
 # its partial after calibration. (2026-11-13: horn 34/37; F2, F#2, G2, the
 # lowest valved partials 2 and 3, do not speak; G#2..B2 are 21..39 c off and
@@ -2784,8 +3000,10 @@ def cymbals():
         return -60 / np.polyfit(t[m], edc[m], 1)[0]
     fs, x = render('on 51 90 wait 7')
     got = [t60(x, fs, fc) for fc in (1000, 4000, 8000, 12500)]
-    want = [3.9, 2.6, 1.65, 1.06]  # a recorded ride (FluidR3)
-    check('ride-cymbal: band decays near a recorded ride\'s (within 25 %)', all(abs(g / w - 1) < 0.25 for g, w in zip(got, want)),
+    # a recorded ride (FluidR3), its highs (4 kHz and up) held 25 % longer: the user's (2026-11-27;
+    # 3.9, 2.6, 1.65, 1.06 s recorded)
+    want = [3.9, 2.6 * 1.25, 1.65 * 1.25, 1.06 * 1.25]
+    check('ride-cymbal: band decays near a recorded ride\'s, its highs 25 % longer (within 25 %)', all(abs(g / w - 1) < 0.25 for g, w in zip(got, want)),
           ' '.join(f'{fc}: {g:.1f} s ({w})' for fc, g, w in zip((1000, 4000, 8000, 12500), got, want)))
     b = 60 / 200
     seq, last = '', 0.0
@@ -2820,6 +3038,28 @@ def cymbals():
     _, b2 = render('on 49 110 wait 1.0 off 49 wait 1.5', 'crash-cymbal')
     e = lambda x: 10 * math.log10(np.mean(x[int(1.4 * fs):int(1.6 * fs)] ** 2) + 1e-20)
     check('crash-cymbal: choked by the hand', e(b2) - e(a) > 20, f'0.4 s after the grab {e(b2) - e(a):.1f} dB under the free ring')
+    # The bloom (src/plate.h, PlateSpec::bloomRate): a hard crash bursts, the plate's core handing
+    # its energy up; against the linear plate (PJ_CYM_BLOOM=0) at velocity 110 it is louder in
+    # 3-8 kHz over the first 0.1 s, its tail at its own length (2-6 s slope within 10 %) and
+    # within 5 dB of the linear one at 3 s (the user: long cymbals for jazz); a soft stroke
+    # (velocity 50) is the linear plate. (2026-11-27: +5.6 dB, tail -2.7 dB, slope 8.6 / 8.6 s.)
+    def lvl(x, fs, t0, t1, lo=None, hi=None):
+        y = sosfiltfilt(butter(4, [lo, hi], 'bandpass', fs=fs, output='sos'), x) if lo else x
+        return 10 * math.log10(np.mean(y[int(t0 * fs):int(t1 * fs)] ** 2) + 1e-30)
+    def slope(x, fs):
+        n = int(0.05 * fs)
+        L = [10 * math.log10(np.mean(x[i:i + n] ** 2) + 1e-30) for i in range(int(2 * fs), int(6 * fs), n)]
+        return -60 / np.polyfit(np.arange(len(L)) * 0.05, L, 1)[0]
+    fs, bl = render('on 49 110 wait 7', 'crash-cymbal')
+    _, li = render('on 49 110 wait 7', 'crash-cymbal', {'PJ_CYM_BLOOM': '0'})
+    _, s1 = render('on 49 50 wait 1', 'crash-cymbal')
+    _, s0 = render('on 49 50 wait 1', 'crash-cymbal', {'PJ_CYM_BLOOM': '0'})
+    burst = lvl(bl, fs, 0, 0.1, 3000, 8000) - lvl(li, fs, 0, 0.1, 3000, 8000)
+    tail = lvl(bl, fs, 2.9, 3.1) - lvl(li, fs, 2.9, 3.1)
+    tb, tl = slope(bl, fs), slope(li, fs)
+    soft = abs(lvl(s1, fs, 0, 1) - lvl(s0, fs, 0, 1))
+    check('crash-cymbal: a hard stroke bursts, its tail as long', burst > 2 and -5 < tail < 0.5 and abs(tb / tl - 1) < 0.1 and soft < 0.1,
+          f'3-8 kHz first 0.1 s {burst:+.1f} dB over the linear plate; at 3 s {tail:+.1f} dB, slope {tb:.1f} s ({tl:.1f}); velocity 50 {soft:.2f} dB')
     for inst, seed, env in (('ride-cymbal', '1', None), ('ride-cymbal-2', '2', None), ('crash-cymbal', '3', None),
                             ('crash-cymbal-2', '4', None), ('splash-cymbal', '5', {'PJ_CYM_BRUSH': '1'}),
                             ('china-cymbal', '6', None), ('ride-cymbal', '7', {'PJ_CYM_BRUSH': '1'})):
@@ -2854,7 +3094,9 @@ def brush_swirl():
         f = np.fft.rfftfreq(len(seg), 1 / fs)
         return (sp * f).sum() / sp.sum()
     # Sustained: the 2-16 kHz band through 8 s of swirl, every half second near its median, the
-    # last seconds as strong as the first; gone when the key is let go.
+    # last seconds as strong as the first; gone when the key is let go (10 dB down 0.5 s later:
+    # the ride's highs ring on a little, held longer since 2026-11-27, the user's; 2 dB more drift
+    # allowed for the wash they build).
     fs, x = render('on 84 60 wait 8 off 84 wait 1')
     hi = sosfiltfilt(butter(4, [2000, 16000], 'bandpass', fs=fs, output='sos'), x)
     lev = [10 * math.log10(np.mean(hi[int(t * fs):int((t + 0.5) * fs)] ** 2) + 1e-30) for t in np.arange(0.5, 8, 0.5)]
@@ -2862,7 +3104,7 @@ def brush_swirl():
     after = 10 * math.log10(np.mean(hi[int(8.5 * fs):int(9 * fs)] ** 2) + 1e-30)
     drift = np.mean(lev[-4:]) - np.mean(lev[:4])
     check('brush swirl on the ride: a sustained high swoosh (2-16 kHz, half seconds over 8 s)',
-          min(lev) > med - 14 and abs(drift) < 10 and after < med - 14,  # (each turn its own arc, width and weight)
+          min(lev) > med - 14 and abs(drift) < 12 and after < med - 10,  # (each turn its own arc, width and weight)
           f'median {med:.1f} dB, lowest {min(lev) - med:+.1f}, last 2 s vs first {drift:+.1f}, after the release {after - med:+.1f}')
     cs = [centroid(x, fs, t, t + 0.5) for t in np.arange(0.5, 8, 0.5)]
     check('brush swirl on the ride: its brightness moves (the hand wandering)', max(cs) > 1.2 * min(cs),
@@ -6584,5 +6826,5 @@ def main():
 
 if __name__ == '__main__':
     GROUPS = (vectorised, nan_recovery, fuzz, tuning, slur_stability, slurs, register_map, family, polyphony, room, parity,
-              realtime, passive_vs_tmm, woodwinds, played_notes, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, piano, upright, bright_piano, clavi, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, organ_continuo, velocity_reading, accordions, harmonica, reed_organ, tonewheel, honky_tonk, pianist, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
+              realtime, passive_vs_tmm, woodwinds, played_notes, shakuhachi_natural, shakuhachi_aim, brass, leads, strings, bowed_body_modes, modals, electric_grand, electric_pianos, piano, upright, bright_piano, clavi, jazz_kick, toms, cymbals, brush_swirl, gm2_extras, hand_drums, metal_perc, scrapers, shakers, stick_snare, clap_claves_surdo, celesta, harpsichord, guitars, electric_guitars, guitar_harmonics, jazz_guitar, electric_bass, pick_bass, slap_bass, fretless_bass, bagpipe_drones, organ, organ_stops, organ_continuo, velocity_reading, accordions, harmonica, reed_organ, tonewheel, honky_tonk, pianist, timpani, harp, choir, voice_oohs, brass_section, sci_fi, fx_rain, fx_soundtrack, fx_atmosphere, fx_brightness, fx_goblins, fx_echoes, plucked_nan)
     sys.exit(main())

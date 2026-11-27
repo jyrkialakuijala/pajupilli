@@ -132,6 +132,11 @@ static void coverRange(const Instrument& inst, int m, double* cmin, double* cmax
 
 static double bisectCover(const Instrument& inst, int m, double p, double dyn, double jet, double a4, double x0, double* cover,
                           double tol = 150) {
+  // (An instrument's own note: the lips stay at rest; its pitch is the bore's.)
+  if (const NoteInfo* ni = inst.design ? noteInfo(inst, m) : nullptr; ni && ni->natural) {
+    *cover = 1;
+    return tryNote(inst, m, 1, p, a4, dyn, jet, nullptr, tol);
+  }
   double cmin, cmax;
   coverRange(inst, m, &cmin, &cmax);
   double xg = x0, c = tryNote(inst, m, std::exp(x0), p, a4, dyn, jet, nullptr, tol);
@@ -598,6 +603,10 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
   static const double kReedPress[] = {1.0, 0.85, 1.15, 0.7, 1.3}, kReedHard[] = {0.6, 1.45};
   const bool lips = inst.kind == Kind::kFlute || inst.kind == Kind::kEndBlown;
   const int nJets = lips ? 8 : 1;
+  // (An instrument's own note: the plain breath, the first jet length that
+  // holds it steady, whatever its pitch: not tuned by the breath or the jet.)
+  const NoteInfo* ni = inst.design ? noteInfo(inst, m) : nullptr;
+  const bool natural = ni && ni->natural;
   auto search = [&](const double* ps, int np, bool robust = false) {
     for (int ij = 0; ij < nJets; ++ij) {
       const double jet = kJets[ij];
@@ -623,6 +632,41 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
       if (bestWob < kSteady && bestAbs < 3) break;
     }
   };
+  // (an instrument's own note: the breath nearest the plain one and the jet
+  // length nearest Fletcher's that hold it steady, whatever its pitch, with the
+  // breath 10 % under and over too: a player settles where a note does not
+  // break when the breath wavers; failing that, the one that holds best)
+  // (an overblown one from a jet a little shorter, x0.9, as players shorten it going up a
+  // register: at Fletcher's, kan F5 learnt steady but wavered in a piece)
+  static const double kJetsUp[] = {0.85, 0.9, 0.8, 1.0, 0.75, 1.1, 0.7, 1.2};
+  const double* jets = natural && ni->harmonic > 1 ? kJetsUp : kJets;
+  auto searchNatural = [&](const double* ps, int np) {
+    for (int k = 0; k < np && !(bestWob < kSteady); ++k) {
+      double bestScore = 1e9;
+      for (int ij = 0; ij < nJets; ++ij) {
+        double wob = 1;
+        const double cc = tryNote(inst, m, 1, ps[k], a4, 0.5, jets[ij], &wob);
+        if (std::isnan(cc) || wob >= kSteady) continue;
+        double score = wob;
+        for (auto [f, dy] : {std::pair{0.9, 0.5}, {1.1, 0.5}, {1.0, 0.25}, {1.0, 0.8}}) {
+          double w2 = 1;
+          if (std::isnan(tryNote(inst, m, 1, ps[k] * f, a4, dy, jets[ij], &w2))) w2 = 1e3;
+          score = std::max(score, w2);
+        }
+        if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d natural jet %.2f: %+.0f c wob %.4f score %.4f\n", m, jets[ij], cc, wob, score);
+        if (score < bestScore) { bestScore = score; bestAbs = std::fabs(cc); bestPress = ps[k]; bestJet = jets[ij]; bestC = cc; bestWob = wob; }
+        if (score < kSteady) break;  // (jets: the nearest the player's first)
+      }
+      if (std::getenv("PJ_CALDEBUG")) std::fprintf(stderr, "  %d natural: press %.2f jet %.2f score %.3f\n", m, bestPress, bestJet, bestScore);
+    }
+    if (!(bestWob < kSteady))  // (none steady: the steadiest that sounds)
+      for (int k = 0; k < np; ++k)
+        for (int ij = 0; ij < nJets; ++ij) {
+          double wob = 1;
+          const double cc = tryNote(inst, m, 1, ps[k], a4, 0.5, jets[ij], &wob);
+          if (!std::isnan(cc) && wob < bestWob) { bestAbs = std::fabs(cc); bestPress = ps[k]; bestJet = jets[ij]; bestC = cc; bestWob = wob; }
+        }
+  };
   if (inst.kind == Kind::kDuct) {
     search(kPress, 1);
   } else if (inst.reed() || inst.lip()) {
@@ -632,6 +676,9 @@ static void calibrateNote(const Instrument& inst, int m, double a4, Calibration*
     if (reed) search(kReedPress, 5, true);
     if (!(bestWob < kSteady && bestAbs <= 10)) search(kReedPress, 5);
     if (!(bestWob < kSteady && bestAbs <= 10)) search(kReedHard, 2);
+  } else if (natural) {
+    searchNatural(kPress, 5);
+    if (!(bestWob < kSteady)) searchNatural(kHard, 3);
   } else {
     search(kPress, 5);
     if (!(bestWob < kSteady && bestAbs <= 10)) search(kHard, 3);

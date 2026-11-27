@@ -102,6 +102,26 @@ class Flute : public Tube {
   double jB_ = 1e-3, jGain_ = 1, jCg_ = 1, jDd_ = 0;
   double lpX0_ = 0, lpE0_ = 1, hissA0_ = 0, hissT0_ = 0;
   double y0_ = 0, kPanAero_ = 1, kPanAim_ = 0.25;  // the jet's offset at the edge (m): see jetCoefs
+  // A bottle's glass wall (thin lead crystal): its shell modes (circumferential n lobes, m half
+  // waves along the body; Soedel's formula for a closed cylinder) driven by the air's pressure
+  // inside through the wall's asymmetries (blown glass is never even: each mode a split pair,
+  // beating), radiating as a flow beside the neck's. Bank 0 the bottle at the lips, bank 1 the
+  // last one, still ringing. PJ_GLASS scales the coupling (0: no wall), PJ_GLASS_H the wall's
+  // thickness, PJ_GLASS_Q the damping, PJ_GLASS_DB how much louder than a real one it is heard.
+  void buildGlass(const PipeDef& p, int midi);
+  static constexpr int kGlassModes = 16;
+  struct GlassBank {
+    int n = 0;
+    // (each mode a band-pass b0 (x - x2) / (1 - a1 z^-1 + a2 z^-2): the wall's velocity, nothing
+    // at DC nor at Nyquist)
+    double a1[kGlassModes], a2[kGlassModes], b0[kGlassModes], out[kGlassModes];
+    double y1[kGlassModes], y2[kGlassModes], x1 = 0, x2 = 0;
+    // (the drive's high-pass, two Butterworth sections at 0.6 x the lowest mode: the boost is for
+    // the ringing, not the wall's push at the note far below it)
+    double hb0 = 0, hb1 = 0, ha1 = 0, ha2 = 0, hz[2][2] = {};
+  };
+  GlassBank glass_[2];
+  double kGlass_ = 1, kGlassH_ = 1, kGlassQ_ = 1, kGlassHeard_ = 1;
 };
 
 }  // namespace pajupilli

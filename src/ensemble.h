@@ -181,6 +181,7 @@ class Ensemble {
     double sg = 1;           // (a shared string orchestra's player: its part's fader, x vgTo)
     int earSelf = -2;        // (... and the part it plays for, the band's channel; -2: the ensemble's)
     std::vector<float> room; // the room's pressure here, next block
+    int moved = 0;           // (its parts' pose the room has: Tube::partsMoved)
     // The band's pull (the winds by ear): the note it is for; now, where it goes, how firmly (the
     // weight); when it was last heard, the band's version then; what the section's solve last
     // took it as; the tuning last given the player (c).

@@ -282,6 +282,9 @@ class Synth {
   // (pajupilli, singing: CHANGES.md 2026-11-26, a held pitch) The speaker's slow random pitch drift (1.2 %, about
   // 20 cents) x this. 1: as built.
   void setPitchDrift(float x) { pitchDriftX_ = x; }
+  // Period doubling throughout (0: none): alternate glottal cycles' breath pressure +-x and tension +- a share of
+  // it (LarynxControl::diplo), which puts a partial at half the pitch under the voice.
+  void setDiplo(float x) { diploX_ = x; }
   // (pajupilli, singing: CHANGES.md 2026-11-26) An expression line over the output's time: at each point (t in s
   // from the first sample pulled, ascending) the lung pressure x `press`, and a vibrato of `vibCents` (the pitch's
   // swing either way) at `vibHz`; straight lines between the points, the first and the last held outside them. A
@@ -829,6 +832,7 @@ class Synth {
   float shield_ = -1, shieldHz_ = 0;  // (setTractShield)
   float planPitchEps_ = -1;  // (setPitchSmoothing)
   float pitchDriftX_ = 1;  // (setPitchDrift)
+  float diploX_ = 0;       // (setDiplo)
   std::vector<Expr> expr_;  // (setExpression)
   size_t exprI_ = 0;
   double exprPhase_ = 0;

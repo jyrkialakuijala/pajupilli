@@ -21,6 +21,16 @@ A change with no entry here is a mistake.
   `line.cc/.h`, `tract.cc/.h`, `english.cc/.h`, `english_data.inc`, `english_shape.inc`,
   `filters.h`, `params.h`, `tuned_defaults.h`, `fastmath.h`.
 - Unchanged at the copy: byte for byte the upstream files.
+- Brought up to date 2026-11-27 (the author: "bring in the recent speech improvements from puhuja"): the
+  sources are now those of puhuja's commit `be11668b16c421eba727ac3d7c73668f80582e73`, byte for byte. That
+  commit is b723192 with puhuja's work since (the vectorized string folds and line coefficients, ab1ddd3; an
+  unstressed k's shorter puff, 7274f9f; the yielding wall behind a voiced closure let go without a pop, cbe0543
+  and d7f52f7; a k or g released into s at the s's own place, c9efd86) and every change recorded below, merged
+  in there three ways. Checked here before taking it: merging each file of this copy with upstream's (base
+  b723192) gave upstream's file exactly, but for the indentation of three lines in folds.h; nine files changed
+  (folds.h, larynx.cc/.h, line.cc/.h, puhuja.cc/.h, string.cc/.h). The singers on a song measure as before
+  (soprano and baritone: pitch, cleanliness and partials the same to 0.2 dB). The entries below remain the
+  record of why each singing change exists; none of them is a difference from upstream any more.
 
 ## How it is built
 
@@ -288,6 +298,20 @@ What to try in speech.
    share follow from two lengths and an area instead of two knobs.
 4. Keep the slow share (STRING_P1SUP, 10 Hz) apart from the fast one: they answer different questions (a
    pressurised mouth, a resonance at the pitch) and may want different values.
+
+### 2026-11-27: period doubling throughout (a singer's subharmonic)
+- Motivation: the author asked for a faint subharmonic under the soprano ("perhaps a -20 db subharmonic on
+  soprano voice would make it more realistic"; after hearing it: "remove the subharmonic or put it at -45 db").
+  Speech has period doubling only in a creaky phrase end (CREAK_END_DIPLO).
+- Change: `Synth::setDiplo(float x)` (puhuja.h; `diploX_`), which in puhuja.cc sets `lc.diplo` to at least x on
+  every sample: alternate glottal cycles' breath pressure +-x and tension +- CREAK_DIPLO_Q x (larynx.cc,
+  unchanged). Default 0: speech is unchanged.
+- Judged by: the partial at half the pitch against the fundamental on the long notes of a song, soprano:
+  -38 dB at 0.03, -32 at 0.06, -26 at 0.12, -21 at 0.24 (6 dB a doubling), a partial at 1.5 times the pitch as
+  strong. The pitch falls by the square of x (7 cents at 0.12, 30 at 0.24), which the singer aims above. The
+  singer uses 0.0135 (about -45 dB) for the soprano, none for the other voices.
+- For puhuja: as it is (a call), or a knob beside CREAK_END_DIPLO; the pitch fall wants a look if it is used
+  strongly (the tension share, CREAK_DIPLO_Q, is the likely cause; not tested).
 
 ## The form of an entry
 
