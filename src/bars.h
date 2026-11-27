@@ -12,10 +12,12 @@
 //                  tube under each, yarn mallets;
 //   xylophone      rosewood bars carved for a twelfth (1 : 3), hard mallets,
 //                  short tubes: a bright clack and a short note;
-//   tubular-bells  brass tubes hung by one end and struck on the other with
-//                  a rawhide hammer: no mode sounds at the pitch heard; the
-//                  fourth, fifth and sixth lie as 2 : 3 : 4.2 and the ear
-//                  supplies the note an octave under the fourth;
+//   tubular-bells  three kinds of bell on one keyboard (research/tubular_bells.md):
+//                  church bells below C4, brass tubes C4 .. G5 (hung by one end,
+//                  struck on its cap with a two-faced hammer, rawhide or wood:
+//                  no mode sounds at the pitch heard, the 4th, 5th and 6th lie
+//                  near 2 : 3 : 4 and the ear supplies the note an octave under
+//                  the 4th), carillon bells above G5;
 //   music-box      a steel comb's teeth, clamped at one end (1 : 6.27 :
 //                  17.5), not struck but plucked: a pin bends the tooth and
 //                  lets it go; the box it is screwed to is what sounds.
@@ -38,7 +40,7 @@
 namespace pajupilli {
 
 struct BarKey {
-  static constexpr int kModes = 9;
+  static constexpr int kModes = 28;
   double f1 = 440;             // the pitch (Hz): the first mode's, or what the ratios are against
   int modes = 0;
   double ratio[kModes] = {};   // each mode's frequency / f1
@@ -53,10 +55,20 @@ struct BarKey {
   double mallet = 0.02, K = 1e8, p = 1.5, hyst = 0;  // kg; N/m^p; more force pressing than parting (s/m)
   bool pluck = false;          // not struck: bent by `K` N per m/s of the key's speed, and let go
   double x = 0;                // where it stands, m from the middle (the bass to the left)
+  // A doublet (a tube or a bell not quite round): mode m and pair[m] are one mode's two
+  // directions; a stroke at angle th shares the mode's `hit` between them as cos th and sin th,
+  // th = theta0 + thetaVary x a number in -1 .. 1, new for each stroke. -1: no partner.
+  int pair[kModes];
+  double theta0 = 0, thetaVary = 0;
+  // A second face of the mallet (the tubes' wood, the bells' iron): its mass, K, p and hyst
+  // (mallet2 0: none). knock[face]: how much of the blow goes into the design's knock.
+  double mallet2 = 0, K2 = 0, p2 = 1.5, hyst2 = 0;
+  double knock[2] = {1, 1};
+  BarKey() { for (int& q : pair) q = -1; }
 };
 
 struct BarDesign {
-  static constexpr int kMaxKeys = 72;
+  static constexpr int kMaxKeys = 80;
   const char* name = "celesta";
   int keys = 0, lowMidi = 48;
   BarKey key[kMaxKeys];
@@ -85,8 +97,13 @@ class Bars {
   int keys() const { return n_; }
   int lowMidi() const { return d_.lowMidi; }
   const BarDesign& design() const { return d_; }
-  // Key 0 .. keys() - 1. The mallet arrives at `speed` (m/s).
-  void strike(int key, double speed);
+  // Key 0 .. keys() - 1. The mallet arrives at `speed` (m/s), with its face 0 or 1 (BarKey's
+  // mallet2: the second face, where the key has one).
+  void strike(int key, double speed, int face = 0);
+  // The key's tuning, cents from its design (its modes all moved alike); its coefficients anew.
+  void retune(int key, double cents);
+  double cents(int key) const { return key_[key].cents; }
+  bool ringing(int key) const { return key_[key].active; }
   void damper(int key, bool down);
   float sample();              // the two microphones' mean
   float side() const { return side_; }
@@ -109,6 +126,8 @@ class Bars {
     float engage = 0;
     bool damperDown = false, active = false;
     int quiet = 0, tick = 0;
+    float mMass = 0.02f, mK = 1e8f, mP = 1.5f, mHyst = 0, knockGain = 1;  // the face striking now
+    double cents = 0;
   };
   void coefs(Key& k, const BarKey& b);
   BarDesign d_;

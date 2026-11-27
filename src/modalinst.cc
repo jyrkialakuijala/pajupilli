@@ -1,11 +1,14 @@
 #include "modalinst.h"
 
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
+#include "band.h"
+#include "heard.h"
 #include "knob.h"
 #include "songclock.h"
 #include "vmath.h"
@@ -46,6 +49,21 @@ void stringDef(ModalSet::Def& d, double f0, double L, double T, double B, int n,
   }
 }
 
+
+// A koto's string meets the body at its ji, the far end from where the tsume plucks it (the
+// ryukaku, by the pick, stands on the body's rigid end): each mode's force there and the body's
+// push back, (-1)^(k+1) of those at the near end. The vibration is the same; the pull's slow
+// force, (L - a)/L of it at the near end, is a/L at the ji (the body was thumped with the whole
+// pull, the body's modes under the note louder than the note for its first 30 ms).
+// PJ_KOTO_JI_END=0: the near end, as before.
+static void atFarEnd(ModalSet::Def& d) {
+  static const bool kOn = knob("PJ_KOTO_JI_END", 1) != 0;
+  if (!kOn) return;
+  for (int k = 1; k < d.n; k += 2) {
+    d.bridge[k] = -d.bridge[k];
+    d.back[k] = -d.back[k];
+  }
+}
 
 // An obstacle under a string (a jawari, a sawari): a patch centred x m from
 // the bridge, w wide (cosine-weighted), its surface h m (below the string:
@@ -225,7 +243,9 @@ void ModalModel::stopString(int si, double f) {
   // finger (no frets); a banjo's on a metal fret: none.)
   const double soft = type_ == kSitar ? 0.5 / std::sqrt(r) : type_ == kShamisen ? 0.7 : 1.0;
   const double t0 = r > 1.0001 ? st.t0 * soft : st.t0;
-  stringDef(d, f, L, st.T, st.B * r * r, st.n, t0, st.fc, st.pluckAt / r, st.split);
+  // (a koto's ji is the far end: the tsume still 3 cm from the fixed bridge)
+  stringDef(d, f, L, st.T, st.B * r * r, st.n, t0, st.fc, type_ == kKoto ? st.pluckAt * r : st.pluckAt / r, st.split);
+  if (type_ == kKoto) atFarEnd(d);
   d.one = st.one;
   for (const Str::Contact& c : st.contacts)
     if (c.x < 0.5 * st.L) addContact(d, L, c.x, c.w, c.h, c.K);  // (the bridge's: the nut's is behind the finger)
@@ -402,8 +422,9 @@ const float kTaikoAmp[] = {1, 0.6f, 0.35f, 0.4f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f
 // heavier and its partials as recorded, 2026-11-16: +10.2 dB, held down so
 // velocity 127 peaks near full scale.) The
 // sound effects measured over a 3 s held key (a helicopter spins up, a wave
-// takes seconds); applause and the gunshot (all peak) held down likewise.
-static const double kModalLevel[21] = {20.4, 9.5, 3.3, 33.8, 24.4, -15.8, 37.2, 30.8, 23.7, 28.8, 1.7, 35.7,
+// takes seconds); applause and the gunshot (all peak) held down likewise. (The koto: +2.0 dB,
+// 2026-11-26, its body now fed at the ji and less below 100 Hz.)
+static const double kModalLevel[21] = {20.4, 9.5, 3.3, 35.8, 24.4, -15.8, 37.2, 30.8, 23.7, 28.8, 1.7, 35.7,
                                        -11.9, 49.4, 34.9, -16.0, 1.4, 8.5, 28.8, 21.8, 22.7};
 
 static ModalSet::Def S_def(ModalSet& S, int i) { return S.def(i); }
@@ -543,12 +564,18 @@ void ModalModel::build1() {
       const double c = std::sqrt(147 / 1.2e-3);
       for (int t : tune) {
         const double L = c / (2 * hz(t));
-        addString(hz(t), L, 147, 1e-4, 48, 4, 3000, std::min(0.25, 0.03 / L), 0.002);
+        const int i = addString(hz(t), L, 147, 1e-4, 48, 4, 3000, std::min(0.25, 0.03 / L), 0.002);
+        ModalSet::Def d = S_def(S, i);
+        atFarEnd(d);
+        S.setVib(i, d);
       }
       // The kiri body, 1.8 m (Coaldrake: the air mode 84 Hz, the top's 100 Hz,
       // a 50 Hz component; Ando's 132, 181, 211 Hz), Q ~30..40 (no measurement).
+      // PJ_KOTO_LOW: the 50 and 84 Hz modes' radiation, x, the 100 Hz top's by its square root
+      // (below the lowest string, they gave the pluck a boom: by ear, less of it).
+      static const float kLow = float(knob("PJ_KOTO_LOW", 0.35));
       body({50.0f, 84.0f, 100.0f, 132.0f, 181.0f, 211.0f, 300.0f, 450.0f, 700.0f, 1100.0f}, {1.32f, 1.04762f, 0.88f, 0.666667f, 0.486188f, 0.417062f, 0.293333f, 0.195556f, 0.125714f, 0.08f},
-           {1.8f, 1.2f, 1.2f, 1.0f, 0.9f, 0.9f, 0.75f, 0.75f, 0.6f, 0.6f}, {0.6f, 1.2f, 1, 0.9f, 0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f},
+           {1.8f, 1.2f, 1.2f, 1.0f, 0.9f, 0.9f, 0.75f, 0.75f, 0.6f, 0.6f}, {0.6f * kLow, 1.2f * kLow, std::sqrt(kLow), 0.9f, 0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f},
            {0.2f, -0.2f, 0.4f, -0.3f, 0.3f, -0.4f, 0.3f, -0.3f, 0.2f, -0.2f});
       gain = 1.5;
       break;
@@ -810,6 +837,348 @@ void ModalModel::build1() {
 ModalPlayer::ModalPlayer(ModalModel& m) : Performer(m), m_(m), s_(m.set()) {
   std::fill(keyOf_, keyOf_ + ModalSet::kMaxVib, -1);
   std::fill(vibOf_, vibOf_ + 128, -1);
+  if (m_.type() == ModalModel::kKoto)
+    for (int i = 0; i < 13; ++i) kotoOpen_[i] = int(std::lround(69 + 12 * std::log2(m_.strings[i].f0 / 440)));
+}
+
+void ModalPlayer::setKotoPlan(const KotoPlan& plan) {
+  kotoPlan_ = plan.steps;
+  kotoStrokes_ = plan.strokes;
+  kotoAt_ = kotoStrokeAt_ = 0;
+}
+
+// The finger for a key at `now`: the part's fingering (kotoplan.h), the stroke at this key nearest
+// in time within 40 ms; live (or none found), the thumb, the index pulling through a fast run up,
+// thumb and index in turn on a repeated key.
+int ModalPlayer::kotoFingerFor(int midi, double now) {
+  int f = -1;
+  if (!kotoStrokes_.empty()) {
+    if (kotoStrokeAt_ >= kotoStrokes_.size() || kotoStrokes_[kotoStrokeAt_].t > now + 0.04) kotoStrokeAt_ = 0;
+    while (kotoStrokeAt_ < kotoStrokes_.size() && kotoStrokes_[kotoStrokeAt_].t < now - 0.04) ++kotoStrokeAt_;
+    double bd = 1e9;
+    for (size_t i = kotoStrokeAt_; i < kotoStrokes_.size() && kotoStrokes_[i].t <= now + 0.04; ++i) {
+      const double d = std::fabs(kotoStrokes_[i].t - now) + (kotoStrokes_[i].key == midi ? 0 : 1);
+      if (d < bd) { bd = d; f = kotoStrokes_[i].finger; }
+    }
+  }
+  if (f < 0) {
+    const double ioi = now - kotoLastT_;
+    if (midi == kotoLastKey_ && ioi < 0.3) f = kotoLastFinger_ == kKotoThumb ? kKotoIndex : kKotoThumb;
+    else if (ioi < 0.12 && midi > kotoLastKey_) f = kKotoIndex;
+    else f = kKotoThumb;
+  }
+  kotoLastT_ = now;
+  kotoLastKey_ = midi;
+  kotoLastFinger_ = f;
+  return f;
+}
+
+// A stroke (research/koto_expressive.md 4): where each finger meets string si, with what, which way,
+// and how fast it lets go. Distances from the fixed bridge, as players place the hand there: the
+// thumb's tsume furthest (4 cm), the index's 3, the middle's nearest (2.2: the brightest, the
+// thinnest); the ivory corner ~3 mm wide. The index and middle pull the string toward the player,
+// pressing into it as they go (steeper toward the board: 0.75, 0.8 rad from it); the thumb pushes
+// it away, flatter (0.45 rad, the other way along the board): more of its swing along the board,
+// rounder and longer. The left hand's bare finger, 10 cm in, 15 mm of flesh (the high partials
+// smoothed away), slower on and off the string, softer. Each stroke rests on the next string the
+// way it moves (the thumb's the lower, away; the others' the higher), taking from it, if it rang
+// with its key let go, as a re-pluck takes. PJ_KOTO_FINGERS=0: one stroke for all (the index's place, as before).
+void ModalPlayer::kotoStroke(int si, int vib, int finger, double amp, int key) {
+  static const bool kOn = knob("PJ_KOTO_FINGERS", 1) != 0;
+  static const double kRest = std::clamp(knob("PJ_KOTO_REST", 0.6), 0.0, 1.0), kRepluck = std::clamp(knob("PJ_KOTO_REPLUCK", 0.6), 0.0, 1.0);
+  struct F { double x, w, angle, rise, hold, slip, force; };
+  static const F kF[4] = {{0.040, 0.003, M_PI - 0.45, 0.002, 0.001, 0.0003, 0.9},
+                          {0.030, 0.003, 0.75, 0.002, 0.001, 0.0003, 1.0},
+                          {0.022, 0.003, 0.80, 0.002, 0.001, 0.0003, 1.05},
+                          {0.100, 0.015, 0.50, 0.004, 0.002, 0.0025, 0.75}};
+  const F& f = kOn ? kF[std::clamp(finger, 0, 3)] : F{0.03, 0, 0.6, 0.002, 0.001, 0.0003, 1.0};
+  const ModalSet::Def& d = s_.def(vib);
+  // (the contact's width, a raised cosine: each mode by its shape averaged under it)
+  auto shape = [&](int s, int n, float* exc) {
+    const double L = std::sqrt(147 / 1.2e-3) / (2 * hz(kotoOpen_[s]));
+    const double x = std::min(f.x, 0.25 * L);
+    constexpr int kPts = 7;
+    std::fill(exc, exc + ModalSet::kModes, 0.0f);
+    for (int k = 1; k <= n; ++k) {
+      double sh = 0, gs = 0;
+      for (int j = 0; j < kPts; ++j) {
+        const double u = 2.0 * j / (kPts - 1) - 1, g = 0.5 * (1 + std::cos(M_PI * u * 0.999));
+        sh += g * stringShape(k, std::max(1e-4, x + 0.5 * f.w * u), L);
+        gs += g;
+      }
+      exc[k - 1] = float(sh / gs);
+    }
+  };
+  float exc[ModalSet::kModes];
+  shape(si, d.n, exc);
+  s_.setExcitation(vib, exc);
+  // (A string still ringing: the tsume stops part of what swings into it, by where it
+  // meets the string and each partial's phase then (ModalSet::pluck). PJ_KOTO_REPLUCK: the
+  // energy taken from a partial that swings fully there, 0.6 (-4 dB) by the owner's ear,
+  // 2026-11-26; 0: the new pluck only added to the old ring, as before.)
+  s_.pluck(vib, 6.25 * amp * f.force, f.rise, f.hold, f.slip, f.angle, kRepluck);
+  // The rest stroke.
+  if (!kOn || kRest <= 0) return;
+  const int rs = finger == kKotoThumb ? si - 1 : finger == kKotoLeft ? -1 : si + 1;
+  if (rs < 0 || rs >= 13) return;
+  const int rv = m_.strings[rs].vib;
+  const int rk = keyOf_[rv];
+  if (rk == key || (rk >= 0 && held_[rk]) || sinceOn_[rv] < 0.03 || s_.energy(rv) < 1e-12) return;
+  // (as the piano's hammer and the re-pluck: the partials that swing where the tsume lands lose
+  // the most, (1 - PJ_KOTO_REST) ^ |the shape there| of their energy left; those with a node there
+  // ring on)
+  shape(rs, s_.def(rv).n, exc);
+  s_.setExcitation(rv, exc);
+  s_.touch(rv, kRest, f.rise + f.hold + f.slip);
+}
+
+// The band's pull on a koto note (research/koto_expressive.md 2): string si sounding `key`, its
+// partials as its stiffness has them at the ji's place; the others' notes and its own ringing
+// strings heard (the order of hearing: src/band.h). fileKey: the key as the file has it (the
+// registry's name for the note).
+double ModalPlayer::kotoPull(int si, int key, int fileKey, double* weight, bool hearOwn) const {
+  *weight = 0;
+  if (!band_) return 0;
+  const ModalModel::Str& st = m_.strings[si];
+  const double fOpen = st.fStop > 0 ? st.fStop : st.f0;
+  const double B = st.B * (fOpen / st.f0) * (fOpen / st.f0);
+  const double f0 = hz(key);
+  double pl[16], pw[16], pk[16];
+  int np = 0;
+  for (int k = 1; k <= 16 && k * f0 < 5000; ++k) {
+    pl[np] = std::log2(k * std::sqrt(1 + B * k * k));
+    pw[np] = bandPartial(kBandPluck, f0, k);
+    pk[np] = k;
+    ++np;
+  }
+  BandListener me;
+  me.self = self_;
+  me.f0 = f0;
+  me.pl = pl;
+  me.pw = pw;
+  me.pk = pk;
+  me.np = np;
+  me.hearOwn = hearOwn;
+  if (const BandNote* own = band_->find(self_, fileKey)) {
+    me.at = own->at;
+    me.pitch = own->pitch;
+  } else {
+    me.at = band_->now();
+    me.pitch = fileKey;
+  }
+  return bandPull(*band_, me, weight);
+}
+
+// The tuner (research/koto_expressive.md 2): the ji placed before playing, string against string,
+// each by the clearest beat it makes with a string already tuned: the pair of partials, k and k'
+// of the two strings, that coincide in the lowest order (an octave's 2:1 before a fifth's 3:2 before
+// a fourth's 4:3), the stiffer short strings' partials sharp of k f0 as the strings have them (so a
+// high octave comes out stretched). Coincidences above PJ_KOTO_TUNE_ORDER (4: Ando's players tune by
+// octaves, fifths and fourths) beat too fast and faint to tune by: a third is not tuned pure. A
+// string none of the tuned reach so is set "by musical sense" (Ando): a semitone above a tuned
+// string PJ_KOTO_SEMI c (90, the narrow semitone Ando measured), or below one by as much; else at
+// its tempered pitch against its nearest. Strings whose ji did not move keep their tuning; a koto
+// fresh begins at the pitch class most of its strings have, the whole then centred on the band's
+// pitch.
+void ModalPlayer::kotoTune(const int open[13]) {
+  static const int kOrder = std::clamp(int(knob("PJ_KOTO_TUNE_ORDER", 4)), 1, 8);
+  static const double kSemi = knob("PJ_KOTO_SEMI", 90);
+  bool tuned[13];
+  int nt = 0;
+  for (int i = 0; i < 13; ++i) nt += tuned[i] = kotoTunedFor_[i] == open[i];
+  // (a partial of string i, c above its fundamental: its stiffness at this length)
+  auto partial = [&](int i, int k) {
+    const ModalModel::Str& st = m_.strings[i];
+    const double r = hz(open[i]) / st.f0, B = st.B * r * r;
+    return 1200 * std::log2(k * std::sqrt(1 + B * k * k));
+  };
+  auto set = [&](int i, double c) {
+    kotoJi_[i] = std::clamp(c, -30.0, 30.0);
+    kotoTunedFor_[i] = open[i];
+    tuned[i] = true;
+    ++nt;
+  };
+  const bool fresh = nt == 0;
+  if (fresh) {
+    int count[12] = {}, ref = 0;
+    for (int i = 0; i < 13; ++i) ++count[open[i] % 12];
+    for (int i = 0; i < 13; ++i)
+      if (count[open[i] % 12] > count[open[ref] % 12]) ref = i;
+    set(ref, 0);
+  }
+  static const bool kLog = std::getenv("PJ_KOTO_LOG") != nullptr;
+  while (nt < 13) {
+    int bi = -1, bj = -1, bk = 0, bl = 0;
+    double bw = 0;
+    for (int i = 0; i < 13; ++i) {
+      if (tuned[i]) continue;
+      for (int j = 0; j < 13; ++j) {
+        if (!tuned[j]) continue;
+        const double d = 100.0 * (open[i] - open[j]);
+        for (int k = 1; k <= kOrder; ++k)
+          for (int l = 1; l <= kOrder; ++l) {
+            if (std::gcd(k, l) != 1) continue;
+            // (partial k of i on partial l of j: i's fundamental l/k of j's, near enough the tempered)
+            if (std::fabs(d - 1200 * std::log2(double(l) / k)) > 30) continue;
+            const int q = std::max(k, l);
+            const double w = 1.0 / (q * q * q) - 1e-6 * std::fabs(d);
+            if (w > bw) { bw = w; bi = i; bj = j; bk = k; bl = l; }
+          }
+      }
+    }
+    if (bi >= 0) {
+      set(bi, 100.0 * open[bj] + kotoJi_[bj] + partial(bj, bl) - partial(bi, bk) - 100.0 * open[bi]);
+      if (kLog)
+        std::fprintf(stderr, "koto tune: string %d (%d) %d:%d on string %d (%d): %+.1f c\n", bi + 1, open[bi], bl, bk,
+                     bj + 1, open[bj], kotoJi_[bi]);
+      continue;
+    }
+    // (none within reach of a clear beat: by musical sense)
+    int si = -1, sj = -1;
+    double c = 0;
+    for (int i = 0; i < 13 && si < 0; ++i)
+      for (int j = 0; j < 13 && si < 0; ++j)
+        if (!tuned[i] && tuned[j] && open[i] - open[j] == 1) si = i, sj = j, c = kotoJi_[j] + kSemi - 100;
+    for (int i = 0; i < 13 && si < 0; ++i)
+      for (int j = 0; j < 13 && si < 0; ++j)
+        if (!tuned[i] && tuned[j] && open[j] - open[i] == 1) si = i, sj = j, c = kotoJi_[j] - (kSemi - 100);
+    if (si < 0)
+      for (int i = 0; i < 13; ++i) {
+        if (tuned[i]) continue;
+        int near = -1;
+        for (int j = 0; j < 13; ++j)
+          if (tuned[j] && (near < 0 || std::abs(open[j] - open[i]) < std::abs(open[near] - open[i]))) near = j;
+        si = i, sj = near, c = kotoJi_[near];
+        break;
+      }
+    set(si, c);
+    if (kLog)
+      std::fprintf(stderr, "koto tune: string %d (%d) by sense from string %d (%d): %+.1f c\n", si + 1, open[si], sj + 1,
+                   open[sj], kotoJi_[si]);
+  }
+  // (fresh, the whole set to the band's pitch: the chain of pure fifths climbs, 13 c by the fifth
+  // fifth; the koto tunes its reference so its strings lie about the band's, not one end on it)
+  if (fresh) {
+    double mean = 0;
+    for (int i = 0; i < 13; ++i) mean += kotoJi_[i] / 13;
+    for (int i = 0; i < 13; ++i) kotoJi_[i] -= mean;
+  }
+}
+
+// A koto note (research/koto_expressive.md 3, 6): the string whose ji has it open, or one or two
+// semitones below it (pressed behind the ji); the ji where the plan has it by now; the pluck tuned
+// by ear; the press made before the pluck when the left hand had the time; the pressing finger
+// taking from each partial by how much it swings where the finger is.
+void ModalPlayer::kotoNote(int midi, double amp, int& vib) {
+  // PJ_KOTO_JI: tuned by ear (1) or equal-tempered (0); PJ_KOTO_JI_LIM: how far (c) a ji is
+  // nudged, and a press deepened or eased; PJ_KOTO_LEAN: the players' lean (a semitone's press a
+  // little over, a whole tone's under: +4, -6 c, x this); PJ_KOTO_PRESS_EARLY: how long (s) the left
+  // hand needs to press before the pluck (else it is late, the pitch scooped); PJ_KOTO_PRESS_DAMP:
+  // the pressing finger's loss (1/s) on a partial swinging fully there, at a whole tone's press;
+  // PJ_KOTO_PRESS_AT: where it presses, m behind the ji.
+  static const double kJi = knob("PJ_KOTO_JI", 1), kLimOpen = knob("PJ_KOTO_JI_LIM", 12), kLean = knob("PJ_KOTO_LEAN", 1),
+                      kEarly = knob("PJ_KOTO_PRESS_EARLY", 0.1), kPressDamp = knob("PJ_KOTO_PRESS_DAMP", 4),
+                      kPressAt = knob("PJ_KOTO_PRESS_AT", 0.12);
+  constexpr double kHalf = 0.0005;  // (the band's pull followed as w / (w + kHalf), as the fretless's)
+  const SongClock& clk = SongClock::get();
+  const double now = clk.playing ? clk.now : clock_;
+  const int key = kotoFold(midi);
+  int open[13];
+  std::copy(kotoOpen_, kotoOpen_ + 13, open);
+  if (!kotoPlan_.empty()) {
+    if (kotoAt_ >= kotoPlan_.size() || (kotoAt_ > 0 && now + 0.02 < kotoPlan_[kotoAt_].t)) kotoAt_ = 0;
+    while (kotoAt_ + 1 < kotoPlan_.size() && kotoPlan_[kotoAt_ + 1].t <= now + 0.02) ++kotoAt_;
+    std::copy(kotoPlan_[kotoAt_].open, kotoPlan_[kotoAt_].open + 13, open);
+  }
+  // The string: open the best, a semitone's press, then a whole tone's; a string still sounding
+  // another held key only if there is no other.
+  int best = -1;
+  double bc = 1e9;
+  for (int i = 0; i < 13; ++i) {
+    const int d = key - open[i];
+    if (d < 0 || d > 2) continue;
+    double c = d == 0 ? 0 : d == 1 ? 1 : 2.5;
+    const int kv = m_.strings[i].vib;
+    if (keyOf_[kv] >= 0 && keyOf_[kv] != midi && held_[keyOf_[kv]]) c += 5;
+    if (c < bc) { bc = c; best = i; }
+  }
+  if (best < 0) {  // nothing within reach: the nearest string's ji moved to it
+    for (int i = 0; i < 13; ++i)
+      if (std::abs(key - open[i]) < bc) { bc = std::abs(key - open[i]); best = i; }
+    open[best] = key;
+  }
+  vib = m_.strings[best].vib;
+  if (keyOf_[vib] >= 0 && keyOf_[vib] != midi) vibOf_[keyOf_[vib]] = -1;
+  s_.damp(vib, 0);
+  // (its ji where it is to be: the string made again at that length, the tension the same)
+  if (kotoOpen_[best] != open[best]) {
+    m_.stopString(best, hz(open[best]));
+    kotoOpen_[best] = open[best];
+  }
+  if (kJi > 0 && !std::equal(open, open + 13, kotoTunedFor_)) kotoTune(open);
+  const int press = key - open[best];
+  // An open string as the tuner left it (kotoTune: by fifths, fourths and octaves); nudged half way
+  // only when the rest of the band disagrees by more than 6 c (as experts correct a fifth in
+  // performance; its own strings not heard there: the tuning is theirs already. Tuned at its
+  // first pluck by whatever then rang, a third against a ringing string came out just, -14 c, not
+  // the koto's). A press is set anew each time, by ear against all that sounds, its own strings too.
+  double cents = 0, want = 0, w = 0;
+  if (kJi > 0) {
+    if (press == 0) cents = kotoJi_[best];
+    if (band_) {
+      want = kotoPull(best, key, midi, &w, press > 0);
+      const double lim = press > 0 ? 2 * kLimOpen : kLimOpen;  // (a press is eased or deepened further than a ji is nudged)
+      if (press > 0) {
+        cents = std::clamp(want * w / (w + kHalf), -lim, lim);
+      } else if (w > 0) {
+        const double ear = std::clamp(kotoJi_[best] + (want - kotoJi_[best]) * w / (w + kHalf), -lim, lim);
+        if (std::fabs(ear - kotoJi_[best]) > 6) kotoJi_[best] += 0.5 * (ear - kotoJi_[best]);
+        cents = kotoJi_[best];
+      }
+    }
+  }
+  static const bool kLog = std::getenv("PJ_KOTO_LOG") != nullptr;  // (each pluck: its string, press, tuning)
+  if (kLog)
+    say(stderr, "koto: key %d string %d (open %d) press %d, the band pulls %+.1f c (w %.5f): %+.1f c\n", midi,
+                 best + 1, open[best], press, want, w, cents);
+  if (press == 1) cents += 4 * kLean;
+  else if (press == 2) cents -= 6 * kLean;
+  kotoCents_[midi] = cents;
+  const double ratio = hz(key) * std::exp2(cents / 1200) / hz(open[best]);
+  kotoRatio_[vib] = ratio;
+  if (press > 0) {
+    // Pressed before the pluck, as players do: the note starts at its pitch, the finger settling a
+    // few cents into it. Late (the left hand just pressed another string, or this string sounded
+    // the note before only now), the press lands with the pluck: the pitch scoops up into it.
+    const bool late = now - pressAt_ < kEarly || sinceOn_[vib] < kEarly;
+    if (late) {
+      s_.retune(vib, 1 + 0.6 * (ratio - 1));
+      s_.retune(vib, ratio, 0.05);
+    } else {
+      s_.retune(vib, ratio * std::exp2(-3.0 / 1200));
+      s_.retune(vib, ratio, 0.04);
+    }
+    pressAt_ = now;
+  } else {
+    s_.retune(vib, ratio);
+  }
+  // The pressing finger on the string 10..15 cm behind the ji: each partial loses by its mode's
+  // swing there (sin^2 of its place on the sounding length's shape, carried over the ji), the more
+  // the harder the press (the tension it adds, as a share of a whole tone's).
+  if (press > 0 && kPressDamp > 0) {
+    const ModalSet::Def& d = s_.def(vib);
+    const double Ls = std::sqrt(147 / 1.2e-3) / (2 * hz(open[best]));
+    const double force = (ratio * ratio - 1) / (std::exp2(4.0 / 12) - 1);
+    float rate[ModalSet::kModes] = {};
+    for (int k = 0; k < d.n; ++k) {
+      const double sh = std::sin(M_PI * (k + 1) * kPressAt / Ls);
+      rate[k] = float(kPressDamp * force * sh * sh);
+    }
+    s_.dampModes(vib, rate);
+  } else {
+    s_.dampModes(vib, nullptr);
+  }
+  kotoStroke(best, vib, kotoFingerFor(midi, now), amp, midi);
 }
 
 void ModalPlayer::seed(unsigned s) { rng_ = 4711u + 7919u * s; }
@@ -1018,40 +1387,9 @@ void ModalPlayer::noteOn(int midi, int velocity) {
       }
       break;
     }
-    case ModalModel::kKoto: {
-      // The string tuned nearest below; pressed behind its bridge (oshide) up
-      // to two semitones, the press reaching its pitch just after the pluck.
-      int best = -1;
-      double bd = 1e9;
-      for (int i = 0; i < 13; ++i) {
-        const double d = 12 * std::log2(hz(midi) / m_.strings[i].f0);
-        if (d < -0.01 || d > 2.01) continue;
-        if (d < bd) { bd = d; best = i; }
-      }
-      if (best < 0) {  // nothing within reach: the nearest string, retuned (its bridge moved)
-        for (int i = 0; i < 13; ++i) {
-          const double d = std::fabs(12 * std::log2(hz(midi) / m_.strings[i].f0));
-          if (d < bd) { bd = d; best = i; }
-        }
-      }
-      vib = m_.strings[best].vib;
-      if (keyOf_[vib] >= 0 && keyOf_[vib] != midi) vibOf_[keyOf_[vib]] = -1;
-      s_.damp(vib, 0);
-      const double ratio = hz(midi) / m_.strings[best].f0;
-      if (ratio > 1.01 && ratio < 1.13) {
-        s_.retune(vib, 1 + 0.8 * (ratio - 1));
-        s_.retune(vib, ratio, 0.06);
-      } else {
-        s_.retune(vib, ratio);
-      }
-      // (A string still ringing: the tsume stops part of what swings into it, by where it
-      // meets the string and each partial's phase then (ModalSet::pluck). PJ_KOTO_REPLUCK: the
-      // energy taken from a partial that swings fully there, 0.6 (-4 dB) by the owner's ear,
-      // 2026-11-26; 0: the new pluck only added to the old ring, as before.)
-      static const double kRepluck = std::clamp(knob("PJ_KOTO_REPLUCK", 0.6), 0.0, 1.0);
-      s_.pluck(vib, 6.25 * amp, 0.002, 0.001, 0.0003, 0.6, kRepluck);
+    case ModalModel::kKoto:
+      kotoNote(midi, amp, vib);
       break;
-    }
     case ModalModel::kKalimba: {
       vib = nextInPool();
       if (keyOf_[vib] >= 0) vibOf_[keyOf_[vib]] = -1;
@@ -1251,7 +1589,7 @@ void ModalPlayer::render(float* out, int n) {
             continue;
           }
           const ModalModel::Str& sv = m_.strings[v];
-          const double base = hz(k) / (sv.fStop > 0 ? sv.fStop : sv.f0);
+          const double base = t == ModalModel::kKoto ? kotoRatio_[v] : hz(k) / (sv.fStop > 0 ? sv.fStop : sv.f0);
           double cents = t == ModalModel::kSitar ? 500 * std::max(0.0, roll_) : 100 * roll_;
           if (t == ModalModel::kFiddle) cents += 100 * vibDepth_ * 4 * std::sin(vibPh_) * std::min(1.0, sinceOn_[v] / 0.4);
           // Only when the bend moves (a meend's or an oshide's glide runs on).

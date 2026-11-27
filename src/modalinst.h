@@ -11,6 +11,7 @@
 
 #include "modal.h"
 #include "sfx.h"
+#include "kotoplan.h"
 #include "performer.h"
 #include "tube.h"
 
@@ -120,6 +121,13 @@ class ModalPlayer : public Performer {
   // the glide, else the shaft runs on from where it was. Empty: back to the knobs.
   struct MotorStep { double t, hz; bool locked; };
   void setMotorPlan(const std::vector<MotorStep>& plan);
+  // (-play) The koto's ji through the piece (src/kotoplan.h): each string moved to its planned
+  // pitch when next plucked. Empty: the hirajoshi on D (live).
+  void setKotoPlan(const KotoPlan& plan);
+  // The koto tunes each pluck by ear (research/koto_expressive.md 2): the band it hears, its own
+  // ringing strings too ("jyrki-spectral", as the organ's pipes and the winds), and reports it.
+  void setBand(const SoundingSet* band, int self) override { band_ = band; self_ = self; }
+  double tuning(int key) const override { return kotoCents_[key & 127]; }
 
  private:
   int pickString(int midi) const;    // fretted/stopped strings: the string for a key
@@ -147,6 +155,28 @@ class ModalPlayer : public Performer {
   std::vector<double> motorTh_, motorCorr_;
   size_t motorAt_ = 0;
   double motorAngle(double t);
+  // The koto (research/koto_expressive.md): the plan and where in it; each string's open pitch now
+  // (its ji); each string's note as a ratio of its open pitch (the pitch wheel bends from it); each
+  // key's tuning (c, as the band hears it); when the left hand last went to press a string.
+  std::vector<KotoTuning> kotoPlan_;
+  std::vector<KotoStroke> kotoStrokes_;  // the part's fingering (empty live)
+  size_t kotoStrokeAt_ = 0;
+  double kotoLastT_ = -1e9;              // (live: the last pluck, its key and finger)
+  int kotoLastKey_ = -1, kotoLastFinger_ = kKotoThumb;
+  int kotoFingerFor(int midi, double now);
+  void kotoStroke(int si, int vib, int finger, double amp, int key);
+  size_t kotoAt_ = 0;
+  int kotoOpen_[13] = {};
+  double kotoJi_[13] = {};      // each open string's tuning (c): the tuner's, then nudged by the band
+  int kotoTunedFor_[13] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // ... the open pitch it was tuned for
+  double kotoRatio_[ModalSet::kMaxVib] = {};
+  double kotoCents_[128] = {};
+  double pressAt_ = -1e9;
+  const SoundingSet* band_ = nullptr;
+  int self_ = -1;
+  double kotoPull(int si, int key, int fileKey, double* weight, bool hearOwn = true) const;
+  void kotoTune(const int open[13]);
+  void kotoNote(int midi, double amp, int& vib);
   int bowKey_ = -1;   // the fiddle: the key under the bow
   double bowDir_ = 1, bowClock_ = 0, bowTarget_ = 0;
   uint32_t rng_ = 4711;

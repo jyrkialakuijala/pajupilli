@@ -187,6 +187,7 @@ void FoldLarynx::step(const LarynxControl& c, LarynxOutput& out) {
     if (std::fabs(c.foldMass - foldMass_) < 1e-5f && std::fabs(foldMassV_) < 1e-3f) foldMass_ = c.foldMass, foldMassV_ = 0;
   }
   in.mass = foldMass_;
+  in.shield = c.shield, in.shieldHz = c.shieldHz;
   // A half-open glottis (breathy h between vowels) lets the folds sag in
   // pitch (-2.4 st in "few who"), faster than the pitch control learns:
   // the tension makes up for it, following the opening over ~8 ms (at

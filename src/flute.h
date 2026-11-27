@@ -101,6 +101,7 @@ class Flute : public Tube {
   // block's start, followed through the block by their series in uj.
   double jB_ = 1e-3, jGain_ = 1, jCg_ = 1, jDd_ = 0;
   double lpX0_ = 0, lpE0_ = 1, hissA0_ = 0, hissT0_ = 0;
+  double y0_ = 0, kPanAero_ = 1, kPanAim_ = 0.25;  // the jet's offset at the edge (m): see jetCoefs
 };
 
 }  // namespace pajupilli

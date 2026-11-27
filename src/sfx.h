@@ -20,10 +20,13 @@
 //     et al. 2001: a syllable a pressure pulse and a tension sweep), the
 //     beak's tract a resonance that follows the note.
 //   - telephone: a polarised ringer: the ring current (20 Hz, 2 s on, 4 s
-//     off) through the coils turns the armature against its spring, its
-//     clapper (a steel ball) swinging into one gong, then the other (Hertz
-//     contacts, solved with each step); each gong 16 modes of 4 numbers
-//     (frequency, decay, its shape where the ball strikes, its radiation).
+//     off) through the coils turns the armature against its spring; on it a
+//     long arm (a spring of its own) and a steel ball that bounces off one
+//     small steel gong into the other, uncontrolled, the swing taking a few
+//     cycles to build into the ring's 40 strokes a second (Hertz contacts,
+//     solved with each step); the gongs a minor third apart, each 16 modes
+//     of 4 numbers (frequency, decay, its shape where the ball strikes, its
+//     radiation).
 //   - helicopter: the main rotor's blades slapping their tip vortices once a
 //     passage (a sharp pressure pulse, ~20 Hz), their thickness noise, the
 //     tail rotor (~100 Hz), the turbine's whine; spinning up and down.
@@ -85,15 +88,15 @@ class Sfx {
   // bird
   double bx_ = 0, by_ = 0, sylT_ = 1e9, sylDur_ = 0.06, gap_ = 0.04, fHi_ = 6000, fLo_ = 3000, tract1_ = 0, tract2_ = 0;
   int syl_ = 0, sylN_ = 0;
-  // telephone: the gongs' modes stepped exactly (2x2 per mode), the clapper
-  // (its place, m from the middle, + toward gong 0; its speed), the ring
-  // current's envelope and phase.
+  // telephone: the gongs' modes stepped exactly (2x2 per mode), the
+  // armature and the ball on its arm (places, m from the middle, + toward
+  // gong 0; speeds), the ring current's envelope and phase.
   struct Gong {
     static constexpr int kN = 16;
     float c00[kN], c01[kN], c10[kN], c11[kN], q[kN], v[kN], exc[kN], rad[kN];
   };
   Gong gong_[2];
-  double ringT_ = 0, clapX_ = 0, clapV_ = 0, ringEnv_ = 0, ringPh_ = 0;
+  double ringT_ = 0, armX_ = 0, armV_ = 0, ballX_ = 0, ballV_ = 0, ringEnv_ = 0, ringPh_ = 0;
   void tuneGongs(double scale);
   // helicopter
   double rotPh_ = 0, tailPh_ = 0, rotHz_ = 5, spin_ = 0, whinePh_ = 0, heliLp_ = 0;

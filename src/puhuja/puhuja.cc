@@ -12462,7 +12462,7 @@ float Synth::tick() {
   phase_ += dt;
   if (phase_ >= 1.0f) {
     phase_ -= 1.0f;
-    drift_ += kPitchDriftFollow * (kPitchDrift * noise() - drift_);
+    drift_ += kPitchDriftFollow * (kPitchDrift * pitchDriftX_ * noise() - drift_);  // (setPitchDrift)
     jitter_ = 1.0f + drift_ + kPitchJitter * noise();
     duty_ = carrier_ == Carrier::Triangle ? kTriangleDuty + kTriangleDutyJitter * noise()
                                           : kSquareDuty;
@@ -12574,6 +12574,17 @@ float Synth::tick() {
         sh.aLip *= 1.0f + 1.5f * o;
         sh.lLip *= 1.0f - 0.5f * o;
         sh.aOral *= 1.0f + 0.5f * o;
+      }
+      if (std::fabs(exprFront_) > 0.001f) {
+        // (singing, setExpression's front: the tongue's body moved forward (> 0) or back (< 0) with the jaw where
+        // it is. Forward, the pharynx behind it widens and the mouth cavity before it narrows, and the tongue's
+        // constriction moves towards the teeth; back, the reverse. That is the gesture that moves the tract's second
+        // resonance (up when forward, down when back) and the first only a little: a singer's way of bringing the
+        // second resonance onto a partial of the note. At +-1 the two cavities' areas x 1.8 and / 1.8.)
+        static const float kK = param("LINE_FRONT_LOG", 0.5878f), kX = param("LINE_FRONT_X", 0.08f);
+        const float o = std::clamp(exprFront_, -1.0f, 1.0f), k = std::exp(kK * o);
+        sh.aPharynx *= k; sh.aOral /= k;
+        sh.xc = std::clamp(sh.xc + kX * o, 0.15f, 0.92f);
       }
       // The female voice: a shorter tract in place of the formant multipliers.
       sh.length /= (voice_.formant[0] + voice_.formant[1] + voice_.formant[2]) / 3.0f;
@@ -12831,11 +12842,25 @@ float Synth::tick() {
       exprOpen_ = a.open + x * (b.open - a.open);
       exprAdduct_ = a.adduct + x * (b.adduct - a.adduct);
       exprNeutral_ = a.neutral + x * (b.neutral - a.neutral);
+      exprFront_ = a.front + x * (b.front - a.front);
       const float off = a.cents + x * (b.cents - a.cents);
       if (off != 0.0f) lc.f0 *= 1.0f + 5.7762265e-4f * off;
     }
     lc.restX = adduction_ * (expr_.empty() ? 1.0f : exprAdduct_);  // (setAdduction, Expr::adduct)
-    lc.foldMass = foldMass_ * (foldKneeHz_ > 0 && lc.f0 > foldKneeHz_ ? std::pow(foldKneeHz_ / lc.f0, foldPower_) : 1.0f);  // (setFoldMass)
+    lc.shield = shield_, lc.shieldHz = shieldHz_;  // (setTractShield)
+    {  // (setFoldMass)
+      float m = 1.0f;
+      if (foldKneeHz_ > 0 && foldKnee2Hz_ <= 0) {
+        if (lc.f0 > foldKneeHz_) m = std::pow(foldKneeHz_ / lc.f0, foldPower_);
+      } else if (foldKneeHz_ > 0) {
+        // (octaves above the first pivot, its corner rounded over a semitone either side)
+        const float w = 1.0f / 12.0f, o = std::log2(std::max(lc.f0, 1.0f) / foldKneeHz_);
+        const float up = o <= -w ? 0.0f : o >= w ? o : (o + w) * (o + w) / (4 * w);
+        const float o2 = std::log2(foldKnee2Hz_ / foldKneeHz_);
+        m = up <= o2 ? std::exp2(-foldPower_ * up) : std::exp2(-foldPower_ * o2 - foldPower2_ * (up - o2));
+      }
+      lc.foldMass = foldMass_ * m;
+    }
     lc.pitchControl = pitchControl_;
     if (!tensionMap_.empty()) {  // (singing: the tension known for this pitch)
       const float at = std::clamp(12.0f * std::log2(std::max(lc.f0, 1.0f) / tensionLoHz_), 0.0f, static_cast<float>(tensionMap_.size() - 1));
@@ -13507,10 +13532,11 @@ void Synth::planSentence() {
     for (int round = 0; round < W.rounds; ++round) {
       std::vector<double> d(n, 0), e(n, 0), f(n, 0), b(n, 0);
       // Smoothness, everywhere.
+      const double eps = c == 3 && planPitchEps_ >= 0 ? planPitchEps_ : W.eps;  // (setPitchSmoothing: a singer's pitch line)
       for (int i = 1; i + 1 < n; ++i) {
-        d[i - 1] += W.eps; d[i] += 4 * W.eps; d[i + 1] += W.eps;
-        e[i - 1] += -2 * W.eps; e[i] += -2 * W.eps;
-        f[i - 1] += W.eps;
+        d[i - 1] += eps; d[i] += 4 * eps; d[i + 1] += eps;
+        e[i - 1] += -2 * eps; e[i] += -2 * eps;
+        f[i - 1] += eps;
       }
       // Relaxation on free frames (and a tiny anchor everywhere, so the
       // system is never singular).

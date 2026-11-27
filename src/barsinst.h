@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "band.h"
 #include "bars.h"
 #include "performer.h"
 #include "tube.h"
@@ -44,6 +45,11 @@ class BarsModel : public Tube {
 // unless the pedal is down, which lifts them all; the others ring on. The
 // keys are at sounding pitch; notes outside the instrument's compass are
 // folded in by octaves.
+// A mallet with two faces (the tubular bells' rawhide and wood, their cast bells' padded
+// face and iron): the loud strokes with the hard one, the soft with the soft, turned only
+// when there is time between the strokes (research/tubular_bells.md 4.3). The tubular bells
+// tune each stroke by ear (jyrki-spectral, 9): a key not ringing is set where its own
+// partials meet the band's, within PJ_BELLS_TUNE_LIM cents (15); PJ_BELLS_TUNING=tet12: not.
 class BarsPlayer : public Performer {
  public:
   explicit BarsPlayer(BarsModel& m);
@@ -52,11 +58,20 @@ class BarsPlayer : public Performer {
   void render(float* out, int n) override;
   void setHold(bool h) override;
   void seed(unsigned) override {}
+  void setBand(const SoundingSet* band, int self) override { band_ = band; self_ = self; }
+  double tuning(int key) const override { return cents_[key & 127]; }
 
  private:
   int keyOf(int midi) const;
+  int faceFor(int velocity);
+  double pull(int key, int midi, double* weight) const;
   BarsModel& m_;
   bool down_[Bars::kMaxKeys] = {};
+  const SoundingSet* band_ = nullptr;
+  int self_ = -1;
+  double cents_[128] = {};
+  double clock_ = 0, lastStroke_ = -1e9;
+  int face_ = 0;
 };
 
 }  // namespace pajupilli

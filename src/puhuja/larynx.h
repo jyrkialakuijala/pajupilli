@@ -103,6 +103,10 @@ struct LarynxControl {
   // (pajupilli, singing: CHANGES.md 2026-11-26) the folds brought together: their rest gap and the chink while
   // voicing x this (< 1: firmer closure, a flow that shuts sharply, stronger overtones). 1: as built.
   float restX = 1;
+  // (pajupilli, singing: CHANGES.md 2026-11-26, the tract shield) the folds shielded from the tract's sound
+  // pressure: this share of it, low-passed at shieldHz, is taken off the pressure on the folds' layers, so they
+  // feel the drop across them more than the tract's resonance. < 0: as built. Synth::setTractShield.
+  float shield = -1, shieldHz = 0;
 };
 
 // What the larynx gives back for this sample.

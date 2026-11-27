@@ -95,6 +95,10 @@ Flute::Flute(const Instrument& inst) : Tube(inst) {
   kEtaMax_ = knob("PJ_ETAMAX", 3) * 1e-3 * inst.emb;  // a hard limit for safety (PJ_AGC limits the swing)
   kEmbR_ = knob("PJ_EMBR", 0.01);
   kGlotNoise_ = knob("PJ_GLOTNOISE", 0.5);
+  // A stopped pipe (pan flute) aims the jet itself (Fletcher 2005, research/panflute.md §1):
+  // PJ_PAN_AERO 1 on; PJ_PAN_AIM the share of the player's own aim kept on top (0.25).
+  kPanAero_ = knob("PJ_PAN_AERO", 1);
+  kPanAim_ = knob("PJ_PAN_AIM", 0.25);
   if (inst.design) {
     buildDesign();
   } else {
@@ -277,6 +281,23 @@ void Flute::jetCoefs() {
   jGain_ = std::exp(std::min(kAlpha_ / h * W, 5.0));
   jCg_ = std::cosh(std::min(kAlpha_ / h * W, 6.0));
   jDd_ = 4 / M_PI * std::sqrt(2 * h * W);
+  y0_ = cur_.y0;
+  if (pipe_ >= 0 && kPanAero_ > 0) {
+    // A stopped pipe takes no steady flow: the air the jet entrains out of the pipe as it
+    // crosses it must be given back, so the jet's mid-plane passes outside the far rim by h0
+    // (Fletcher 2005, eqs. 1-9). The jet leaves the lips (2 b0 = h) as a top-hat, relaxes to a
+    // Bickley jet of b1 = 1.5 b0 within delta (longer for a faster jet: ~2 mm at 20 m/s, [G]),
+    // then spreads by eps = 0.1 (6 degrees) to b at the rim; alpha = b / b1. The flow drawn
+    // from inside: gamma U0 = ((sqrt(alpha) - 1) / 2 + sqrt(alpha) beta) U0, beta ~ 0.175 (the
+    // relaxation's share); tanh(h0 / b) = 1 - 2 gamma / sqrt(alpha). A short, fast jet (a high
+    // note) spreads less: alpha nearer 1, a larger h0 / b, stronger even harmonics. The player's
+    // own aim is a trim on top (PJ_PAN_AIM).
+    const double b1 = 0.75 * h, delta = 2e-3 * std::max(uj_, 5.0) / 20;
+    const double alpha = 1 + 0.1 * std::max(0.0, W - delta) / b1, ra = std::sqrt(alpha);
+    const double gamma = 0.5 * (ra - 1) + 0.175 * ra;
+    const double t = std::clamp(1 - 2 * gamma / ra, 0.0, 0.95);
+    y0_ = kPanAero_ * jB_ * std::atanh(t) + kPanAim_ * cur_.y0;
+  }
   lpX0_ = jetLpX(kJetLp_, kConv_, std::max(uj_, 0.3), jB_, fs_);
   lpE0_ = std::exp(-lpX0_);
   hissA0_ = hissA(uj_, cur_.lipH, fs_);
@@ -412,7 +433,7 @@ float Flute::sample() {
   // Large swings: the jet rolls up into vortices instead of growing on; its
   // swing at the edge saturates at a few millimetres.
   if (kEtaMax_ > 0) eta = kEtaMax_ * std::tanh(eta / kEtaMax_);
-  const double fn = std::tanh((eta - cur_.y0) / b);
+  const double fn = std::tanh((eta - y0_) / b);
   const double dd = jDd_;
   const double kj = kRho * dd * b * uj_ / W;
   // --- The bore, then the window branch at the embouchure cell (implicit).

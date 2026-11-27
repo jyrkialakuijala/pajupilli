@@ -104,6 +104,10 @@ class ModalSet {
   // repluck: of a vibrator still ringing, the energy the pick takes from the modes that swing
   // fully where it meets the string (0: none, the new pull only added to the old motion).
   void pluck(int i, double force, double rise, double hold, double slip, double angle = 0.6, double repluck = 0);
+  // Something touching ringing vibrator i where its excitation shape is (a finger coming to rest on
+  // a string): over `contact` s, each mode keeps (1 - take) ^ |its shape there| of its energy, the
+  // swing toward the toucher's side only (the angle of its last pluck), as a repluck takes.
+  void touch(int i, double take, double contact);
   // A mallet: mass (kg), speed (m/s), contact stiffness K (N/m^alpha), alpha.
   void strike(int i, double mass, double speed, double K, double alpha = 1.5);
   // The bow on vibrator i: its speed (m/s), force (N); exc is the shape under
@@ -120,6 +124,10 @@ class ModalSet {
   void setCoupling(int i, float s) { vib_[i].couple = s; }
   // A damper (a finger, the hand, a felt): every mode of i dies at `rate` 1/s (0: off).
   void damp(int i, double rate);
+  // A finger resting on i at one place (a koto's left hand pressing behind the ji): each mode
+  // its own added loss, 1/s (the more, the more the mode swings there); nullptr: none. Kept
+  // through retunes and new defs (setVib) until set again.
+  void dampModes(int i, const float* rate);
   // The vibrator's energy (per unit modal mass; tests).
   double energy(int i) const;
 
@@ -142,6 +150,7 @@ class ModalSet {
     double ratio = 1, ratioFrom = 1, ratioTo = 1, glideT = 1, glideDur = 0, glideNow = 1;
     double dampRate = 0;
     float dampMul = 1;
+    float extra[kModes] = {};  // (dampModes: each mode's added loss, 1/s)
     float couple = 1;
     // Pluck.
     double pF = 0, pRise = 0, pHold = 0, pSlip = 0, pT = 1e9, pAngle = 0.6;

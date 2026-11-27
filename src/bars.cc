@@ -255,46 +255,256 @@ BarDesign xylophoneDesign() {
                   knob("PJ_XYLO_TUBE", 1.3), 0.020, hard * 3e8, hard * 8e8, 0.36, 0.04, 1.4, 1.1, knob("PJ_XYLO_OVERTONE", 1.0));
 }
 
-// --- Tubular bells: C4 .. F5.
+// --- Tubular bells (research/tubular_bells.md): church bells C2 .. B3, tubes C4 .. G5,
+// carillon bells G#5 .. C8; the change from one to the next sudden, as from one instrument to
+// another (the tubes being a portable carillon, the low tubes a church bell's cheap stand-in).
+
+namespace {
+constexpr int kTubeLow = 60, kTubeHigh = 79;  // C4, G5
+
+// A tube's bending modes (free at both ends, the plug at the top, where it is struck) by finite
+// elements: Timoshenko beam elements (shear and rotary inertia), the plug a mass with its own
+// rotary inertia (research/tubular_bells.md 3.2: within ~5 c of a fine mesh to the 9th mode with
+// 40 elements). Writes the first `want` frequencies (Hz) and each mode's displacement at the
+// top, mass-normalised (1/sqrt(kg)). The generalized problem K x = w^2 M x by Cholesky and cyclic
+// Jacobi.
+void tubeModes(double L, double D, double wall, double plug, double plugLen, int want, double* f, double* top) {
+  constexpr int ne = 40, n = 2 * (ne + 1);
+  const double E = 105e9, rho = 8500, nu = 0.34, G = E / (2 * (1 + nu)), kap = 0.53;
+  const double Di = D - 2 * wall, A = kPi / 4 * (D * D - Di * Di), I = kPi / 64 * (D * D * D * D - Di * Di * Di * Di);
+  const double h = L / ne, ph = 12 * E * I / (kap * G * A * h * h), c = E * I / (h * h * h * (1 + ph));
+  static thread_local double K[n][n], M[n][n], V[n][n];
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j) K[i][j] = M[i][j] = 0;
+  const double ke[4][4] = {{12, 6 * h, -12, 6 * h}, {6 * h, (4 + ph) * h * h, -6 * h, (2 - ph) * h * h},
+                           {-12, -6 * h, 12, -6 * h}, {6 * h, (2 - ph) * h * h, -6 * h, (4 + ph) * h * h}};
+  const double mt[4][4] = {{156, 22 * h, 54, -13 * h}, {22 * h, 4 * h * h, 13 * h, -3 * h * h},
+                           {54, 13 * h, 156, -22 * h}, {-13 * h, -3 * h * h, -22 * h, 4 * h * h}};
+  const double mr[4][4] = {{36, 3 * h, -36, 3 * h}, {3 * h, 4 * h * h, -3 * h, -h * h},
+                           {-36, -3 * h, 36, -3 * h}, {3 * h, -h * h, -3 * h, 4 * h * h}};
+  const double ct = rho * A * h / 420, cr = rho * I / (30 * h);
+  for (int e = 0; e < ne; ++e)
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j) {
+        K[2 * e + i][2 * e + j] += c * ke[i][j];
+        M[2 * e + i][2 * e + j] += ct * mt[i][j] + cr * mr[i][j];
+      }
+  M[0][0] += plug;
+  M[1][1] += plug * (D * D / 16 + plugLen * plugLen / 12);
+  // M = R R^T (R lower), C = R^-1 K R^-T, into K.
+  for (int j = 0; j < n; ++j) {
+    double d = M[j][j];
+    for (int k = 0; k < j; ++k) d -= M[j][k] * M[j][k];
+    M[j][j] = std::sqrt(d);
+    for (int i = j + 1; i < n; ++i) {
+      double s = M[i][j];
+      for (int k = 0; k < j; ++k) s -= M[i][k] * M[j][k];
+      M[i][j] = s / M[j][j];
+    }
+  }
+  for (int col = 0; col < n; ++col)  // K <- R^-1 K (columns)
+    for (int i = 0; i < n; ++i) {
+      double s = K[i][col];
+      for (int k = 0; k < i; ++k) s -= M[i][k] * K[k][col];
+      K[i][col] = s / M[i][i];
+    }
+  for (int row = 0; row < n; ++row)  // K <- K R^-T (rows)
+    for (int i = 0; i < n; ++i) {
+      double s = K[row][i];
+      for (int k = 0; k < i; ++k) s -= M[i][k] * K[row][k];
+      K[row][i] = s / M[i][i];
+    }
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j) V[i][j] = i == j;
+  for (int sweep = 0; sweep < 30; ++sweep) {
+    double off = 0, diag = 0;
+    for (int i = 0; i < n; ++i) {
+      diag += K[i][i] * K[i][i];
+      for (int j = i + 1; j < n; ++j) off += K[i][j] * K[i][j];
+    }
+    if (off < 1e-26 * diag) break;
+    for (int p = 0; p < n; ++p)
+      for (int q = p + 1; q < n; ++q) {
+        if (std::fabs(K[p][q]) < 1e-300) continue;
+        const double th = (K[q][q] - K[p][p]) / (2 * K[p][q]);
+        const double t = (th >= 0 ? 1 : -1) / (std::fabs(th) + std::sqrt(th * th + 1));
+        const double cs = 1 / std::sqrt(t * t + 1), sn = t * cs;
+        for (int k = 0; k < n; ++k) {
+          const double kp = K[k][p], kq = K[k][q];
+          K[k][p] = cs * kp - sn * kq;
+          K[k][q] = sn * kp + cs * kq;
+        }
+        for (int k = 0; k < n; ++k) {
+          const double pk = K[p][k], qk = K[q][k];
+          K[p][k] = cs * pk - sn * qk;
+          K[q][k] = sn * pk + cs * qk;
+        }
+        for (int k = 0; k < n; ++k) {
+          const double vp = V[k][p], vq = V[k][q];
+          V[k][p] = cs * vp - sn * vq;
+          V[k][q] = sn * vp + cs * vq;
+        }
+      }
+  }
+  int idx[n];
+  for (int i = 0; i < n; ++i) idx[i] = i;
+  std::sort(idx, idx + n, [&](int a, int b) { return K[a][a] < K[b][b]; });
+  // (The two rigid motions first.) The mode's shape x = R^-T y: its top displacement x[0].
+  for (int m = 0; m < want; ++m) {
+    const int e = idx[m + 2];
+    f[m] = std::sqrt(std::max(K[e][e], 0.0)) / (2 * kPi);
+    double x[n];
+    for (int i = n - 1; i >= 0; --i) {
+      double s = V[i][e];
+      for (int k = i + 1; k < n; ++k) s -= M[k][i] * x[k];
+      x[i] = s / M[i][i];
+    }
+    top[m] = std::fabs(x[0]);
+  }
+}
+
+// A tube: brass, hung by a cord near its top, struck on the cap at its top. Its bending modes
+// (tubeModes), the 4th tuned to twice the note; each a doublet (the tube not quite round); its
+// longitudinal mode, which only the stroke's share along the tube drives. Each mode's sound is set
+// by its level under a hard impulse (`lv`, dB; fitted to the recorded sets, section 3.1 / 10), the
+// hammer's contact then shaping it by face and speed.
+void tubeKey(BarKey& k, double fs, double D, uint32_t& rng) {
+  static const double lossA = knob("PJ_BELLS_LOSS", 0.11), lossC = knob("PJ_BELLS_LOSSCUBE", 0.025);
+  static const double split = knob("PJ_BELLS_SPLIT", 1.0), axial = knob("PJ_BELLS_AXIAL", 0.1);
+  static const double rawK = knob("PJ_BELLS_RAWHIDE", 2e8), woodK = knob("PJ_BELLS_WOOD", 1.2e9);
+  static const double level = knob("PJ_BELLS_TUBELEVEL", 1.6), plugK = knob("PJ_BELLS_PLUG", 1.0);
+  const double E = 105e9, rho = 8500, nu = 0.34, G = E / (2 * (1 + nu)), kap = 0.53;
+  const double wall = 0.05 * D, Di = D - 2 * wall, r2 = (D * D + Di * Di) / 16;
+  const double A = kPi / 4 * (D * D - Di * Di), I = kPi / 64 * (D * D * D * D - Di * Di * Di * Di);
+  const double cb = std::sqrt(E * I / (rho * A)), shear = r2 * (1 + E / (kap * G));
+  // (20 g for a 3/4" tube, as the area of its end.)
+  const double plug = plugK * 0.02 * (D / 0.01905) * (D / 0.01905), plugLen = 0.015 * D / 0.01905;
+  // The length: Timoshenko's 4th mode without the plug (f_EB / sqrt(1 + (beta r / L)^2 (1 +
+  // E / (kappa G)))), then the elements' with it.
+  auto f4 = [&](double L) {
+    const double b = kBeta[3] / L;
+    return b * b * cb / (2 * kPi) / std::sqrt(1 + b * b * shear);
+  };
+  double L = std::sqrt(kBeta[3] * kBeta[3] * cb / (2 * kPi * 2 * fs));
+  for (int it = 0; it < 8; ++it) L *= std::sqrt(f4(L) / (2 * fs));
+  double f[12], top[12];
+  for (int it = 0; it < 2; ++it) {
+    tubeModes(L, D, wall, plug, plugLen, 12, f, top);
+    L *= std::sqrt(f[3] / (2 * fs));
+  }
+  tubeModes(L, D, wall, plug, plugLen, 12, f, top);
+  const double M = rho * A * L + plug, mh = 0.15, tune = 2 * fs / f[3];
+  // (Evened over the compass, about as the recorded sets are: the short tubes would be ~4 dB an
+  // octave quieter.)
+  const double even = level * 0.75 * std::pow(fs / 261.6, 0.63);
+  k.f1 = fs;
+  // Under a hard impulse (dB re the 5th): the low modes hardly radiate (a thin tube's two sides
+  // against each other), the strike note's group the most.
+  static const double lv[12] = {-40, -26, -18, -3, 0, -2, -4, -12, -18, -24, -30, -36};
+  for (int n = 0; n < 12; ++n) {
+    const double fn = f[n] * tune;
+    if (fn * 1.01 > 20000) break;
+    // (The split: 0.15 % at the 4th, a slow wah of ~1.5 Hz at C5, widening upwards, Hibbert's
+    // "very wide" in the high partials: ~1 % at the 8th.)
+    const double d = split * 0.0015 * std::exp2(0.65 * (n - 3)) * (0.5 + urand(rng));
+    for (int h = 0; h < 2; ++h) {
+      const int m = k.modes++;
+      const double fm = fn * (h ? 1 + d / 2 : 1 - d / 2), w = 2 * kPi * fm;
+      k.ratio[m] = fm / fs;
+      k.hit[m] = top[n];
+      // P4 ~35 s, P5-P6 15-25 s, P7 and up 3-8 s (the user's listening, section 3.5); the
+      // weaker direction of a doublet dies faster (the recordings: 2-4 x).
+      k.loss[m] = (lossA + lossC * std::pow(fm / 1000, 3)) * (h ? 1.5 : 1.0);
+      k.rad[m] = even * std::pow(10.0, lv[n] / 20) / (w * top[n] * mh);
+    }
+    k.pair[k.modes - 2] = k.modes - 1;
+  }
+  // The longitudinal mode, c / 2L: driven by the stroke's share along the tube.
+  {
+    const double fl = std::sqrt(E / rho) / (2 * L), nrm = 1 / std::sqrt(M);
+    const int m = k.modes++;
+    k.ratio[m] = fl / fs;
+    k.hit[m] = axial * 2 * nrm;
+    k.hitVary[m] = 0.5 * axial * 2 * nrm;
+    k.loss[m] = 0.45;
+    k.rad[m] = even * std::pow(10.0, -22 / 20.0) / (2 * kPi * fl * 2 * nrm * mh);
+  }
+  k.theta0 = 2 * kPi * urand(rng);
+  k.thetaVary = 0.17;  // (+-10 degrees: a careful player's horizontal blow)
+  // The hammer: rolled rawhide, and its wood face (research/tubular_bells.md 4).
+  k.mallet = mh; k.K = rawK; k.p = 1.5; k.hyst = 0.3;
+  k.mallet2 = mh; k.K2 = woodK; k.p2 = 1.5; k.hyst2 = 0.05;
+  k.knock[0] = 0.2; k.knock[1] = 1.0;
+}
+
+// A cast bronze bell, true-harmonic (Simpson) tuned, hanging still and struck on its sound bow:
+// hum, prime, tierce, quint, nominal, superquint, octave nominal and two above (Lehr 1986's F4
+// bell; the carillon bells' tierce a little sharp of the minor third). Each a doublet (a cast
+// bell is less round than a tube). The hum and the prime ring longest; a big bell longer than a
+// small one. Its mass ~ 2 t at C4, x 2 every four semitones down (Chime Master), at least 12 kg
+// (the small bells are thick). The hammer: a padded face and an iron one, heavier for a bigger
+// bell. Old-style tuning (PJ_BELLS_OLDSTYLE): the hum a little sharp, the prime flat.
+void castBellKey(BarKey& k, double fs, bool carillon, uint32_t& rng) {
+  static const double oldStyle = knob("PJ_BELLS_OLDSTYLE", 0), level = knob("PJ_BELLS_BELLLEVEL", 0.45);
+  static const double ring = knob("PJ_BELLS_BELLRING", 1.0), split = knob("PJ_BELLS_SPLIT", 1.0);
+  static const double padK = knob("PJ_BELLS_PADDED", 4e8), ironK = knob("PJ_BELLS_IRON", 1e10);
+  double r[9] = {0.5, 1, 1.205, 1.5, 2, 3.008, 4.174, 5.472, 6.832};
+  if (oldStyle > 0) { r[0] *= std::exp2(oldStyle * 150 / 1200.0); r[1] *= std::exp2(-oldStyle * 120 / 1200.0); }
+  static const double lv[9] = {-10, -6, -6, -22, 0, -5, -8, -12, -16};
+  static const double t60[9] = {90, 50, 45, 15, 22, 7, 4, 2.5, 1.8};  // (s, a C4 bell) [est]
+  static const double dsp[9] = {0.0025, 0.004, 0.003, 0.002, 0.0015, 0.0012, 0.001, 0.001, 0.001};
+  const double M = std::max(12.0, 2000 * std::pow(fs / 261.6, -3.0)), nrm = 1.5 / std::sqrt(0.25 * M);
+  const double mh = std::clamp(1.5 * std::cbrt(M / 2000), 0.25, 6.0);
+  const double size = std::pow(261.6 / fs, 0.8);
+  k.f1 = fs;
+  for (int n = 0; n < 9; ++n) {
+    const double f = fs * r[n];
+    if (f * 1.01 > 20000) break;
+    const double d = split * dsp[n] * (0.5 + urand(rng));
+    for (int h = 0; h < 2; ++h) {
+      const int m = k.modes++;
+      const double fm = f * (h ? 1 + d / 2 : 1 - d / 2), w = 2 * kPi * fm;
+      k.ratio[m] = fm / fs;
+      k.hit[m] = nrm;
+      k.loss[m] = 6.91 / std::min(150.0, ring * t60[n] * size) * (h ? 1.3 : 1.0);
+      k.rad[m] = level * (carillon ? 0.88 * std::pow(fs / 830.6, 0.7) : 0.85) * std::pow(10.0, lv[n] / 20) / (w * nrm * mh);
+    }
+    k.pair[k.modes - 2] = k.modes - 1;
+  }
+  k.theta0 = 2 * kPi * urand(rng);
+  k.thetaVary = 0.2;
+  // (A carillon's clappers are bare iron: the soft face there a lighter touch of it.)
+  static const double carK = knob("PJ_BELLS_CARILLON", 3e9);
+  k.mallet = mh; k.K = carillon ? carK : padK; k.p = 1.5; k.hyst = carillon ? 0.05 : 0.3;
+  k.mallet2 = mh; k.K2 = ironK; k.p2 = 1.5; k.hyst2 = 0.02;
+  k.knock[0] = k.knock[1] = 0;
+}
+}  // namespace
 
 BarDesign tubularBellsDesign() {
   BarDesign d;
   d.name = "tubular-bells";
-  d.keys = 18;
-  d.lowMidi = 60;
+  d.lowMidi = 36;
+  d.keys = 73;  // C2 .. C8
   d.speedLo = 0.5; d.speedHi = 3.0;
   d.micDist = 1.5;
-  const double E = 105e9, rho = 8500, dia = 0.038, wall = 1.5e-3;  // brass
-  const double c = std::sqrt(E / rho), gyr = dia / (2 * std::sqrt(2.0));
-  const double lossLow = knob("PJ_BELLS_LOSS", 0.35), lossRise = knob("PJ_BELLS_LOSSRISE", 0.5), hard = knob("PJ_BELLS_HARD", 1.0);
+  // The tubes' diameter (mm): 19.05 (3/4", as the recorded sets and the user's video), 31.8 or 38.1.
+  const double D = knob("PJ_BELLS_DIAMETER", 19.05) * 1e-3;
+  uint32_t rng = 1515;
   for (int i = 0; i < d.keys; ++i) {
     BarKey& k = d.key[i];
-    k.f1 = pitch(d.lowMidi + i);  // the note heard: an octave under the fourth mode
-    // A free tube's bending modes lie nearly as the odd squares, 9 : 25 : 49 : 81 : 121 : 169 ...;
-    // the fourth is tuned to twice the note.
-    const double f4 = 2 * k.f1, L = std::sqrt(kPi / 8 * 81 * gyr * c / f4);
-    const double mass = rho * kPi * dia * wall * L, nrm = 1 / std::sqrt(mass);
-    for (int n = 1; n <= 9; ++n) {
-      const int m = k.modes++;
-      const double f = f4 * (2 * n + 1) * (2 * n + 1) / 81.0;
-      k.ratio[m] = f / k.f1;
-      k.hit[m] = 2 * nrm;  // struck on its top end, where every mode swings fully
-      k.hitVary[m] = 0;
-      k.loss[m] = lossLow + lossRise * f / 1000;
-      // A thin tube sounds as a line of small sources, its two sides against
-      // each other: poorly while it is thinner than the wavelength (the low
-      // modes are hardly heard), better the higher.
-      const double kd = 2 * kPi * f / kC * dia;
-      k.rad[m] = kRho / (4 * kPi * d.micDist) * L * dia * 0.6 * nrm * std::min(1.0, kd);
-      if (f > 21000) { k.hit[m] = 0; k.rad[m] = 0; }
-    }
-    // A rawhide (or plastic) hammer.
-    k.mallet = 0.2;
-    k.K = hard * 4e7;
-    k.p = 1.5;
-    k.hyst = 0.3;
-    k.x = 0.9 * ((i + 0.5) / d.keys - 0.5);
+    const int midi = d.lowMidi + i;
+    const double fs = pitch(midi);  // the strike note
+    if (midi >= kTubeLow && midi <= kTubeHigh) tubeKey(k, fs, D, rng);
+    else castBellKey(k, fs, midi > kTubeHigh, rng);
+    for (int m = 0; m < k.modes; ++m)
+      if (fs * k.ratio[m] > 20000) { k.hit[m] = k.hitVary[m] = 0; k.rad[m] = 0; }
+    k.x = 1.6 * ((i + 0.5) / d.keys - 0.5);
   }
+  // The cap's rim under the blow: a short metallic tick (the wood face's more than the rawhide's).
+  const double kn = knob("PJ_BELLS_CLICK", 1.0);
+  const double f[3] = {3200, 5100, 7400}, t60[3] = {0.02, 0.015, 0.01}, g[3] = {0.5, 0.4, 0.3};
+  for (int i = 0; i < 3; ++i) { d.knockF[i] = f[i]; d.knockT[i] = t60[i]; d.knockG[i] = kn * g[i]; }
   return d;
 }
 
@@ -424,17 +634,42 @@ void Bars::reset() {
   for (Case& c : case_) c.x = c.v = 0;
 }
 
-void Bars::strike(int key, double speed) {
+void Bars::retune(int key, double cents) {
   if (key < 0 || key >= n_) return;
   Key& k = key_[key];
   const BarKey& b = d_.key[key];
-  // Where the mallet lands this time.
-  const double stray = 2 * urand(rng_) - 1;
-  double g = 0;
+  k.cents = cents;
+  const double f1 = b.f1 * std::exp2(cents / 1200);
   for (int m = 0; m < k.nm; ++m) {
-    k.hit[m] = float(b.hit[m] + stray * b.hitVary[m]);
-    g += double(k.hit[m]) * k.hit[m];
+    const double wr = 2 * kPi * f1 * b.ratio[m];
+    k.w2[m] = float(wr * wr);
   }
+  coefs(k, b);
+}
+
+void Bars::strike(int key, double speed, int face) {
+  if (key < 0 || key >= n_) return;
+  Key& k = key_[key];
+  const BarKey& b = d_.key[key];
+  // The face that meets it.
+  const bool second = face == 1 && b.mallet2 > 0;
+  k.mMass = float(second ? b.mallet2 : b.mallet);
+  k.mK = float(second ? b.K2 : b.K);
+  k.mP = float(second ? b.p2 : b.p);
+  k.mHyst = float(second ? b.hyst2 : b.hyst);
+  k.knockGain = float(b.knock[second ? 1 : 0]);
+  // Where the mallet lands this time, and from which side (a doublet's share).
+  const double stray = 2 * urand(rng_) - 1;
+  const double th = b.theta0 + b.thetaVary * (2 * urand(rng_) - 1), ct = std::cos(th), st = std::sin(th);
+  double g = 0;
+  for (int m = 0; m < k.nm; ++m) k.hit[m] = float(b.hit[m] + stray * b.hitVary[m]);
+  for (int m = 0; m < k.nm; ++m)
+    if (b.pair[m] > m && b.pair[m] < k.nm) {
+      const float h = k.hit[m];
+      k.hit[m] = float(h * ct);
+      k.hit[b.pair[m]] = float(h * st);
+    }
+  for (int m = 0; m < k.nm; ++m) g += double(k.hit[m]) * k.hit[m];
   if (!k.active) { k.active = true; k.quiet = 0; active_[nActive_++] = key; }
   if (b.pluck) {
     // Bent by the pin and let go: each mode starts from where the bending
@@ -444,7 +679,7 @@ void Bars::strike(int key, double speed) {
     knockIn_ += float(force * fs_ * 0.02);
     return;
   }
-  k.G = float(dt_ * dt_ * (g + 1 / b.mallet));
+  k.G = float(dt_ * dt_ * (g + 1 / k.mMass));
   double h = 0;
   for (int m = 0; m < k.nm; ++m) h += double(k.hit[m]) * k.q[m];
   k.hz = h + 1e-5;  // from above, a hair over the piece as it is now
@@ -484,16 +719,17 @@ float Bars::sample() {
       double force = 0, d = 0;
       if (free > 0) {
         double lo = 0, hi = free;
-        const double hyst = 1 + b.hyst * std::clamp((free - k.dPrev) / dt_, -2.0, 6.0);
+        const double hyst = 1 + k.mHyst * std::clamp((free - k.dPrev) / dt_, -2.0, 6.0);
+        const double K = k.mK, P = k.mP;
         for (int it = 0; it < 34; ++it) {
           d = 0.5 * (lo + hi);
-          if (d + k.G * b.K * fastPow(d, b.p) * hyst > free) hi = d; else lo = d;
+          if (d + k.G * K * fastPow(d, P) * hyst > free) hi = d; else lo = d;
         }
-        force = std::max(0.0, b.K * fastPow(d, b.p) * hyst);
+        force = std::max(0.0, K * fastPow(d, P) * hyst);
       }
       k.dPrev = float(d);
-      knockIn_ += float(force);
-      k.hv += dt_ * force / b.mallet;
+      knockIn_ += float(force) * k.knockGain;
+      k.hv += dt_ * force / k.mMass;
       k.hz += dt_ * k.hv;
       for (int m = 0; m < k.nm; ++m) f[m] -= k.hit[m] * float(force);
       if (force == 0 && k.hv > 0) k.hammerOn = false;  // thrown back: it is taken away

@@ -916,9 +916,34 @@ key is held; a pair (A2, A3) sits ~6 dB under the chanter (`PJ_DRONE_GAIN`).
   Eagle II as Woodhouse, Politzer & Mansour measured it, the light bridge on the Mylar head (the
   500–800 Hz formant; it is loud and dies fast). **Shamisen**: silk strings, the first buzzing on
   the sawari, the skin's measured modes (Kokubun), the bachi meeting the skin a moment after the
-  string. **Koto**: 13 strings at 147 N tuned to hirajōshi by their bridges, notes between pressed
-  behind the bridge (oshide, reaching pitch just after the pluck); the kiri body's modes
-  (Coaldrake). **Kalimba**: tines with the measured 1 : 5.9 overtone, over a ~400 Hz box,
+  string. **Koto**: 13 strings at 147 N tuned by their bridges (ji), notes between pressed behind
+  the bridge (oshide); the kiri body's modes (Coaldrake). Live, the ji stand in hirajōshi on D.
+  With `-play` the player reads its part first and sets the ji for the piece, so most notes fall
+  on open strings; a part wider than 13 strings gets a pentatonic through its range with the
+  scale's other notes pressed, and the ji move again only at breaths, where the music leaves the
+  set (`src/kotoplan.cc`, `research/koto_expressive.md`). It tunes by ear, as the organ's
+  `jyrki-spectral`: the ji placed string against string by the clearest beat (partials
+  coinciding up to the 4th: octaves, fifths and fourths pure, as Ando measured players tune; the
+  thirds come out Pythagorean, the high octaves a little stretched by the strings' stiffness); a
+  string no such beat reaches set "by sense", a narrow 90 c semitone (hirajōshi's two), the whole
+  centred on the band's pitch and nudged by it in play; a press set anew each pluck against all
+  that sounds. The part is fingered as it is read: the thumb's tsume (4 cm from the fixed bridge,
+  pushing the string away, flatter) for the line, the index (3 cm) and middle (2.2 cm, the
+  brightest) pulling toward the player, steeper; a chord's top note the thumb's and its lowest the
+  middle's, a fast run up the index alone through the strings, down the thumb, a repeated note
+  thumb and index in turn, a broken chord middle-index-thumb; a bass note under the right hand the
+  left hand's bare finger (10 cm in, soft and round) when no press needs it; each stroke resting on
+  the next string, stopping it. A press is made before the pluck when the left hand has the time (the
+  note starts at pitch), else it scoops in; the pressing finger damps each partial by how much it
+  swings where the finger is. Knobs: `PJ_KOTO_PLAN=0` (hirajōshi throughout), `PJ_KOTO_JI=0`
+  (equal temperament), `PJ_KOTO_JI_LIM` (12 c), `PJ_KOTO_LEAN` (1), `PJ_KOTO_PRESS_EARLY`
+  (0.1 s), `PJ_KOTO_PRESS_DAMP` (4 /s), `PJ_KOTO_PRESS_AT` (0.12 m), `PJ_KOTO_TUNE_ORDER` (4:
+  the highest partial tuned by; 5 lets thirds be tuned just), `PJ_KOTO_SEMI` (90 c),
+  `PJ_KOTO_FINGERS=0` (one stroke for every note), `PJ_KOTO_REST` (0.6: the rest stroke takes
+  from the next string as a re-pluck does, by each partial's swing where the tsume lands),
+  `PJ_KOTO_LOW` (0.35: the body's modes under 100 Hz, x), `PJ_KOTO_JI_END=0` (the body fed at
+  the fixed bridge by the pick, as before: the whole pull thumps it; by default at the ji), `PJ_KOTO_LOG` (the plan's moves, the
+  tuner's steps and each pluck). **Kalimba**: tines with the measured 1 : 5.9 overtone, over a ~400 Hz box,
   pressed slowly and let go by the nail. **Fiddle**: bowed **waveguide** strings (two delay
   lines split at the bow, the stick-slip table where they meet, as STK's), whose bridge force
   drives the violin body's measured modes (A0, CBR, B1−, B1+, the bridge hill); a modal string
@@ -2578,12 +2603,41 @@ the ring or take from it, and no two strokes land in quite the same place.
 | `vibraphone` | 12 | F3–F6 | (above) |
 | `marimba` | 13 | C2–C7 | rosewood bars tuned 1 : 4 : 10, a tube under each, yarn mallets |
 | `xylophone` | 14 | F4–C8 | rosewood bars tuned 1 : 3 : 6, hard mallets, short notes |
-| `tubular-bells` | 15 | C4–F5 | brass tubes struck on the end: the note heard is an octave under the fourth mode |
+| `tubular-bells` | 15 | C2–C8 | church bells below C4, brass tubes C4–G5, carillon bells above: three instruments, changing suddenly (below) |
 | `dulcimer` | 16 | G2–A6 | courses of steel strings, light leather-faced hammers, no dampers (`src/dulcimer.cc`) |
 
-The celesta is fitted to a recording. The other six are first forms from general acoustics, not
-yet checked against the literature or recordings; the dulcimer still sounds through the grand's
-soundboard.
+The celesta is fitted to a recording. The tubular bells are researched (research/tubular_bells.md)
+and their tubes fitted to the recorded GM sets. The other five are first forms from general
+acoustics, not yet checked against the literature or recordings; the dulcimer still sounds through
+the grand's soundboard.
+
+**Tubular bells** are three kinds of bell on one keyboard, the change from one to the next sudden:
+the tubes being a portable carillon, and the low tubes a cheap, portable church bell.
+- **C4–G5, the tubes:** ¾" brass (`PJ_BELLS_DIAMETER`, mm: 19.05; 31.8 or 38.1 for the bigger
+  orchestral sets), a plug at the top, struck on its cap. Their modes come from a Timoshenko beam
+  computed at start (shear and rotary inertia flatten the upper partials: 2 : 2.96 : 4.07 : 5.33
+  at C5, as the recordings have them). No mode sounds at the note: the ear hears it an octave
+  under the 4th. Each mode is a doublet; the stroke's direction (a careful horizontal blow, ±10°)
+  shares it between the two and they beat slowly. The stroke drives a little of the
+  longitudinal mode too (`PJ_BELLS_AXIAL`, 0.1). The strike note rings ~35 s to -60 dB (down
+  30 dB at 17 s, as heard on a real set), its upper partials much less (`PJ_BELLS_LOSS`,
+  `PJ_BELLS_LOSSCUBE`).
+- **The hammer has two faces:** rolled rawhide, and wood with a click from the cap's rim. The
+  player turns to the wood from velocity 100 up and back to the rawhide below 80, only when a gap
+  of 0.4 s gives the time; with the wood the stroke is a little lighter (`PJ_BELLS_HARD_VEL`,
+  `PJ_BELLS_SOFT_VEL`, `PJ_BELLS_TURN`, `PJ_BELLS_HARD_EASE`; `PJ_BELLS_FACE` 0 or 1 holds one).
+- **Below C4, church bells:** cast bronze, true-harmonic (hum 0.5, prime, minor-third tierce,
+  quint, nominal 2, superquint, octave nominal …), each partial a doublet, about 2 t at C4 and
+  twice as heavy every four semitones down. The hum and prime ring a minute or more. A heavy
+  padded hammer, or an iron one for the loud strokes. `PJ_BELLS_OLDSTYLE=1`: the hum sharp and
+  the prime flat, as in old bells.
+- **Above G5, carillon bells:** the same partials, small bells struck by iron clappers.
+- **Tuning:** each stroke of a key not already ringing is tuned by ear (jyrki-spectral): its own
+  partials against all that sounds, the bells' own ringing too, within `PJ_BELLS_TUNE_LIM`
+  (15 c). The tierce and the tubes' 3rd partial count only lightly. The band hears the bells by
+  their own inharmonic partials. `PJ_BELLS_TUNING=tet12`: equal temperament. `PJ_BELLS_LOG`
+  prints each stroke's pull.
+- No damper or pedal yet: the bells ring on.
 
 #### Celesta
 
@@ -2619,8 +2673,11 @@ damped and chirping upward as van den Doel models liquid sounds, their sizes fro
 their rate following each wave's crash, wash and backwash), `bird-tweet` (the syrinx's labia as a
 van der Pol valve driven by pressure and tension gestures after Gardner et al.: syllables sweeping
 down, the beak's resonance following the note), `telephone` (a polarised ringer: the 20 Hz ring
-current, 2 s on and 4 s off, turns the armature against its spring, ~18 Hz, and its steel ball
-swings into one gong, then the other, through Hertz contacts solved with the step; each gong 16
+current, 2 s on and 4 s off, turns the armature against its spring, ~19 Hz; on it a long arm,
+springy itself, whose steel ball bounces off one small steel gong into the other as it will,
+now and then striking twice, through Hertz contacts solved with the step; the swing takes a few
+cycles to build: the first strokes reach only the nearer, bigger gong, a soft key settling into
+the 40 strokes a second in ~0.3 s, a hard one in ~0.1 s; the gongs a minor third apart, each 16
 modes of 4 numbers, frequency, decay, shape at the strike, radiation: a stamped bowl's (m, n)
 families as doublets), `helicopter` (the blade-vortex slap once a blade passage, the thickness
 noise, the tail rotor, the turbine; spinning up and down), `applause` (an audience of up to 960

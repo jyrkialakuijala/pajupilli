@@ -82,7 +82,7 @@ void ModalSet::coefs(Vib& v) {
         v.c00[p][k] = v.c01[p][k] = v.c10[p][k] = v.c11[p][k] = 0;
         continue;
       }
-      const double w = 2 * M_PI * f, s = kLn1000 / d.t60[k] + v.dampRate;
+      const double w = 2 * M_PI * f, s = kLn1000 / d.t60[k] + v.dampRate + v.extra[k];
       const double wd = std::sqrt(std::max(w * w - s * s, 1e-6)), e = std::exp(-s * dt_);
       const double c = std::cos(wd * dt_), sn = std::sin(wd * dt_);
       v.c00[p][k] = float(e * (c + s / wd * sn));
@@ -173,19 +173,23 @@ void ModalSet::pluck(int i, double force, double rise, double hold, double slip,
   v.pT = 0;
   v.pAngle = angle;
   v.rT = -1;
-  if (repluck > 0 && v.awake && energy(i) > 1e-13) {
-    const double contact = v.pRise + v.pHold + v.pSlip;
-    const double left = 0.5 * std::log(std::max(1 - repluck, 1e-3));
-    std::memcpy(v.rx, v.x, sizeof v.rx);
-    std::memcpy(v.rv, v.v, sizeof v.rv);
-    for (int k = 0; k < kModes; ++k) {
-      const double f = k < v.def.n ? v.def.freq[k] * v.ratio : 0;
-      v.rLn[k] = float(left * std::min(1.0, std::fabs(double(v.exc[k]))) * (1 + std::min(1.0, f * contact)));
-    }
-    v.rN = std::max(1, int(contact * fs_));
-    v.rT = 0;
-  }
+  if (repluck > 0) touch(i, repluck, v.pRise + v.pHold + v.pSlip);
   v.awake = true;
+}
+
+void ModalSet::touch(int i, double take, double contact) {
+  Vib& v = vib_[i];
+  if (take <= 0 || !v.awake || energy(i) <= 1e-13) return;
+  contact = std::max(contact, dt_);
+  const double left = 0.5 * std::log(std::max(1 - take, 1e-3));
+  std::memcpy(v.rx, v.x, sizeof v.rx);
+  std::memcpy(v.rv, v.v, sizeof v.rv);
+  for (int k = 0; k < kModes; ++k) {
+    const double f = k < v.def.n ? v.def.freq[k] * v.ratio : 0;
+    v.rLn[k] = float(left * std::min(1.0, std::fabs(double(v.exc[k]))) * (1 + std::min(1.0, f * contact)));
+  }
+  v.rN = std::max(1, int(contact * fs_));
+  v.rT = 0;
 }
 
 void ModalSet::strike(int i, double mass, double speed, double K, double alpha) {
@@ -228,6 +232,17 @@ void ModalSet::damp(int i, double rate) {
   Vib& v = vib_[i];
   v.dampRate = rate;
   v.dampMul = float(std::exp(-rate * dt_));
+}
+
+void ModalSet::dampModes(int i, const float* rate) {
+  Vib& v = vib_[i];
+  bool same = true;
+  for (int k = 0; k < kModes; ++k) {
+    const float r = rate ? rate[k] : 0.0f;
+    same = same && r == v.extra[k];
+    v.extra[k] = r;
+  }
+  if (!same) coefs(v);
 }
 
 double ModalSet::energy(int i) const {

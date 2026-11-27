@@ -226,7 +226,7 @@ void SnarePlayer::control(double dt) {
   // Both brushes on the head. Asked for (key 40 held), or of the drummer's
   // own accord: brush strokes are being played, so between them the head is
   // never left alone, and for a while after the last.
-  const bool asked = swirl_ || hold_;
+  bool asked = swirl_ || hold_;
   // Once begun (a brush stroke asks for it), the brushing goes on: through
   // bars with no stroke, for as long as the band plays. It stops for a
   // general pause or the song's end (alone, with no song to go by: after
@@ -234,6 +234,9 @@ void SnarePlayer::control(double dt) {
   {
     const SongClock& c = SongClock::get();
     if (c.valid ? c.pause : sinceTap_ > 12) brushing_ = false;
+    // (the ending: the brushes are off the head two bars before the final note, whatever was begun or is held;
+    // the drummer decides this, also against the file)
+    if (c.valid && c.now >= c.brushEnd) brushing_ = false, asked = false;
   }
   const bool own = loop_ && brushing_;
   if (!asked && !own) {

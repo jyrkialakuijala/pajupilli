@@ -8,7 +8,14 @@ plan. The code is in `src/midifile.cc` (the swirls, the ending) and `src/drumkit
 
 - **The brushes' cymbal swirl ends before the final note.** A swirl planned into the ending is
   cut two bars before the piece's final note; one left under a second long is not played. The
-  final note is the first of the pitched parts' notes begun within a second of the very last.
+  final note is the last chord: three or more pitched notes begun together in the last three
+  seconds (a pickup into it and a late grace note after it are not it). Without such a chord it
+  is the first note begun within a second of the very last.
+- **The snare's own brush circles stop two bars before the final note.** The brushed snare's left
+  hand circles of its own accord from the first brush stroke on and used to stop only when the
+  song was over, so a woosh ran under and past the last chord. From two bars before the final
+  note the brushes are off the head: no circling, and a swirl the file holds (key 40) is ended
+  too. Strokes still sound. This holds for any band and any kit, not only with the jazz drummer.
 - **The ending is marked.** With brushes (a jazz band's file) the drummer strikes the snare, the
   bass drum and a crash together on the final note, unless the file's own drums already strike
   there. `PJ_SWIRL_END=0` gives the earlier behaviour.
@@ -16,6 +23,10 @@ plan. The code is in `src/midifile.cc` (the swirls, the ending) and `src/drumkit
 - **A proper ending for the file's own drums.** A triplet on the snare sets up the last beat,
   the beat before the final note is left open, and none of the file's drum strokes are played
   after the final note (with brushes each was a sweep under the last chord).
+
+- **The drummer listens.** A cymbal swirl is no louder than 0.7 of the velocity the pitched parts
+  play around it (`PJ_SWIRL_UNDER`), and the ending's strokes are set against the band's last
+  notes (the bass drum a little over them, the crash under them).
 
 Not built: everything below.
 
@@ -104,7 +115,8 @@ decide to stop it even if it is requested in the midi file".
 Leaving the swirl: not snatched up (a "zip"), but resolved into a soft tap on 2 or 4, or slowed
 and lifted at a phrase's end.
 
-Not built yet.
+Built of this: only the two bars without swirl before the final note (section 1). The rest is not
+built yet.
 
 ## 5. Next steps, in order of use
 

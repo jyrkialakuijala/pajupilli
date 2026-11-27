@@ -97,6 +97,10 @@
 // turns, most of them with the mouth left open (no closing consonant, the air let out), and carry
 // no stress of their own: by the author's ear they were nervous otherwise.
 // A classical singer keeps the jaw open throughout (PJ_SINGER_CLASSICAL_OPEN 0.3).
+// Two schools of the one voice: the classical styles sing with the larynx low and a vibrato all
+// through the note (5.8 Hz); the jazz styles, after the African traditions jazz singing comes
+// from, with the larynx at speech level (PJ_SINGER_JAZZ_LARYNX -0.5 cm: brighter, forward) and a
+// straight tone whose vibrato is a late ornament.
 // No long note stands still (the author, 2026-11-26: "something should be changing -- the vowel
 // color, the opening of the mouth, the lung pressure, air flow"): a note of 0.6 s or more develops,
 // the breath, the mouth's opening, the folds' closure and the vowel's clarity moving together, the

@@ -704,14 +704,17 @@ def ocarina():
 
 
 # ---------------------------------------------------------------------------
-# Pan flute (nai), chromatic: one stopped pipe per note, blown across its rim;
-# the lips cover part of the top (tilting the pipe bends the pitch).
+# Pan flute, chromatic: one stopped pipe per note, blown across its rim; the
+# lips cover part of the top (tilting the pipe bends the pitch). G4..C7 a nai's
+# compass; below it the bass pipes of a bass nai or an Andean toyo, down to C3
+# (a 26 mm pipe of 66 cm), the bore following the same law (Fletcher 2005:
+# d = 1.32 L^0.43 mm; this one ~15 % wider).
 
 def panflute():
-    lo, hi = midi('G4'), midi('C7')
+    lo, hi = midi('C3'), midi('C7')
 
     def dia(m):
-        return 15.0 * (6.5 / 15.0) ** ((m - lo) / (hi - lo))
+        return 15.0 * (6.5 / 15.0) ** ((m - midi('G4')) / (hi - midi('G4')))
 
     def pipes(spec, Model):
         out = []
@@ -731,7 +734,7 @@ def panflute():
                     b = L
             out.append((m, 0.5 * (a + b), d))
         return out
-    return dict(name='panflute', title='Pan flute (nai), chromatic, G4..C7', family='panflute', kind='end',
+    return dict(name='panflute', title='Pan flute (nai, toyo), chromatic, C3..C7', family='panflute', kind='end',
                 transpose=0, lo=lo, hi=hi, fs=96000, gain=1.0, end=200, closed=True,
                 bore=[(0, 15.0), (1000, 15.0)], holes=[], core={}, pipes_fn=pipes, emb=0.8,
                 doc="""One stopped pipe per note, blown across the rim.""", jet=dict(chimney=0.5))

@@ -24,6 +24,9 @@ struct SongClock {
   double start = 0;      // (-start_time: where in the song the rendering began, s)
   bool playing = false;  // (a file is being rendered: -play; messages carry the song's time, src/heard.h)
   double lastOn[128];
+  // The ending: from this moment of the song (s) no brush circles on the snare of its own accord or because
+  // the file holds a swirl (two bars before the final note; the file player sets it). Strokes still sound.
+  double brushEnd = 1e18;
   SongClock() { for (double& t : lastOn) t = -1e9; }
   static SongClock& get() {
     static SongClock c;

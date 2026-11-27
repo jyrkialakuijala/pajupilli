@@ -703,19 +703,61 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     std::vector<DrumTempo> tm;
     for (const Song::Tempo& x : song.tempo) tm.push_back({x.t, x.beat, x.len});
     std::vector<CymbalSwirl> sw = planCymbalSwirls(notes, tm, song.gs);
+    // The drummer listens (the author, 2026-11-26: "how loud is the dynamic at any given place and the
+    // velocity may need to be interpreted within that context -- especially ... swooshing on the cymbal
+    // can easily be too loud"): how hard the pitched parts play around a moment (their keys' mean
+    // velocity from a second before to a second after; none there: the song's).
+    auto bandVel = [&](double t0, double t1) {
+      double sum = 0, all = 0;
+      int n = 0, na = 0;
+      for (const DrumPlanNote& nn : notes) {
+        if (nn.drum) continue;
+        all += nn.velocity; ++na;
+        if (nn.t >= t0 - 1 && nn.t <= t1 + 1) { sum += nn.velocity; ++n; }
+      }
+      return n >= 3 ? sum / n : na ? all / na : 64.0;
+    };
+    // (a swirl is a decoration under the band: no louder than PJ_SWIRL_UNDER, 0.7, of what the band plays there)
+    {
+      static const double kUnder = knob("PJ_SWIRL_UNDER", 0.7);
+      for (CymbalSwirl& q : sw) {
+        const int cap = std::max(12, int(kUnder * bandVel(q.on, q.off)));
+        if (q.velocity > cap) q.velocity = cap;
+      }
+    }
     // The ending (the author, 2026-11-26: "the swoosh has to stop before the final note, it cannot
     // continue over it, perhaps there can be a snare, kick and crash to indicate the end instead").
     // The final note: the last notes of the pitched parts, from the first of those begun within a
     // second of the very last. A swirl is over two bars before it (a swirl left under a second
     // long is not played at all), and with brushes the drummer marks the final note with the snare,
     // the bass drum and a crash, unless the file's own drums already strike there. PJ_SWIRL_END=0: as before.
-    if (knob("PJ_SWIRL_END", 1) > 0 && (jazzBand || brushKitWanted() || !sw.empty())) {
+    SongClock::get().brushEnd = 1e18;
+    if (knob("PJ_SWIRL_END", 1) > 0) {
+      // (the final note: the last chord, three or more pitched notes begun together (each within 60 ms of
+      // the one before) in the song's last three seconds, a pickup into it or a late grace note after it
+      // not counted; no such chord: the first note begun within a second of the very last)
       double last = -1, final = -1;
+      std::vector<double> ons;
       for (const DrumPlanNote& nn : notes)
-        if (!nn.drum) last = std::max(last, nn.t);
+        if (!nn.drum) ons.push_back(nn.t);
+      std::sort(ons.begin(), ons.end());
+      if (!ons.empty()) last = ons.back();
+      for (size_t e = ons.size(); e > 0 && final < 0 && ons[e - 1] >= last - 3.0;) {
+        size_t b = e - 1;
+        while (b > 0 && ons[b] - ons[b - 1] <= 0.06) --b;
+        if (e - b >= 3) final = ons[b];
+        e = b;
+      }
       for (const DrumPlanNote& nn : notes)
-        if (!nn.drum && nn.t >= last - 1.0 && (final < 0 || nn.t < final)) final = nn.t;
+        if (final < 0 && !nn.drum && nn.t >= last - 1.0) final = nn.t;
+      const bool drummer = jazzBand || brushKitWanted() || !sw.empty();
       if (final > 0) {
+        const double bar = 4 * (song.tempo.empty() ? 0.5 : song.tempo.back().len);
+        // (the snare's own circling brush, and a swirl the file holds, stop there too: any band, any kit)
+        SongClock::get().brushEnd = final - 2 * bar;
+        std::fprintf(stderr, "  (the brushes: the final note at %.1f s; no brush swirls from %.1f s, two bars before it)\n", final, final - 2 * bar);
+      }
+      if (final > 0 && drummer) {
         const double bar = 4 * (song.tempo.empty() ? 0.5 : song.tempo.back().len);
         for (size_t q = 0; q < sw.size();) {
           if (sw[q].off > final - 2 * bar) sw[q].off = final - 2 * bar;
@@ -742,7 +784,7 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
             if (e.t <= final - 2 * beat) tick = e.tick;
           for (int q = 0; q < 3; ++q) {
             const double t = final - 2 * beat + q * beat / 3;
-            song.ev.push_back({t, 0, uint8_t(0x99), uint8_t(38), uint8_t(56 + 9 * q)});
+            song.ev.push_back({t, 0, uint8_t(0x99), uint8_t(38), uint8_t(std::clamp(int(bandVel(final - 1, final)) - 14 + 9 * q, 24, 100))});
             song.ev.back().tick = tick;
             song.ev.push_back({t + 0.08, 0, uint8_t(0x89), uint8_t(38), uint8_t(0)});
             song.ev.back().tick = tick;
@@ -757,7 +799,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           uint64_t tick = 0;
           for (const Event& e : song.ev)
             if (e.t <= final) tick = e.tick;
-          const int hit[3][2] = {{36, 86}, {38, 80}, {49, 70}};
+          // (as loud as the band's last notes ask: a little over them, the crash under them)
+          const int lv = int(bandVel(final - 1, final));
+          const int hit[3][2] = {{36, std::clamp(lv + 14, 40, 110)}, {38, std::clamp(lv + 8, 36, 104)}, {49, std::clamp(lv - 6, 28, 92)}};
           for (const auto& h : hit) {
             song.ev.push_back({final, 0, uint8_t(0x99), uint8_t(h[0]), uint8_t(h[1])});
             song.ev.back().tick = tick;
@@ -1378,6 +1422,38 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       }
       p.ens->placeParts();
     }
+  // The koto's ji, set for the piece as a player sets them (src/kotoplan.h): its part's notes read
+  // first (its channel's, while the channel's program is the koto's).
+  for (auto& [id, p] : parts) {
+    if (std::strcmp(p.inst->name, "koto") != 0 || p.ens->size() < 1) continue;
+    auto* mp = dynamic_cast<ModalPlayer*>(&p.ens->player(0));
+    if (!mp) continue;
+    const int ch = id / 128, prog = id % 128;
+    int pr = 0;
+    std::vector<KotoNote> notes;
+    std::map<int, size_t> on;
+    for (const Event& e : song.ev) {
+      if ((e.status & 15) != ch) continue;
+      const int kind = e.status & 0xf0;
+      if (kind == 0xc0) pr = e.a;
+      if (kind == 0x90 && e.b > 0) {
+        if (pr != prog) continue;
+        on[e.a] = notes.size();
+        notes.push_back({e.t, e.t + 0.3, e.a, e.b});
+      } else if (kind == 0x80 || kind == 0x90) {
+        auto it = on.find(e.a);
+        if (it != on.end()) {
+          notes[it->second].off = e.t;
+          on.erase(it);
+        }
+      }
+    }
+    if (notes.empty()) continue;
+    const KotoPlan plan = planKoto(notes);
+    if (plan.steps.empty()) continue;
+    mp->setKotoPlan(plan);
+    std::fprintf(stderr, "  koto    %2d: %s\n", ch + 1, plan.summary.c_str());
+  }
   // A vibraphone's motor, set as a vibist sets it (between sections, not ridden), bar by bar by
   // how exposed the part is: among many instruments the openings on the eighth notes (by the
   // song's clock: the vibraphone stands out); alone (a solo piece, or a solo passage in a slow
@@ -1899,7 +1975,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
       const int ear = Ensemble::windEar(*p.inst);
       if (ear >= 0) p.ens->setBand(&band, id / 128, ear);
     }
-  auto byEar = [&](const Part& p) { return p.ens->listens() ? 2 : fretlessBassInstrument(*p.inst) ? 1 : 0; };
+  auto byEar = [&](const Part& p) {
+    return p.ens->listens() ? 2 : fretlessBassInstrument(*p.inst) || std::strcmp(p.inst->name, "koto") == 0 ? 1 : 0;
+  };
   std::vector<std::vector<Part*>> jobs;
   {
     std::vector<Part*> circuits, others;
@@ -2299,7 +2377,9 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
           // (the file's keys are sounding pitches, and so are the ensemble's: a transposing
           // instrument's `transpose` is between its written notes and these, not added here)
           heldKey[ch * 128 + e.a] = pk;
-          if (ch != 9) band.on(ch, e.a, heldKey[ch * 128 + e.a], e.b, bandFamily(it->second.inst->family, it->second.inst->name), byEar(it->second));
+          if (ch != 9)
+            band.on(ch, e.a, heldKey[ch * 128 + e.a], e.b, bandFamily(it->second.inst->family, it->second.inst->name), byEar(it->second),
+                    std::strcmp(it->second.inst->name, "koto") == 0);
           if (it->second.plan) {  // (an organ by its plan: the note on its track's division)
             Part& op = it->second;
             const int line = ch * 1000 + e.track;

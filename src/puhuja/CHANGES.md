@@ -143,6 +143,10 @@ exp/log/pow in vectorized loops). Everything is in `namespace puhuja`.
   a change in 3 ms (larynx.cc); `Synth::setFoldMass(scale, kneeHz, power)` (puhuja.h): the mass x scale, and
   above kneeHz x (kneeHz / pitch)^power, set each sample from the pitch target (puhuja.cc). Speech is unchanged
   (1, 0: the mass table itself, bit for bit).
+  Later the same day two more arguments, `knee2Hz` and `power2`: the author's table of the registers gives each
+  voice a chest range, a crossover zone between two pivots (the primo and the secondo passaggio) and a head
+  range, "a gradual overlap bounded by two pivot points", not one bend. The mass falls by one law through the
+  zone and by another above it; the first pivot is rounded over a semitone either side. 0: one law, as before.
 - Judged by: a sung scale C3 to E6 on "dah" (pajupilli, 2026-11-26). Mass 1: on pitch to D4, then 70 to 200
   cents off. Mass 0.5: to G#4. Mass 0.25: to C5. Mass 1 falling as (150 Hz / pitch)^1.5: within 7 cents from C3
   to E5 and from A#5 to D6, with a hole at F#5 and G#5 (240 and 95 cents flat; the pitch crossing the vowel's
@@ -167,6 +171,123 @@ exp/log/pow in vectorized loops). Everything is in `namespace puhuja`.
   countertenor), 0.9 (contralto), 1 (mezzo), 1.1 (soprano), 1.15 (coloratura).
 - For puhuja: the per-voice parameters chosen by `-female` at start-up ("@f" values) are not mixed and cannot be
   chosen in-process at all; a voice as a value from 0 to 1 would need them read per Synth.
+
+### 2026-11-26: the folds shielded from the tract's sound pressure (a singer's setting)
+- Motivation: the author on pajupilli's soprano: "soprano is still screatchy", "something strange is happening
+  vocal folds ... feels like they need some stabilizing". Held notes showed the folds breaking into a rough swing
+  about a semitone flat, the noise louder than the harmonics, wherever the sung pitch meets the vowel's first
+  resonance: "ah" at G#5 and A5 (soprano), "ee" at E4, "oo" at F4; a longer tract moves the break down with the
+  resonance. Fold mass (0.14 to 0.28), the mass law's pivots, the closure (x 0.7, x 1.3), the breath (x 0.7) and
+  the mouth opening did not cure it; nor did the sample rate (48, 96 and 192 kHz sing alike). Speech never holds
+  a pitch on a first resonance, so it does not meet this.
+- Change: `VocalFolds::Input::shield, shieldHz` (folds.h), read in the string folds' step (string.cc) in place
+  of STRING_P1SUP and STRING_P1SUP_HZ when shield >= 0; `LarynxControl::shield, shieldHz` (larynx.h, larynx.cc);
+  `Synth::setTractShield(share, hz)` (puhuja.h, puhuja.cc). Default -1: the built constants, speech bit for bit
+  as before. pajupilli's singers use 0.5 at 3000 Hz (PJ_SINGER_SHIELD, PJ_SINGER_SHIELD_HZ).
+- Judged by: held notes, the pitch found and the harmonics' energy over the rest between 100 Hz and 12 kHz.
+  Soprano "ah" G5, G#5, A5, A#5: 10, 8, -8, 14 dB and -112, -109 cents on the middle two, to 32, 18, 18, 21 dB and
+  all within 3 cents. Her "ee" at E4: -143 cents and -0.5 dB to +16 cents and 10 dB. A baritone's notes move by
+  a few dB either way, none breaks. Shares 0.5 and 1 at 300 and 1000 Hz did not cure all of it; 1 at 3000 Hz
+  does but costs 3 to 5 dB of level in the fifth below the break. Not yet judged by ear.
+- Later the same day, after the author's listening ("sounds much better, but still a little screechy ... perhaps
+  go down to 25 %"): pajupilli's singers use 0.75 at 8000 Hz. Soprano, 27 held notes C4 to D6, notes with the
+  harmonics under 15 dB over the rest: unshielded 3 ("ah"), 8 ("ee"), 8 ("oo"); 0.5 at 3000 Hz 0, 4, 7; 0.75 at
+  8000 Hz 0, 0, 3 ("oo" at E5 to F#5, which only an opened mouth cures: fold mass, closure, damping, collision
+  stiffness and the glottal inertance did not). No change in puhuja for this, only the values pajupilli passes.
+- For puhuja: the note at STRING_P1SUP says a quick corner killed the male b d g voice bars; that was with the
+  share 1 and other variants. The bars should be checked with 0.5 at 3000 Hz before speech takes this.
+
+### 2026-11-26: the pitch line's own smoothness (a singer's held note)
+- Motivation: the author heard the soprano as "still a little screechy". Her long notes in a song were steady
+  in the folds but not in pitch: 20 to 30 cents of wander through a held note with no vibrato asked, from the
+  motion plan's smoothness term (PLAN_EPS 0.05) rounding the pitch line as it does the formants. Speech wants
+  that; a sung note is to hold still.
+- Change: `Synth::setPitchSmoothing(eps)` (puhuja.h) and `planPitchEps_`, used in `planSentence` (puhuja.cc) for
+  the pitch channel only when >= 0. Default -1: PLAN_EPS for all four channels, speech bit for bit as before.
+  pajupilli's singers pass 0.001 (PJ_SINGER_PITCH_EPS).
+- Judged by: E5, B5, E5 on "dah", 0.55 s each, the pitch every 40 ms: the middle of each note within 30 cents
+  before, within 7 after. (The plan's pitch speed limit and its tolerance changed nothing there.)
+- With it `Synth::setPitchDrift(x)` (puhuja.h; `pitchDriftX_` in the per-cycle drift, puhuja.cc): the speaker's slow
+  random pitch drift (kPitchDrift, 1.2 %) x this, 1 by default (speech unchanged); pajupilli's singers pass 0.3
+  (PJ_SINGER_DRIFT). In a song the middle half of the soprano's long notes wandered 8.3 cents with 1, 6.8 with
+  0.5, 6.2 with 0.
+- For puhuja: the plan also makes a pitch move three to four times as long as `Shape::sungAt` and `sungEndAt`
+  ask (35 ms asked, 120 ms heard, the pitch keyframes being sparse); pajupilli now asks for 8 ms. A sung
+  vowel's pitch anchors should be keyframes of their own.
+
+### 2026-11-26: the tongue's body forward or back (a second-resonance control for singing)
+- Motivation: the author: "this tuned resonance I like very much, let's build a second resonance for the octave
+  partial -- build a control for a plausible second resonance". On the line tract `Shape::f2` has no effect, and
+  the expression line could only open the mouth (the first resonance) or go to the neutral vowel. A soprano's
+  partials 2 to 4 lay 19 dB under her fundamental in a song.
+- Change: `Synth::Expr::front` (puhuja.h), followed like `open`; at `lineShapePlanned:` (puhuja.cc), after the
+  neutral and open mixes: the pharynx's area x exp(k front) and the mouth cavity's / exp(k front) (k = ln 1.8,
+  LINE_FRONT_LOG), the tongue constriction's place + 0.08 front of the length (LINE_FRONT_X), front limited to
+  -1 .. 1. 0, the default: nothing, speech unchanged.
+- Why this gesture: it is what a tongue does. Its body is one mass between the pharynx and the mouth: forward, it
+  leaves room behind and takes it in front; the two cavities' areas change oppositely and the constriction goes
+  with it. In a two-cavity tract that is the classical lever on the second resonance (the front cavity's), with
+  the first moved less. No area is invented: the two cavities' product is kept.
+- Judged by: held notes. A low voice on G2, the resonances read off the partials: "ee" second resonance about
+  1800 Hz at -1, 2070 at -0.5, 2700 and up at +1 (the first 460 down to 200); "oo" 840 to 1400; "ah" only 1140
+  to 1250 (its constriction is weak). Soprano, overtones 2 to 4 against the fundamental with front +1 against
+  0: "ah" F#5 to D6 +6 to +14 dB; "oo" G#4 to D6 +5 to +21; "ee" G#5 to C6 +2 to +5. With -1 her low "ee" and
+  "oo" (C4 to F#4) gain 15 to 22 dB, mostly by the first resonance rising (the vowel darker). Not judged by ear.
+- For puhuja: a real tongue model (the body's place and height as two numbers, the areas following) would give
+  this and `open` from one mechanism; the resonances should be computed from the area function so that a
+  singer can ask for "the second resonance at 2 f0" and not for a tongue position found by trial.
+
+### 2026-11-26: the tract shield, for puhuja to explore in speech
+The author asked for the shield to be described for puhuja and for its physical plausibility. This is that note;
+no code beyond the entry "the folds shielded from the tract's sound pressure" above.
+
+What the model does. A layer of the string folds is pushed sideways by the pressure on its medial surface times
+that surface (STRING_KAPPA). Upstream of the narrowest point that pressure is the subglottal one; downstream of
+it, and on the upper layer when the folds are shut, it is p1, the sound pressure in the tract's first section,
+taken whole (string.cc, `p = j < jClosed ? in.ps : in.p1`). Nothing presses back. The shield takes
+`share x lowpass(p1, hz)` off every layer's pressure. The flow equation is not touched: the air through the
+glottis is still driven by `ps - p1` in full.
+
+What it cures. Where the pitch meets the tract's first resonance, p1 at the pitch's own frequency is large and
+turns from in step with the flow to against it within a semitone or two. Acting whole on the tissue it throws
+the folds into an uneven swing about a semitone flat. Held soprano notes with the harmonics under 15 dB over
+the rest, of 27 from C4 to D6 on "ah", "ee", "oo": unshielded 3, 8, 8; share 0.5 at 3 kHz 0, 4, 7; 0.75 at
+8 kHz 0, 0, 3; 1 at 8 kHz 3, 3, 5 (too much is worse again). In a song: worst tenth of notes 66 cents off
+unshielded, 20 with 0.5 or 0.75.
+
+Why it may be physical, and where it is not.
+- A fold is not a wall with air on one side. Above and beside its upper part lies the laryngeal ventricle, an
+  air space open to the tract just above the folds. Being small it follows the tract's pressure there up to a
+  few kHz. So the same p1 that pushes the fold's upper medial surface outward also presses on its upper and
+  outer surface from the ventricle, inward and down. Sideways, the two largely cancel: a fold immersed in p1
+  feels the pressure drop across the glottis and little of p1 itself. This is the argument of the existing
+  STRING_P1SUP note, there applied only to the slow part (10 Hz, the mouth pressurised in b d g); the ventricle
+  does not stop following at 10 Hz, so the argument holds for the sound as well.
+- The cancelling cannot be whole. The surfaces differ in size and direction, the ventricle's opening has its own
+  inertance, and the lower (body) layer is not reached from above at all. A share between a half and nine
+  tenths is what the geometry allows; 0.75 is fitted by ear and by the counts above, not derived.
+- Downstream of where the jet leaves the wall the pressure on the medial surface is near p1, but upstream of
+  that point it is set by the flow (Bernoulli) and not by p1. The model gives p1 to the whole downstream part;
+  that overstates p1's hold on the tissue, in the same direction as the shield corrects.
+- The flow's coupling to the tract is kept on purpose. The tract's inertance skewing the flow pulse is what
+  gives a voice its power and is well measured; only the tissue's direct push from p1 is reduced. Real voices
+  do break where pitch crosses the first resonance (untrained singers, children); trained ones avoid it by
+  moving the resonance. So some of the unshielded behaviour is real, and its size here was not.
+- Not physical as built: the share is taken off all layers, also the upstream ones that never see p1 (for them
+  it is a small wrong force, s x p1 against ps); and the corner frequency stands for the ventricle's own
+  resonance without modelling it.
+
+What to try in speech.
+1. Shares 0.25, 0.5, 0.75 with the corner at 1, 3 and 8 kHz, against the male b d g voice bars (they died with
+   share 1 and a fast fall), the voiceless fricatives' hiss (0.8 dB weaker with the slow share 1) and the
+   aspiration after t and s.
+2. The female voice on close vowels at accent peaks: her pitch (250 to 350 Hz) meets the first resonance of
+   "ee" and "oo" there, the case this cures in singing. Look for rough or flat "ee"/"oo" under accents.
+3. The more physical form: take the share off the downstream surfaces only, and give the ventricle its own
+   small volume and neck (a Helmholtz side branch at the tract's first section) so that the corner and the
+   share follow from two lengths and an area instead of two knobs.
+4. Keep the slow share (STRING_P1SUP, 10 Hz) apart from the fast one: they answer different questions (a
+   pressurised mouth, a resonance at the pitch) and may want different values.
 
 ## The form of an entry
 

@@ -231,9 +231,10 @@ float StringFolds::step(float h, const VocalFolds::Input& in) {
   }
   area_ = aOld;
   const float drive = in.ps - in.p1;
-  if (h != p1LpH_) p1LpH_ = h, p1LpA_ = 1.0f - std::exp(-2.0f * kPi * kP1SupHz * h);
+  const float supHz = in.shield >= 0 ? in.shieldHz : kP1SupHz;  // (Input::shield: a singer's own share and corner)
+  if (h != p1LpH_ || supHz != p1LpHz_) p1LpH_ = h, p1LpHz_ = supHz, p1LpA_ = 1.0f - std::exp(-2.0f * kPi * supHz * h);
   p1Lp_ += p1LpA_ * (in.p1 - p1Lp_);
-  const float pRef = kP1Sup * p1Lp_;  // (0 by default: the layers' pressures as before, bit for bit)
+  const float pRef = (in.shield >= 0 ? in.shield : kP1Sup) * p1Lp_;  // (0 by default: the layers' pressures as before, bit for bit)
   // Flow per lane channel: implicit step of Lg du/dt = drive - rho/2 u^2 / a^2
   // (u >= 0), each channel with kMoving times the glottal inertance (in
   // parallel they add up to it). The heard flow goes through the rounded area.

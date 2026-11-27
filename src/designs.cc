@@ -642,11 +642,30 @@ const NoteInfo kOcarinaNotes[] = {
 };
 const Design kOcarinaDesign = {kOcarinaBore, 2, kOcarinaHoles, 12, kOcarinaNotes, 3.73, 70.4, true, nullptr, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0.0009, 0.01, 0.0045, 0.01, 0.003, 0.02, 0.00015, 400, 7000}};
 
-// Pan flute (nai), chromatic, G4..C7
+// Pan flute (nai, toyo), chromatic, C3..C7
 // One stopped pipe per note, blown across the rim.
 const BorePoint kPanfluteBore[] = {
     {0.0, 15.00}, {1000.0, 15.00}};
 const NoteInfo kPanfluteNotes[] = {
+    {"", 1},  // 48 C3 (+0 c passive)
+    {"", 1},  // 49 C#3 (+0 c passive)
+    {"", 1},  // 50 D3 (+0 c passive)
+    {"", 1},  // 51 D#3 (+0 c passive)
+    {"", 1},  // 52 E3 (+0 c passive)
+    {"", 1},  // 53 F3 (+0 c passive)
+    {"", 1},  // 54 F#3 (+0 c passive)
+    {"", 1},  // 55 G3 (+0 c passive)
+    {"", 1},  // 56 G#3 (+0 c passive)
+    {"", 1},  // 57 A3 (+0 c passive)
+    {"", 1},  // 58 A#3 (+0 c passive)
+    {"", 1},  // 59 B3 (+0 c passive)
+    {"", 1},  // 60 C4 (+0 c passive)
+    {"", 1},  // 61 C#4 (+0 c passive)
+    {"", 1},  // 62 D4 (+0 c passive)
+    {"", 1},  // 63 D#4 (+0 c passive)
+    {"", 1},  // 64 E4 (+0 c passive)
+    {"", 1},  // 65 F4 (+0 c passive)
+    {"", 1},  // 66 F#4 (+0 c passive)
     {"", 1},  // 67 G4 (+0 c passive)
     {"", 1},  // 68 G#4 (+0 c passive)
     {"", 1},  // 69 A4 (+0 c passive)
@@ -679,6 +698,25 @@ const NoteInfo kPanfluteNotes[] = {
     {"", 1},  // 96 C7 (+0 c passive)
 };
 const PipeDef kPanflutePipes[] = {
+    {48, 630.09, 25.94},
+    {49, 594.18, 25.21},
+    {50, 560.30, 24.49},
+    {51, 528.34, 23.79},
+    {52, 498.20, 23.12},
+    {53, 469.76, 22.46},
+    {54, 442.93, 21.82},
+    {55, 417.63, 21.20},
+    {56, 393.76, 20.60},
+    {57, 371.24, 20.01},
+    {58, 350.01, 19.44},
+    {59, 329.98, 18.89},
+    {60, 311.08, 18.36},
+    {61, 293.12, 17.83},
+    {62, 276.17, 17.33},
+    {63, 260.19, 16.83},
+    {64, 245.12, 16.36},
+    {65, 230.90, 15.89},
+    {66, 217.49, 15.44},
     {67, 205.29, 15.00},
     {68, 193.13, 14.57},
     {69, 181.67, 14.16},
@@ -709,7 +747,7 @@ const PipeDef kPanflutePipes[] = {
     {94, 35.16, 6.89},
     {95, 32.64, 6.69},
     {96, 30.27, 6.50}};
-const Design kPanfluteDesign = {kPanfluteBore, 2, nullptr, 0, kPanfluteNotes, 1.87, 200.0, true, kPanflutePipes, 30, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0.0005, 0, 0, 0, 0}};
+const Design kPanfluteDesign = {kPanfluteBore, 2, nullptr, 0, kPanfluteNotes, 1.87, 200.0, true, kPanflutePipes, 49, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0.0005, 0, 0, 0, 0}};
 
 // Blown bottles (one per note), C4..C6
 // One bottle per note, blown across the neck (a Helmholtz resonator).
@@ -1049,7 +1087,7 @@ extern const Instrument kDesigned[] = {
     {"whistle", 0, 74, 93, 1, 1, 0.8, 96000, 0, false, false, 0, 0.8, Kind::kDuct, &kWhistleDesign, "whistle"},
     {"shakuhachi", 0, 62, 85, 1, 1, 1.3, 48000, 0, false, false, 0, 1, Kind::kEndBlown, &kShakuhachiDesign, "shakuhachi"},
     {"ocarina", 0, 69, 89, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kDuct, &kOcarinaDesign, "ocarina"},
-    {"panflute", 0, 67, 96, 1, 1, 0.8, 96000, 0, false, false, 0, 1, Kind::kEndBlown, &kPanfluteDesign, "panflute"},
+    {"panflute", 0, 48, 96, 1, 1, 0.8, 96000, 0, false, false, 0, 1, Kind::kEndBlown, &kPanfluteDesign, "panflute"},
     {"bottle", 0, 60, 84, 1, 1, 1, 96000, 0, false, false, 0, 1, Kind::kEndBlown, &kBottleDesign, "bottle"},
     {"soprano-sax", -2, 58, 86, 0.666667, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kSopranoSaxDesign, "sax"},
     {"alto-sax", -9, 58, 87, 1, 1, 1, 48000, 0, false, false, 0, 0.5, Kind::kReed, &kAltoSaxDesign, "sax"},

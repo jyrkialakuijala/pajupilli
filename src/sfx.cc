@@ -19,8 +19,8 @@ double hz(double midi) { return 440 * std::exp2((midi - 69) / 12); }
 // 1.8 % apart), the ball striking at 20 deg (big) or 35 deg (small) from
 // the pair's axes (cos m phi, sin m phi); radiation as a multipole of order
 // m-1 at ka (a = 35, 30 mm) its efficiency (ka)^(m-1) / (1 + (ka)^(m-1)).
-// Q ~1000 (the steel's, the stud's). The small gong ~1.19 x the big one's
-// pitch (no measurement found: a ringer's familiar clash).
+// Q ~1000 (the steel's, the stud's). The small gong tuned a minor third over
+// the big one (tuneGongs scales its table to exactly 2^(3/12)).
 const float kGong[2][16][4] = {
     {{1177.6f, 2.266f, 0.766f, 0.430f}, {1182.4f, 2.134f, 0.643f, 0.431f},
      {3223.5f, 0.978f, 0.375f, 0.810f}, {3242.9f, 0.921f, 0.650f, 0.812f},
@@ -39,12 +39,20 @@ const float kGong[2][16][4] = {
      {11808.3f, 0.258f, -0.349f, 0.999f}, {11950.8f, 0.242f, 0.031f, 0.999f},
      {13776.5f, 0.206f, -0.199f, 1.000f}, {14026.7f, 0.194f, 0.017f, 1.000f}}};
 
-// The ringer's armature and clapper: the ball and the arm's inertia at the
-// ball (12 g) on the armature's spring (resonant ~18 Hz, just under the ring
-// current's 20: a ringer is built to swing with it), lightly damped; the
-// gongs 1.2 mm either side of its rest; each gong's modal mass at the rim
-// (8 g); steel ball (6 mm) on steel: Hertz K = 4/3 E* sqrt(R) ~ 8e9.
-constexpr double kClapM = 0.012, kClapF0 = 18, kClapZeta = 0.1, kGap = 2e-3, kGongM = 0.008, kBallK = 8e9;
+// The ringer's armature and its arm: the solenoid's armature (its inertia
+// at the ball, 20 g) on its spring (~19 Hz, near the ring current's 20: a
+// ringer is built to swing with it), lightly damped (zeta 0.03: it takes
+// some cycles to build up); the long, thin arm a spring of its own (the ball,
+// 4 g, on it ~60 Hz against the armature, zeta 0.02), so the ball bounces off
+// one gong and flies to the other as it will, now and then striking twice.
+// The ball rests 1.5 mm from the gongs on average, nearer the big one (a 30 %
+// asymmetry: the first strokes, before the swing is built, only reach it);
+// each gong's modal mass at the rim (8 g); steel ball (6 mm) on steel: Hertz
+// K = 4/3 E* sqrt(R) ~ 8e9.
+constexpr double kArmM = 0.020, kArmF0 = 19, kArmZeta = 0.03, kBallM = 0.004, kBallF0 = 60, kBallZeta = 0.02;
+constexpr double kGap = 1.5e-3, kGapAsym = 0.3, kGongM = 0.008, kBallK = 8e9;
+// The small gong's (2,0) a minor third over the big one's: 2^(3/12).
+constexpr double kMinorThird = 1.1892071150027210;
 
 // F = K (c0 - G F)^1.5 (the contact's force through this step: c0 the
 // overlap without it, G how far a unit force moves the two apart).
@@ -69,7 +77,8 @@ void Sfx::tuneGongs(double scale) {
   for (int g = 0; g < 2; ++g) {
     Gong& G = gong_[g];
     for (int k = 0; k < Gong::kN; ++k) {
-      const double f = kGong[g][k][0] * scale, t60 = kGong[g][k][1] / std::sqrt(scale);
+      const double tune = g ? kMinorThird * kGong[0][0][0] / kGong[1][0][0] : 1;
+      const double f = kGong[g][k][0] * scale * tune, t60 = kGong[g][k][1] / std::sqrt(scale * tune);
       const double w = 2 * M_PI * std::min(f, 0.45 * fs_), s = 6.907755 / t60;
       const double wd = std::sqrt(std::max(w * w - s * s, 1e-6)), e = std::exp(-s * dt_);
       const double c = std::cos(wd * dt_), sn = std::sin(wd * dt_);
@@ -208,7 +217,7 @@ void Sfx::reset() {
     std::fill(g.q, g.q + Gong::kN, 0.0f);
     std::fill(g.v, g.v + Gong::kN, 0.0f);
   }
-  clapX_ = clapV_ = ringEnv_ = 0;
+  armX_ = armV_ = ballX_ = ballV_ = ringEnv_ = 0;
 }
 
 bool Sfx::applauding() const {
@@ -437,19 +446,23 @@ float Sfx::sample(float* side) {
     case kPhone: {
       // The ring current: 20 Hz, 2 s on and 4 s off, through the ringer's
       // capacitor and coils (its envelope builds and dies in ~15 ms); its
-      // force on the armature (a polarised ringer: as the current), stronger
-      // for a harder key (the line's ringing voltage).
+      // force on the armature (a polarised ringer: as the current).
       if (held_) ringT_ += dt_;
       const bool on = held_ && std::fmod(ringT_, 6.0) < 2.0;
       ringEnv_ += (1 - std::exp(-dt_ / 0.015)) * ((on ? 1.0 : 0.0) - ringEnv_);
       ringPh_ = std::fmod(ringPh_ + 20 * dt_, 1.0);
-      const double wc = 2 * M_PI * kClapF0;
-      const double Fd = (0.3 + 0.9 * vel_) * ringEnv_ * std::sin(2 * M_PI * ringPh_);
-      const double Fc = Fd - kClapM * wc * wc * clapX_ - 2 * kClapZeta * kClapM * wc * clapV_;
-      // The clapper through this step without the gongs, each gong's rim
-      // where the ball strikes without the ball; the contacts solved with
-      // the step (a steel ball on a steel rim: ~0.1 ms).
-      const double v1 = clapV_ + Fc / kClapM * dt_, x1 = clapX_ + v1 * dt_;
+      // (Stronger for a harder key, the line's ringing voltage: a soft one
+      // barely builds the swing, a hard one locks into it in ~0.1 s.)
+      const double Fd = (0.095 + 0.125 * vel_) * ringEnv_ * std::sin(2 * M_PI * ringPh_);
+      const double wa = 2 * M_PI * kArmF0, wb = 2 * M_PI * kBallF0;
+      // The arm's spring between the armature and the ball.
+      const double Fs = kBallM * wb * wb * (ballX_ - armX_) + 2 * kBallZeta * kBallM * wb * (ballV_ - armV_);
+      armV_ += (Fd - kArmM * wa * wa * armX_ - 2 * kArmZeta * kArmM * wa * armV_ + Fs) / kArmM * dt_;
+      armX_ += armV_ * dt_;
+      // The ball through this step without the gongs, each gong's rim where
+      // the ball strikes without the ball; the contacts solved with the step
+      // (a steel ball on a steel rim: ~0.1 ms).
+      const double v1 = ballV_ - Fs / kBallM * dt_, x1 = ballX_ + v1 * dt_;
       double F[2];
       for (int g = 0; g < 2; ++g) {
         Gong& G = gong_[g];
@@ -458,11 +471,12 @@ float Sfx::sample(float* side) {
           y += G.exc[k] * (G.c00[k] * G.q[k] + G.c01[k] * G.v[k]);
           cg += G.exc[k] * G.exc[k] * G.c01[k];
         }
-        const double over = (g == 0 ? x1 : -x1) - (kGap + y);
-        F[g] = hertz(over, cg * dt_ / kGongM + dt_ * dt_ / kClapM, kBallK);
+        const double gap = kGap * (g == 0 ? 1 - kGapAsym : 1 + kGapAsym);
+        const double over = (g == 0 ? x1 : -x1) - (gap + y);
+        F[g] = hertz(over, cg * dt_ / kGongM + dt_ * dt_ / kBallM, kBallK);
       }
-      clapV_ = v1 - (F[0] - F[1]) / kClapM * dt_;
-      clapX_ += clapV_ * dt_;
+      ballV_ = v1 - (F[0] - F[1]) / kBallM * dt_;
+      ballX_ += ballV_ * dt_;
       for (int g = 0; g < 2; ++g) {
         Gong& G = gong_[g];
         const float imp = float(F[g] * dt_ / kGongM);
@@ -478,8 +492,8 @@ float Sfx::sample(float* side) {
         y += 0.5f * o;
         sd += g ? 0.15f * o : -0.15f * o;
       }
-      y *= 0.38f;
-      sd *= 0.38f;
+      y *= 0.95f;
+      sd *= 0.95f;
       break;
     }
     case kHeli: {

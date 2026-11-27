@@ -33,7 +33,7 @@ namespace pajupilli {
 
 enum BandFamily {
   kBandPiano, kBandPluck, kBandMallet, kBandBell, kBandOrgan, kBandChoir, kBandFlute,
-  kBandStrings, kBandBrass, kBandReed, kBandClarinet, kBandBass, kBandOther, kBandNone
+  kBandStrings, kBandBrass, kBandReed, kBandClarinet, kBandBass, kBandChime, kBandOther, kBandNone
 };
 
 struct BandNote {
@@ -45,6 +45,7 @@ struct BandNote {
   int fam = kBandOther;
   bool down = true;   // its key still down
   bool kept = false;  // let go under the sustain pedal (or a family that rings on)
+  bool rings = false; // rings on after its key, whatever its family (SoundingSet::on)
   double at = 0;      // when it began (s, the set's clock)
   bool byEar = false; // its part tunes it by ear (heard in order: above)
   bool wind = false;  // ... a wind's (its cents in the winds' common healing: drift())
@@ -54,7 +55,8 @@ struct BandNote {
 class SoundingSet {
  public:
   // ear: 0 a fixed pitch, 1 tuned by ear (the fretless), 2 a wind by ear.
-  void on(int ch, int key, int pitch, int velocity, int fam, int ear = 0);
+  // rings: the note rings on after its key whatever its family (a koto's strings: nothing stops them).
+  void on(int ch, int key, int pitch, int velocity, int fam, int ear = 0, bool rings = false);
   void off(int ch, int key);
   void pedal(int ch, bool down);
   void step(double dt);              // the ringing notes fall; the faint leave
@@ -85,6 +87,9 @@ int bandFamily(const char* family, const char* name);
 // Partial k's amplitude (k >= 1) in family fam's template at fundamental f0 (Hz); 0: none. Not
 // normalised.
 double bandPartial(int fam, double f0, int k);
+// Where partial k lies, x f0: k, but for the inharmonic (kBandChime: the tubular bells' tubes,
+// from C4 to G5, and their church and carillon bells below and above; research/tubular_bells.md 9).
+double bandRatio(int fam, double f0, int k);
 // The band's pull on a listener's note (research/fretless_bass.md 7.5, 7.6): its own partials
 // against each other note's template, each pair within 36 c pulling by the weaker one's level x
 // exp(-(delta/20 c)^2) / (the higher harmonic number)^2, a faded note the less (its level x4, at
@@ -102,6 +107,9 @@ struct BandListener {
   int np = 0;                  // (at most 32)
   double at = -1;              // its onset (the set's clock)
   int pitch = 0;
+  // Its own part's other notes heard too (a koto's ringing strings, as an organ's pipes): those
+  // before it in the order of hearing; the note itself (same pitch, begun within 35 ms) left out.
+  bool hearOwn = false;
 };
 // (earWeight: the part of the weight from notes tuned by ear, if asked.)
 double bandPull(const SoundingSet& band, const BandListener& me, double* weight, double* earWeight = nullptr);

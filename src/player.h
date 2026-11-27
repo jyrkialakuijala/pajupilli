@@ -50,7 +50,7 @@ class Player : public Performer {
   int held_[128] = {};
   int stackTop_ = 0, stack_[16];
   double kFace_ = 1;
-  double kW_, kY0_, kY0Exp_, kP_, kVibThroat_, breath_;
+  double kW_, kY0_, kY0Exp_, kPipeLips_, kP_, kVibThroat_, breath_;
   double glottisClock_ = 1e9;
   Vibrato vib_;  // its own vibrato (performer.h)
   double lung_ = 0;

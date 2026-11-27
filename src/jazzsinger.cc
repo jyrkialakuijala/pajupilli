@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <complex>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,7 @@ using puhuja::Ph;
 using puhuja::Synth;
 
 constexpr double kFs = 48000;
+constexpr double kLn10 = 2.302585092994046;  // (10^x as exp(kLn10 x): a decibel value to a gain without std::pow)
 // Where the voice holds its pitch (measured, the male voice with the tightened controller: the
 // middle of every vowel within 13 c from D2 to C4; above, the folds leave the pitch asked).
 // The voices (the author, 2026-11-26: the folds' mass chosen by the singer's range, and changed in a
@@ -44,20 +46,30 @@ constexpr double kFs = 48000;
 // 0.9; the men likewise, a bass a little past the usual man). puhuja's female voice has the
 // resonances 12 to 15 % higher, her glottal chink, nasal passage and output; tractCm then only
 // trims the length.
-// (mass, kneeHz, power: the best of 80 tried for each voice, ./pajupilli -singer-voices, 2026-11-26.
-// They matter little: every setting tried sang every note; the misses differ by a few cents.)
-struct VoiceType { const char* name; int lo, hi; float mass, kneeHz, power, tractCm; float woman = 0; };
+// The registers (the author's table, 2026-11-26): each voice has a chest range, a crossover zone
+// between two pivots and a head range above it:
+//   bass       chest E2-G3,  crossover G3-C4,  head C4-F4      baritone  G2-B3,  B3-E4,  E4-A4
+//   tenor      chest C3-D4,  crossover D4-G4,  head G4-C5      contralto F3-G4,  G4-C5,  C5-F5
+//   mezzo      chest A3-B4,  crossover B4-E5,  head E5-A5      soprano   C4-D5,  D5-G5,  G5-C6
+// kneeHz is the lower pivot (the primo passaggio: to there the whole fold swings), knee2Hz the
+// upper (the secondo); through the zone the mass falls as (kneeHz / pitch)^2, the stiffness no
+// longer growing, and above it as (knee2Hz / pitch)^1.5. The whole fold has to carry the pitch up
+// to the lower pivot, so a voice whose chest goes higher has lighter folds: the model's folds at
+// mass 1 hold to about D4, at 0.5 to G#4, at 0.25 to C5 (measured), hence the women's 0.45 to
+// 0.18 here, lighter than their anatomy alone says. (An earlier search of mass, pivot and power,
+// -singer-voices, found every setting tried singing every note, the misses a few cents apart.)
+struct VoiceType { const char* name; int lo, hi; float mass, kneeHz, power, tractCm; float woman = 0; float knee2Hz = 0; };
 const VoiceType kVoices[] = {
     // (a basso profondo: the longest and heaviest folds, the longest tract; down to A1)
-    {"profondo", 33, 57, 1.4f, 196, 1.5f, 1.4f, -0.15f},
-    {"bass", 40, 64, 1.15f, 220, 1.5f, 0.9f, -0.1f},
-    {"baritone", 38, 67, 1.0f, 247, 1.5f, 0.6f, 0},
-    {"tenor", 48, 72, 1.19f, 206, 1.5f, 0.2f, 0.1f},
-    {"countertenor", 52, 76, 1.26f, 165, 1.5f, 0.2f, 0.1f},
-    {"contralto", 53, 77, 0.87f, 231, 1.5f, 0.6f, 0.9f},
-    {"mezzo", 57, 81, 0.57f, 349, 2.0f, 0.4f, 1.0f},
-    {"soprano", 60, 84, 0.70f, 259, 1.5f, 0.3f, 1.1f},
-    {"coloratura", 60, 89, 0.47f, 370, 1.5f, 0.2f, 1.15f},
+    {"profondo", 33, 57, 1.4f, 165, 2.0f, 1.4f, -0.15f, 220},
+    {"bass", 40, 65, 1.15f, 196, 2.0f, 0.9f, -0.1f, 262},
+    {"baritone", 38, 67, 1.0f, 247, 2.0f, 0.6f, 0, 330},
+    {"tenor", 48, 72, 0.8f, 294, 2.0f, 0.2f, 0.1f, 392},
+    {"countertenor", 52, 76, 0.9f, 165, 2.0f, 0.2f, 0.1f, 220},
+    {"contralto", 53, 77, 0.45f, 392, 2.0f, 0.6f, 0.9f, 523},
+    {"mezzo", 57, 81, 0.28f, 494, 2.0f, 0.4f, 1.0f, 659},
+    {"soprano", 60, 84, 0.16f, 587, 2.0f, 0.3f, 1.1f, 784},
+    {"coloratura", 60, 89, 0.18f, 622, 2.0f, 0.2f, 1.15f, 831},
 };
 constexpr int kNVoices = int(sizeof(kVoices) / sizeof(kVoices[0]));
 constexpr int kMapPad = 4;  // (the tension is learnt this many semitones past the range, both ways)
@@ -119,9 +131,10 @@ const char* spell(char nucleus) {
 // The voice as the singer uses it: puhuja's default speaker (string folds, line tract), with the
 // singer's pitch control and larynx.
 const VoiceType* gVoiceTry = nullptr;  // (the practice: a voice's folds being tried out)
-void voice(Synth& s, const VoiceType& vt, const std::vector<float>* map) {
+void voice(Synth& s, const VoiceType& vt, const std::vector<float>* map, float larynxCm = 0) {
   static const bool kWoman = knobD("PJ_SINGER_WOMAN", 1) > 0;
-  if (vt.woman != 0 && kWoman) s.setVoiceBlend(vt.woman);
+  static const float kBlendAdd = float(knobD("PJ_SINGER_BLEND_ADD", 0));  // (a trial knob: the voice moved along the male-female line)
+  if (vt.woman != 0 && kWoman) s.setVoiceBlend(vt.woman + kBlendAdd);
   s.setCarrier(puhuja::Carrier::String);
   s.setFormantMotion(puhuja::FormantMotion::Planned);
   s.setTract(puhuja::Tract::Line);
@@ -137,9 +150,25 @@ void voice(Synth& s, const VoiceType& vt, const std::vector<float>* map) {
   s.setPitchControl(kShare, kVib);
   // (the larynx low and still: 0.6 cm longer a tract, no rise in s k g r; to be set by ear)
   static const float kLarynxLow = float(knobD("PJ_SINGER_LARYNX_LOW", 0.6)), kLarynxRaise = float(knobD("PJ_SINGER_LARYNX_RAISE", 0));
-  s.setLarynx(vt.tractCm + (kLarynxLow - 0.6f), kLarynxRaise);
+  s.setLarynx(vt.tractCm + (kLarynxLow - 0.6f) + larynxCm, kLarynxRaise);
   static const float kMassX = float(knobD("PJ_SINGER_FOLD_MASS", 1)), kPower = float(knobD("PJ_SINGER_FOLD_POWER", 0));
-  s.setFoldMass(vt.mass * kMassX, vt.kneeHz, kPower > 0 ? kPower : vt.power);
+  static const float kKneeX = float(knobD("PJ_SINGER_KNEE_X", 1)), kPower2 = float(knobD("PJ_SINGER_FOLD_POWER2", 1.5));
+  s.setFoldMass(vt.mass * kMassX, vt.kneeHz * kKneeX, kPower > 0 ? kPower : vt.power, vt.knee2Hz * kKneeX, kPower2);
+  // The folds shielded from half of the mouth's sound pressure (2026-11-26): where the sung pitch met the vowel's
+  // first resonance ("ah" at G#5 and A5, "ee" at E4, "oo" at F4) the folds broke into a rough swing a semitone
+  // flat, which no mass, closure or breath cured. PJ_SINGER_SHIELD=-1: the folds as the speaker has them.
+  // (0.5 at 3000 Hz at first; the author: "sounds much better, but still a little screechy ... perhaps go down to
+  // 25 %": with a quarter of the pressure left on the folds and the corner at 8000 Hz no held "ah" or "ee" from
+  // C4 to D6 is rough any more; what is left, "oo" at E5 to F#5, the practice sings with the mouth opened.)
+  static const float kShield = float(knobD("PJ_SINGER_SHIELD", 0.75)), kShieldHz = float(knobD("PJ_SINGER_SHIELD_HZ", 8000));
+  s.setTractShield(kShield, kShieldHz);
+  // (a held note holds still: the pitch line planned with little smoothing, or it wandered 20 to 30 cents)
+  static const float kPitchEps = float(knobD("PJ_SINGER_PITCH_EPS", 0.0002));
+  s.setPitchSmoothing(kPitchEps);
+  // (the speaker's slow random pitch drift, about 20 cents: a third of it left; with the lighter folds of the
+  // soprano, 0.16 for 0.2, the middle of her long notes wanders 4 cents for 8 and her vowels are 3 dB cleaner)
+  static const float kDrift = float(knobD("PJ_SINGER_DRIFT", 0.3));
+  s.setPitchDrift(kDrift);
   if (map && !map->empty()) s.setTensionMap(float(440 * std::exp2((vt.lo - kMapPad - 69) / 12.0)), *map);
 }
 
@@ -965,6 +994,24 @@ void JazzSinger::weigh(Style style) {
         note_[i].on += kLayback;
         if (i > 0 && note_[i - 1].off > note_[i].on - 0.03) note_[i - 1].off = std::max(note_[i - 1].off, note_[i].on);
       }
+  // The vowel on the beat (the author, 2026-11-26: "the singer should not try to start the consonant at the note
+  // begin, but earlier -- note begin is when the vowel should already ring", and: "only start early if there is a
+  // consonant to sing first, and try to be that much early as needed to reach the first vowel"). The consonant
+  // already lies before the written start and the vowel begins on it; but after a consonant the voice is not
+  // there when its vowel begins: in a song it reached half its level 14 ms (soprano) to 28 ms (baritone) after
+  // the written start. So a note that begins with a consonant is sung that much sooner (PJ_SINGER_EARLY_MS: 15
+  // for a woman's voice, 28 for a man's, x PJ_SINGER_EARLY); a note with none, a slur or a bare vowel, is not moved.
+  static const double kEarlyX = knobD("PJ_SINGER_EARLY", 1), kEarlyMs = knobD("PJ_SINGER_EARLY_MS", 0);
+  if (kEarlyX > 0 && int(syl_.size()) == n) {
+    const double e = kEarlyX * (kEarlyMs > 0 ? kEarlyMs : kVoices[voice_].woman >= 0.5f ? 15.0 : 28.0) * 1e-3;
+    for (int i = 0; i < n; ++i) {
+      if (!syl_[i].cons[0]) continue;
+      const double on = std::max(note_[i].on - e, i > 0 ? note_[i - 1].on + 0.03 : 0.0);
+      if (on >= note_[i].on) continue;
+      note_[i].on = on;
+      if (i > 0 && note_[i - 1].off > on) note_[i - 1].off = on;
+    }
+  }
 }
 
 bool JazzSinger::setVoice(const std::string& name) {
@@ -1005,8 +1052,16 @@ std::string JazzSinger::weighted() const {
 std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& vowelMs, const std::vector<double>& restMs,
                                     const std::vector<double>& sungAt, std::vector<double>* vowelAt, double* lead) const {
   Synth s{float(kFs)};
+  // The school (the author, 2026-11-26: the same apparatus, shaped by the tradition). The classical
+  // European way: the larynx low, the tract long, dark and round, a vibrato all through the note.
+  // The way jazz has from the African traditions: the larynx at speech level (the tract
+  // PJ_SINGER_JAZZ_LARYNX cm, -0.5, shorter: brighter, forward, the words' own vowels), the tone
+  // straight and locked, the vibrato an ornament late in a note. (Not here yet: the twang of a
+  // narrowed epilarynx, and nasal colour.)
+  static const float kJazzLarynx = float(knobD("PJ_SINGER_JAZZ_LARYNX", -0.5));
+  const bool jazzSchool = style_ == kJazz || style_ == kBebop || style_ == kBallad || style_ == kFolk;
   if (gVoiceTry) voice(s, *gVoiceTry, nullptr);
-  else voice(s, kVoices[voice_], &tensionMap(voice_));
+  else voice(s, kVoices[voice_], &tensionMap(voice_), jazzSchool && !noLevel_ ? kJazzLarynx : 0.0f);
   std::vector<int> keys;
   for (int i = p.first; i < p.first + p.count; ++i) keys.push_back(note_[i].key);
   std::sort(keys.begin(), keys.end());
@@ -1016,14 +1071,21 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
   std::vector<int> ncons(p.count, 0);
   // The way into each note from the one before (practised; none after a rest, where a note starts anew).
   std::vector<Way> way(p.count);
+  // (trial knobs: how much of a practised note's breath, as a power, and of its mouth opening is used)
+  static const double kRowPress = knobD("PJ_SINGER_ROW_PRESS", 1), kRowOpen = knobD("PJ_SINGER_ROW_OPEN", 1);
   std::vector<char> hasWay(p.count, 0);
-  std::vector<const SingerTrim*> noteRow(p.count, nullptr);
+  std::vector<const SingerTrim*> noteRow(p.count, nullptr), levelRow(p.count, nullptr);
+  // What of the practice is used in a song (PJ_SINGER_TABLE). 1, the default: only how loud each note comes out
+  // on each vowel sung plainly, which evens the vowels after the voice. 2: also each note's pitch trim, breath
+  // and mouth opening and the intervals' ways. Those are practised on half-second notes; on a song's short ones
+  // every one of them put the soprano out of tune (median miss 3.5 c without, 13 c with; 2026-11-26).
+  static const int kTable = int(knobD("PJ_SINGER_TABLE", 1));
   for (int j = 1; j < p.count; ++j) {
     if (restMs[j - 1] > 1 || note_[p.first + j].key == note_[p.first + j - 1].key) continue;
     const char c = syl_[p.first + j].cons[0];
     const int kind = c == 0 || c == 'l' || c == 'w' || c == 'j' ? 0 : 1;
     if (tryWay_) { way[j] = *tryWay_; hasWay[j] = 1; }
-    else if (!plain_ && practised())
+    else if (!plain_ && practised() && kTable >= 2)
       hasWay[j] = wayOf(voice_, kind, note_[p.first + j - 1].key, note_[p.first + j].key - note_[p.first + j - 1].key, &way[j]);
   }
   for (int j = 0; j < p.count; ++j) {
@@ -1050,8 +1112,10 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
     Synth::Shape sh;
     sh.level = float((kLevelLo + (kLevelHi - kLevelLo) * std::pow(n.vel / 127.0, 1.5)) * (1 + 0.15 * std::clamp(double(n.accent), -1.0, 1.0)));
     // (the note as practised on this vowel: how far off it lands, the breath it takes, the vowel opened)
-    const SingerTrim* nt = tryNoteSet_ ? tryNote_ : (!plain_ && practised()) ? noteOf(voice_, n.key, y.nucleus) : nullptr;
+    const SingerTrim* row = (!plain_ && practised()) ? noteOf(voice_, n.key, y.nucleus) : nullptr;
+    const SingerTrim* nt = tryNoteSet_ ? tryNote_ : kTable >= 2 ? row : nullptr;
     noteRow[j] = nt;
+    levelRow[j] = tryNoteSet_ || kTable < 1 ? nullptr : row;
     static const float kTrimX = float(knobD("PJ_SINGER_TRIM_X", 1));
     const float trim = nt ? nt->cents * (tryNoteSet_ ? 1.0f : kTrimX) : 0.0f;
     const float st = float(n.key - base) + (n.cents + trim) / 100;
@@ -1066,8 +1130,11 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
     };
     // (the pitch reached 35 ms into the sung part and held to 35 ms before its end: the way to the
     // next note is in the consonant. PJ_SINGER_SCOOP ms: later, a scoop.)
-    static const double kScoop = knobD("PJ_SINGER_SCOOP", 35);
-    const double arriveMs = hasWay[j] ? way[j].arriveMs : kScoop, leaveMs = j + 1 < p.count && hasWay[j + 1] ? way[j + 1].leaveMs : 35.0;
+    // (8 ms asked, 2026-11-26: the pitch line rounds what is asked to three or four times its length, so the
+    // 35 ms asked before were 120 ms heard: a held note began 80 cents off and slid 100 to 150 cents towards the
+    // next one at full voice over its last fifth of a second, a swoop that on a soprano is a screech.)
+    static const double kScoop = knobD("PJ_SINGER_SCOOP", 8), kLeave = knobD("PJ_SINGER_LEAVE", 8);
+    const double arriveMs = hasWay[j] ? way[j].arriveMs : kScoop, leaveMs = j + 1 < p.count && hasWay[j + 1] ? way[j + 1].leaveMs : kLeave;
     auto hold = [&](double ms) {
       sh.sungAt = float(std::min(0.3, arriveMs / std::max(ms, 1.0)));
       sh.sungEndAt = float(std::max(0.6, 1 - leaveMs / std::max(ms, 1.0)));
@@ -1135,7 +1202,7 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
     static const double kReduceX = knobD("PJ_SINGER_REDUCE", 0.35);
     const bool scat = style_ == kJazz || style_ == kBebop || style_ == kBallad || style_ == kFolk;
     // (level: the director's, 0 .. 1; w: the syllable's weight, 0.4 the plain middle)
-    auto press = [](double level, double w) { return float(std::pow(10.0, (kDramaDb * (level - 0.5) + kWeightDb * (w - 0.4)) / 20 / 1.5)); };
+    auto press = [](double level, double w) { return float(std::exp(kLn10 * ((kDramaDb * (level - 0.5) + kWeightDb * (w - 0.4)) / 20 / 1.5))); };
     double carried = 0.4;  // the weight the breath is at, at the end of the syllable before
     for (int j = 0; j < p.count; ++j) {
       const SungNote& n = note_[p.first + j];
@@ -1153,7 +1220,21 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
         else { delay = 0.8 * len; depth *= 0.3; }                              // a trace at the end
         depth *= (0.75 + 0.6 * n.harm) * std::clamp(1.3 - 0.6 * n.busy / 8.0, 0.7, 1.3);
       }
-      const double hz = kVibHz * (n.cued ? std::clamp(double(n.vibRate), 0.5, 1.6) : 1.0);
+      // (the classical school: a vibrato all through every note that has the time for one, from its
+      // beginning, a little quicker)
+      if (!scat && len > 0.3) {
+        if (!n.cued) depth = kVib;
+        delay = std::min(delay, 0.06);
+      }
+      if (noLevel_) depth = 0;  // (the practice hears the notes plain: no vibrato)
+      const double hz = kVibHz * (n.cued ? std::clamp(double(n.vibRate), 0.5, 1.6) : 1.0) * (scat ? 1.0 : 1.08);
+      // How a vibrato comes in (the author, 2026-11-27: "sometimes vibrato could start with a lower frequency and
+      // ramp up to the normal frequency during the vibrato, other times the vibrato is roughly constant frequency
+      // and only the amplitude of the vibrato ramps up when it is introduced"). PJ_SINGER_VIB_QUICKEN (0.4) of
+      // the notes with the time for it begin at PJ_SINGER_VIB_QUICKEN_FROM (0.7) of the rate and reach it over
+      // PJ_SINGER_VIB_QUICKEN_S (0.6 s); the rest keep the rate and only grow in depth.
+      static const double kQuick = knobD("PJ_SINGER_VIB_QUICKEN", 0.4), kQuickFrom = knobD("PJ_SINGER_VIB_QUICKEN_FROM", 0.7), kQuickS = std::max(0.05, knobD("PJ_SINGER_VIB_QUICKEN_S", 0.6));
+      const bool quicken = len - delay > 0.5 && (mix(uint32_t(p.first + j) * 2654435761u + 977u) >> 9) % 1000 < 1000 * kQuick;
       const int steps = std::max(2, int(len / 0.02));
       // How a long note develops (src/jazzsinger.h): which way, from where the play is going.
       static const double kDevelop = knobD("PJ_SINGER_DEVELOP", 1), kTurn = knobD("PJ_SINGER_TURN", 1);
@@ -1173,15 +1254,18 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
       const bool push = w >= 0.2 || ex.empty();
       // (no punch: a weighted syllable's pressure is steady and supported, a little eased by its end)
       const double w0 = push ? w : std::min(carried, 0.4), w1 = push ? w - 0.1 * std::max(0.0, w - 0.4) : std::min(w0, 0.15);
-      if (push && (ex.empty() || t0 - 0.06 > ex.back().t)) ex.push_back({std::max(0.0, t0 - 0.06), press(n.level, w0) * (noteRow[j] ? noteRow[j]->press : 1.0f), 0, float(hz)});
+      if (push && (ex.empty() || t0 - 0.06 > ex.back().t)) ex.push_back({std::max(0.0, t0 - 0.06), press(n.level, w0) * (noteRow[j] ? float(std::pow(noteRow[j]->press, kRowPress)) : 1.0f), 0, float(hz)});
       carried = w1;
       for (int q = 0; q <= steps; ++q) {
         const double x = double(q) / steps, t = t0 + x * len;
         const double pk = std::clamp(double(n.swellPeak), 0.1, 0.9);
         const double bump = x < pk ? std::sin(0.5 * M_PI * x / pk) : std::cos(0.5 * M_PI * (x - pk) / (1 - pk));
         const double level = n.level + (n.levelEnd - n.level) * x + n.swell * bump * bump;
-        // (the vibrato grows over 0.2 s from its beginning and eases over the note's last 60 ms)
-        const double grow = std::clamp((x * len - delay) / 0.2, 0.0, 1.0) * std::clamp((len - x * len) / 0.06, 0.0, 1.0);
+        // (the vibrato grows over 0.2 s from its beginning and eases over the note's last 60 ms; one that
+        // quickens is at its depth sooner, and slower at first)
+        const double into = x * len - delay;
+        const double grow = std::clamp(into / (quicken ? 0.1 : 0.2), 0.0, 1.0) * std::clamp((len - x * len) / 0.06, 0.0, 1.0);
+        const double hzNow = quicken ? hz * (kQuickFrom + (1 - kQuickFrom) * std::clamp(into / kQuickS, 0.0, 1.0)) : hz;
         if (!ex.empty() && t <= ex.back().t) continue;
         // (the weight eases over the syllable's first 0.3 s, a long note no longer pressed)
         const double ease = std::min(1.0, x * len / 0.3);
@@ -1197,14 +1281,45 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
           const double tin = x * len;
           const int dir = n.key > note_[p.first + j - 1].key ? 1 : -1;
           aim = float(dir * way[j].over * std::max(0.0, 1 - tin / std::max(1e-3, way[j].overMs * 1e-3)));
-          breath = float(std::pow(10.0, way[j].dipDb * std::max(0.0, 1 - tin / 0.08) / 20 / 1.5));
+          breath = float(std::exp(kLn10 * (way[j].dipDb * std::max(0.0, 1 - tin / 0.08) / 20 / 1.5)));
+        } else {
+          // (a note with no practised way: the voice comes on under its pitch, 70 to 95 cents low and
+          // 100 to 150 ms in getting there, on almost every note of a song; so it is aimed above the
+          // note at first, by PJ_SINGER_START_C cents fading over PJ_SINGER_START_MS)
+          static const double kStartC = knobD("PJ_SINGER_START_C", 0), kStartMs = knobD("PJ_SINGER_START_MS", 120);
+          aim = float(kStartC * std::max(0.0, 1 - x * len / (kStartMs * 1e-3)));
         }
         // (the mouth opened for a high note, as practised: the jaw dropped and the lips flared, the
         // vowel towards "ah", which keeps the tract's first resonance at the pitch or above it; opening
         // over the note's first 40 ms)
-        float open = noteRow[j] ? noteRow[j]->f1x * float(std::min(1.0, x * len / 0.04)) : 0.0f;
+        float open = noteRow[j] ? float(kRowOpen) * noteRow[j]->f1x * float(std::min(1.0, x * len / 0.04)) : 0.0f;
         // (a classical singer keeps the jaw open throughout: the colours, the overtones and the tuning are easier)
         if (!scat) open = std::max(open, float(kClassicalOpen));
+        // (a high voice's vowels migrate towards an open "ah" as the pitch rises. The author, 2026-11-26: "perhaps for
+        // the soprano in highest notes they need to move towards a single vowel space to have enough resonance
+        // because the carrier wave becomes less dense", and: "should be gradual with the increasing pitch, the idea
+        // is to keep the sound more or less without 'breaks' within pitch changes". So no step anywhere: nothing at
+        // PJ_SINGER_MIGRATE_LO (C5), growing evenly with the pitch, slowly at first, to PJ_SINGER_MIGRATE (0.85)
+        // at PJ_SINGER_MIGRATE_HI (C6) and held above; within a note it follows the note's own pitch.)
+        {
+          static const double kMigLo = knobD("PJ_SINGER_MIGRATE_LO", 523.25), kMigHi = knobD("PJ_SINGER_MIGRATE_HI", 1046.5), kMig = knobD("PJ_SINGER_MIGRATE", 0.85);
+          const double f0 = 440 * std::exp2((n.key - 69) / 12.0);
+          const double u = std::clamp(std::log2(f0 / kMigLo) / std::log2(kMigHi / kMigLo), 0.0, 1.0);
+          open = std::max(open, float(kMig * std::pow(u, 1.5)));
+        }
+        // (the second resonance: the tongue's body brought forward as the pitch rises, puhuja's Expr::front, which
+        // raises the tract's second resonance towards the note's octave partial. The author, 2026-11-26: "let's build
+        // a second resonance for the octave partial". Measured on the soprano's held notes: on "ah" from F#5 up the
+        // overtones 2 to 4 are 6 to 14 dB stronger with the tongue fully forward, on "oo" from G#4 up 5 to 8 dB, on
+        // "ee" from G#5 up 2 to 5 dB. Gradual with the pitch like the migration: nothing at PJ_SINGER_FRONT_LO (C5),
+        // PJ_SINGER_FRONT (1) from PJ_SINGER_FRONT_HI (G5) up.)
+        float front = 0;
+        {
+          static const double kLo = knobD("PJ_SINGER_FRONT_LO", 523.25), kHi = knobD("PJ_SINGER_FRONT_HI", 784.0), kMax = knobD("PJ_SINGER_FRONT", 1);
+          const double f0 = 440 * std::exp2((n.key - 69) / 12.0);
+          const double u = std::clamp(std::log2(f0 / kLo) / std::log2(kHi / kLo), 0.0, 1.0);
+          front = float(kMax * u * u * (3 - 2 * u));
+        }
         // (the vowel towards the neutral one: an unweighted syllable's, PJ_SINGER_REDUCE of the way;
         // a quick note's more, the tongue and lips busy with the consonants and not reaching the vowel)
         float neutral = 0;
@@ -1217,11 +1332,11 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
           adduct = ghost ? 1.4f : w >= 0.7 ? float(1 - 0.15 * (w - 0.7) / 0.3) * 0.925f + 0.075f : w < 0.2 ? 1.25f : 1.0f;
           if (w >= 0.7) {
             open = std::min(1.0f, open + 0.15f * float(std::min(1.0, x * len / 0.04)));
-            pulse = float(std::pow(10.0, kPulseDb * std::max(0.0, 1 - x * len / 0.06) / 20 / 1.5));
+            pulse = float(std::exp(kLn10 * (kPulseDb * std::max(0.0, 1 - x * len / 0.06) / 20 / 1.5)));
           }
         }
         if (g != 0) {
-          if (!directed) breath *= float(std::pow(10.0, 2.2 * g / 20 / 1.5));           // the breath, +-2.2 dB
+          if (!directed) breath *= float(std::exp(kLn10 * (2.2 * g / 20 / 1.5)));           // the breath, +-2.2 dB
           open = std::clamp(open + float(0.12 * (g + devAmp) * (devColour > 0 ? 1.0 : 0.4)), 0.0f, 1.0f);  // the mouth
           adduct *= float(1 - 0.07 * g);                                                 // the folds: more together as it grows
           neutral = std::clamp(neutral + float(0.12 * (devAmp - g) * (devColour > 0 ? 0.5 : 1.0)), 0.0f, 0.6f);  // the vowel clearer as it grows
@@ -1232,7 +1347,7 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
           const double fr = u - std::floor(u), now = lvl(u), before = u >= 1 ? lvl(u - 1) : now;
           aim += float(turnCents * (before + (now - before) * std::min(1.0, fr / 0.3)));
         }
-        ex.push_back({t, press(level, w0 + (w1 - w0) * ease) * breath * pulse * (noteRow[j] ? noteRow[j]->press : 1.0f), float(depth * grow * (push ? 1.0 : 0.5)), float(hz), aim, open, adduct, neutral});
+        ex.push_back({t, press(level, w0 + (w1 - w0) * ease) * breath * pulse * (noteRow[j] ? float(std::pow(noteRow[j]->press, kRowPress)) : 1.0f), float(depth * grow * (push ? 1.0 : 0.5)), float(hzNow), aim, open, adduct, neutral, front});
       }
     }
     s.setExpression(std::move(ex));
@@ -1240,10 +1355,14 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
   std::vector<float> pcm = pullAll(s);
   vowelAt->assign(p.count, -1.0);
   std::vector<int> seen(p.count, 0);
+  struct Phone { double start, end; bool nucleus; };
+  std::vector<Phone> phone;
   for (const Synth::Label& l : s.labels()) {
     if (l.word < 1 || l.word > p.count) continue;
     const int j = l.word - 1;
-    if (seen[j]++ == ncons[j]) (*vowelAt)[j] = l.start;
+    const bool nucleus = seen[j]++ == ncons[j];
+    if (nucleus) (*vowelAt)[j] = l.start;
+    if (l.symbol != "_") phone.push_back({l.start, l.end, nucleus});
   }
   *lead = (*vowelAt)[0] >= 0 ? (*vowelAt)[0] : 0.5;
   // Lighter folds swing wider and sound much louder (a soprano's 10 dB over the baritone's on the
@@ -1258,7 +1377,7 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
       if ((*vowelAt)[j] < 0) continue;
       const int key = note_[p.first + j].key;
       const double want = -34 + kRise * (key - kVoices[voice_].lo) / 12.0;
-      pt.push_back({(*vowelAt)[j] - 0.05, float(std::pow(10.0, std::clamp(want - (noteRow[j] && !sungAt.empty() ? noteRow[j]->levelDb : levelOf(voice_, key)), -40.0, 12.0) / 20))});
+      pt.push_back({(*vowelAt)[j] - 0.05, float(std::exp(kLn10 * (std::clamp(want - (noteRow[j] && !sungAt.empty() ? noteRow[j]->levelDb : levelRow[j] && !sungAt.empty() ? levelRow[j]->plainDb : levelOf(voice_, key)), -40.0, 12.0) / 20)))});
     }
     if (!pt.empty()) {
       size_t q = 0;
@@ -1268,6 +1387,85 @@ std::vector<float> JazzSinger::take(const Phrase& p, const std::vector<double>& 
         while (q + 1 < pt.size() && i / kFs >= pt[q + 1].first) ++q;
         const float to = pt[q].second;
         g += std::clamp(to - g, -step * std::max(g, to), step * std::max(g, to));
+        pcm[i] *= g;
+      }
+    }
+  }
+  // Resonances that follow the note (the author, 2026-11-26: "let's get the 3rd overtone as well as 5th overtone
+  // covered with respective resonances", "the resonances follow the pitch lazily (like 10 ms delayed ...)", then
+  // 2026-11-27: "they don't need to trail 10 ms but be guided through PI-control in a way that they have half
+  // corrected at 10 ms",
+  // "coloratura could have lower Q values with the overtone resonances ... possibly also soprano"). A singer
+  // tunes resonances to the partials of the note being sung; the tract model has controls for the first two (the
+  // mouth's opening, the tongue's place), so the next two are resonances after the voice: one at three times and
+  // one at five times the note's pitch, each led to the pitch by a PI control (on the pitch's logarithm: half of
+  // a step made good after PJ_SINGER_PARTIAL_HALF_MS, 10; the integral leaves no lag behind a glide; its damping
+  // PJ_SINGER_PARTIAL_DAMP, 1: critical, a step overshot by 13 %; higher overshoots less), added to the
+  // voice at PJ_SINGER_PARTIAL_DB (0: a partial on the resonance comes out 6 dB stronger; -99: none), their
+  // width PJ_SINGER_PARTIAL_CENTS (100 cents; the soprano's 150, the coloratura's 200: a lower Q). Fixed
+  // resonances on the scale's pitches cannot do this: all partials of a note in tune lie on them alike.
+  if (!noLevel_ && vowelAt) {
+    static const double kDb = knobD("PJ_SINGER_PARTIAL_DB", 0), kHalfMs = knobD("PJ_SINGER_PARTIAL_HALF_MS", 10), kDamp = knobD("PJ_SINGER_PARTIAL_DAMP", 1), kCentsAll = knobD("PJ_SINGER_PARTIAL_CENTS", 0);
+    static const double kTop = knobD("PJ_SINGER_PARTIAL_TOP_HZ", 9000);
+    if (kDb > -90) {
+      const double cents = kCentsAll > 0 ? kCentsAll : !std::strcmp(kVoices[voice_].name, "coloratura") ? 200.0 : !std::strcmp(kVoices[voice_].name, "soprano") ? 150.0 : 100.0;
+      const double k = std::exp2(cents / 1200) - 1, gain = std::exp(kLn10 * (kDb / 20));  // (k = 1 / Q)
+      // (the PI control: the resonance's pitch moves at kp * miss + ki * the miss's integral; its natural
+      // rate w is found by trying w = 1 and timing the half way of a step)
+      static const double kW = [] {
+        const double z = std::max(kDamp, 0.3), dt = 1e-4;
+        double y = 0, in = 0, t = 0;
+        for (; y < 0.5 && t < 100; t += dt) { const double e = 1 - y; in += e * dt; y += (2 * z * e + in) * dt; }
+        return t / (std::max(kHalfMs, 0.1) * 1e-3);
+      }();
+      const double dt = 1 / kFs, kp = 2 * std::max(kDamp, 0.3) * kW * dt, ki = kW * kW * dt * dt;
+      std::vector<std::pair<double, double>> hz;  // (from when, the note's pitch)
+      for (int j = 0; j < p.count; ++j)
+        if ((*vowelAt)[j] >= 0) hz.push_back({(*vowelAt)[j], 440 * std::exp2((note_[p.first + j].key - 69 + note_[p.first + j].cents / 100) / 12.0)});
+      if (!hz.empty()) {
+        size_t q = 0;
+        double lf = std::log(hz[0].second), integ = 0, s1[2] = {0, 0}, s2[2] = {0, 0};
+        const int part[2] = {3, 5};
+        for (size_t i = 0; i < pcm.size(); ++i) {
+          while (q + 1 < hz.size() && i / kFs >= hz[q + 1].first) ++q;
+          const double miss = std::log(hz[q].second) - lf;
+          integ += ki * miss;
+          lf += kp * miss + integ;
+          const double f = std::exp(lf);
+          const double x = pcm[i];
+          double add = 0;
+          for (int h = 0; h < 2; ++h) {
+            const double fc = part[h] * f;
+            if (fc > kTop) continue;
+            // (a state-variable resonance, steady while its pitch moves; its peak gain 1)
+            const double g = std::tan(M_PI * fc / kFs), a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+            const double v3 = x - s2[h], v1 = a1 * s1[h] + a2 * v3, v2 = s2[h] + a2 * s1[h] + a3 * v3;
+            s1[h] = 2 * v1 - s1[h]; s2[h] = 2 * v2 - s2[h];
+            add += k * v1;
+          }
+          pcm[i] = float(x + gain * add);
+        }
+      }
+    }
+  }
+  // Consonants against vowels (the author, 2026-11-27: "now the vowels are a bit too powerful in comparison to
+  // the consonants with all these resonances likely, perhaps just make consonants a little stronger (+2 db) and
+  // vowels a little less strong (like -3 db)", "it is possible that the inbalance only existed for soprano and
+  // coloratura"). For those two voices a syllable's nucleus is brought down 3 dB and the consonants around it
+  // up 2 dB, the gain moving between them over about 8 ms; PJ_SINGER_VOWEL_DB and PJ_SINGER_CONS_DB set them
+  // for every voice.
+  if (!noLevel_ && !phone.empty()) {
+    static const double kVDb = knobD("PJ_SINGER_VOWEL_DB", 99), kCDb = knobD("PJ_SINGER_CONS_DB", 99);
+    const bool high = !std::strcmp(kVoices[voice_].name, "coloratura") || !std::strcmp(kVoices[voice_].name, "soprano");
+    const float kV = float(std::exp(kLn10 * ((kVDb < 90 ? kVDb : high ? -3.0 : 0.0) / 20))), kC = float(std::exp(kLn10 * ((kCDb < 90 ? kCDb : high ? 2.0 : 0.0) / 20)));
+    if (kV != 1 || kC != 1) {
+      const float a = float(1 - std::exp(-1 / (0.003 * kFs)));
+      size_t q = 0;
+      float g = phone[0].nucleus ? kV : kC;
+      for (size_t i = 0; i < pcm.size(); ++i) {
+        const double t = i / kFs;
+        while (q + 1 < phone.size() && t >= phone[q + 1].start) ++q;
+        g += a * ((phone[q].nucleus ? kV : kC) - g);
         pcm[i] *= g;
       }
     }
@@ -1390,15 +1588,61 @@ void JazzSinger::render(float* out, int n) {
   head_ += size_t(have);
   if (head_ >= ahead_.size()) { ahead_.clear(); head_ = 0; }
   else if (head_ > (1u << 18)) { ahead_.erase(ahead_.begin(), ahead_.begin() + head_); head_ = 0; }
+  // Resonators at the pitches of the scale (a trial; the author, 2026-11-26: "let's try extra nasal resonances
+  // perhaps each at each 12-tet frequences"): a narrow resonance on every equal-tempered semitone from C4 to C8,
+  // each PJ_SINGER_NASAL12_CENTS (25) wide, their sum added to the voice at PJ_SINGER_NASAL12_DB (-6; -99: none).
+  // In a song the soprano's vowels came out 1 dB cleaner at -6 dB and 1.4 dB at 0 dB, her overtones 0.2 to 0.4 dB
+  // stronger: a small effect, left on low for the ear to judge.
+  // Of a note in tune its fundamental and the partials an octave apart (2, 4, 8) fall on one; 3 and 6 lie
+  // 2 cents off one, 5 lies 14 off, 7 lies 31 off. After the voice, not inside the tract: it colours the sound
+  // and does not act back on the folds.
+  {
+    static const double kDb = knobD("PJ_SINGER_NASAL12_DB", -6);
+    // (the author: "coloratura could have lower Q values with the overtone resonances ... possibly also soprano":
+    // their resonances twice and one and a half times as wide, 50 and 38 cents for 25; PJ_SINGER_NASAL12_CENTS: all)
+    static const double kCentsAll = knobD("PJ_SINGER_NASAL12_CENTS", 0);
+    static const double kCents = kCentsAll > 0 ? kCentsAll : !std::strcmp(kVoices[voice_].name, "coloratura") ? 50.0 : !std::strcmp(kVoices[voice_].name, "soprano") ? 38.0 : 25.0;
+    if (kDb > -90) {
+      constexpr int kN = 3 * 49;
+      struct Bank { double a1[kN], a2[kN], b[kN], y1[kN] = {}, y2[kN] = {}, x1 = 0, x2 = 0; };
+      static Bank* bank = [] {
+        Bank* q = new Bank;
+        // (the author: "let's get the 3rd overtone as well as 5th overtone covered with respective resonances". A
+        // note's third partial lies 2.0 cents above a pitch of the scale and its fifth 13.7 cents below one (and so
+        // do the sixth and the tenth), which the 25-cent resonance on the scale's pitch covers poorly for the fifth.
+        // So two more rows: every semitone + 1.955 cents and every semitone - 13.686 cents. PJ_SINGER_NASAL12_JUST=0:
+        // the scale's own pitches alone.)
+        static const bool kJust = knobD("PJ_SINGER_NASAL12_JUST", 1) > 0;
+        const double off[3] = {0, 1.955, -13.686};
+        for (int k = 0; k < kN; ++k) {
+          const double f = 440 * std::exp2((60 + k % 49 - 69 + off[k / 49] / 100) / 12.0), bw = f * (std::exp2(kCents / 1200) - 1);
+          const double r = std::exp(-M_PI * bw / kFs);
+          q->a1[k] = 2 * r * std::cos(2 * M_PI * f / kFs); q->a2[k] = -r * r; q->b[k] = k >= 49 && !kJust ? 0.0 : 0.5 * (1 - r * r);
+        }
+        return q;
+      }();
+      static const double g = std::exp(kLn10 * (kDb / 20));  // (once: the knob does not change)
+      for (int i = 0; i < n; ++i) {
+        const double x = out[i], d = x - bank->x2;
+        double sum = 0;
+        for (int k = 0; k < kN; ++k) {
+          const double y = bank->b[k] * d + bank->a1[k] * bank->y1[k] + bank->a2[k] * bank->y2[k];
+          bank->y2[k] = bank->y1[k]; bank->y1[k] = y; sum += y;
+        }
+        bank->x2 = bank->x1; bank->x1 = x;
+        out[i] = float(x + g * sum);
+      }
+    }
+  }
   // The level held gently, as a hand on the fader: above the threshold 2 : 1 on the voice's
   // loudness over ~50 ms, coming in over 20 ms and letting go over 0.3 s, and made up by what
   // a usual note loses.
   {
-    static const double kRatio = std::max(1.0, knobD("PJ_SINGER_COMP", 2)), kThr = std::pow(10.0, knobD("PJ_SINGER_COMP_DB", -18) / 20);
+    static const double kRatio = std::max(1.0, knobD("PJ_SINGER_COMP", 2)), kThr = std::exp(kLn10 * (knobD("PJ_SINGER_COMP_DB", -18) / 20));
     static const double kUp = 1 - std::exp(-1 / (0.02 * kFs)), kDown = 1 - std::exp(-1 / (0.3 * kFs));
     // (a usual sung note is about -13 dB here: what it loses is given back, so the knob changes
     // the evenness and not the level)
-    static const double kMakeup = std::pow(10.0, std::max(0.0, -13 - knobD("PJ_SINGER_COMP_DB", -18)) * (1 - 1 / kRatio) / 20);
+    static const double kMakeup = std::exp(kLn10 * (std::max(0.0, -13 - knobD("PJ_SINGER_COMP_DB", -18)) * (1 - 1 / kRatio) / 20));
     if (kRatio > 1)
       for (int i = 0; i < n; ++i) {
         const double p = double(out[i]) * out[i];
@@ -1408,9 +1652,9 @@ void JazzSinger::render(float* out, int n) {
         out[i] = float(out[i] * g * kMakeup);
       }
   }
-  // The singer's fader (PJ_SINGER_GAIN, 24 by the author's ear, 2026-11-26: twice it is 6 dB more), after the hold, so that it is
+  // The singer's fader (PJ_SINGER_GAIN, 9.4 by the author's ear, 2026-11-26, after 24, then 7.5: twice it is 6 dB more), after the hold, so that it is
   // a plain gain (before it, the hold took half of every change back).
-  static const float kFader = float(knobD("PJ_SINGER_GAIN", 24.0) / 6.0);
+  static const float kFader = float(knobD("PJ_SINGER_GAIN", 9.4) / 6.0);
   if (kFader != 1)
     for (int i = 0; i < n; ++i) out[i] *= kFader;
   sent_.insert(sent_.end(), out, out + n);
@@ -1465,7 +1709,7 @@ struct JazzSinger::Plate {
     y1.assign(a1.size(), 0.0f);
     y2.assign(a1.size(), 0.0f);
     delay.assign(std::max<size_t>(1, size_t(kPre * 1e-3 * kFs)), 0.0f);
-    send = float(std::pow(10.0, knobD("PJ_SINGER_PLATE_DB", -99) / 20));
+    send = float(std::exp(kLn10 * (knobD("PJ_SINGER_PLATE_DB", -99) / 20)));
   }
   void run(const float* in, float* l, float* r, int n, float side) {
     const int nm = int(a1.size());
@@ -1571,6 +1815,10 @@ int JazzSinger::practise(const char* outPath, int jobs) {
     } else vowelMs[0] = 500;
     js.weight_.assign(n, 0.5f);
     js.wordStart_.assign(n, 0);
+    js.play_.assign(n, 0.0f); js.bright_.assign(n, 0.0f); js.mischief_.assign(n, 0.0f);
+    js.playV_.assign(n, 0.0f); js.brightV_.assign(n, 0.0f);
+    js.flip_.assign(n, 0); js.again_.assign(n, 0);
+    js.style_ = kJazz;
     js.wordStart_[0] = 1;
     js.phrase_.push_back(Phrase{0, n, 0, 0, {}, false});
     js.tryWay_ = w;
@@ -1588,7 +1836,9 @@ int JazzSinger::practise(const char* outPath, int jobs) {
   // rough: the share of it where every second cycle differs (the folds fallen into half the pitch,
   // a rattle); early: where the pitch is 50 to 120 ms in (cents).
   // rich: the 2nd to 5th partials' mean level against the fundamental's (dB).
-  struct Heard { double off = 1e9, sway = 0, level = -99, rough = 0, early = 0, rich = -40; };
+  // clean: the harmonics' energy over all the rest between 100 Hz and 12 kHz (dB): low where the folds swing
+  // unevenly on the right pitch (a screech), as they do where the pitch meets one of the vowel's resonances.
+  struct Heard { double off = 1e9, sway = 0, level = -99, rough = 0, early = 0, rich = -40, clean = 40; };
   auto hear = [&](int vi, int key, char vowel, const SingerTrim* row) {
     Heard h;
     std::vector<double> at;
@@ -1644,6 +1894,36 @@ int JazzSinger::practise(const char* outPath, int jobs) {
           p[q] = 10 * std::log10(re * re + im * im + 1e-20);
         }
       h.rich = std::clamp(0.25 * (p[1] + p[2] + p[3] + p[4]) - p[0], -40.0, 10.0);
+      // (the spectrum of 8192 samples from 0.2 s on: what lies within 1.2 % or 12 Hz of a harmonic, and the rest)
+      const int N = 8192;
+      if (i0 + N <= x.size()) {
+        std::vector<std::complex<double>> a(N);
+        for (int i = 0; i < N; ++i) a[i] = x[i0 + i] * (0.5 - 0.5 * std::cos(2 * M_PI * i / N));
+        for (int i = 1, j = 0; i < N; ++i) {
+          int bit = N >> 1;
+          for (; j & bit; bit >>= 1) j ^= bit;
+          j ^= bit;
+          if (i < j) std::swap(a[i], a[j]);
+        }
+        for (int len = 2; len <= N; len <<= 1) {
+          const std::complex<double> wl = std::polar(1.0, -2 * M_PI / len);
+          for (int i = 0; i < N; i += len) {
+            std::complex<double> w = 1;
+            for (int k = 0; k < len / 2; ++k, w *= wl) {
+              const std::complex<double> u = a[i + k], v = a[i + k + len / 2] * w;
+              a[i + k] = u + v; a[i + k + len / 2] = u - v;
+            }
+          }
+        }
+        double har = 0, rest = 0;
+        for (int k = 1; k < N / 2; ++k) {
+          const double f = k * kFs / N;
+          if (f < 100 || f > 12000) continue;
+          const double hn = std::max(1.0, std::round(f / f0));
+          (std::fabs(f - hn * f0) < std::max(12.0, 0.012 * hn * f0) ? har : rest) += std::norm(a[k]);
+        }
+        h.clean = std::clamp(10 * std::log10((har + 1e-30) / (rest + 1e-30)), -20.0, 40.0);
+      }
     }
     std::sort(early.begin(), early.end());
     h.early = early.empty() ? h.off : early[early.size() / 2];
@@ -1812,10 +2092,11 @@ int JazzSinger::practise(const char* outPath, int jobs) {
               row.levelDb = float(h.level);
               const double score = std::fabs(h.off) + 2 * h.sway + 3 * std::fabs(h.level - want) + 4 * std::max(0.0, 20 * std::log10(double(row.press))) + (f1x > 0 ? 2 + 3 * f1x : 0) +
                                    100 * h.rough + 0.5 * std::min(100.0, std::fabs(h.early - h.off)) +
-                                   0.4 * std::max(0.0, -8 - h.rich);  // (overtones weaker than 8 dB under the fundamental cost)
+                                   0.4 * std::max(0.0, -8 - h.rich) +  // (overtones weaker than 8 dB under the fundamental cost)
+                                   2.0 * std::max(0.0, 20 - h.clean);  // (a screech: the harmonics less than 20 dB over the rest)
               if (score < bestScore) { bestScore = score; best = row; bestHeard = h; }
               row.cents = float(std::clamp(row.cents - 0.8 * h.off, -90.0, 90.0));
-              row.press = float(std::clamp(row.press * std::pow(10.0, (want - h.level) / 20 / 1.5), 0.45, 1.5));
+              row.press = float(std::clamp(row.press * std::exp(kLn10 * ((want - h.level) / 20 / 1.5)), 0.45, 1.5));
             }
           }
           std::fprintf(f, "T %d %d %c %.1f %.3f %.2f %.1f %.1f %.1f %.1f %.1f %.1f %.2f %.2f %.0f %.0f %.1f %.1f\n", c.voice, c.from, v, best.cents, best.press, best.f1x, best.levelDb,
@@ -1859,6 +2140,8 @@ int JazzSinger::practise(const char* outPath, int jobs) {
     int st = 0;
     waitpid(pid, &st, 0);
     ok = ok && WIFEXITED(st) && WEXITSTATUS(st) == 0;
+    if (WIFSIGNALED(st)) std::fprintf(stderr, "a worker ended on signal %d\n", WTERMSIG(st));
+    else if (WIFEXITED(st) && WEXITSTATUS(st)) std::fprintf(stderr, "a worker ended with status %d\n", WEXITSTATUS(st));
   }
   if (!ok) { std::fprintf(stderr, "the singer's practice: a worker failed\n"); return 1; }
   for (int k = 0; k < jobs; ++k) {
@@ -1877,10 +2160,11 @@ int JazzSinger::practise(const char* outPath, int jobs) {
           if (mute > 0.5f) continue;
         }
         char row[160];
-        std::snprintf(row, sizeof row, "    {%d, %3d, '%c', %.1ff, %.3ff, %.2ff, %.1ff},  // %s: %+.0f c %+.1f dB -> %+.0f c %+.1f dB", vi, a, v, x1, pr, f1x, lv,
+        const float plain = float(-34 + knobD("PJ_SINGER_RISE_DB", 4) * (a - kVoices[vi].lo) / 12.0) + lb;  // (sung plainly: the level wanted + how far over it)
+        std::snprintf(row, sizeof row, "    {%d, %3d, '%c', %.1ff, %.3ff, %.2ff, %.1ff, %.1ff},  // %s: %+.0f c %+.1f dB -> %+.0f c %+.1f dB", vi, a, v, x1, pr, f1x, lv, plain,
                       kVoices[vi].name, before > 1e8f ? 999.0f : before, lb, after, la);
         trims.push_back(row);
-        gTrimsNow.push_back(SingerTrim{vi, a, v, x1, pr, f1x, lv});
+        gTrimsNow.push_back(SingerTrim{vi, a, v, x1, pr, f1x, lv, plain});
         if (before < 1e8f) { sum[vi].tb += std::fabs(before); sum[vi].lb += std::fabs(lb); sum[vi].rb += rb; sum[vi].eb += eb; ++sum[vi].ntb; }
         sum[vi].ra += ra; sum[vi].ea += ea; sum[vi].ha += ha;
         if (before < 1e8f) sum[vi].hb += hb;
@@ -1905,9 +2189,9 @@ int JazzSinger::practise(const char* outPath, int jobs) {
   std::fprintf(f, "// What the lead singer has practised (./pajupilli -singer-practice writes this file; src/jazzsinger.h).\n");
   std::fprintf(f, "// voice:");
   for (int vi = 0; vi < kNVoices; ++vi) std::fprintf(f, " %d %s%s", vi, kVoices[vi].name, vi + 1 < kNVoices ? "," : ".\n");
-  std::fprintf(f, "// Notes: {voice, key, vowel, cents added to the pitch asked, breath x, the mouth opened (0 .. 1: towards ah, jaw dropped, lips flared), its level then (dB)}.\n");
+  std::fprintf(f, "// Notes: {voice, key, vowel, cents added to the pitch asked, breath x, the mouth opened (0 .. 1: towards ah, jaw dropped, lips flared), its level then (dB), its level sung plainly (dB)}.\n");
   std::fprintf(f, "// Ways: {voice, kind (0 slurred, 1 direct), from key, interval, leaveMs, arriveMs, over, overMs, dipDb}.\n");
-  std::fprintf(f, "struct SingerTrim { int voice, key; char vowel; float cents, press, f1x, levelDb; };\n");
+  std::fprintf(f, "struct SingerTrim { int voice, key; char vowel; float cents, press, f1x, levelDb, plainDb = 0; };\n");
   std::fprintf(f, "struct SingerWay { int voice, kind, from, interval; float leaveMs, arriveMs, over, overMs, dipDb; };\n");
   std::fprintf(f, "static const SingerTrim kSingerTrim[] = {\n");
   for (const std::string& r : trims) std::fprintf(f, "%s\n", r.c_str());

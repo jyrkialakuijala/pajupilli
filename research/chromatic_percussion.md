@@ -60,6 +60,9 @@ piece where it is.
 
 ## 5. Tubular bells (GM 15): C4–F5
 
+(Superseded by research/tubular_bells.md, 2026-11-26: measured ratios, the hammer's two faces,
+the stroke, damping, orchestration and jyrki-spectral tuning. Below: what the first model used.)
+
 - Brass tubes 38 mm across, 1.5 mm wall **[memory]**. A free tube's bending modes lie nearly as the
   odd squares 9 : 25 : 49 : 81 : 121 : 169 … **[memory]**. No mode is at the pitch heard: the fourth,
   fifth and sixth lie as 2 : 2.99 : 4.17 and the ear hears the note an octave under the fourth

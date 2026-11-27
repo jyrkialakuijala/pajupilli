@@ -23,11 +23,18 @@ double fallOf(int fam) {
     case kBandPluck: return 6;
     case kBandMallet: return 3;
     case kBandBell: return 4;
+    case kBandChime: return 2;  // (a tube's strike note ~35 s to -60 dB)
     case kBandBass: return 5;
     default: return 0;
   }
 }
-bool ringsOn(int fam) { return fam == kBandBell; }
+bool ringsOn(int fam) { return fam == kBandBell || fam == kBandChime; }
+
+// The tubular bells' partials against the strike note, and their levels (dB) at a stroke: a tube's
+// (the recorded sets' and the model's, research/tubular_bells.md 3.1), a cast bell's (12.2).
+bool chimeTube(double f0) { return f0 > 255 && f0 < 800; }
+const double kTubeR[7] = {0.62, 1.22, 2, 2.95, 4.05, 5.3, 6.6}, kTubeDb[7] = {-24, -18, -4, 0, -1, -8, -20};
+const double kCastR[8] = {0.5, 1, 1.205, 1.5, 2, 3.008, 4.174, 5.472}, kCastDb[8] = {-10, -6, -6, -22, 0, -5, -8, -12};
 }  // namespace
 
 bool& jazzBandFile() {
@@ -50,10 +57,22 @@ int bandFamily(const char* family, const char* name) {
   if (std::strcmp(family, "clarinet") == 0) return kBandClarinet;
   if (any(family, {"sax", "oboe", "bassoon", "duduk", "shawm", "shehnai"})) return kBandReed;
   if (std::strcmp(family, "bass") == 0) return name && std::strstr(name, "synth") ? kBandOther : kBandBass;
+  if (name && std::strcmp(name, "tubular-bells") == 0) return kBandChime;
   return kBandOther;
 }
 
+double bandRatio(int fam, double f0, int k) {
+  if (fam != kBandChime || k < 1) return k;
+  if (chimeTube(f0)) return k <= 7 ? kTubeR[k - 1] : 1e9;
+  return k <= 8 ? kCastR[k - 1] : 1e9;
+}
+
 double bandPartial(int fam, double f0, int k) {
+  if (fam == kBandChime) {
+    const bool tube = chimeTube(f0);
+    if (k < 1 || k > (tube ? 7 : 8) || bandRatio(fam, f0, k) * f0 > 5000) return 0;
+    return fastPow(10.0, (tube ? kTubeDb : kCastDb)[k - 1] / 20);
+  }
   if (k < 1 || k * f0 > 5000) return 0;
   switch (fam) {
     case kBandChoir: {  // (Ensemble::choirTune's)
@@ -74,7 +93,7 @@ double bandPartial(int fam, double f0, int k) {
   }
 }
 
-void SoundingSet::on(int ch, int key, int pitch, int velocity, int fam, int ear) {
+void SoundingSet::on(int ch, int key, int pitch, int velocity, int fam, int ear, bool rings) {
   if (fam == kBandNone) return;
   for (BandNote& n : n_)
     if (n.ch == ch && n.key == key) {  // (struck again: anew)
@@ -85,6 +104,7 @@ void SoundingSet::on(int ch, int key, int pitch, int velocity, int fam, int ear)
       n.level = std::pow(std::clamp(velocity, 1, 127) / 127.0, 1.5);
       n.down = true;
       n.kept = false;
+      n.rings = rings;
       ++version_;
       return;
     }
@@ -98,6 +118,7 @@ void SoundingSet::on(int ch, int key, int pitch, int velocity, int fam, int ear)
   b.at = t_;
   b.byEar = ear > 0;
   b.wind = ear == 2;
+  b.rings = rings;
   n_.push_back(b);
   ++version_;
 }
@@ -107,7 +128,7 @@ void SoundingSet::off(int ch, int key) {
     BandNote& n = n_[i];
     if (n.ch != ch || n.key != key || !n.down) continue;
     n.down = false;
-    if ((pedalDown(ch) && n.fall > 0) || ringsOn(n.fam)) {
+    if ((pedalDown(ch) && n.fall > 0) || ringsOn(n.fam) || n.rings) {
       n.kept = true;
       ++version_;
     } else {
@@ -124,7 +145,7 @@ void SoundingSet::pedal(int ch, bool down) {
   if (down) return;
   // (The pedal lifts: what it kept is damped.)
   const size_t before = n_.size();
-  n_.erase(std::remove_if(n_.begin(), n_.end(), [&](const BandNote& n) { return n.ch == ch && n.kept && !ringsOn(n.fam); }), n_.end());
+  n_.erase(std::remove_if(n_.begin(), n_.end(), [&](const BandNote& n) { return n.ch == ch && n.kept && !ringsOn(n.fam) && !n.rings; }), n_.end());
   if (n_.size() != before) ++version_;
 }
 
@@ -182,7 +203,7 @@ double bandPull(const SoundingSet& band, const BandListener& me, double* weight,
   const double f0 = me.f0;
   double sw = 0, sd = 0;
   for (const BandNote& o : band.notes()) {
-    if (o.ch == me.self) continue;
+    if (o.ch == me.self && (!me.hearOwn || (o.pitch == me.pitch && std::fabs(o.at - me.at) <= 0.035))) continue;
     // (A part tuning by ear is heard only by the notes after it: the order above.)
     if (o.byEar && me.at >= 0) {
       const bool before = o.at < me.at - 0.035 ||
@@ -204,9 +225,10 @@ double bandPull(const SoundingSet& band, const BandListener& me, double* weight,
     for (int i = 0; i < np; ++i)
       for (int k = 1; k <= nq; ++k) {
         if (qw[k - 1] <= 0) continue;
-        const double delta = rel + 1200 * (std::log2(double(k)) - me.pl[i]);
+        const double ko = bandRatio(o.fam, g0, k);
+        const double delta = rel + 1200 * (std::log2(ko) - me.pl[i]);
         if (std::fabs(delta) > 36) continue;
-        const double kq = std::max(me.pk[i], double(k));
+        const double kq = std::max({me.pk[i], ko, 1.0});
         const double w = std::min(pw[i], qw[k - 1] * lv) * std::exp(-(delta / 20) * (delta / 20)) / (kq * kq);
         sw += w;
         sd += w * delta;

@@ -44,6 +44,7 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
   kFace_ = knob("PJ_FACE", 1);
   kY0_ = knob("PJ_Y0", 0.8);
   kY0Exp_ = knob("PJ_Y0EXP", 1);
+  kPipeLips_ = knob("PJ_PIPELIPS", 0.7);
   kP_ = knob("PJ_P", 1);
   kVibThroat_ = knob("PJ_VIBTHROAT", 0);
   breath_ = knob("PJ_BREATH", 0.01);
@@ -345,7 +346,16 @@ void Player::render(float* out, int n) {
       const int en = onTrillKey_ && trill_ && trill_->keepLips ? trillBase_ : note_;
       // (A glide: the pitch the fingers pass.)
       const double f = glideFrequency();
-      const double fw = f * std::exp2(-inst_.transpose / 12.0), ke = inst_.emb;
+      const double fw = f * std::exp2(-inst_.transpose / 12.0);
+      // (A pan flute's bass pipes, wider than the nai's 15 mm: a bigger, looser embouchure, the
+      // lips and the uncovered rim x (d / 15 mm)^PJ_PIPELIPS (0.7), as a toyo player's.)
+      double ke = inst_.emb;
+      if (inst_.design && inst_.design->pipes) {
+        const Design& d = *inst_.design;
+        for (int k = 0; k < d.nPipes; ++k)
+          if (d.pipes[k].midi == en - inst_.transpose && d.pipes[k].d > 15)
+            ke *= fastPow(d.pipes[k].d / 15, kPipeLips_);
+      }
       // Dynamics: knob + breath controls + key velocity, never below the softest
       // the note holds its register at (learned by calibration).
       const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_, dynLo[en], std::max(dynLo[en], dynHi[en]));
