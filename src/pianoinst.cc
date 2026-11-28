@@ -200,6 +200,13 @@ static PianoDesign designFor(const Instrument& inst) {
 }
 
 PianoModel::PianoModel(const Instrument& inst) : Tube(inst), piano_(inst.fs, designFor(inst)) {
+  if (std::strncmp(inst.name, "harpsichord", 11) != 0) {
+    const double db[2] = {knob("PJ_PIANO_EQ1_DB", 1.0), knob("PJ_PIANO_EQ2_DB", 1.0)}, hz[2] = {knob("PJ_PIANO_EQ1_HZ", 1000), knob("PJ_PIANO_EQ2_HZ", 3000)};
+    for (int k = 0; k < 2; ++k) {
+      eqG_[k] = float(std::pow(10.0, db[k] / 20) - 1);
+      eqA_[k] = float(1 - std::exp(-2 * M_PI * hz[k] / inst.fs));
+    }
+  }
   // (the action's knock: the hammered pianos)
   if (std::strcmp(inst.name, "grand-piano") == 0 || std::strcmp(inst.name, "bright-piano") == 0 ||
       std::strcmp(inst.name, "upright-piano") == 0) {
@@ -281,6 +288,16 @@ float PianoModel::sample() {
   float y = g * piano_.sample(float(testDp_));  // (tests: a force on the bridge at middle C)
   testDp_ = 0;
   float sd = g * float(outScale()) * piano_.side();
+  // (a mild lift of the highs, the author 2026-11-28: "perhaps piano would benefit from mild eq -- something like
+  // adding highs: +1 db above 1 kHz and another +1 db above 3 kHz". Two first-order shelves, PJ_PIANO_EQ1_DB (1) from
+  // PJ_PIANO_EQ1_HZ (1000) and PJ_PIANO_EQ2_DB (1) from PJ_PIANO_EQ2_HZ (3000); the pianos, not the harpsichord.)
+  for (int k = 0; k < 2; ++k)
+    if (eqG_[k] != 0) {
+      eqM_[k] += eqA_[k] * (y - eqM_[k]);
+      eqS_[k] += eqA_[k] * (sd - eqS_[k]);
+      y += eqG_[k] * (y - eqM_[k]);
+      sd += eqG_[k] * (sd - eqS_[k]);
+    }
   if (treble_ != 0) {
     // (the honky-tonk: the bar-room upright with its front off, miked close to the strings: its
     // highs lifted from ~2 kHz, the top above ~6 kHz shelved down again (a bright piano, no hiss))

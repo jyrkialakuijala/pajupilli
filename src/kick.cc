@@ -15,42 +15,76 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kRho = 1.2, kC = 343.0;
 }  // namespace
 
-bool jazzKick(const Instrument& inst) { return std::strncmp(inst.name, "jazz-kick", 9) == 0; }
+bool jazzKick(const Instrument& inst) {
+  return std::strncmp(inst.name, "jazz-kick", 9) == 0 || std::strcmp(inst.name, "studio-kick") == 0;
+}
 
-KickSpec kickSpec(bool twenty) {
+// The bass drums a drummer may bring (research/kick.md, research/jazz_kick_sound.md), each a size,
+// a tuning and a damping; which one a piece gets: chooseKick (src/drumkit.cc).
+//   jazz-kick-16  16" x 14": the small room, the trio with brushes; high, tight, open.
+//   jazz-kick     18" x 14": the bebop kick; tuned high, both heads, no port, open.
+//   jazz-kick-20  20" x 14": post-bop, organ trios, horns in front: a little lower and rounder.
+//   jazz-kick-22  22" x 14": the big band; lower, a felt strip on each head (a shorter ring under
+//                 the section's hits, the bombs still deep).
+//   studio-kick   22" x 16": the pop, funk and disco kick: a looser batter, a ported resonant
+//                 head (the air let out), a pillow inside, a hard felt beater at the middle, the
+//                 microphone at the port: a short punch with the beater's click.
+namespace {
+struct KickKind {
+  const char* name;
+  double inch, deepInch, tension, reso;
+  double zeta01, zeta0, zeta, zeta2;  // the felt strips' or pillow's damping, as the heads' zeta
+  double vent, feltK, where, click, micZ;
+};
+constexpr KickKind kKicks[] = {
+    {"jazz-kick-16", 16, 14, 760, 1.05, 0.018, 0.012, 0.012, 0.010, 4, 1.5e8, 0.12, 1.0, 0.6},
+    {"jazz-kick", 18, 14, 690, 1.0, 0.018, 0.012, 0.012, 0.010, 4, 1.5e8, 0.12, 1.0, 0.6},
+    {"jazz-kick-20", 20, 14, 640, 1.0, 0.018, 0.012, 0.012, 0.010, 4, 1.5e8, 0.12, 1.0, 0.6},
+    {"jazz-kick-22", 22, 14, 600, 1.0, 0.030, 0.020, 0.020, 0.016, 4, 1.5e8, 0.12, 1.0, 0.6},
+    {"studio-kick", 22, 16, 520, 1.0, 0.100, 0.080, 0.060, 0.080, 40, 4.0e8, 0.06, 2.0, 0.25},
+};
+const KickKind& kickKind(const char* name) {
+  for (const KickKind& k : kKicks)
+    if (std::strcmp(k.name, name) == 0) return k;
+  return kKicks[1];
+}
+}  // namespace
+
+KickSpec kickSpec(const char* name) {
+  const KickKind& k = kickKind(name);
   KickSpec s;
-  // An 18" x 14" bebop kick (20" x 14": a little lower and rounder): a
-  // coated single-ply batter, an unported single-ply resonant head a little
-  // higher, both tuned up for a note (research/kick.md 2).
-  const double R = (twenty ? 0.254 : 0.2286);
+  // A coated single-ply batter, a single-ply resonant head (research/kick.md 2); the size, tuning
+  // and damping the kind's. The PJ_KICK_* knobs move every kind alike, as factors on its own.
+  const double R = k.inch * 0.0254 / 2;
   s.batter.radius = s.reso.radius = R;
   s.batter.sigma = knob("PJ_KICK_SIGMA", 0.26);
   s.reso.sigma = knob("PJ_KICK_SIGMA2", 0.20);
-  s.batter.tension = knob("PJ_KICK_TENSION", twenty ? 640 : 690);
-  s.reso.tension = knob("PJ_KICK_TENSION2", twenty ? 640 : 690) * knob("PJ_KICK_RESO", 1.0);
+  s.batter.tension = k.tension * knob("PJ_KICK_TENSION", 1.0);
+  s.reso.tension = k.tension * knob("PJ_KICK_TENSION2", 1.0) * k.reso * knob("PJ_KICK_RESO", 1.0);
   s.batter.top = knob("PJ_KICK_TOP", 1400);
   s.reso.top = knob("PJ_KICK_TOP2", 700);
-  s.batter.zeta01 = s.reso.zeta01 = knob("PJ_KICK_ZETA01", 0.018);
-  s.batter.zeta0 = s.reso.zeta0 = knob("PJ_KICK_ZETA0", 0.012);
-  s.batter.zeta = knob("PJ_KICK_ZETA", 0.012);
-  s.reso.zeta = knob("PJ_KICK_ZETA2", 0.010);
+  const double damp = knob("PJ_KICK_DAMP", 1.0);
+  s.batter.zeta01 = s.reso.zeta01 = k.zeta01 * damp;
+  s.batter.zeta0 = s.reso.zeta0 = k.zeta0 * damp;
+  s.batter.zeta = k.zeta * damp;
+  s.reso.zeta = k.zeta2 * damp;
   s.batter.lossKnee = s.reso.lossKnee = 1500;
   s.batter.stretch = knob("PJ_KICK_STRETCH", 1.1e6);
   s.reso.stretch = knob("PJ_KICK_STRETCH2", 0.8e6);
   s.batter.seed = 11;
   s.reso.seed = 12;
-  s.depth = knob("PJ_KICK_DEPTH", 0.356);
+  s.depth = k.deepInch * 0.0254 * knob("PJ_KICK_DEPTH", 1.0);
   s.air.volume = kPi * R * R * s.depth;
-  s.air.vent = knob("PJ_KICK_VENT", 4);  // the shell's air hole (no port)
+  s.air.vent = k.vent * knob("PJ_KICK_VENT", 1.0);  // the shell's air hole; the studio kick's port
   s.beaterMass = knob("PJ_KICK_MASS", 0.07);
-  s.feltK = knob("PJ_KICK_FELTK", 1.5e8);
+  s.feltK = k.feltK * knob("PJ_KICK_FELTK", 1.0);
   s.feltAlpha = knob("PJ_KICK_FELTALPHA", 2.3);
   s.feltLoss = knob("PJ_KICK_FELTLOSS", 0.6);
-  s.beaterR = knob("PJ_KICK_WHERE", 0.12);
+  s.beaterR = k.where * knob("PJ_KICK_WHERE", 1.0);
   s.buryForce = knob("PJ_KICK_BURYF", 12);
   s.footDamp = knob("PJ_KICK_FOOTDAMP", 60);
-  s.micZ = knob("PJ_KICK_MICZ", 0.6);
-  s.click = knob("PJ_KICK_CLICK", 1);
+  s.micZ = k.micZ * knob("PJ_KICK_MICZ", 1.0);
+  s.click = k.click * knob("PJ_KICK_CLICK", 1);
   s.gain = knob("PJ_KICK_GAIN", 1);
   return s;
 }
@@ -222,7 +256,7 @@ float Kick::sample() {
 }
 
 KickModel::KickModel(const Instrument& inst)
-    : Tube(inst), kick_(inst.fs, kickSpec(std::strcmp(inst.name, "jazz-kick-20") == 0)) {}
+    : Tube(inst), kick_(inst.fs, kickSpec(inst.name)) {}
 
 void KickModel::resetAir() {
   Tube::resetAir();
@@ -264,10 +298,7 @@ KickPlayer::KickPlayer(KickModel& m) : Performer(m), m_(m) {
   if (knob("PJ_KICK_BURY", 0) > 0) m_.kick().setBury(true);
 }
 
-double KickPlayer::ur() {
-  rng_ = rng_ * 1664525u + 1013904223u;
-  return (rng_ >> 8) * (1.0 / 16777216.0);
-}
+double KickPlayer::ur() { return 0.5 * (rng_.uniform() + 1); }
 
 double KickPlayer::beaterSpeed(int velocity, double dynamics) {
   // ~ velocity^1.25 (General MIDI's 30 dB from 16 to 127; the drum is linear

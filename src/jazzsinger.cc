@@ -200,11 +200,12 @@ void voice(Synth& s, const VoiceType& vt, const std::vector<float>* map, float l
   // next falls without it for every other voice (bass 4.2 -> 3.6 %, baritone 4.3 -> 3.4, tenor 3.1 -> 2.0,
   // contralto 2.7 -> 1.9, mezzo 2.8 -> 1.9), while the soprano's and the coloratura's worst notes break without it
   // (research/tenor_rasp.md). The author, after listening: "Bass, Baritone, Tenor, Alto, Mezzo better without
-  // shield, turn shield to 0 %". So none for those five; 0.75 for the rest. PJ_SINGER_SHIELD: every voice's.)
+  // shield, turn shield to 0 %". PJ_SINGER_SHIELD: every voice's.)
   static const float kShieldAll = float(knobD("PJ_SINGER_SHIELD", -9)), kShieldHz = float(knobD("PJ_SINGER_SHIELD_HZ", 5000));
-  bool bare = false;
-  for (const char* nm : {"bass", "baritone", "tenor", "contralto", "mezzo"}) bare = bare || !std::strcmp(vt.name, nm);
-  s.setTractShield(kShieldAll > -8 ? kShieldAll : bare ? 0.0f : 0.75f, kShieldHz);
+  // (then: "why is profondo still with shield -- I thought soprano needed to stay with shield": the profondo and
+  // the countertenor too. Only the soprano and the coloratura keep it.)
+  const bool high = !std::strcmp(vt.name, "soprano") || !std::strcmp(vt.name, "coloratura");
+  s.setTractShield(kShieldAll > -8 ? kShieldAll : high ? 0.75f : 0.0f, kShieldHz);
   // (a held note holds still: the pitch line planned with little smoothing, or it wandered 20 to 30 cents)
   static const float kPitchEps = float(knobD("PJ_SINGER_PITCH_EPS", 0.0002));
   s.setPitchSmoothing(kPitchEps);

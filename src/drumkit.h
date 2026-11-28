@@ -37,6 +37,20 @@ Drum drumFor(int gmKey, Kit kit = brushKitWanted() ? Kit::kBrush : Kit::kStandar
 // gain (dB) that goes with it (drumkit.cc; tools/gmcompare.py kits --emit).
 int drumVelocity(int gmKey, Kit kit, int velocity);
 double drumGainDb(const char* inst);  // the player's share (the room hears it)
+// The bass drum the drummer brought for this piece (src/kick.cc kKicks): keys 35 and 36 play it.
+// Chosen by chooseKick from the piece's setup (-play); nullptr: the 18" jazz kick. PJ_KICK_KIND
+// names one for every piece. The kinds share the 18"'s calibration (one key map, one gain).
+struct KickSetup {
+  bool jazz = false, amped = false, ballad = false, classical = false;
+  double bpm = 120;
+  int parts = 0;          // melodic channels (not the drums)
+  int horns = 0;          // ... of them saxes and brass (GM 57 .. 72)
+  int orchestral = 0;     // ... strings, orchestral brass, woodwinds, timpani (GM 41 .. 61, 69 .. 76)
+  bool brassSection = false, electricBass = false, uprightBass = false, organ = false, brushes = false;
+  double kicksPerBeat = 0, kickVel = 0, kickOnBeat = 0;  // the drum channel's 35/36: how many, how hard, on the beat
+};
+const char* chooseKick(const KickSetup& s, std::string* why);
+const char*& chosenKick();
 double drumTrimDb(const char* inst);  // what is over +6 dB: the direct sound alone
 const char* drumName(int gmKey);  // General MIDI's name of the key ("" outside 35 .. 81)
 

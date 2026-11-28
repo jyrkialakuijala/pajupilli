@@ -930,6 +930,64 @@ int playMidiFile(const std::string& path, const char* outWav, const RoomSpec* ro
     ampedPiece() = dir.amped;
     rotaryRoom() = dir.sparse || dir.ballad;
     std::fprintf(stderr, "  (the director: %s)\n", dir.jazzWhy.c_str());
+    // The bass drum the drummer brings for this band (src/drumkit.cc chooseKick; PJ_KICK_KIND: one named).
+    {
+      KickSetup ks;
+      ks.jazz = dir.jazz;
+      ks.amped = dir.amped;
+      ks.ballad = dir.ballad;
+      ks.classical = dir.style != Direction::kUnknown;
+      std::vector<double> lens;
+      for (const Song::Tempo& x : song.tempo) lens.push_back(x.len);
+      if (!lens.empty()) {
+        std::nth_element(lens.begin(), lens.begin() + lens.size() / 2, lens.end());
+        ks.bpm = 60 / std::max(0.05, lens[lens.size() / 2]);
+      }
+      bool chan[16] = {}, horn[16] = {}, orch[16] = {};
+      int pr16[16] = {}, drumProg = 0;
+      long first = -1, last = 0;
+      int kicks = 0, onBeat = 0;
+      std::vector<int> kv;
+      for (const Event& e : song.ev) {
+        const int ch = e.status & 15, kind = e.status & 0xf0;
+        if (kind == 0xc0) pr16[ch] = e.a;
+        if (kind != 0x90 || e.b == 0) continue;
+        if (ch == 9) {
+          if (first < 0) { first = long(e.tick); drumProg = pr16[9]; }
+          last = long(e.tick);
+          if (e.a == 35 || e.a == 36) {
+            ++kicks;
+            kv.push_back(e.b);
+            const long ph = long(e.tick) % song.div;
+            onBeat += ph < song.div / 8 || ph > song.div * 7 / 8;
+          }
+          continue;
+        }
+        const int p = pr16[ch] & 127;
+        chan[ch] = true;
+        horn[ch] |= p >= 56 && p <= 71;
+        orch[ch] |= (p >= 40 && p <= 60) || (p >= 68 && p <= 75);
+        ks.brassSection |= p == 61;
+        ks.electricBass |= p >= 33 && p <= 39;
+        ks.uprightBass |= p == 32;
+        ks.organ |= p >= 16 && p <= 18;
+      }
+      for (int c = 0; c < 16; ++c) { ks.parts += chan[c]; ks.horns += horn[c]; ks.orchestral += orch[c]; }
+      ks.brushes = first >= 0 && kitOf(drumProg) == Kit::kBrush;
+      const double beats = first >= 0 ? std::max(1.0, double(last - first) / song.div) : 1;
+      ks.kicksPerBeat = kicks / beats;
+      if (!kv.empty()) {
+        std::nth_element(kv.begin(), kv.begin() + kv.size() / 2, kv.end());
+        ks.kickVel = kv[kv.size() / 2];
+      }
+      ks.kickOnBeat = kicks ? double(onBeat) / kicks : 0;
+      if (kicks > 0) {
+        std::string why;
+        if (!chosenKick()) chosenKick() = chooseKick(ks, &why);
+        else why = std::string(chosenKick()) + ": PJ_KICK_KIND";
+        std::fprintf(stderr, "  (the bass drum: %s)\n", why.c_str());
+      }
+    }
     // The flutes of a Baroque piece played on the Baroque flute (PJ_BAROQUE_FLUTE, 1; 0: never,
     // 2: always where it can): the director read the piece as Baroque, or the file is named by a
     // Baroque catalogue (BWV, HWV, TWV, BuxWV, RV: Bach, Handel, Telemann, Buxtehude, Vivaldi). Only

@@ -101,12 +101,54 @@ general knowledge, to be checked; **[design]** a choice; **[meas]** measured on 
   - On the same notes (the first 90 s of each), the trimmed jazz kick is +1.1 to +6.5 dB over the
     taiko. That puts it on average 1.4 dB from TiMidity's level (−5 to +8 dB per file) [meas].
 
-## 6. Open
+## 6. The kinds, and which one a piece gets (built 2026-11-28)
+
+The user: "have all jazz kicks and choose the most suitable for every setup; develop rules which
+decide which jazz kick you keep". `src/kick.cc` `kKicks`, one instrument each; keys 35 and 36 play
+the piece's kick (`chosenKick()`, `src/drumkit.cc`). All share the 18"'s calibration (one key map,
+one gain); their own levels are `src/levels_data.h`'s trims, set to the 18"'s loudness (K-weighted,
+loudest 400 ms, v64/96/120).
+
+| Kind | Size | Note [meas] | -30 dB [meas] | Damping, heads, beater |
+|---|---|---|---|---|
+| `jazz-kick-16` | 16" x 14" | 86 Hz | 0.18 s | open; the resonant head 5 % up |
+| `jazz-kick` | 18" x 14" | 70 Hz | 0.30 s | open (as before) |
+| `jazz-kick-20` | 20" x 14" | 60 Hz | 0.40 s | open (as before) |
+| `jazz-kick-22` | 22" x 14" | 52 Hz | 0.30 s | a felt strip on each head (zeta x 1.6–1.7) |
+| `studio-kick` | 22" x 16" | 48 Hz | 0.11 s | ported (vent 40 Hz), a pillow (zeta x 5–8), hard felt at the middle, the mic at the port, click x 2 |
+
+The rule (`chooseKick`, printed as "the bass drum: ..."), from the director's reading and the file:
+
+- **Not jazz:**
+  - an orchestra (the classical reading, orchestral programs at least half the parts, no electric
+    bass, under 0.3 kick strokes a beat): the 22";
+  - pop, rock, funk, disco (an electric bass, an amped band, or a hard four on the floor): the studio kick;
+  - otherwise, acoustic (bossa, folk, a singer's ballad): the 20".
+- **Jazz:**
+  - a big band (a brass section, or 4+ horns): the 22", but the 20" at 240 a minute or faster;
+  - an electric bass, or an organ trio: the 20";
+  - a trio or smaller with brushes, or a ballad: the 16";
+  - two or more horns at under 200 a minute: the 20";
+  - otherwise: the 18" (bebop).
+- `PJ_KICK_KIND=<name>` forces one.
+
+On the collection [meas]:
+- Disco Boogie, A Hard Day's Night, Brazil and Beguine get the studio kick.
+- Autumn Leaves, Caravan and Blue Moon get the 18".
+- Take Five (a big-band arrangement: 13 horn channels) gets the 22".
+- Desafinado, El Cumbanchero and Are You Lonesome Tonight get the 20".
+
+The `PJ_KICK_*` size and tuning knobs are now factors on each kind's own values. `PJ_KICK_ZETA*`
+became one factor, `PJ_KICK_DAMP`.
+
+## 7. Open
 
 - Fit the note's T60, the pair and the glide to recordings of a jazz kick (the separated stems:
   `drums.md`). The kick is felt more than heard there, so it needs passages with little bass.
+  `research/jazz_kick_sound.md` holds the targets, and the places where it finds the model off: the
+  decay, the 18"'s note at the bottom of its range, the out-of-phase pair, the strike positions.
 - Sympathy: the kick ringing the snare's wires and the toms (the kit's room).
-- A felt strip or a pillow (muffling) as an option for other styles.
+- The kinds by ear: none is tuned against a recording yet.
 
 ## Sources
 

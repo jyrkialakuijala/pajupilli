@@ -162,6 +162,10 @@ extern const Instrument kPlucked[] = {
     // The jazz bass drum, 18" (and 20") (src/kick.cc): General MIDI's drum keys 35, 36.
     {"jazz-kick", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"jazz-kick-20", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    // (the other bass drums a drummer may bring: src/kick.cc kKicks; one chosen per piece, chooseKick)
+    {"jazz-kick-16", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"jazz-kick-22", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
+    {"studio-kick", 0, 35, 36, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     // Shakers and jingles (src/shaker.cc): General MIDI's drum keys 70, 69, 54; GM2's 82, 83.
     {"maracas", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},
     {"shaker", 0, 36, 96, 1, 1, 1, 48000, 0, false, false, 0, 1.0, Kind::kString, &kPianoDesign, "drum"},

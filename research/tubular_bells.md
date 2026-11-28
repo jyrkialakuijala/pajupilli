@@ -483,8 +483,12 @@ Status of each step on 2026-11-27:
    key not held (`setHold`). The felt: `PJ_BELLS_DAMPER` 20 1/s at 500 Hz, x sqrt(f / 500)
    (0.7 .. 2.5: the higher modes sooner), about 0.35 s to -60 dB on a tube's strike note; the
    cast bells beyond the tubes 0.6 of it (no damper on a real set: a hand on the heavier bell);
-   the felt coming down over `PJ_BELLS_DAMPER_TIME` 0.04 s. Not yet: hand damping, damped
-   strokes, the damper's own release sound, the director choosing to let a short note ring.
+   the felt coming down over `PJ_BELLS_DAMPER_TIME` 0.04 s. **The half pedal** (the user: "the
+   player can do a slower release by half pedaling them a bit when they need to die out"): a note
+   let go gets the felt only touching, `PJ_BELLS_HALFPEDAL` 0.2 of the full damper (about 1.5 s
+   to -60 dB [meas]); the next stroke clears every key let go with the full damper (the player
+   moving on, no smear); `PJ_BELLS_HALFPEDAL=1`: the full stop at once. Not yet: hand damping,
+   damped strokes, the damper's own release sound.
 7. **Swing — not yet.**
 8. **Tuning — built** (section 9): `BarsPlayer::pull` at each stroke of a key not ringing, its
    own ringing bells heard too (`hearOwn`), ±15 c; `kBandChime` and `bandRatio` in `src/band.*`

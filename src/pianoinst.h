@@ -85,6 +85,7 @@ class PianoModel : public Tube {
   std::vector<float> partPlace_, partOut_;
   std::vector<std::vector<float>> part_;
   float treble_ = 0, trebleA_ = 0, trebleM_ = 0, trebleS_ = 0;  // (the honky-tonk's lifted highs)
+  float eqG_[2] = {}, eqA_[2] = {}, eqM_[2] = {}, eqS_[2] = {};  // (the pianos' mild lift of the highs: two shelves)
   float air_ = 0, airA_ = 0, airM_ = 0, airS_ = 0;              // (... and its top)
   float lpB_[3] = {}, lpA_[2] = {}, lpZm_[2] = {}, lpZs_[2] = {};  // (... rolled off: no hiss)
   bool lpOn_ = false;

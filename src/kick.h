@@ -26,6 +26,7 @@
 
 #include "membrane.h"
 #include "performer.h"
+#include "rng.h"
 #include "tube.h"
 
 namespace pajupilli {
@@ -49,7 +50,7 @@ struct KickSpec {
   double click = 1;              // the felt's own thump above the modes (x)
   double gain = 1;
 };
-KickSpec kickSpec(bool twenty);  // with the PJ_KICK_* knobs
+KickSpec kickSpec(const char* name);  // the kind by its instrument's name, with the PJ_KICK_* knobs
 
 class Kick {
  public:
@@ -119,13 +120,13 @@ class KickPlayer : public Performer {
   void noteOff(int) override {}
   void render(float* out, int n) override;
   void setHold(bool h) override;
-  void seed(unsigned s) override { rng_ = 4241u + 7919u * s; }
+  void seed(unsigned s) override { rng_.reseed(4241u + 7919u * s); }
   static double beaterSpeed(int velocity, double dynamics);  // m/s
 
  private:
   double ur();
   KickModel& m_;
-  uint32_t rng_ = 4241u;
+  Rng rng_{4241u};
 };
 
 }  // namespace pajupilli

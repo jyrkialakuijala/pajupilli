@@ -92,6 +92,9 @@ constexpr LevelTrim kLevelTrims[] = {
     {"harpsichord-full", 20.0f},
     {"jazz-kick", -4.3f},
     {"jazz-kick-20", -5.4f},
+    {"jazz-kick-16", -1.7f},  // (the other kinds at the 18"'s loudness: K-weighted, loudest 400 ms, v64/96/120, 2026-11-28)
+    {"jazz-kick-22", -4.3f},
+    {"studio-kick", -5.2f},
     {"maracas", -2.9f},
     {"shaker", -0.4f},
     {"cabasa", -0.4f},

@@ -92,7 +92,7 @@ Drum drumFor(int k, Kit kit, bool gs) {
   }
   if (k == 85) return {"perc-extras", 21};                     // castanets (General MIDI 2)
   switch (k) {
-    case 35: case 36: return {"jazz-kick", k};                                // bass drum (35: lower on the head, 36: nearer its middle)
+    case 35: case 36: return {chosenKick() ? chosenKick() : "jazz-kick", k};  // bass drum (35: lower on the head, 36: nearer its middle; the piece's kick)
     case 75: return {"claves", 75};
     case 76: case 77: return {"wood-blocks", k};                             // high, low
     case 84: return {"bell-tree", 84};                                       // General MIDI 2
@@ -306,7 +306,13 @@ struct DrumCalState {
     const double a = (v - kDrumCalVels[i]) / double(kDrumCalVels[i + 1] - kDrumCalVels[i]);
     return c.target[i] + a * (c.target[i + 1] - c.target[i]);
   }
+  // (the bass drums all as the 18" jazz kick's calibration: one key map, one gain; their own levels
+  // the level trims', src/levels_data.h)
+  static const char* canon(const char* inst) {
+    return std::strncmp(inst, "jazz-kick", 9) == 0 || std::strcmp(inst, "studio-kick") == 0 ? "jazz-kick" : inst;
+  }
   double gainOf(const char* inst) const {
+    inst = canon(inst);
     for (const auto& g : gain)
       if (g.first == inst) return g.second;
     return 0;
@@ -323,8 +329,8 @@ struct DrumCalState {
       if (std::strcmp(d.inst, "agogo") == 0) need = 0;  // (GM 114)
       bool found = false;
       for (auto& g : gain)
-        if (g.first == d.inst) { g.second = std::max(g.second, need); found = true; }
-      if (!found) gain.push_back({d.inst, need});
+        if (g.first == canon(d.inst)) { g.second = std::max(g.second, need); found = true; }
+      if (!found) gain.push_back({canon(d.inst), need});
     }
     for (const DrumCal& c : kDrumCal) {
       const Drum d = drumFor(c.key, kKits[c.kit], false);
@@ -357,6 +363,58 @@ const DrumCalState& drumCal() {
 // 1-2 dB softer and further away. As velocity's, at most +6 dB into the room; what is over goes to the trim.)
 double drumGainDb(const char* inst) { return drumCal().on ? std::min(drumCal().gainOf(inst), 6.0) : 0; }
 double drumTrimDb(const char* inst) { return drumCal().on ? std::max(drumCal().gainOf(inst) - 6.0, 0.0) : 0; }
+
+const char*& chosenKick() {
+  static const char* k = [] { const char* e = std::getenv("PJ_KICK_KIND"); return e && *e ? e : nullptr; }();
+  return k;
+}
+
+// Which bass drum for the piece (research/jazz_kick_sound.md, research/kick.md; the drummer's
+// choice by the band and the room it plays in). In order:
+//   - Not jazz:
+//       - an orchestra (the director's classical reading, orchestral instruments half the parts or
+//         more, no electric bass, the bass drum sparse: under 0.3 strokes a beat, no groove's kick):
+//         the 22" with its felt strips (the nearest to an orchestra's
+//         bass drum: big, low, its ring held short);
+//       - pop, rock, funk, disco, soul (an electric bass, an amped band, or a hard four on the
+//         floor: a stroke on nearly every beat, on the beat, at velocity 100 or over): the
+//         studio kick, ported and damped;
+//       - otherwise, acoustic (bossa, folk, a singer's ballad): the 20", open and soft.
+//   - Jazz:
+//       - a big band (a brass section, or four or more horns): the 22" (the
+//         section's hits and the bombs under them); at 240 a minute or faster the 20" (the 22"'s
+//         note too long for the time);
+//       - an electric bass, or an organ trio: the 20" (the bass's and the organ's low end round it);
+//       - a trio or smaller with brushes, or a ballad: the 16" (a small room's drum, high and
+//         short under a soft bass);
+//       - two or more horns in front at under 200 a minute: the 20" (hard bop, post-bop);
+//       - otherwise: the 18", the bebop kick.
+const char* chooseKick(const KickSetup& s, std::string* why) {
+  char b[300];
+  auto say = [&](const char* k, const char* r) {
+    if (why) {
+      std::snprintf(b, sizeof b, "%s: %s (%d parts, %d horns, %d orchestral; %s bass; %.0f a minute; the kick %.2f a beat, "
+                    "%.0f %% on it, velocity %.0f)", k, r, s.parts, s.horns, s.orchestral,
+                    s.electricBass ? "an electric" : s.uprightBass ? "an upright" : "no named", s.bpm, s.kicksPerBeat,
+                    100 * s.kickOnBeat, s.kickVel);
+      *why = b;
+    }
+    return k;
+  };
+  if (!s.jazz) {
+    if (s.classical && !s.electricBass && !s.amped && s.orchestral >= std::max(2, (s.parts + 1) / 2) && s.kicksPerBeat < 0.3)
+      return say("jazz-kick-22", "an orchestra: the big drum, damped");
+    const bool floor4 = s.kicksPerBeat >= 0.85 && s.kickOnBeat >= 0.85 && s.kickVel >= 100;
+    if (s.electricBass || s.amped || floor4) return say("studio-kick", "pop, rock, funk or disco: the ported, damped studio kick");
+    return say("jazz-kick-20", "acoustic, not jazz (bossa, folk, a ballad): the open 20\"");
+  }
+  if (s.brassSection || s.horns >= 4)
+    return s.bpm >= 240 ? say("jazz-kick-20", "a big band, fast: the 20\"") : say("jazz-kick-22", "a big band: the 22\"");
+  if (s.electricBass || (s.organ && !s.uprightBass)) return say("jazz-kick-20", "an electric bass or an organ trio: the 20\"");
+  if (s.parts <= 3 && (s.brushes || s.ballad)) return say("jazz-kick-16", "a trio or smaller, brushes or a ballad: the 16\"");
+  if (s.horns >= 2 && s.bpm < 200) return say("jazz-kick-20", "horns in front: the 20\"");
+  return say("jazz-kick", "a small group: the 18\" bebop kick");
+}
 
 int drumVelocity(int gmKey, Kit kit, int velocity) {
   const DrumCalState& s = drumCal();
