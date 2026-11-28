@@ -195,6 +195,9 @@ double noteLead(const Instrument& inst) {
   // as section players do: the horns' long bores up to 85 ms: src/brasssect.cc)
   static const double kBrass = knob("PJ_BRASS_LEAD", 0.09);
   if (std::strcmp(inst.name, "brass-section") == 0) return kBrass;
+  // (the tambourine's motion before its stroke, the lift's small jingle: src/shaker.cc, research/tambourine.md 2.6)
+  static const double kTamb = knob("PJ_TAMB_LEAD", 0.10);
+  if (std::strcmp(inst.name, "tambourine") == 0 && knob("PJ_TAMB_PLAN", 1) > 0) return kTamb;
   return std::strcmp(inst.name, "maracas") == 0 ? kMaracas : 0.0;
 }
 

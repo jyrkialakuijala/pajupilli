@@ -7,7 +7,9 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "cowbellplan.h"
 #include "drumcal_data.h"
+#include "metalperc.h"
 #include "knob.h"
 
 namespace pajupilli {
@@ -26,6 +28,9 @@ Drum drumFor(int k, Kit kit, bool gs) {
     if (k == kKeySwirlCrash2) return {"crash-cymbal-2", 84};
     if (k == kKeySwirlCrash) return {"crash-cymbal", 84};
   }
+  // (The cowbell player's chosen strokes: -play's keys, src/cowbellplan.h.)
+  if (k >= kKeyCowbellStroke0 && k < kKeyCowbellStroke0 + 16) return {"cowbell", kCowbellStroke0 + k - kKeyCowbellStroke0};
+  if (k >= kKeyCowbellMounted0 && k < kKeyCowbellMounted0 + 16) return {"cowbell", kCowbellMounted0 + k - kKeyCowbellMounted0};
   // The usual snare is played with sticks (src/sticksnare.cc: the same drum
   // under sticks, with its rim shot and roll). A jazz group's (Kit::kJazz: a
   // file with a piano and an upright bass) and a Brush kit's is the brushed
@@ -356,6 +361,7 @@ double drumTrimDb(const char* inst) { return drumCal().on ? std::max(drumCal().g
 int drumVelocity(int gmKey, Kit kit, int velocity) {
   const DrumCalState& s = drumCal();
   const int k = kit == Kit::kStandard ? 0 : kit == Kit::kJazz ? 1 : 2;
+  if ((gmKey >= kKeyCowbellStroke0 && gmKey < kKeyCowbellStroke0 + 16) || (gmKey >= kKeyCowbellMounted0 && gmKey < kKeyCowbellMounted0 + 16)) gmKey = 56;  // (a cowbell stroke: as the cowbell's key)
   if (!s.on || gmKey < 0 || gmKey > 127 || velocity < 1 || !s.has[k][gmKey]) return velocity;
   return s.map[k][gmKey][std::min(velocity, 127)];
 }

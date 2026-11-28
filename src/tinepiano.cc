@@ -1,10 +1,13 @@
 #include "tinepiano.h"
 #include "heard.h"
+#include "director.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <string>
 
 #include "knob.h"
 #include "vmath.h"
@@ -123,7 +126,50 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
   static const double kP = knob("PJ_TINEPIANO_P", 1.25);          // the bell's exponent
   static const double kBarQ = knob("PJ_TINEPIANO_BAR_Q", 40);
   static const double kSideDb = knob("PJ_TINEPIANO_SIDE_DB", -20);  // the sideways polarisation's share
-  suitcase_ = knob("PJ_TINEPIANO_SUITCASE", 1) > 0;
+  // What is recorded: the style's (see tinepiano.h), PJ_TINEPIANO_OUT sets it; the older
+  // PJ_TINEPIANO_SUITCASE=0 is the Stage straight in, =1 the Suitcase whole.
+  {
+    // (Jazz: the DI; a small band or a ballad: the Leslies; rock, funk, blues: the combo; else the DI.)
+    const int byStyle = jazzPiece() ? 0 : rotaryRoom() ? 4 : ampedPiece() ? 3 : 0;
+    const double old = knob("PJ_TINEPIANO_SUITCASE", -1);
+    out_ = int(knob("PJ_TINEPIANO_OUT", old < 0 ? byStyle : old > 0 ? 1 : 2));
+    out_ = std::clamp(out_, 0, 4);
+  }
+  suitcase_ = out_ <= 1;
+  if (out_ == 4) {
+    // The organ's two-cabinet set (src/tonewheel.cc): each its parts +-7 % off nominal, its own
+    // speed (x 1.172, x 1.081: their cross ratios far from simple fractions) and horn-to-drum
+    // ratio (the model's own; the published 122's 1.20 slow, 1.17 fast), each its own valve amp,
+    // fed the Stage x8 (PJ_TINEPIANO_LESIN: the Suitcase preamp's gain, a ff chord into the amps'
+    // knees), the two together as loud as one (0.54). Slow until the mod wheel says fast.
+    static const double kSpeed[2] = {1.1724, 1.0811};
+    les_.resize(2);
+    for (int c = 0; c < 2; ++c) les_[c].setup(inst.fs, 7311u + 7919u * c, 0.07, false, kSpeed[c], c ? 1.20 : 0.0, c ? 1.17 : 0.0);
+    lesIn_ = knob("PJ_TINEPIANO_LESIN", 8.0);
+    // In the room as the organ's left and right cabinets (src/tonewheel.cc): 0.3 m toward the
+    // listener, 2 m either side, each turned 25 degrees in.
+    lesRoom_.setup(inst.fs, {{0.3, 2.0, 25 * M_PI / 180}, {0.3, -2.0, -25 * M_PI / 180}});
+    roomMics_ = std::getenv("PJ_ROTARY_MICS") == nullptr || std::string(std::getenv("PJ_ROTARY_MICS")) != "close";
+  }
+  {
+    static const double kTrimDb[5] = {-1.5, 0, 12.5, 13.0, -2.4};
+    trim_ = fastPow(10.0, kTrimDb[out_] / 20);
+  }
+  if (out_ == 3) {
+    // The Stage's harp (0.65 H, 1.4 kOhm) through its 10 kOhm volume pot and a cable into the
+    // combo's 1 MOhm; the DI blended 30 % (PJ_TINEPIANO_BLEND), lined up with the mic. The harp's
+    // EMF scaled into the combo's volts (PJ_TINEPIANO_AMPIN: a fortissimo bass chord near its
+    // stages' knees, a mezzo-forte line clean).
+    GuitarAmp::Preset p = GuitarAmp::cleanCombo();
+    p.name = "tine-combo";
+    p.blend = knob("PJ_TINEPIANO_BLEND", 0.3);
+    p.diAlign = true;
+    p.hpOut = 10;
+    amp_.reset(new GuitarAmp(inst.fs, p));
+    amp_->connect({0.65, 1400, 100e-12, 10e3}, 400e-12);
+    ampIn_ = knob("PJ_TINEPIANO_AMPIN", 2.0);
+    ampOut_ = knob("PJ_TINEPIANO_AMPOUT", 1.0) / ampIn_;
+  }
   const double fs = inst.fs;
   keys_.resize(kKeys);
   for (int k = 0; k < kKeys; ++k) {
@@ -258,8 +304,22 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
   for (double& e : humEps_) e = 0.05 * urand(h);
 }
 
+// (called by the room each block: from then on the Leslies radiate into it, as the organ's)
+void TinePianoModel::takeEarly(int n, float* l, float* r, float g) {
+  inRoom_ = true;
+  const int have = int(earlyL_.size()), m = std::min(n, have);
+  for (int i = 0; i < m; ++i) {
+    l[n - m + i] += g * earlyL_[have - m + i];
+    r[n - m + i] += g * earlyR_[have - m + i];
+  }
+  earlyL_.clear();
+  earlyR_.clear();
+}
+
 void TinePianoModel::resetAir() {
   Tube::resetAir();
+  lesRoom_.reset();
+  if (amp_) amp_->reset();
   for (Key& K : keys_) {
     for (Mode& m : K.m) m.re = m.im = 0;
     K.side.re = K.side.im = K.bar.re = K.bar.im = 0;
@@ -410,8 +470,32 @@ float TinePianoModel::sample() {
   const double hv = harpB_[0] * e + harpB_[1] * hx_[0] + harpB_[2] * hx_[1] - harpA_[1] * hy_[0] - harpA_[2] * hy_[1];
   hx_[1] = hx_[0], hx_[0] = e, hy_[1] = hy_[0], hy_[0] = hv;
   double l, r;
-  if (!suitcase_) {
-    l = r = hv;  // the Stage: straight out (a DI)
+  if (out_ == 4) {
+    l = r = 0;
+    float rays[2][Rotary::kRays];
+    for (int c = 0; c < 2; ++c) {
+      float cl, cr;
+      les_[c].process(float(0.54 * lesIn_ * hv), cl, cr, inRoom_ ? rays[c] : nullptr);
+      l += cl, r += cr;
+    }
+    if (inRoom_) {
+      // Into the room: the pair's early sound from the two cabinets' paths; the room's late field
+      // fed the rays' mean (all round).
+      double el = 0, er = 0, sum = 0;
+      lesRoom_.step(rays, 2, el, er, sum);
+      static const double kRoomDb = knob("PJ_TINEPIANO_LESROOM_DB", 1.7);
+      const double g = trim_ * fastPow(10.0, kRoomDb / 20);
+      earlyL_.push_back(float(g * el * outScale()));
+      earlyR_.push_back(float(g * er * outScale()));
+      last_ = float(g * sum / Rotary::kRays);
+      side_.push_back(0);
+      return finish(last_);
+    }
+    l *= trim_, r *= trim_;
+  } else if (out_ == 3) {
+    l = r = trim_ * ampOut_ * amp_->process(float(ampIn_ * e));  // the Stage into the combo, its DI under it
+  } else if (!suitcase_) {
+    l = r = trim_ * hv;  // the Stage: straight out (a DI)
   } else {
     // The Peterson preamp: 0.22 uF in (~24 Hz), gain ~8, its tone at the centre (a gentle treble
     // roll-off).
@@ -437,6 +521,15 @@ float TinePianoModel::sample() {
         cell_[c] += (light - cell_[c]) * (1 - std::exp(-dt_ / tc));
         gch[c] = 1 / (1 + 9 * cell_[c]);
       }
+    }
+    if (out_ == 0) {
+      // The preamp's outputs taken direct: the vibrato, no power amplifier, no speakers.
+      l = pre * gch[0];
+      r = pre * gch[1];
+      l *= trim_, r *= trim_;
+      side_.push_back(float(outScale() * 0.5 * (l - r)));
+      last_ = float(0.5 * (l + r));
+      return finish(last_);
     }
     // The power amplifier: its unregulated rails sag under a heavy signal (~50 ms) and recover
     // (~300 ms); it clips softly against them.
@@ -500,6 +593,7 @@ void TinePianoPlayer::render(float* out, int n) {
     tick(m / fs_);
     const double depth = (depth_ >= 0 ? depth_ : kDepth) + 0.5 * std::clamp(breathCtl_, 0.0, 1.0);
     m_.setVibrato(rate_ > 0 ? rate_ : kRate, std::min(1.0, depth));
+    m_.setRotaryFast(flutter_ >= 0.5);  // (the mod wheel: fast from 64, as the organ's)
     m_.process(out + i, m);
   }
   blowing_ = !m_.asleep();

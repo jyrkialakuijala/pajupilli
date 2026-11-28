@@ -119,6 +119,7 @@
 #ifndef PAJUPILLI_JAZZSINGER_H_
 #define PAJUPILLI_JAZZSINGER_H_
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -186,6 +187,15 @@ class JazzSinger {
   // (before setScore; not set: the one whose range holds the part best). false: no such voice.
   bool setVoice(const std::string& name);
   const char* voiceName() const;
+  // What the singer is told of its place in the band (before setScore): the part was written for a bass
+  // instrument; a solo line (an instrument or another singer) sounds in a higher register. With either of the two a
+  // basso profondo or a bass sings a plucked bass's syllables ("dum", "dzum", "djum", "tzum": plan()).
+  void setBassPlace(bool bassPart, bool soloAbove) { bassPart_ = bassPart; soloAbove_ = soloAbove; }
+  bool singsBass() const { return bassSyl_; }
+  // Which singer of the rendering this is (before setScore; 0: the first, or the only one): the choices drawn by
+  // lot (syllables, modes, vibrato, colours) and the voice's noise and drift are then its own. Without it two
+  // singers draw the same at the same note of their parts.
+  void setSinger(int k) { salt_ = uint32_t(k) * 0x9e3779b9u; }
   std::string range() const;  // "C4-C6"
   int outside() const { return outside_; }  // notes outside the voice's range as sung
 
@@ -199,8 +209,15 @@ class JazzSinger {
   // agree: the pitch trimmed onto the note, the breath set so that every vowel is as loud on a
   // pitch as the others (a loud vowel on less breath: the least effort), a vowel opened where the
   // pitch climbs past its first resonance. Then every interval, slurred (vowel to vowel) and
-  // direct (a consonant between), on one vowel and on a changing one, trying ways of going until
-  // the new note is there soonest and cleanest.
+  // direct (a consonant between), a note sung again and a note begun after a rest, each into notes
+  // of 0.12, 0.2, 0.27, 0.35 and 0.6 s as a song has them (the author, 2026-11-27: "the singers for
+  // voice-lead could practice intervals and slurs"), up and down, from every sixth note of the
+  // range, on four occasions (other vowels, another consonant, unweighted): sung plainly and
+  // heard, then sung again aiming past the note by what was missed, fading; the aim kept if the
+  // note is clearly nearer its pitch for it on the whole and on no occasion much further. Used in a song
+  // under PJ_SINGER_WAYS.
+  // (PJ_SINGER_PRACTICE_ONLY=ways: these alone, the notes left as they are in the file;
+  // PJ_SINGER_PRACTICE_VOICE: one voice; PJ_SINGER_PRACTICE_JOBS: how many processes.)
   // Writes src/singer_data.h (jobs processes; 0: one a core). Returns 0 if it went well.
   static int practise(const char* outPath, int jobs);
 
@@ -229,12 +246,14 @@ class JazzSinger {
   void weigh(Style style);
   // (the practice's trials: a way for every change of note, a trim for every note, or nothing practised used at all)
   const Way* tryWay_ = nullptr;
+  int tryWayAt_ = 1;  // (which note of the phrase the way tried leads into)
   const ::SingerTrim* tryNote_ = nullptr;
   bool tryNoteSet_ = false, plain_ = false, noLevel_ = false;
   std::vector<float> weight_;    // each syllable's weight, 0 (unweighted) .. 1
   std::vector<char> wordStart_;  // it begins a word
   std::vector<double> others_;
   std::vector<Phrase> phrase_;
+  bool bassPart_ = false, soloAbove_ = false, bassSyl_ = false;
   int voice_ = -1;  // (index into the voices; -1: not chosen yet)
   Style style_ = kJazz;  // (as planned)
   std::vector<float> play_, bright_, mischief_;  // the play at each note: level, colour, mischief (plan())
@@ -251,6 +270,8 @@ class JazzSinger {
   std::shared_ptr<Plate> plate_;
   std::vector<float> sent_;  // the voice as rendered, waiting for halo()
   double compEnv_ = 0;
+  std::shared_ptr<void> bank_, headBank_;  // the resonators after the voice (render())
+  uint32_t salt_ = 0;
   double lastEnd_ = -1e9;  // when the last phrase's last note ended (s)
   mutable double breathEnd_ = 0;  // take(): where the breath in ends in the sound it returned (s)
 };

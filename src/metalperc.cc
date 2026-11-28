@@ -41,6 +41,14 @@ const double kBellRatio[] = {1, 1.072, 1.142, 1.229, 4.20, 4.74, 5.28, 5.35, 5.4
 const double kBellDb[] = {0, -13, -24, -30, -27, -30, -20, -31, -28, -32, -29, -29, -28, -32};
 const double kBellT60[] = {0.75, 0.7, 0.74, 0.66, 0.67, 0.4, 0.73, 0.6, 0.4, 0.75, 0.67, 0.65, 0.35, 0.68};
 constexpr int kBellN = int(sizeof kBellRatio / sizeof kBellRatio[0]);
+// Above them, the walls' higher plate modes near the closed end, which the
+// shaft on the mouth's edge (a long contact, far from them) hardly reaches and
+// the stick's tip on the crown does: what makes the crown's stroke a "ping"
+// (research/triangle_cowbell.md 2.4; a design, no recording of a crown stroke).
+const double kBellHiRatio[] = {8.9, 10.3, 11.8, 13.6};
+const double kBellHiDb[] = {-30, -32, -34, -36};
+const double kBellHiT60[] = {0.35, 0.3, 0.25, 0.2};
+constexpr int kBellHiN = int(sizeof kBellHiRatio / sizeof kBellHiRatio[0]);
 
 }  // namespace
 
@@ -106,27 +114,33 @@ MetalPercModel::MetalPercModel(const Instrument& inst)
     def.modalMass = float(knob("PJ_COWBELL_MASS", 0.08));
     def.zShare = 0;
     const double f0 = knob("PJ_COWBELL_HZ", 472);
-    def.n = kBellN;
-    uint32_t h = 777;
-    for (int k = 0; k < kBellN; ++k) {
-      def.freq[k] = float(f0 * kBellRatio[k]);
-      def.t60[k] = float(kBellT60[k] * knob("PJ_COWBELL_T60", 1.0));
+    def.n = kBellN + kBellHiN;
+    Rng sides(777);
+    for (int k = 0; k < def.n; ++k) {
+      const bool hi = k >= kBellN;
+      const double ratio = hi ? kBellHiRatio[k - kBellN] : kBellRatio[k], db = hi ? kBellHiDb[k - kBellN] : kBellDb[k];
+      def.freq[k] = float(f0 * ratio);
+      def.t60[k] = float((hi ? kBellHiT60[k - kBellN] : kBellT60[k]) * knob("PJ_COWBELL_T60", 1.0));
       def.exc[k] = 1;
       // The sound ~ f x rad x the shape at the stroke: rad to the recorded
       // levels.
       // (The walls' modes 12 dB up: what the stick's ~0.1 ms contact gives
       // them less than the recording's harder or sharper stroke, fitted.)
-      def.rad[k] = float(fastPow(10.0, kBellDb[k] / 20) / kBellRatio[k] * (k >= 4 ? 4.0 : 1.0));
-      h = h * 1664525u + 1013904223u;
-      def.side[k] = float(0.4 * def.rad[k] * (((h >> 9) & 1) ? 1 : -1));
+      def.rad[k] = float(fastPow(10.0, db / 20) / ratio * (k >= 4 ? 4.0 : 1.0));
+      def.side[k] = float(0.4 * def.rad[k] * (sides.uniform() >= 0 ? 1 : -1));
     }
     set_.setVib(0, def);
     gain_ = knob("PJ_COWBELL_GAIN", 0.53);  // (a peak ~0.3 at velocity 100; the trim then small)
+    // (the crossover: a 2nd-order Butterworth low-pass at 1.1 kHz; the high band is what is left)
+    const double w = std::tan(kPi * knob("PJ_COWBELL_XOVER", 1100) / inst.fs), q = std::sqrt(2.0), nrm = 1 / (1 + q * w + w * w);
+    xb_[0] = w * w * nrm; xb_[1] = 2 * xb_[0]; xb_[2] = xb_[0];
+    xa_[0] = 2 * (w * w - 1) * nrm; xa_[1] = (1 - q * w + w * w) * nrm;
+    swayW_ = 2 * kPi * 0.6 / inst.fs;
   }
   excite(0.5);
 }
 
-void MetalPercModel::excite(double where) {
+void MetalPercModel::excite(double where, double place) {
   if (kind_ == kTriangle) {
     // A stroke across the bottom side (the middle third of the rod) at a
     // slant: in the plane mostly, a little across it (cos / sin of 25 deg);
@@ -141,15 +155,33 @@ void MetalPercModel::excite(double where) {
       set_.setExcitation(fam, shape);
     }
   } else {
-    // Along the mouth's edge: the walls' modes change most with the place,
-    // the mouth's breathing little.
+    // Two zones. The mouth (place < 0.5: the side of the stick on the open
+    // edge): the walls' modes change most with where along the edge, the
+    // mouth's breathing little, a little less a little further in. The top
+    // (place >= 0.5: the tip on the body, toward the closed end): the
+    // mouth's breathing fades (its motion is greatest at the open end, least
+    // where the top holds the walls: ~-8 dB on the body, ~-14 dB at the
+    // crown), and the walls' high modes near the closed end come in. (A larger
+    // shape is also a lighter bell under the stick, which then takes less:
+    // these are kept near 1, the level comes from the stroke.)
     float shape[ModalSet::kModes] = {};
     const ModalSet::Def& d = set_.def(0);
+    const double p = std::clamp(place, 0.0, 1.0);
+    const bool top = p >= 0.5;
+    const double u = top ? (p - 0.5) * 2 : p * 2;  // where within the zone, 0 .. 1
+    static const double kLowBody = knob("PJ_COWBELL_BODY_LOW", 0.4), kLowCrown = knob("PJ_COWBELL_CROWN_LOW", 0.2),
+                        kHiTop = knob("PJ_COWBELL_TOP_HI", 1.0);
+    const double low = top ? kLowBody + (kLowCrown - kLowBody) * u : 1 - 0.2 * u;
     for (int k = 0; k < d.n; ++k) {
+      if (k >= kBellN) {
+        shape[k] = float(top ? kHiTop * (0.5 + 0.5 * u) * (0.7 + 0.6 * std::fabs(std::cos((k - kBellN + 2) * kPi * where))) : 0.0);
+        continue;
+      }
       const double m = 1 + std::floor(kBellRatio[k] * 1.3);
       // (The stick's shaft lies across a few cm of the edge: no wall mode is
-      // ever wholly at a node.)
-      shape[k] = float(k < 4 ? 1.0 : 0.6 + 0.8 * std::fabs(std::cos(m * kPi * where)));
+      // ever wholly at a node; the tip is a point, so a little more varied.)
+      const double wall = top ? 0.4 + 1.0 * std::fabs(std::cos(m * kPi * where)) : 0.6 + 0.8 * std::fabs(std::cos(m * kPi * where));
+      shape[k] = float(k < 4 ? low : wall);
     }
     set_.setExcitation(0, shape);
   }
@@ -170,6 +202,39 @@ void MetalPercModel::strike(double speed, double where) {
   }
 }
 
+void MetalPercModel::strikeBell(double speed, double where, double place, double mute) {
+  const double p = std::clamp(place, 0.0, 1.0), mu = std::clamp(mute, 0.0, 1.0);
+  // The hand: a finger on the broad face damps the mouth's breathing most
+  // (the face moves most in it), the walls' modes less. Fully pressed: T60
+  // ~0.1 s on the lowest four, ~0.25 s above; a kit's bell with tape inside
+  // is about a third of that.
+  static const double kLowT = knob("PJ_COWBELL_MUTE_LOW_T60", 0.1), kHiT = knob("PJ_COWBELL_MUTE_HI_T60", 0.25);
+  float rate[ModalSet::kModes] = {};
+  // (a light touch takes little: the loss grows as the pressure^1.5)
+  const double press = mu * std::sqrt(mu);
+  for (int k = 0; k < set_.def(0).n; ++k) rate[k] = float(press * 6.91 / (k < 4 ? kLowT : kHiT));
+  set_.dampModes(0, mu > 0 ? rate : nullptr);
+  excite(where, p);
+  // The side of the stick (20 g at the edge, a ~0.1 ms contact) or the tip (lighter, ~7
+  // g, and a stiffer local contact: a shorter one that reaches the walls'
+  // high modes). The tip is further out on the stick than the shoulder: it
+  // moves faster for the same swing (x 1.4).
+  static const double kTipSpeed = knob("PJ_COWBELL_TIP_SPEED", 1.4), kTipMass = knob("PJ_COWBELL_TIP", 0.007);
+  const bool top = p >= 0.5;
+  const double mass = top ? kTipMass : knob("PJ_COWBELL_STICK", 0.02), K = knob("PJ_COWBELL_K", 2e9) * (top ? 2 : 1);
+  set_.strike(0, mass, speed * (top ? kTipSpeed : 1), K, 1.5);
+}
+
+void MetalPercModel::turn(double degrees, double seconds, bool held) {
+  angTo_ = held ? degrees : 0;
+  // (the hand turns it as the stick comes in: most of the way there at the stroke, the rest through the ring)
+  static const double kAhead = knob("PJ_COWBELL_TURN_AHEAD", 0.9);
+  if (held) ang_ += kAhead * (angTo_ - ang_);
+  angA_ = held ? 1 - std::exp(-1 / (std::max(0.01, seconds) * fs())) : 1;
+  swayAmp_ = held ? knob("PJ_COWBELL_SWAY", 4.0) : 0;
+  if (!held) ang_ = 0;
+}
+
 void MetalPercModel::setHand(bool on) {
   if (on == hand_) return;
   hand_ = on;
@@ -180,8 +245,26 @@ void MetalPercModel::setHand(bool on) {
 }
 
 float MetalPercModel::sample() {
-  const float y = float(gain_) * set_.sample();
-  side_.push_back(float(gain_ * outScale()) * set_.side());
+  float y = float(gain_) * set_.sample();
+  float sideX = 0;
+  if (kind_ == kCowbell) {
+    // The crossover (direct form II transposed), then the upper band beamed:
+    // along the mouth's axis full, off it down by PJ_COWBELL_BEAM (12) dB x
+    // (1 - cos): -6 dB tipped up 60 degrees; turned, a little of it to the side.
+    const double lo = xb_[0] * y + lp1_;
+    lp1_ = xb_[1] * y - xa_[0] * lo + lp2_;
+    lp2_ = xb_[2] * y - xa_[1] * lo;
+    const double hi = y - lo;
+    ang_ += (angTo_ - ang_) * angA_;
+    sway_ += swayW_;
+    if (sway_ > 2 * kPi) sway_ -= 2 * kPi;
+    const double a = (ang_ + swayAmp_ * std::sin(sway_)) * (kPi / 180);
+    static const double kBeam = knob("PJ_COWBELL_BEAM", 12.0) / 20 * std::log(10.0);
+    const double g = std::exp(-kBeam * (1 - std::cos(a)));
+    y = float(lo + g * hi);
+    sideX = float(0.3 * sideDir_ * std::sin(a) * hi);
+  }
+  side_.push_back(float(gain_ * outScale()) * set_.side() + float(outScale()) * sideX);
   last_ = y;
   return finish(y);
 }
@@ -189,6 +272,7 @@ float MetalPercModel::sample() {
 void MetalPercModel::resetAir() {
   Tube::resetAir();
   set_.reset();
+  lp1_ = lp2_ = ang_ = angTo_ = 0;
 }
 
 const float* MetalPercModel::takeSide(int n) {
@@ -201,10 +285,7 @@ const float* MetalPercModel::takeSide(int n) {
 
 MetalPercPlayer::MetalPercPlayer(MetalPercModel& m) : Performer(m), m_(m) {}
 
-double MetalPercPlayer::ur() {
-  rng_ = rng_ * 1664525u + 1013904223u;
-  return (rng_ >> 8) * (1.0 / 16777216.0);
-}
+double MetalPercPlayer::ur() { return 0.5 * (rng_.uniform() + 1); }
 
 double MetalPercPlayer::speed(int velocity, double dynamics) {
   // ~ velocity^1.65: General MIDI's ~30 dB from 16 to 127 (a steel or hickory
@@ -225,7 +306,28 @@ void MetalPercPlayer::noteOn(int midi, int velocity) {
     // The bottom side: the middle third of the rod, a little elsewhere each time.
     m_.strike(speed(velocity, dyn_) * (1 + 0.04 * (ur() - 0.5)), 0.42 + 0.12 * ur());
   } else {
-    m_.strike(speed(velocity, dyn_) * 1.5 * (1 + 0.04 * (ur() - 0.5)), 0.2 + 0.6 * ur());
+    // Key 56 (and any key outside the player's strokes): the open mouth
+    // stroke, General MIDI's one cowbell. Keys 60 .. 75: a stroke chosen by
+    // the player (src/cowbellplan.h): 4 places x 4 mutes. The hand is never
+    // exact: the place and the finger's pressure scatter a little.
+    double place = 0.08 * ur(), mute = 0;
+    const bool held = midi >= kCowbellStroke0 && midi < kCowbellStroke0 + 16, mounted = midi >= kCowbellMounted0 && midi < kCowbellMounted0 + 16;
+    if (held || mounted) {
+      const int c = midi - (held ? kCowbellStroke0 : kCowbellMounted0);
+      // (0, 1: the mouth, at the edge's middle or further along it; 2, 3: the
+      // top, on the body or at the crown; the scatter stays in its zone)
+      static const double kPlace[4] = {0.06, 0.36, 0.62, 0.92};
+      const int z = c / 4;
+      place = std::clamp(kPlace[z] + 0.12 * (ur() - 0.5), z < 2 ? 0.0 : 0.5, z < 2 ? 0.49 : 1.0);
+      mute = (c % 4) == 0 ? 0 : std::clamp((c % 4) / 3.0 + 0.1 * (ur() - 0.5), 0.0, 1.0);
+    }
+    // Held, the bell turns with the stroke: the top struck with the mouth
+    // toward the listener, the mouth with it tipped up ~60 degrees; it is
+    // nearly there as the stick lands and turns on through the ring (~70 ms), its partials projecting
+    // differently as it goes.
+    if (held) m_.turn(place < 0.5 ? 60 + 10 * (ur() - 0.5) : 8 * (ur() - 0.5), 0.07 * (0.7 + 0.6 * ur()), true);
+    else m_.turn(0, 0.07, false);
+    m_.strikeBell(speed(velocity, dyn_) * 1.5 * (1 + 0.04 * (ur() - 0.5)), 0.2 + 0.6 * ur(), place, mute);
   }
 }
 

@@ -189,20 +189,14 @@ class TonewheelModel : public Tube {
   struct Cab {
     Rotary les;
     double x = 0, y = 0, rot = 0;            // (its place, m: x toward the listener; its facing, rad)
-    std::vector<float> ring[Rotary::kRays];  // (its rays, delayed to the paths)
-    // Per path (direct, left wall, right wall, back wall, back-left, back-right corners, the floor)
-    // and microphone: the delay (samples), and the two rays leaving toward it with their gains.
-    int dly[7][2] = {}, ray[7][2][2] = {};
-    double g[7][2][2] = {};
     double mix[3] = {1, 1, 1};  // (the upper's, the lower's and the pedals' gains into it)
   };
   std::vector<Cab> cab_;
-  void placeCabinets();
+  RotaryRoom room_;  // (their paths to the listener's pair: src/rotary.h)
   uint32_t rng_ = 1;
   float last_ = 0;
   std::vector<float> side_, sideOut_;
   bool roomMics_ = true, inRoom_ = false;
-  int rayPos_ = 0;
   std::vector<float> earlyL_, earlyR_;
 };
 

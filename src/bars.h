@@ -104,7 +104,10 @@ class Bars {
   void retune(int key, double cents);
   double cents(int key) const { return key_[key].cents; }
   bool ringing(int key) const { return key_[key].active; }
-  void damper(int key, bool down);
+  void damper(int key, bool down) { damper(key, down ? 1.0f : 0.0f); }
+  // ... laid on only partly (0 lifted .. 1 fully down): a half pedal, a slower dying out.
+  void damper(int key, float depth);
+  float damperDepth(int key) const { return key_[key].damperWant; }
   float sample();              // the two microphones' mean
   float side() const { return side_; }
   void reset();
@@ -124,7 +127,8 @@ class Bars {
     bool hammerOn = false;
     float dPrev = 0;
     float engage = 0;
-    bool damperDown = false, active = false;
+    float damperWant = 0;  // where the damper is going: 0 lifted .. 1 resting fully
+    bool active = false;
     int quiet = 0, tick = 0;
     float mMass = 0.02f, mK = 1e8f, mP = 1.5f, mHyst = 0, knockGain = 1;  // the face striking now
     double cents = 0;

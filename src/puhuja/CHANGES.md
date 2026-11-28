@@ -313,6 +313,21 @@ What to try in speech.
 - For puhuja: as it is (a call), or a knob beside CREAK_END_DIPLO; the pitch fall wants a look if it is used
   strongly (the tension share, CREAK_DIPLO_Q, is the likely cause; not tested).
 
+### 2026-11-27: the jaw dropped with the mouth's corners in (a singer's tall mouth)
+- Motivation: the author, on the soprano: "the soprano could open mouth more in the high notes, and keep mouth
+  sides narrow, so that the backwave goes from the teeth back to the throat, and the sound would be a bit more
+  'open' and less stressed". `Expr::open` is the other gesture: towards "ah" with the lips flared and their
+  tube shortened.
+- Change: `Expr::tall` (puhuja.h, 0 .. 1, the last field, default 0; `exprTall_`). In puhuja.cc the vowel's
+  shape keeps its place and the mouth's cavity grows x LINE_TALL_ORAL (1.6), the lips' opening
+  x LINE_TALL_LIP (1.25), the lip tube x LINE_TALL_LEN (1.15); and `open`'s lip flare is taken back with it (the
+  opening's growth to 0.4 of it, the tube not shortened). Speech sets no expression: unchanged.
+- Judged by: a song, soprano, 168 vowels, tall from A4 to A5: the pitch miss the same (median 3.4 -> 3.5
+  cents), the harmonic share the same (20.5 -> 20.9 dB), the fundamental stronger against the overtones
+  (overtones 2 to 4: -8.2 -> -9.6 dB; partial 3 -4.1 -> -6.7 dB), 2.5 to 6 kHz 0.5 dB less. Not yet heard by the
+  author.
+- For puhuja: no use in speech as it is.
+
 ## The form of an entry
 
     ### YYYY-MM-DD: a short title

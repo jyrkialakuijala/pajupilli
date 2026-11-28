@@ -58,6 +58,9 @@ HornPlayer::HornPlayer(Horn& h) : Performer(h), horn_(h) {
   // moving over ~0.15 s. By the dynamics asked for, not the note's calibrated range: a note
   // the lips cannot play louder still has its bell. PJ_BELLTURN=0: the bell stays.
   kBellTurn_ = knob("PJ_BELLTURN", std::strcmp(inst_.name, "horn") == 0 ? 1 : 0) > 0;
+  kBellAim_ = std::strcmp(inst_.name, "trumpet") == 0 && knob("PJ_TP_AIM", 1) > 0;
+  kTpBeam_ = knob("PJ_TP_BEAM", 6);
+  aimK_ = float(1 - std::exp(-2 * M_PI * 1500 / fs_));
   kBellSoft_ = knob("PJ_BELLTURN_SOFT", -12);
   kBellLoud_ = knob("PJ_BELLTURN_LOUD", 12);
   bellK_ = 1 - std::exp(-2 * M_PI * knob("PJ_BELLTURN_HZ", 400) / fs_);
@@ -446,6 +449,34 @@ void HornPlayer::render(float* out, int n) {
       // above their aim; its reach as a soloist's: at 2 % a horn's ear ran away 35 c flat on E4)
       const double reach = section_ ? kSectionEar : 0.008;
       earCorr_ = std::clamp(earCorr_, -reach, reach);
+    }
+    if (kBellAim_) {  // (after the ear, as the horn's: the player hears the trumpet, not the hall)
+      // Raised towards the hall as the playing grows loud, on an accent, in the high register;
+      // lowered into a phrase's end, and between phrases, resting (src/heldaim.h's lift).
+      constexpr double deg = M_PI / 180;
+      double to = 30 * deg;
+      if (note_ >= 0) {
+        const double want = std::clamp(dyn_ + breathCtl_ + bellVel_, 0.0, 1.0);
+        const double accent = cued_ ? std::max(0.0, double(cue_.v[kCueAccent])) : 0.0;
+        const double high = std::clamp((note_ - 72) / 12.0, 0.0, 1.0);
+        to = 15 * deg - 36 * deg * (want - 0.5) - 4 * deg * accent - 3 * deg * high;
+        if (cued_ && cue_.v[kCuePhraseEnd] > 0.5f) to += 10 * deg * std::min(1.0, sinceOn_ / 0.8);
+      } else if (sinceOff_ < 1.5) {
+        to = aimAng_[0];
+      }
+      aimDrift_ += bdt * 2 * M_PI * 0.09;
+      to = std::clamp(to + 1.5 * deg * std::sin(aimDrift_), 0.0, 40 * deg);
+      const double a = 1 - std::exp(-bdt / 0.3);
+      aimAng_[0] += a * (to - aimAng_[0]);
+      aimAng_[1] += a * (aimAng_[0] - aimAng_[1]);
+      // (a trumpet's bell beams its upper partials: about -3 dB 20 degrees off its axis, -6 at 30)
+      const double off = aimAng_[1] / (30 * deg), off0 = 0.5;
+      aimDb_ = -kTpBeam_ * (off * off - off0 * off0);
+      const float g = float(fastPow(10.0, aimDb_ / 20) - 1), k = aimK_;
+      for (int j = 0; j < m; ++j) {
+        aimLp_ += k * (out[i + j] - aimLp_);
+        out[i + j] += g * (out[i + j] - aimLp_);
+      }
     }
     if (kBellTurn_) {  // (after the ear: the player hears the horn, not the hall)
       const double want = std::clamp(dyn_ + breathCtl_ + bellVel_, 0.0, 1.0);

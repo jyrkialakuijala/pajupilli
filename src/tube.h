@@ -97,8 +97,13 @@ class Tube {
   // poses (the room asks again when it changes).
   void aimOn(int backHole);
   void setPose(double down, double side, double turn);
+  // A transverse flute (held across, to the player's right): setPose's `down` is then how far
+  // its foot dips below the lips, `side` the body's turn to the listener's right (the flute and
+  // the face turning with it); its holes look up, a little out.
+  void setTransverse(bool t) { transverse_ = t; }
   int partsMoved() const { return aimMoved_; }
   bool aimed() const { return aim_; }
+  bool transverse() const { return transverse_; }
   // A model that makes its own early sound at the listener (the organ: each
   // pipe its own paths through the church, src/organroom.h): the room then
   // adds only its late field for it. Its last n samples' left and right
@@ -223,6 +228,7 @@ class Tube {
   // embouchure, -2 the foot, else its hole), its gain at 1 m, this sample's sound, its DC
   // blocker; the parts' places and lobes as posed, their samples waiting for the room)
   bool aim_ = false;
+  bool transverse_ = false;
   int aimBack_ = -1, aimMoved_ = 0;
   float radX_[kMaxHoles + 2] = {}, radGain1_[kMaxHoles + 2] = {}, aimNow_[kMaxHoles + 2] = {};
   int radKind_[kMaxHoles + 2] = {};

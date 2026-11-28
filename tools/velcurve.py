@@ -18,6 +18,8 @@ what compare. Keys this program does not build come out silent here ("-").
     tools/velcurve.py programs              every GM program 1..128 (one key each)
     tools/velcurve.py programs 1 57 66      some programs (1-based)
     (-csv FILE: also write every number; -kit N: the drum kit's program, 1-based)
+    tools/velcurve.py -emit-winds [57-62,65-68]  the winds (1-based programs) as whole parts at one
+                                            velocity each (their -play reading): their rows only
     tools/velcurve.py -emit                 measure every program and drum key without the
                                             velocity gain (PJ_NOVELGAIN) and write
                                             src/velgain_data.h
@@ -203,10 +205,119 @@ def emit():
     print('wrote src/velgain_data.h')
 
 
+# A wind's part: -play's director reads a part's velocities as a line and accents (src/velline.h):
+# the line goes into the part's level (its breath and PJ_DIRECTOR_WINDDB's gain), and the key is
+# played at the part's own velocity plus the accent; the gain here is asked at that velocity. A
+# whole part at one velocity is what it answers for, so a wind's own curve is measured that way:
+# one file per velocity (no line to read), a few keys over the middle of its range, each twice.
+WIND_KEYS = {56: (60, 67, 72), 57: (48, 55, 60), 58: (36, 43, 48), 59: (60, 67, 72), 60: (53, 60, 65),
+             61: (55, 60, 67), 64: (66, 71, 78), 65: (61, 66, 73), 66: (54, 61, 66), 67: (43, 49, 54)}
+
+
+def part_file(path, program, keys, v, hold=0.8, slot=1.6):
+    q, tempo = 480, 500000
+    tick = lambda s: int(round(s / 0.5 * q))
+    ev = [(0, b'\xff\x51\x03' + tempo.to_bytes(3, 'big')), (0, bytes([0xc0, program]))]
+    t = 0.0
+    for _ in range(2):
+        for k in keys:
+            ev += [(tick(t), bytes([0x90, k, v])), (tick(t + hold), bytes([0x80, k, 0]))]
+            t += slot
+    ev.append((tick(t + 0.5), b'\xff\x2f\x00'))
+    ev.sort(key=lambda e: e[0])
+    body, last = b'', 0
+    for tt, d in ev:
+        body += var(tt - last) + d
+        last = tt
+    with open(path, 'wb') as f:
+        f.write(b'MThd' + struct.pack('>IHHH', 6, 0, 1, q) + b'MTrk' + struct.pack('>I', len(body)) + body)
+    return 2 * len(keys)
+
+
+def part_level(tmp, program, keys, v, raw):
+    """A part at velocity v: its notes' mean LAFmax (dB), and the instrument -play chose."""
+    name = 'w%d_%d_%d' % (program, v, raw)
+    mid, wav = os.path.join(tmp, name + '.mid'), os.path.join(tmp, name + '.wav')
+    n = part_file(mid, program, keys, v)
+    env = dict(os.environ, PJ_PLAY_TAIL='0.2', PJ_PLAY_VELMEDIAN='1000', PJ_THREADS='1')
+    if raw:
+        env['PJ_NOVELGAIN'] = '1'
+    r = subprocess.run([PAJUPILLI, '-play', mid, '-room', 'dry', '-o', wav], capture_output=True, text=True, env=env)
+    m = re.search(r'(?:channel|drums)\s+\d+: (\S+) \(', r.stderr)
+    lv = levels(wav, n) if os.path.exists(wav) else []
+    xs = [a for a, _ in lv if a is not None]
+    return (float(np.mean(xs)) if xs else None), (m.group(1) if m else None)
+
+
+def monotone(y):
+    """The nearest non-decreasing sequence (pool adjacent violators), then a light 3-point smoothing."""
+    blocks = [[float(v), 1] for v in y]
+    i = 0
+    while i < len(blocks) - 1:
+        if blocks[i][0] > blocks[i + 1][0]:
+            a, b = blocks[i], blocks[i + 1]
+            blocks[i:i + 2] = [[(a[0] * a[1] + b[0] * b[1]) / (a[1] + b[1]), a[1] + b[1]]]
+            i = max(0, i - 1)
+        else:
+            i += 1
+    out = [v for v, w in blocks for _ in range(w)]
+    sm = [out[0]] + [(out[k - 1] + 2 * out[k] + out[k + 1]) / 4 for k in range(1, len(out) - 1)] + [out[-1]]
+    return sm
+
+
+def wind_gain_curve(own):
+    """dB to add at each of VELS: GM's curve less the part's own (monotone, from velocity 90)."""
+    y = monotone(own)
+    at90 = np.interp(math.log10(90), [math.log10(v) for v in VELS], y)
+    return [max(-40.0, min(30.0, GM_SLOPE * math.log10(v / 90) - (o - at90))) for v, o in zip(VELS, y)]
+
+
+def emit_winds(programs):
+    """Measure the winds' parts (programs 0-based) without the velocity gain and write their rows of
+    src/velgain_data.h, the other rows kept."""
+    with tempfile.TemporaryDirectory() as tmp, ThreadPoolExecutor(12) as ex:
+        futs = {(p, v): ex.submit(part_level, tmp, p, WIND_KEYS.get(p, (key_for_program(p) - 5, key_for_program(p),
+                                                                       key_for_program(p) + 7)), v, True)
+                for p in programs for v in VELS}
+        per = {}
+        for p in programs:
+            res = [futs[(p, v)].result() for v in VELS]
+            inst = res[0][1]
+            if inst is None or any(r[0] is None for r in res):
+                print(f'GM {p + 1}: not measured')
+                continue
+            own = [r[0] for r in res]
+            g = wind_gain_curve(own)
+            per[inst] = g
+            at90 = np.interp(90, VELS, own)
+            print(f'{inst:16s} own  ' + ' '.join('%5.1f' % (o - at90) for o in own))
+            print(f'{"":16s} gain ' + ' '.join('%5.1f' % x for x in g))
+    path = os.path.join(ROOT, 'src', 'velgain_data.h')
+    lines = open(path).read().split('\n')
+    for inst, g in per.items():
+        row = '    {"%s", {%s}},  // (velcurve.py -emit-winds: a part at one velocity)' % (inst, ', '.join('%.1f' % x for x in g))
+        k = [i for i, l in enumerate(lines) if l.strip().startswith('{"%s",' % inst)]
+        if k:
+            lines[k[0]] = row
+        else:
+            end = max(i for i, l in enumerate(lines) if l.strip().startswith('{"'))
+            lines.insert(end + 1, row)
+    open(path, 'w').write('\n'.join(lines))
+    print('wrote src/velgain_data.h (%d rows)' % len(per))
+
+
 def main():
     args = sys.argv[1:]
     if '-emit' in args:
         return emit()
+    if '-emit-winds' in args:
+        i = args.index('-emit-winds')
+        sel = args[i + 1] if len(args) > i + 1 else '57-62,65-68'
+        progs = []
+        for part in sel.split(','):
+            a, _, b = part.partition('-')
+            progs += list(range(int(a) - 1, int(b or a)))
+        return emit_winds(progs)
     csv = None
     kit = None
     if '-csv' in args:

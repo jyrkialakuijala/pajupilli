@@ -7,6 +7,7 @@
 #include "instrument.h"
 #include "knob.h"
 #include "songclock.h"
+#include "tambplan.h"
 #include "vmath.h"
 
 namespace pajupilli {
@@ -29,12 +30,7 @@ bool shakerInstrument(const Instrument& inst) {
   return false;
 }
 
-float Shaker::ur() {
-  rng_ ^= rng_ << 13;
-  rng_ ^= rng_ >> 17;
-  rng_ ^= rng_ << 5;
-  return (rng_ >> 8) * (1.0f / 16777216.0f);
-}
+float Shaker::ur() { return 0.5f * (rng_.uniform() + 1); }
 
 float Shaker::un() { return (ur() + ur() + ur() + ur() - 2.0f) * 1.7320508f; }
 
@@ -45,6 +41,7 @@ void Shaker::addMode(std::vector<Mode>& v, double hz, double t60, double gain) {
   m.pr = float(r * std::cos(w));
   m.pi = float(r * std::sin(w));
   m.g = float(gain);
+  m.hz = float(hz);
   v.push_back(m);
 }
 
@@ -56,12 +53,20 @@ void Shaker::excite(std::vector<Mode>& v, int from, int n, float J) {
 
 // A jingle disc (a bell) struck at a random place on its rim: each of its
 // modes (two, three, four nodal diameters: its first three) driven by its
-// shape there, |cos m phi|: every collision a different mix of the same ring.
-void Shaker::exciteRim(std::vector<Mode>& v, int from, int n, float J) {
+// shape there, |cos m phi|: every collision a different mix of the same ring
+// (a fourth mode, the tambourine's highest: five diameters). A hard meeting is
+// brief and reaches the high modes; a gentle one, longer, only the low ones.
+void Shaker::exciteRim(std::vector<Mode>& v, int from, int n, float J, float speed) {
   const float phi = float(2 * M_PI) * ur();
+  const float fc = hard_ > 0 ? hardHz_ * fastPow(std::max(std::fabs(speed), 0.05f), hard_) : 0;
   for (int i = 0; i < n; ++i) {
-    const int m = 2 + i % 3;
-    v[from + i].re += J * 1.571f * std::fabs(std::cos(m * phi)) * (0.8f + 0.4f * ur());
+    const int m = 2 + i;
+    float w = J * 1.571f * std::fabs(std::cos(m * phi)) * (0.8f + 0.4f * ur());
+    if (fc > 0) {  // (relative to the disc's main mode, its second: darker, not quieter)
+      const float x = v[from + i].hz / fc, x1 = v[from + 1].hz / fc;
+      w *= std::sqrt((1 + x1 * x1 * x1 * x1) / (1 + x * x * x * x));
+    }
+    v[from + i].re += w;
   }
 }
 
@@ -136,10 +141,23 @@ Shaker::Shaker(double fs, Type type, uint32_t seed) : type_(type), fs_(fs), dt_(
     }
     case Type::kTambourine: {
       // The frame's knock (wood, the hand on it), and six pairs of jingles,
-      // each disc its own three modes a few % off its neighbours'.
+      // each disc its own modes a few % off its neighbours'. Measured against
+      // two recordings of headless tambourines (research/tambourine.md §3.1):
+      // little at 3 kHz (−30 dB of the energy there), most at 6–9 kHz, and a
+      // second cluster at 11–15 kHz.
       addMode(frame_, 250, 0.05, 1.0);
       addMode(frame_, 520, 0.035, 0.7);
       addMode(frame_, 1100, 0.02, 0.5);
+      // The head (calf or plastic, glued on, the holding hand damping it): its
+      // first two modes, heard as the pop of a fist in the centre or the thigh
+      // against it (a 10-inch frame drum's (0,1), (1,1); research/tambourine.md 3.4).
+      addMode(head_, 230, 0.07, 1.0);
+      addMode(head_, 480, 0.045, 0.5);
+      hLpA_ = float(1 - std::exp(-2 * kPi * 4000 * dt_));
+      static const double kLow = knob("PJ_TAMB_LOW", 0.3), kHigh = knob("PJ_TAMB_HIGH", 0.6);
+      hardHz_ = float(knob("PJ_TAMB_HARDHZ", 9000));
+      hard_ = float(knob("PJ_TAMB_HARD", 0.7));
+      const int per = kHigh > 0 ? 4 : 3;
       for (int j = 0; j < 6; ++j) {
         Rattler r;
         r.masses = 2;
@@ -147,13 +165,15 @@ Shaker::Shaker(double fs, Type type, uint32_t seed) : type_(type), fs_(fs), dt_(
         r.m = 6e-3f;
         r.e = 0.6f;
         r.mode0 = int(rattleModes_.size());
+        r.perDisc = per;
         for (int d = 0; d < 2; ++d) {
           const double k = 1 + 0.12 * (ur() - 0.5);
-          addMode(rattleModes_, 3200 * k, 0.30 * (0.7 + 0.6 * ur()), 0.6);
+          addMode(rattleModes_, 3200 * k, 0.30 * (0.7 + 0.6 * ur()), 0.6 * kLow);
           addMode(rattleModes_, 5600 * k * (1 + 0.04 * (ur() - 0.5)), 0.22 * (0.7 + 0.6 * ur()), 1.0);
           addMode(rattleModes_, 8100 * k * (1 + 0.04 * (ur() - 0.5)), 0.15 * (0.7 + 0.6 * ur()), 0.9);
+          if (per == 4) addMode(rattleModes_, 12500 * k * (1 + 0.08 * (ur() - 0.5)), 0.10 * (0.7 + 0.6 * ur()), kHigh);
         }
-        r.nmode = 6;
+        r.nmode = 2 * per;
         r.z[0] = -r.gap;
         r.z[1] = -r.gap;
         rat_.push_back(r);
@@ -294,6 +314,11 @@ void Shaker::hitRattlers(double speed) {
   const double f = std::clamp(0.25 + 0.75 * speed / 1.2, 0.25, 1.0);
   gEff_ = float(9.81 * (0.6 + 0.4 * ur()));
   const double rock = 0.6 * ur(), psi = 2 * M_PI * ur();
+  throwRattlers(speed, f, rock, psi, 0.008, false, 1.0);
+  if (!frame_.empty()) excite(frame_, 0, int(frame_.size()), float(0.02 * speed));
+}
+
+void Shaker::throwRattlers(double speed, double frac, double rock, double psi, double spread, bool twist, double eK) {
   const int n = int(rat_.size());
   for (int j = 0; j < n; ++j) {
     Rattler& r = rat_[j];
@@ -302,18 +327,197 @@ void Shaker::hitRattlers(double speed) {
         r.z[i] = float(-r.gap + 0.4 * r.gap * ur());
         r.u[i] = float(0.05 * (ur() - 0.5));
       }
-    if (ur() > f) continue;
+    if (ur() > frac) continue;
     // The kick reaches the pairs over a few ms (the frame flexing under the
     // hand), each tilted on its pin its own way: its bounce and its free
-    // travel differ from stroke to stroke.
-    const double k = 1 + rock * std::cos(2 * M_PI * j / n - psi);
-    r.kick = float(speed * k * (0.75 + 0.5 * ur()));
-    r.delay = int(ur() * 0.008 / dt_);
-    r.eS = float(r.e * (0.65 + 0.6 * ur()));
+    // travel differ from stroke to stroke. A twist of the wrist throws them
+    // in turn round the ring, the far side from the hand (the larger radius)
+    // hardest.
+    double k = 1 + rock * std::cos(2 * M_PI * j / n - psi);
+    if (twist) k *= 0.45 + 0.75 * std::sin(M_PI * (j + 0.5) / n);
+    const float kick = float(speed * k * (0.75 + 0.5 * ur()));
+    const int d = twist ? int((j + 0.3 * ur()) / n * spread / dt_) : int(ur() * spread / dt_);
+    r.kick = kick;
+    r.delay = d;
+    r.eS = float(r.e * eK * (0.65 + 0.6 * ur()));
     r.gapS = float(r.gap * (0.6 + 0.4 * ur()));
     r.moving = true;
   }
-  if (!frame_.empty()) excite(frame_, 0, int(frame_.size()), float(0.02 * speed));
+}
+
+// The tambourine played by a gesture. Its parts in time: the lift (a small
+// jingle as the motion begins), the stroke `lead` s later, a choke after it.
+void Shaker::tambourine(const TambGesture& g) {
+  static const float kTrim = float(std::exp(0.11513 * knob("PJ_TAMB_GTRIM", -7.5)));
+  gTrim_ = kTrim;
+  asleep_ = false;
+  quiet_ = 0;
+  auto at = [&](double t, int what, const TambGesture& x) {
+    TPend p{tNow_ + t, what, x};
+    auto it = std::upper_bound(pend_.begin(), pend_.end(), p.at, [](double a, const TPend& b) { return a < b.at; });
+    pend_.insert(it, p);
+  };
+  if (g.drive == TambGesture::kShakeRoll || g.drive == TambGesture::kThumbRoll) {
+    // A roll: a sustained sound, not a rhythm. It begins with an attack (a
+    // shake roll: the instrument pushed upright with a stroke; a thumb roll:
+    // the thumb set on the head) and goes on to its end or the key's release.
+    TambGesture a = g;
+    a.drive = TambGesture::kHead;
+    a.striker = g.drive == TambGesture::kThumbRoll ? TambGesture::kFingertips : TambGesture::kFingers;
+    a.fingers = 1;
+    a.place = 0.2f;
+    a.speed = g.speed * (g.drive == TambGesture::kThumbRoll ? 0.5f : 0.8f);
+    a.follow = TambGesture::kRing;
+    at(g.lead, 0, a);
+    roll_.on = true;
+    roll_.thumb = g.drive == TambGesture::kThumbRoll;
+    roll_.t0 = tNow_ + g.lead + 0.03;
+    roll_.end = g.dur > 0 ? tNow_ + g.lead + g.dur : 1e18;
+    roll_.next = roll_.t0;
+    roll_.s0 = g.speed;
+    roll_.s1 = g.speed2;
+    roll_.tilt = g.tilt;
+    roll_.dir = 1;
+    roll_.endStroke = g.follow != TambGesture::kHold;
+    heightT_ = g.height;
+    return;
+  }
+  if (g.drive == TambGesture::kChoke) {
+    at(g.lead, 2, g);
+    return;
+  }
+  if (g.lift > 0 && g.lead > 0.02) {
+    TambGesture l = g;
+    l.speed = g.speed * 0.3f * g.lift;
+    at(0, 1, l);
+  }
+  at(g.lead, 0, g);
+  if (g.follow == TambGesture::kStop) at(g.lead + g.stopAfter, 2, g);
+}
+
+void Shaker::tambourineRollEnd() {
+  if (!roll_.on) return;
+  if (roll_.end > tNow_ + 0.02) roll_.end = tNow_ + 0.02;
+}
+
+// The stroke itself, now.
+void Shaker::tambStroke(const TambGesture& g) {
+  asleep_ = false;
+  quiet_ = 0;
+  // Held flat the pins stand upright: gravity draws the discs onto each other
+  // and they rest together, short and dry; upright they hang free and ring.
+  const double tilt = std::clamp(g.tilt + 0.06 * (ur() - 0.5), 0.0, 1.0);
+  gEff_ = float(9.81 * (0.15 + 0.85 * std::cos(0.5 * M_PI * tilt)) * (0.9 + 0.2 * ur()));
+  const double eK = (0.75 + 0.5 * tilt) * (g.height < 0.25 ? 0.85 : 1.0);  // (low: on the leg, damped by it)
+  heightT_ = g.height;
+  const double v = g.speed, psi = 2 * M_PI * ur();
+  const double frac = std::clamp(0.25 + 0.75 * v / 1.2, 0.25, 1.0);
+  float headJ = 0, frameJ = 0;
+  switch (g.drive) {
+    case TambGesture::kAgainst: {
+      // The frame stops on the other hand, the thigh or the knee: every pair
+      // thrown at once, hard; the leg's dull pop through the head.
+      const bool leg = g.striker == TambGesture::kThigh || g.striker == TambGesture::kKnee;
+      throwRattlers(1.15 * v, 1.0, 0.2 * ur(), psi, 0.0015, false, eK);
+      frameJ = float(0.025 * v);
+      headJ = float((leg ? 0.06 : 0.02) * v);
+      break;
+    }
+    case TambGesture::kAir:
+      // A turn in the air: the frame slows and reverses, the pairs fly on;
+      // spread out a little in time, the up stroke the weaker (against the
+      // arm's weight).
+      throwRattlers((g.dir > 0 ? 0.85 : 0.65) * v, frac, 0.3 + 0.3 * ur(), psi + (g.dir > 0 ? 0 : M_PI), 0.010, false, eK);
+      break;
+    case TambGesture::kTwist:
+      throwRattlers(0.95 * v, 1.0, 0.0, psi, 0.005, true, eK);
+      frameJ = float(0.005 * v);
+      break;
+    case TambGesture::kHead: {
+      // On the head: a light striker at the rim kicks the pairs nearest it
+      // and hardly the head; a heavy one in the centre sounds the head and
+      // throws all the pairs alike.
+      static const float kK[] = {0.55f, 0.8f, 1.0f, 1.1f, 0.9f, 1.0f, 1.0f};
+      static const float kH[] = {0.004f, 0.012f, 0.03f, 0.04f, 0.02f, 0.05f, 0.05f};
+      float k = kK[g.striker], hj = kH[g.striker];
+      if (g.striker == TambGesture::kFingertips) k *= 0.75f + 0.15f * float(std::clamp(g.fingers, 1, 3));
+      const double place = std::clamp(g.place + 0.08 * (ur() - 0.5), 0.0, 1.0);
+      throwRattlers(k * v, g.striker == TambGesture::kFingertips ? frac * (0.5 + 0.5 * place) : frac,
+                    0.15 + 0.8 * (1 - place), psi, 0.003, false, eK);
+      headJ = float(hj * v * (0.3 + 0.7 * place));
+      frameJ = float(0.012 * v * (1 - place));  // (at the rim: the frame's knock)
+      break;
+    }
+    default:
+      break;
+  }
+  if (frameJ > 0 && !frame_.empty()) excite(frame_, 0, int(frame_.size()), frameJ);
+  if (headJ > 0 && !head_.empty()) {
+    static const double kHead = knob("PJ_TAMB_HEAD", 1.0);
+    excite(head_, 0, int(head_.size()), float(headJ * kHead));
+  }
+}
+
+// The hand stops the jingles: the instrument laid flat, the palm on the head.
+// What still rings dies in ~30 ms; the discs come to rest at once.
+void Shaker::tambChoke() {
+  for (Rattler& r : rat_) {
+    r.moving = false;
+    r.kick = 0;
+    r.delay = 0;
+    for (int i = 0; i < r.masses; ++i) { r.u[i] = 0; r.z[i] = -r.gap; }
+  }
+  if (!rattleModes_.empty()) excite(rattleModes_, 0, int(rattleModes_.size()), 2e-4f);  // (the discs meeting the hand)
+  choke_ = int(0.03 / dt_);
+  roll_.on = false;
+}
+
+// A roll in progress. A shake roll: the wrist turning and the forearm
+// shaking together (Stiers: a sustained sound, not a rhythm), each reversal
+// a throw of the jingles, 9 to 14 a second, irregular, with smaller shakes of
+// the other motion between. A thumb roll: the thumb running along the head in
+// small jerks (stick and slip), each a weak kick of the head and of the pairs
+// near it, 35 to 70 a second. Its end: an attack (a shake roll: the stroke as
+// the instrument returns to 45 degrees; a thumb roll: the thumb dropped on the
+// head).
+void Shaker::stepRoll() {
+  if (tNow_ < roll_.next) return;
+  const double span = roll_.end < 1e17 ? std::max(roll_.end - roll_.t0, 1e-3) : 1.0;
+  const double a = roll_.end < 1e17 ? std::clamp((tNow_ - roll_.t0) / span, 0.0, 1.0) : 0.0;
+  const float s = float(roll_.s0 + (roll_.s1 - roll_.s0) * a);
+  if (tNow_ >= roll_.end) {
+    roll_.on = false;
+    if (!roll_.endStroke) return;
+    TambGesture e;
+    e.drive = roll_.thumb ? TambGesture::kHead : TambGesture::kAgainst;
+    e.striker = roll_.thumb ? TambGesture::kFingers : TambGesture::kHeel;
+    e.place = 0.6f;
+    e.tilt = 0.5f;
+    e.height = heightT_;
+    e.speed = s * (roll_.thumb ? 0.7f : 0.9f);
+    tambStroke(e);
+    return;
+  }
+  gEff_ = float(9.81 * (0.15 + 0.85 * std::cos(0.5 * M_PI * roll_.tilt)));
+  if (roll_.thumb) {
+    const double rate = 35 + 35 * std::clamp(s / 1.0, 0.0, 1.0);
+    throwRattlers(0.45 * s * (0.6 + 0.8 * ur()), 0.3, 0.7, 2 * M_PI * ur(), 0.001, false, 1.0);
+    if (!head_.empty()) excite(head_, 0, int(head_.size()), float(0.003 * s));
+    roll_.next = tNow_ + (0.6 + 0.8 * ur()) / rate;
+  } else {
+    const double rate = 9 + 5 * ur();
+    roll_.dir = -roll_.dir;
+    throwRattlers((roll_.dir > 0 ? 0.75 : 0.6) * s * (0.8 + 0.4 * ur()), 0.8, 0.5 * ur(), 2 * M_PI * ur(), 0.012, false, 1.0);
+    // (the other motion, between: a smaller shake)
+    TPend p{tNow_ + (0.35 + 0.3 * ur()) / rate, 1, TambGesture{}};
+    p.g.drive = TambGesture::kAir;
+    p.g.speed = 0.35f * s;
+    p.g.tilt = roll_.tilt;
+    p.g.height = heightT_;
+    auto it = std::upper_bound(pend_.begin(), pend_.end(), p.at, [](double x, const TPend& b) { return x < b.at; });
+    pend_.insert(it, p);
+    roll_.next = tNow_ + (0.8 + 0.4 * ur()) / rate;
+  }
 }
 
 float Shaker::stepRattlers() {
@@ -338,13 +542,13 @@ float Shaker::stepRattlers() {
     // The stops: the top mass against the slot's top, the bottom one its floor.
     if (r.z[top] > gap && r.u[top] > 0) {
       const float J = r.m * (1 + e0) * r.u[top];
-      exciteRim(rattleModes_, r.mode0 + 3 * top, 3, J);
+      exciteRim(rattleModes_, r.mode0 + r.perDisc * top, r.perDisc, J, r.u[top]);
       r.u[top] = -e0 * r.u[top] * (0.7f + 0.6f * ur());
       r.z[top] = gap;
     }
     if (r.z[0] < -gap && r.u[0] < 0) {
       const float J = -r.m * (1 + e0) * r.u[0];
-      if (J > 1e-6f) exciteRim(rattleModes_, r.mode0, 3, J);
+      if (J > 1e-6f) exciteRim(rattleModes_, r.mode0, r.perDisc, J, r.u[0]);
       r.u[0] = -e0 * r.u[0] * (0.6f + 0.5f * ur());
       r.z[0] = -gap;
     }
@@ -352,8 +556,8 @@ float Shaker::stepRattlers() {
     if (nm == 2 && r.z[0] > r.z[1] && r.u[0] > r.u[1]) {
       const float um = 0.5f * (r.u[0] + r.u[1]), dv = r.u[0] - r.u[1];
       const float J = r.m * 0.5f * (1 + e0) * dv;
-      exciteRim(rattleModes_, r.mode0, 3, J);      // each disc where it was met
-      exciteRim(rattleModes_, r.mode0 + 3, 3, J);
+      exciteRim(rattleModes_, r.mode0, r.perDisc, J, dv);  // each disc where it was met
+      exciteRim(rattleModes_, r.mode0 + r.perDisc, r.perDisc, J, dv);
       const float e = e0 * (0.7f + 0.6f * ur());  // tilted on the pin: how squarely they meet
       r.u[0] = um - e * (r.u[0] - um);
       r.u[1] = um - e * (r.u[1] - um);
@@ -368,6 +572,7 @@ float Shaker::stepRattlers() {
   }
   float y = ring(rattleModes_, 0, int(rattleModes_.size()));
   if (!frame_.empty()) y += ring(frame_, 0, int(frame_.size()));
+  if (!head_.empty()) y += ring(head_, 0, int(head_.size()));
   return y;
 }
 
@@ -581,6 +786,27 @@ void Shaker::release() {
 }
 
 float Shaker::sample() {
+  if (type_ == Type::kTambourine) {
+    tNow_ += dt_;
+    while (!pend_.empty() && pend_.front().at <= tNow_) {
+      const TPend p = pend_.front();
+      pend_.erase(pend_.begin());
+      if (p.what == 2) {
+        tambChoke();
+      } else if (p.what == 1) {
+        // The lift (and a roll's in-between shakes): the frame starting to
+        // move, a soft smear of the pairs that leave their rest.
+        const float g = gEff_;
+        throwRattlers(p.g.speed, 0.5, 0.3, 2 * M_PI * ur(), 0.02, false, 1.0);
+        gEff_ = g;
+        asleep_ = false;
+        quiet_ = 0;
+      } else {
+        tambStroke(p.g);
+      }
+    }
+    if (roll_.on) stepRoll();
+  }
   if (asleep_) { side_ = 0; return 0; }
   float y = 0, s = 0;
   if (type_ == Type::kMaracas)
@@ -596,13 +822,35 @@ float Shaker::sample() {
   // A small closed body radiates no steady push: its sound rises with
   // frequency (a zero at DC; the hits all push one way during a chick, and a
   // broad resonance would pass their mean).
+  if (choke_ > 0) {  // (the hand on the jingles: what rings dies, ~60 dB in 30 ms)
+    --choke_;
+    for (std::vector<Mode>* v : {&rattleModes_, &frame_, &head_})
+      for (Mode& m : *v) { m.re *= 0.9952f; m.im *= 0.9952f; }
+  }
   const float dy = y - prevY_, ds = s - prevS_;
   prevY_ = y;
   prevS_ = s;
   y = dy * gain_;
+  if (type_ == Type::kTambourine) {
+    // Where it is held: high in the air, clear of the body and turned out,
+    // a little louder and brighter; low against the thigh, shadowed by the
+    // body: darker above ~4 kHz and quieter (a shelf; the height glides,
+    // 20 ms).
+    height_ += 0.0010f * (heightT_ - height_) * float(48000 * dt_);
+    const float h = height_;
+    if (std::fabs(h - hAt_) > 0.002f) {
+      hAt_ = h;
+      const float hiDb = h < 0.5f ? -10 * (0.5f - h) : 3 * (h - 0.5f);   // (-5 .. +1.5 dB above it)
+      const float allDb = h < 0.5f ? -6 * (0.5f - h) : 4 * (h - 0.5f);   // (-3 .. +2 dB in all)
+      hHi_ = std::exp(0.11513f * hiDb);
+      hAll_ = std::exp(0.11513f * allDb);
+    }
+    hiLp_ += hLpA_ * (y - hiLp_);
+    y = (hiLp_ + (y - hiLp_) * hHi_) * hAll_ * gTrim_;
+  }
   side_ = ds * gain_;
   if (!std::isfinite(y)) { reset(); return 0; }
-  bool moving = twistOn_ || gest_[0].on || gest_[1].on || gest_[0].rolling || gest_[1].rolling;
+  bool moving = twistOn_ || gest_[0].on || gest_[1].on || gest_[0].rolling || gest_[1].rolling || !pend_.empty() || roll_.on || choke_ > 0;
   for (const Shell& sh : shells_) moving |= sh.moving > 0;
   for (const Rattler& r : rat_) moving |= r.moving;
   if (!moving && std::fabs(y) < 1e-7f) {
@@ -705,11 +953,74 @@ void ShakerPlayer::noteOn(int midi, int velocity) {
     hand_ ^= 1;
     return;
   }
+  static const bool kTambPlan = knob("PJ_TAMB_PLAN", 1) > 0;
+  if (t == Shaker::Type::kTambourine && kTambPlan) {
+    tambourineOn(velocity);
+    return;
+  }
   m_.shaker().stroke(v, hand_);
   hand_ ^= 1;
 }
 
+// The tambourine's gesture for a key. In a song: the planned one (when, what,
+// how hard: src/tambplan.cc), landing noteLead after the key as the file
+// player sends these keys that early, the lift filling the time before. Live:
+// from the velocity (the fingertips at the rim .. the fingers .. the fist in
+// the centre .. the other hand's heel), a quick repeat a turn in the air (down,
+// up, in turn), a key held on a roll. Every gesture with the hand's own
+// inexactness in its strength.
+void ShakerPlayer::tambourineOn(int velocity) {
+  Shaker& sh = m_.shaker();
+  const SongClock& clk = SongClock::get();
+  const double lead = clk.valid && noteLeadsApplied() ? noteLead(m_.instrument()) : 0;
+  TambGesture g;
+  int vel = velocity;
+  tambPlanned_ = false;
+  if (clk.playing && !tambourinePlan().empty()) {
+    if (const TambPlanned* p = plannedTambourine(clk.now + lead)) {
+      if (p->skip) return;
+      g = p->g;
+      vel = p->velocity;
+      tambPlanned_ = true;
+    }
+  }
+  if (!tambPlanned_) {
+    const double since = clock_ - lastTamb_;
+    if (since < 0.11) {
+      g.drive = TambGesture::kAir;
+      tambDir_ = -tambDir_;
+      g.dir = tambDir_;
+      g.tilt = 0.65f;
+    } else {
+      tambDir_ = 1;
+      g.drive = TambGesture::kHead;
+      if (vel <= 45) { g.striker = TambGesture::kFingertips; g.fingers = vel <= 30 ? 1 : 2; g.place = 0.1f; g.tilt = 0.45f; }
+      else if (vel <= 75) { g.striker = TambGesture::kFingers; g.place = 0.5f; }
+      else if (vel <= 105) { g.striker = TambGesture::kFist; g.place = 0.8f; }
+      else { g.drive = TambGesture::kAgainst; g.striker = TambGesture::kHeel; }
+    }
+    g.height = float(std::clamp(0.3 + 0.5 * vel / 127.0, 0.2, 0.85));
+  }
+  lastTamb_ = clock_;
+  // (the striker's ladder carries part of the dynamic, fingertips to the heel ~11 dB: the hand's
+  // speed spans less than for the one stroke, the whole on General MIDI's curve)
+  static const double kExp = knob("PJ_TAMB_VEXP", 1.0);
+  const double base = handSpeed(vel, dyn_, kExp) * (1 + 0.05 * hand_rng_.uniform());
+  g.speed = float(g.speed * base);
+  g.speed2 = float(g.speed2 * base);
+  g.lead = float(lead);
+  if (lead <= 0) g.lift = 0;
+  sh.tambourine(g);
+  tambHeld_ = !tambPlanned_;
+  tambHeldT_ = 0;
+  tambVel_ = vel;
+}
+
 void ShakerPlayer::noteOff(int) {
+  if (m_.shaker().type() == Shaker::Type::kTambourine) {
+    tambHeld_ = false;
+    if (!tambPlanned_) m_.shaker().tambourineRollEnd();
+  }
   m_.shaker().release();
   if (marHand_ >= 0) {
     if (marRolling_) m_.shaker().maracaStop(marHand_);
@@ -723,6 +1034,24 @@ void ShakerPlayer::render(float* out, int n) {
   for (int i = 0; i < n; i += kBlock) {
     const int m = std::min(kBlock, n - i);
     tick(m / fs_);
+    clock_ += m / fs_;
+    // A tambourine's key held on (live, or a file's long note the plan did not
+    // make a roll of: 3/4 of a beat, live 0.4 s): a roll until it is let go,
+    // a thumb roll when soft, else shaken.
+    if (tambHeld_) {
+      tambHeldT_ += m / fs_;
+      const SongClock& clk = SongClock::get();
+      if (tambHeldT_ > (clk.valid ? 0.75 * clk.beatLen : 0.4) && !m_.shaker().tambourineRolling()) {
+        TambGesture g;
+        g.drive = tambVel_ <= 50 ? TambGesture::kThumbRoll : TambGesture::kShakeRoll;
+        g.dur = 0;
+        g.tilt = 0.9f;
+        g.height = float(std::clamp(0.3 + 0.5 * tambVel_ / 127.0, 0.2, 0.85));
+        g.speed = g.speed2 = float(handSpeed(tambVel_, dyn_, knob("PJ_TAMB_VEXP", 1.0)));
+        m_.shaker().tambourine(g);
+        tambHeld_ = false;
+      }
+    }
     // A maraca's key held on past a note's length (0.4 s; in a song 3/4 of a
     // beat): the maraca turned in loops until the key is let go.
     if (marHand_ >= 0 && !marRolling_) {

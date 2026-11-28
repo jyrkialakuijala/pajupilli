@@ -30,11 +30,20 @@
 //     and letting go slowly, shunting its channel), the power amplifier on its unregulated supply
 //     (sagging under bass chords, clipping), and the 4 x 12 in cabinet; or
 //   - a Stage (PJ_TINEPIANO_SUITCASE=0): the harp into its 10 kOhm volume pot, straight out (DI).
+// What is recorded is the style's (research/electric_pianos.md 9; the director's reading): in
+// jazz, pop, R&B, soul the Suitcase's preamp direct (the studio's way: its vibrato wide and clean,
+// the low end whole, no hiss); in rock, funk and blues a Stage into a clean valve 2 x 12 combo,
+// miked, 70 %, its DI 30 % under it (the amp's grit and air, the DI's weight and attack).
 // A trace of mains hum through the harp's groups (PJ_TINEPIANO_HUM).
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
+#include <memory>
 #include <vector>
+
+#include "guitaramp.h"
+#include "rotary.h"
 
 #include "performer.h"
 #include "tube.h"
@@ -51,9 +60,14 @@ class TinePianoModel : public Tube {
   void strike(int key, double speed);
   void damp(int key, bool on);  // the damper on (key up, no pedal) or off
   void setVibrato(double rateHz, double depth) { vibRate_ = rateHz, vibDepth_ = depth; }
+  void setRotaryFast(bool f) { for (Rotary& r : les_) if (r.fast() != f) r.setFast(f); }
   bool asleep() const { return awake_ == 0; }
   const float* takeSide(int n) override;
   double testResponse() const override { return last_; }
+  // The two Leslies in a room (output 4; PJ_ROTARY_MICS=close: their close microphones instead):
+  // they bring their own early sound to the room's pair, as the organ's (src/rotary.h RotaryRoom).
+  bool ownEarly() const override { return out_ == 4 && roomMics_; }
+  void takeEarly(int n, float* l, float* r, float g) override;
   void resetAir() override;
 
  private:
@@ -87,8 +101,22 @@ class TinePianoModel : public Tube {
   std::vector<Key> keys_;
   int awake_ = 0;
   double dt_;
-  // electronics
+  // electronics: what is recorded (PJ_TINEPIANO_OUT; -1: the director's style chooses):
+  //   0 a Suitcase's preamp taken direct (its stereo vibrato, no power amp, no speakers);
+  //   1 the Suitcase whole, its 4 x 12 in heard; 2 a Stage straight in (a DI); 3 a Stage into a
+  //   clean valve 2 x 12 combo, miked, its DI under it (GuitarAmp's clean combo); 4 a Stage into
+  //   two rotary cabinets (the organ's two-cabinet set: src/rotary.h), their close microphones, no
+  //   DI (the mod wheel from 64: fast, as the organ's).
+  int out_ = 0;
+  std::vector<Rotary> les_;
+  double lesIn_ = 8;
+  RotaryRoom lesRoom_;
+  bool roomMics_ = true, inRoom_ = false;
+  std::vector<float> earlyL_, earlyR_;
   bool suitcase_ = true;
+  std::unique_ptr<GuitarAmp> amp_;
+  double ampIn_ = 1, ampOut_ = 1;
+  double trim_ = 1;  // each output's level against the Suitcase's whole (measured: a chord, a line, a bass chord)
   double harpB_[3] = {}, harpA_[3] = {}, hx_[2] = {}, hy_[2] = {};
   double hum_ = 0, humPh_ = 0, humEps_[4] = {};
   double vibRate_ = 4.5, vibDepth_ = 0.5, vibPh_ = 0;

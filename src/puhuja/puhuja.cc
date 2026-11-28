@@ -12603,9 +12603,23 @@ float Synth::tick() {
         const float len = sh.length;
         sh = lineShapeMix(sh, kAh, 0.7f * o);
         sh.length = len + (kAh.length - len) * 0.7f * o;
-        sh.aLip *= 1.0f + 1.5f * o;
-        sh.lLip *= 1.0f - 0.5f * o;
+        // (with setExpression's tall the lips do not flare: the mouth's corners stay in)
+        const float flare = 1.0f - std::min(std::max(exprTall_, 0.0f), 1.0f);
+        sh.aLip *= 1.0f + 1.5f * o * (0.4f + 0.6f * flare);
+        sh.lLip *= 1.0f - 0.5f * o * flare;
         sh.aOral *= 1.0f + 0.5f * o;
+      }
+      if (exprTall_ > 0.001f) {
+        // (singing, setExpression's tall: the jaw dropped with the mouth's corners kept in, a tall narrow opening and
+        // not a wide one. The vowel stays what it is (no move towards "ah"): the mouth's cavity behind the teeth
+        // grows, the lips' opening grows only a little and their tube is a little longer, so more of the wave turns
+        // back at the teeth towards the throat than with a flared mouth. At 1: the cavity x LINE_TALL_ORAL (1.6), the
+        // lips' opening x LINE_TALL_LIP (1.25), their tube x LINE_TALL_LEN (1.15).)
+        static const float kO = param("LINE_TALL_ORAL", 1.6f), kL = param("LINE_TALL_LIP", 1.25f), kT = param("LINE_TALL_LEN", 1.15f);
+        const float o = std::min(exprTall_, 1.0f);
+        sh.aOral *= 1.0f + (kO - 1.0f) * o;
+        sh.aLip *= 1.0f + (kL - 1.0f) * o;
+        sh.lLip *= 1.0f + (kT - 1.0f) * o;
       }
       if (std::fabs(exprFront_) > 0.001f) {
         // (singing, setExpression's front: the tongue's body moved forward (> 0) or back (< 0) with the jaw where
@@ -12875,6 +12889,7 @@ float Synth::tick() {
       exprAdduct_ = a.adduct + x * (b.adduct - a.adduct);
       exprNeutral_ = a.neutral + x * (b.neutral - a.neutral);
       exprFront_ = a.front + x * (b.front - a.front);
+      exprTall_ = a.tall + x * (b.tall - a.tall);
       const float off = a.cents + x * (b.cents - a.cents);
       if (off != 0.0f) lc.f0 *= 1.0f + 5.7762265e-4f * off;
     }

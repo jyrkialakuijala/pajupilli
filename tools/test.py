@@ -458,9 +458,10 @@ def shakuhachi_natural():
 def shakuhachi_aim():
     """The shakuhachi held in the hands and aimed into the room (-play: Tube::aimOn, the player's
     Player::aim): each opening, the embouchure, the holes, the foot, its own place in the room as
-    the instrument is held, its paths moving as the player lifts it for the loud, high phrase,
-    bows it at the ends and turns each phrase to a side. Against it held still (PJ_AIM=0): (1)
-    the balance between the microphones moves (in some phrase by 1 dB or more: the turn heard),
+    the instrument is held, its paths moving as the player lifts it for the loud, high phrase and
+    bows it at the ends (up and down only, 2026-11-28: its blowing is delicate; src/heldaim.h).
+    Against it held still (PJ_AIM=0): (1) the balance between the microphones moves (in some
+    phrase by 1 dB or more: the lift heard in the room's paths),
     while each phrase's level stays within 3 dB (projection, not a fader); (2) the moving paths
     add no clicks (bursts above 14 kHz, 10 ms windows 6 dB over their neighbours' median: at most
     3 more than held still). (2026-11-27: R-L moved -0.7, +3.6, -0.7 dB; levels within 1.6 dB;
@@ -529,7 +530,7 @@ def shakuhachi_aim():
         moved.append(r['aimed'][0] - r['still'][0])
         lev.append(r['aimed'][1] - r['still'][1])
     said = f"R-L moved {', '.join(f'{m:+.1f}' for m in moved)} dB, levels {', '.join(f'{l:+.1f}' for l in lev)} dB"
-    check('shakuhachi: aimed into the room, the turns heard (-play)',
+    check('shakuhachi: aimed into the room, the lift heard (-play)',
           max(abs(m) for m in moved) >= 1 and max(abs(l) for l in lev) <= 3, said)
     sos = butter(6, 14000, 'hp', fs=fs, output='sos')
     bursts = {}
@@ -2905,6 +2906,19 @@ def metal_perc():
     f2, l2 = peak(x, 2300, 2700)
     check("cowbell: its note and the walls' partial (as recorded: 472 Hz; 2.49 kHz at -20 dB)",
           abs(f1 - 472) < 10 and abs(f2 - 2490) < 40 and -30 < l2 < -10, f'{f1:.0f} Hz; {f2:.0f} Hz at {l2:+.0f} dB')
+    # The cowbell's two voices and the hand (src/cowbellplan.h): keys 40 + 4 place + mute (mounted),
+    # 60 + ... (held: turned as it is struck).
+    def bell(key):
+        fs, x = render('cowbell', f'on {key} 100 wait 1 off {key}')
+        env = np.sqrt(np.convolve(x ** 2, np.ones(240) / 240, 'same'))
+        top = int(np.argmax(env))
+        t30 = np.argmax(env[top:] < env[top] * 10 ** (-1.5)) / fs
+        return band(fs, x, 400, 650, 0.0, 0.1), band(fs, x, 1800, 4000, 0.0, 0.1), t30
+    mo, tp, mm, hm = bell(40), bell(48), bell(42), bell(60)
+    check('cowbell: the top (the tip) is drier and higher than the mouth (the side of the stick)',
+          (tp[1] - tp[0]) - (mo[1] - mo[0]) > 6 and tp[0] < mo[0] - 4, f'high - low {mo[1] - mo[0]:+.0f} dB on the mouth, {tp[1] - tp[0]:+.0f} dB on the top')
+    check('cowbell: the lower fingers pressed shorten the ring', mm[2] < 0.5 * mo[2], f'{mo[2]:.2f} s open, {mm[2]:.2f} s muted (to -30 dB)')
+    check('cowbell: held, the mouth stroke tipped up beams its upper partials away', hm[1] < mo[1] - 4, f'{hm[1] - mo[1]:+.1f} dB (1.8 - 4 kHz)')
     fs, x = render('agogo', 'on 83 100 wait 1 off 83')
     f5, l5 = peak(x, 4800, 5300)
     check("agogo: the recorded bells' strong partial at 5.12 x", abs(f5 / 988 - 5.12) < 0.08 and l5 > -25,
@@ -5044,7 +5058,7 @@ def shakers():
           f'rattle 20-70 ms {rattle - chick:+.1f} dB, 200-300 ms {after - chick:+.1f} dB, against the chick')
     # Brightness: each body's spectral centre.
     want = {'maracas': (70, 2500, 5500), 'shaker': (82, 3500, 7500), 'cabasa': (69, 5000, 12000),
-            'tambourine': (54, 4500, 8500), 'jingle-bell': (83, 4000, 8500)}
+            'tambourine': (54, 4500, 9500), 'jingle-bell': (83, 4000, 8500)}
     cs = []
     ok = True
     for inst, (key, lo, hi) in want.items():
@@ -5074,6 +5088,24 @@ def shakers():
     top = seg(0.0, 0.1)
     held, gone = seg(0.3, 0.55) - top, seg(0.75, 0.9) - top
     check('cabasa: held as long as its key', held > -16 and gone < -40, f'0.3-0.55 s {held:+.1f} dB, 0.75-0.9 s {gone:+.1f} dB')
+    # The tambourine by gestures (research/tambourine.md 1.2): a key held on is a roll, sustained
+    # until it is let go (its ending stroke, then quiet); a soft stroke (the fingertips at the
+    # rim) darker than a hard one (the fist, the other hand's heel).
+    fs, y = render('tambourine', 'on 54 100 wait 2.0 off 54 wait 0.8')
+    seg = lambda a, b: y[int(a * fs):int(b * fs)]
+    start, mid, gone = db(seg(0, 0.2)), db(seg(1.0, 1.6)), db(seg(2.5, 2.8))
+    check('tambourine: a held key a roll, until let go', mid - start > -20 and gone - mid < -40,
+          f'1.0-1.6 s {mid - start:+.1f} dB, 0.5-0.8 s after the release {gone - mid:+.1f} dB')
+    cen = []
+    for v in (30, 120):
+        c = []
+        for _ in range(4):
+            fs, y = render('tambourine', f'on 54 {v} wait 0.06 off 54 wait 0.5')
+            sp = np.abs(np.fft.rfft(y[:int(0.06 * fs)])) ** 2
+            f = np.fft.rfftfreq(int(0.06 * fs), 1 / fs)
+            c.append((sp * f).sum() / sp.sum())
+        cen.append(np.median(c))
+    check('tambourine: soft strokes darker than hard', cen[0] < cen[1] - 300, f'spectral centre {cen[0]:.0f} Hz at 30, {cen[1]:.0f} Hz at 120')
     for inst, seed in (('maracas', '1'), ('shaker', '2'), ('cabasa', '3'), ('tambourine', '4'), ('jingle-bell', '5')):
         r = run(['-inst', inst, '-fuzz', '10', seed])
         check(f'fuzz 10 s ({inst})', r.returncode == 0, r.stdout.strip())

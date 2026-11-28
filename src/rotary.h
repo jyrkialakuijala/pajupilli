@@ -108,4 +108,32 @@ class Rotary {
   uint32_t rng_ = 1;
 };
 
+// Rotary cabinets standing in a room, heard by the listener's pair (the organ's, src/tonewheel.cc;
+// the electric piano's two, src/tinepiano.cc): each cabinet's rays (Rotary::process's) delayed
+// along its paths to the two microphones, 2 m apart, aimed 55 degrees out to their sides, D m in
+// front (PJ_ROTARY_LISTENER, 4): directly, off the side walls 4 m off, the back wall 1.5 m behind
+// the rearmost cabinet, its corners, the floor 1 m down; each path fed by the two rays leaving the
+// cabinet toward it (its facing), weighted by the reflection's loss, the microphone's aim and the
+// distance.
+class RotaryRoom {
+ public:
+  struct Place { double x = 0, y = 0, rot = 0; };  // (m: x toward the listener, y to the left; its facing, rad)
+  void setup(double fs, const std::vector<Place>& places);
+  // One sample of nc cabinets' rays: the pair's early sound added to el, er; the rays' sum to sum.
+  void step(const float (*rays)[Rotary::kRays], int nc, double& el, double& er, double& sum);
+  void reset();
+
+ private:
+  struct Cab {
+    Place p;
+    std::vector<float> ring[Rotary::kRays];  // (its rays, delayed to the paths)
+    // Per path (direct, left wall, right wall, back wall, back-left, back-right corners, the floor)
+    // and microphone: the delay (samples), and the two rays leaving toward it with their gains.
+    int dly[7][2] = {}, ray[7][2][2] = {};
+    double g[7][2][2] = {};
+  };
+  std::vector<Cab> cab_;
+  int pos_ = 0;
+};
+
 }  // namespace pajupilli

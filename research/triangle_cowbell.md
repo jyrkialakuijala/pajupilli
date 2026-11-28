@@ -105,6 +105,50 @@ worked out here; **[memory]** general knowledge, to be checked; **[design]** a c
   - The 2–3.7 kHz group gives its edge. (The classic drum machine imitated a cowbell with two square waves at 540
     and 800 Hz **[memory]**: a rough pair, as here, but not these ratios.)
 
+### 2.4 Two voices, the hand and the turning (2026-11-27) **[design; the owner; web via the owner]**
+
+- **What players do** (the owner, and the material the owner brought):
+  - **The four main tones:** the lower and side fingers press the bell or lift off, apart from where it
+    is struck: open mouth, muted mouth, open top, muted top. Within each, where exactly on the mouth or
+    the top still varies.
+  - **The stick:** the mouth with the side (shoulder) of the drumstick: the open, low, accented clang;
+    the top, toward the closed end, with its tip: a dry, high ping for ghost notes and subdivisions.
+  - **The turning** (the owner): the bell turned toward the listener when the top is struck, tipped up
+    about 60° when the mouth is. As it turns, its partials project differently into the room: complexity
+    from the handling.
+  - **The kit's bell** is mounted (an L-rod on the kick's hoop or a stand): no hand, no turning, a strip
+    of tape or a gel inside to take the excess ring.
+- **The model** (`src/metalperc.cc`, `MetalPercModel::strikeBell`, `turn`):
+  - **Place** 0 … 1 in two zones. The mouth (< 0.5): the side of the stick (20 g, K 2·10⁹); the breathing
+    modes full, a little less further in. The top (≥ 0.5): the tip (7 g, K 4·10⁹, ×1.4 faster: further out
+    on the stick). The breathing modes at 0.4 on the body and 0.2 (−14 dB) at the crown: they move most
+    at the open end. Four high wall modes (8.9–13.6×, T60 0.2–0.35 s) come in.
+  - *Found while building:* a larger excitation shape is also a lighter bell under the stick, which
+    then takes less energy. Raising the crown's wall shapes made it 11 dB *quieter*. So the shapes stay
+    near 1 and the level comes from the stroke.
+  - **The hand:** extra loss per mode, the lowest four (the face's breathing) to T60 0.1 s, the rest to
+    0.25 s, when fully pressed; growing as pressure^1.5. It is set as the stroke lands, kept until the next.
+  - **The turning:** the crossover at 1.1 kHz on the bell's sound. The mouth's breathing (472–580 Hz,
+    ka ≈ 0.4) goes everywhere; the walls' 2–4 kHz partials (ka 3–6) beam along the mouth's axis: off it
+    by −12 dB × (1 − cos θ), −6 dB at 60°, and a share of them to the side. The bell is 90 % of the way to
+    its angle as the stick lands and turns on through the ring (~70 ms), with a 0.6 Hz sway of ±4°.
+- **Keys:** cowbell 56: the open mouth stroke, still, as before. Mounted 40 + 4 place + mute, held
+  (turning) 60 + 4 place + mute: place 0, 1 the mouth (its middle, further along), 2, 3 the top (the
+  body, the crown); mute 0 … 3. The hand scatters place (±0.06, within its zone) and pressure (±0.05).
+- **Measured** (velocity 100, mounted, first 100 ms; `scratchpad/cb/strokes.py`):
+
+| stroke | peak dB | 400–650 Hz | 1.8–4 kHz | centroid (Hz) | to −30 dB (s) |
+|---|---|---|---|---|---|
+| 56 (as before) | −4.6 | −23.4 | −35.7 | 573 | 0.33 |
+| mouth, open | −4.5 | −23.4 | −35.4 | 576 | 0.33 |
+| mouth, muted 1 / 2 / 3 | −4.0 | −25.7 / −28.2 / −29.7 | −36.2 / −37.6 / −38.6 | 649 / 874 / 1224 | 0.16 / 0.08 / 0.05 |
+| mouth, further along | −5.1 | −25.2 | −35.3 | 644 | 0.33 |
+| top (body), open / muted 1 | −6.5 / −6.4 | −29.6 / −31.4 | −33.7 / −34.2 | 1110 / 1507 | 0.33 / 0.19 |
+| crown, open / muted 1 / 2 / 3 | −8.6 … −8.7 | −32.4 / −34.2 / −35.5 / −36.1 | −33.8 / −34.2 / −35.9 / −37.3 | 1457 / 1886 / 2213 / 2374 | 0.33 / 0.19 / 0.13 / 0.07 |
+
+  - Held and tipped up, the mouth stroke's 1.8–4 kHz is 4–8 dB under the mounted one's (the angle and
+    the sway); the top stroke, facing the listener, is unchanged.
+
 ## 3. The agogo bells
 
 - **What they are:** two conical iron bells on one handle, struck with a stick (Brazilian; GM's 67
@@ -180,12 +224,77 @@ worked out here; **[memory]** general knowledge, to be checked; **[design]** a c
   cut at about 1.7 s, so the long T60s are a design.
 - **Triangle details:** the triangle's suspension (its string) and its slow swinging are not
   modelled. The kink coupling is folded into the second family's offset, not computed.
-- **Cowbell strokes:** only the mouth stroke. A body or tip stroke (drier) and a hand-held,
-  hand-damped cowbell are not separate keys in GM; they could follow velocity or a knob.
+- **Cowbell strokes:** built 2026-11-27 (§2.4, §7).
 - **Sizes:** one size each (8" triangle, a 472 Hz cowbell). Cowbells vary a lot; `PJ_COWBELL_HZ`
   moves the whole bell.
 
-## 7. Sources
+## 7. The player (2026-11-27): a key 56 is "the cowbell plays here" **[design]**
+
+As with the tambourine (`research/tambourine.md` §1.1), the note is a request. The player chooses the
+stroke before the song (`src/cowbellplan.h/.cc`, called from `src/midifile.cc`, sent as keys 88–119).
+
+- **The user's files** (`research/gm_compare/work/cowbell/cb.py`, `pat.py`): about 3100 notes of key 56.
+  - **Hand-made Latin files** with velocities that mean something: *Manteca* (beats 1 and 3 at 70, the
+    anticipations 2& and 4& at 48: the campana's open and closed strokes written as velocities),
+    *Peanut Vendor* (quarters, humanized 59–72), *Cubano Chant*, *Gaviota* (quarters at 127).
+  - **Transcriptions:** every note at 100, spread evenly over the beat (Jammo, So Flute, El Shing-A-Ling,
+    Say My Name, Paul Simon).
+- **What it reads:**
+  - the velocities: flat (one value for 85 % of the notes) or carrying accents;
+  - the grid: sixteenths, triplets, or neither (a transcription);
+  - a Latin band (16 or more notes on bongos, congas, timbales, claves, guiro): the bell is held;
+  - else it is mounted on the kit.
+- **Each note's accent weight:**
+  - The meter (4/4 from the song's start): 1 → 1.0, 3 → 0.85, 2 and 4 → 0.6, the "&" → 0.4, the
+    sixteenths → 0.2; in a transcription 0.5, since its grid is not the music's.
+  - Listening: +0.35 with the clave (Latin), +0.2 with the bass drum, +0.15 for the first stroke after
+    a gap.
+  - The file's velocity, where it means something: ±0.35 per standard deviation.
+- **Ranked within its bar** (half the rank, half the weight), so that a bell on quarters and one on
+  sixteenths both get two voices. Then: ≥ 0.72 the mouth, ≥ 0.55 the mouth further along, ≥ 0.35 the
+  body, else the crown.
+  - Quarters come out as the mouth on 1 and 3 and the body on 2 and 4, as the pasted advice has it.
+  - In rock or funk, a stroke on the snare's backbeat moves one step toward the crown and 8 % softer:
+    it locks with the snare rather than fighting it.
+- **The hand** (held only): open for an accent (≥ 0.72) or a note with a beat or more of room; pressed
+  (2) for quick in-between notes (half a beat or less to the next); lightly (1) between. A mounted
+  bell: tape, mute 1 on the top. The last stroke before a rest of two beats rings open.
+- **The level:** the file's own velocity where it means something. Flat: the band's level + 25 at
+  most, × 1.0 / 0.92 / 0.85 / 0.78 by place, the bar's downbeat × 1.06.
+- **A transcription:** a doubled note (two within 25 ms) is played once. An isolated note (fewer than
+  three others within four bars) is skipped off the beat; on the beat it is played soft on the body.
+- **What it read in the files:**
+
+| file | read as | mouth / lip / body / crown | muted | skipped |
+|---|---|---|---|---|
+| Manteca | held, the file's accents | 475 / 0 / 235 / 238 | 470 | 0 |
+| Peanut Vendor | held, the file's accents | 363 / 97 / 128 / 139 | 23 | 0 |
+| Cubano Chant 2 | held, the file's accents | 46 / 13 / 23 / 37 | 13 | 0 |
+| Jammo | held, a transcription | 63 / 26 / 171 / 13 | 186 | 1 |
+| El Shing-A-Ling | mounted (no Latin percussion in the file), a transcription | 15 / 25 / 52 / 94 | 128 (tape) | 3 |
+| Say My Name | mounted, a transcription | 5 / 12 / 20 / 10 | 25 (tape) | 0 |
+
+- **Switches:** `PJ_COWBELL_PLAN=0` (every note key 56, as before), `PJ_COWBELL_BEAM` (12 dB; 0: no
+  turning), `PJ_COWBELL_SWAY` (4°), `PJ_COWBELL_TURN_AHEAD` (0.9), `PJ_COWBELL_TIP_SPEED` (1.4),
+  `PJ_COWBELL_TIP` (7 g), `PJ_COWBELL_BODY_LOW` / `CROWN_LOW` (0.4 / 0.2), `PJ_COWBELL_TOP_HI` (1),
+  `PJ_COWBELL_MUTE_LOW_T60` / `MUTE_HI_T60` (0.1 / 0.25 s).
+- **Listening** (`research/gm_compare/work/cowbell/`, 45 s each, `-base` = `PJ_COWBELL_PLAN=0`):
+  `manteca`, `peanut`, `cubano`, `jammo`, `shingaling`, `saymyname`; and the bell alone: `tones-held`
+  (the four tones, 4 each, then the mambo bell's 2-3 pattern, M open mouth, c muted top),
+  `tones-held-noturn` (the same, not turning), `tones-mounted`.
+- **Not done:**
+  - the bell's size by style (a large bongo bell, a small cha-cha or mambo bell, a deep rock bell):
+    one bell, 472 Hz;
+  - no sections and no restraint across the form: the plan does not lay out in verses or bring the bell
+    in for a chorus;
+  - no vocal awareness;
+  - no swing reading beyond triplets;
+  - the bar assumed to be 4/4 from the song's start;
+  - the timbalero's two bells;
+  - with the Latin band read only from its percussion keys, a salsa transcription that uses kit sounds
+    gets a mounted bell.
+
+## 8. Sources
 
 - **[S22]** M. D. Stanciu et al., "Mechanical and Acoustic Properties of Alloys Used for Musical
   Instruments", Materials 15 (2022) 5192, https://doi.org/10.3390/ma15155192 (triangles' modal

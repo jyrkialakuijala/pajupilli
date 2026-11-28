@@ -1,5 +1,6 @@
 #include "director.h"
 #include "velline.h"
+#include "heard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -69,6 +70,16 @@ bool& jazzPiece() {
   return jazz;
 }
 
+bool& ampedPiece() {
+  static bool amped = false;
+  return amped;
+}
+
+bool& rotaryRoom() {
+  static bool room = false;
+  return room;
+}
+
 // Jazz, from what a listener hears first (research/bass_amps.md 13.6): swung eighths (the off-beat
 // at two thirds of the beat, not at half: in a file played or written with its swing), the time
 // kept on the ride cymbal more than on the hi-hat, a walking bass (a line of quarter notes), the
@@ -116,14 +127,38 @@ static void readJazz(const DirInput& in, Direction& d) {
     eighths = steps ? double(halves) / steps : 0;
   }
   const bool swung = offs >= 16 && swing >= 0.6, rides = ride >= 16 && ride >= 1.5 * hat, walks = walk >= 0.5;
+  // (Rock, funk, blues: GM 30 / 31 overdriven and distorted guitars, 19 rock organ, 8 clavinet,
+  // 37 / 38 slap basses; or a shuffle not read as jazz.)
+  const bool rockBand = in.program[29] || in.program[30] || in.program[18] || in.program[7] || in.program[36] || in.program[37];
   const bool band = in.program[26] || in.program[64] || in.program[65] || in.program[66] || in.program[67] || in.program[11] || in.program[59];
   const int score = 2 * swung + rides + walks + band;
   d.jazz = in.jazzBand || score >= 2;
   static const int kForce = int(knob("PJ_DIRECTOR_JAZZ", -1));
   if (kForce >= 0) d.jazz = kForce > 0;
-  char why[240];
-  std::snprintf(why, sizeof why, "%s: off-beats swung %.0f %% (of %d), ride %d against hi-hat %d, the bass (channel %d) in beats %.0f %%, quicker %.0f %%%s%s%s",
-                d.jazz ? "jazz" : "not jazz", 100 * swing, offs, ride, hat, bass + 1, 100 * walk, 100 * eighths, band ? ", a jazz band's instruments" : "",
+  d.amped = !d.jazz && (rockBand || swung);
+  // The band's size: the parts (not the drums) that play at least 8 notes; the tempo: the quarter's
+  // length over the piece, weighted by how long each tempo holds.
+  int parts = 0;
+  for (int c = 0; c < 16; ++c) parts += chN[c] >= 8;
+  double quarter = 0;
+  {
+    long lastTick = 0;
+    for (const DirNote& x : in.notes) lastTick = std::max(lastTick, x.tickOff);
+    double beats = 0, secs = 0;
+    for (size_t i = 0; i < in.tempo.size(); ++i) {
+      const double b0 = in.tempo[i].beat, b1 = i + 1 < in.tempo.size() ? in.tempo[i + 1].beat : double(lastTick) / div;
+      if (b1 > b0) { beats += b1 - b0; secs += (b1 - b0) * in.tempo[i].len; }
+    }
+    quarter = beats > 0 ? secs / beats : 0.5;
+  }
+  d.sparse = parts >= 1 && parts <= 3;
+  d.ballad = quarter >= 0.75;
+  static const int kAmped = int(knob("PJ_DIRECTOR_AMPED", -1));
+  if (kAmped >= 0) d.amped = kAmped > 0;
+  char why[400];
+  std::snprintf(why, sizeof why, "%s%s%s%s: off-beats swung %.0f %% (of %d), ride %d against hi-hat %d, the bass (%s) in beats %.0f %%, quicker %.0f %%%s%s%s",
+                d.jazz ? "jazz" : "not jazz", d.amped ? (rockBand ? " (rock, funk or blues: its instruments)" : " (a shuffle: blues)") : "",
+                d.sparse ? strf(" (a small band: %d part%s)", parts, parts == 1 ? "" : "s").c_str() : "", d.ballad ? strf(" (a ballad: %.0f a minute)", 60 / quarter).c_str() : "", 100 * swing, offs, ride, hat, bass >= 0 ? strf("channel %d", bass + 1).c_str() : "none", 100 * walk, 100 * eighths, band ? ", a jazz band's instruments" : "",
                 in.jazzBand ? ", a piano and an upright bass" : "", kForce >= 0 ? " (PJ_DIRECTOR_JAZZ)" : "");
   d.jazzWhy = why;
 }

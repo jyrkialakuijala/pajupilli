@@ -12,20 +12,29 @@
 //     clasps the triangle (a key 80, or the hold); an open stroke lets go.
 //   - The cowbell (-inst cowbell; 56): a sheet-iron box, open at the mouth,
 //     its modes as measured on a recorded cowbell (the mouth's breathing near
-//     the note and its neighbours, a cluster at 4-8 x), the stick on the
-//     mouth's edge.
+//     the note and its neighbours, a cluster at 4-8 x). Two voices on one
+//     bell: the stick's shaft on the mouth's edge (open, low, the clank) or
+//     its tip on the body toward the closed crown (dry, high, the ping), and
+//     the hand's finger on the face (open ... muted). Key 56 is the open mouth
+//     stroke; keys 60 .. 75 are a stroke the player chose (src/cowbellplan.h).
 #pragma once
 
 #include <cstdint>
 
 #include "modal.h"
 #include "performer.h"
+#include "rng.h"
 #include "tube.h"
 
 namespace pajupilli {
 
 struct Instrument;
 bool metalPerc(const Instrument& inst);  // -inst triangle, cowbell
+// The cowbell's chosen strokes: keys kCowbellStroke0 + 4 x place + mute,
+// place 0, 1 (the mouth, the side of the stick) .. 2, 3 (the top, its tip),
+// mute 0 (open) .. 3 (the lower fingers pressed). Held in the hand, turned as
+// it is struck (from 60); mounted on the kit, still (from 40).
+constexpr int kCowbellStroke0 = 60, kCowbellMounted0 = 40;
 
 class MetalPercModel : public Tube {
  public:
@@ -35,6 +44,14 @@ class MetalPercModel : public Tube {
   // A stroke: the beater's speed (m/s); where along the rod (share of its
   // length; the triangle) or of the mouth's edge (the cowbell).
   void strike(double speed, double where);
+  // The cowbell's stroke: place 0 (the shaft on the mouth's edge) .. 1 (the
+  // tip on the crown); mute 0 (open) .. 1 (a finger pressed on the face),
+  // set as the stroke lands and kept until the next.
+  void strikeBell(double speed, double where, double place, double mute);
+  // Where the held bell's mouth turns to, from the listener (degrees: 0
+  // toward them, 60 tipped up), and how fast (s); held false: mounted, still,
+  // toward the listener.
+  void turn(double degrees, double seconds, bool held);
   // The hand on the triangle (0: off, 1: clasped).
   void setHand(bool on);
   bool hand() const { return hand_; }
@@ -45,7 +62,7 @@ class MetalPercModel : public Tube {
  private:
   void controlStep() override {}
   float sample() override;
-  void excite(double where);
+  void excite(double where, double place = 0);
   Kind kind_;
   ModalSet set_;
   int nVib_ = 1;
@@ -55,6 +72,11 @@ class MetalPercModel : public Tube {
   bool hand_ = false;
   double gain_ = 1;
   float last_ = 0, sd_ = 0;
+  // The held bell's turning: its walls' partials (over ~1.1 kHz) beam along
+  // the mouth's axis, its mouth's breathing goes everywhere. A crossover on
+  // the sound, the upper band's level and side share from the angle.
+  double ang_ = 0, angTo_ = 0, angA_ = 0, sway_ = 0, swayW_ = 0, swayAmp_ = 0, sideDir_ = 1;
+  double lp1_ = 0, lp2_ = 0, xb_[3] = {}, xa_[2] = {};
   std::vector<float> side_, sideOut_;
 };
 
@@ -65,7 +87,7 @@ class MetalPercPlayer : public Performer {
   void noteOff(int midi) override;
   void render(float* out, int n) override;
   void setHold(bool h) override;
-  void seed(unsigned s) override { rng_ = s * 2654435761u + 1; }
+  void seed(unsigned s) override { rng_.reseed(s); }
   // The beater's speed for a key's velocity (m/s).
   static double speed(int velocity, double dynamics);
 
@@ -73,7 +95,7 @@ class MetalPercPlayer : public Performer {
   double ur();
   MetalPercModel& m_;
   bool hold_ = false;
-  uint32_t rng_ = 12345;
+  Rng rng_{12345};
 };
 
 }  // namespace pajupilli

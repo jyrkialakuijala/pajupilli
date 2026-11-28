@@ -32,7 +32,32 @@ ReedPlayer::ReedPlayer(Reed& r) : Performer(r), reed_(r) {
   if (bag_) ear_ = false;
 }
 
+// How the clarinet, the oboe, the cor anglais are held into the room (src/heldaim.h): lifted with
+// the playing, bowed into a phrase's end, the bell circling a little, wider over a long note.
+void ReedPlayer::aim(double dt) {
+  if (!aimKind_) {
+    aimKind_ = true;
+    heldAim_.setKind(HeldAim::kFree, randomSeed(12, int(aimSeed_)));
+  }
+  if (aimNew_) {
+    aimNew_ = false;
+    heldAim_.newPhrase();
+  }
+  const bool on = note_ >= 0 && blowing_;
+  const double loud = std::clamp(dyn_ + breathCtl_ + velDyn_, 0.0, 1.0);
+  const double high = note_ >= 0 ? std::clamp((note_ - inst_.lo - 24) / 12.0, 0.0, 1.0) : 0.0;  // (its top octave and over)
+  const double accent = cued_ ? std::max(0.0, double(cue_.v[kCueAccent])) : 0.0;
+  double down = 0, side = 0, turn = 0;
+  heldAim_.step(dt, on, loud, high, accent, aimEnd_, sinceOn_, sinceOff_, &down, &side, &turn);
+  if (std::fabs(down - aimSet_[0]) + std::fabs(side - aimSet_[1]) > 0.002) {
+    aimSet_[0] = down;
+    aimSet_[1] = side;
+    reed_.setPose(down, side, turn);
+  }
+}
+
 void ReedPlayer::seed(unsigned s) {
+  aimSeed_ = s;
   rng_ = 4242u + 7907u * s;
   vib_.seed(s);
   if (s == 0) return;
@@ -69,6 +94,9 @@ void ReedPlayer::noteOn(int midi, int velocity) {
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
+  // (held into the room: a new phrase after a rest or a phrase's end; src/heldaim.h)
+  if (!legato && (sinceOff_ > 0.35 || aimEnd_)) aimNew_ = true;
+  aimEnd_ = cued_ && cue_.v[kCuePhraseEnd] > 0.5f;
   const Articulation art = articulate(midi, velocity, legato);
   const int from = note_;
   note_ = midi;
@@ -341,6 +369,7 @@ void ReedPlayer::render(float* out, int n) {
     tongueClock_ += bdt;
     sinceOn_ += bdt;
     sinceOff_ += bdt;
+    if (reed_.aimed()) aim(bdt);
     e.tongue = tongueClock_ < tongueClosed_ ? 0 : std::min(1.0, (tongueClock_ - tongueClosed_) / tongueRelease_);
     e.tongue = tongueFloor_ + (1 - tongueFloor_) * e.tongue;
     e.tongue *= tongueStop();

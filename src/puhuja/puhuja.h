@@ -297,7 +297,7 @@ class Synth {
   // for a stressed syllable, > 1 let apart for a breathy ghost note)
   // (neutral: the vowel's shape this far towards the neutral vowel's, 0 .. 1: a quick or unstressed sung
   // syllable, whose articulators do not reach the vowel)
-  struct Expr { double t; float press, vibCents, vibHz; float cents = 0; float open = 0; float adduct = 1; float neutral = 0; float front = 0; };
+  struct Expr { double t; float press, vibCents, vibHz; float cents = 0; float open = 0; float adduct = 1; float neutral = 0; float front = 0; float tall = 0; };
   void setExpression(std::vector<Expr> e) { expr_ = std::move(e); exprI_ = 0; }
   // Kokoro mode: a reference reading's profile guides rhythm, pitch and level (prosody.h); nullptr: puhuja's own.
   void setProsodyGuide(ProsodyGuide* g) { prosodyGuide_ = g; }
@@ -836,7 +836,7 @@ class Synth {
   std::vector<Expr> expr_;  // (setExpression)
   size_t exprI_ = 0;
   double exprPhase_ = 0;
-  float exprOpen_ = 0, exprAdduct_ = 1, exprNeutral_ = 0, exprFront_ = 0;
+  float exprOpen_ = 0, exprAdduct_ = 1, exprNeutral_ = 0, exprFront_ = 0, exprTall_ = 0;
   float creakTarget_ = 0, creakNow_ = 0, kCreakFollow_ = 0;  // creaky irregularity
   float liqShelfNow_ = 0, liqShelfTarget_ = 0;  // LIQ agent31: extra source shelf share in an ɹ / l (LIQ_R_SHELF ...)
   bool liqShelfSet_ = false;

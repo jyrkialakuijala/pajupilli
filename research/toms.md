@@ -72,6 +72,22 @@ to be checked; **[design]** a choice of this plan.
   - Those are rock and pop tunings. Jazz toms sit a few semitones higher: a 12" near 130–165 Hz and a
     14" near 98–110 Hz **[memory, to be measured]**.
   - The toms of a set are tuned in fourths, fifths or the notes of a chord **[web, OL12]**.
+- **The user's notes (2026-11-28)** **[user]**, the jazz ranges above confirmed:
+  - 12" × 8" rack tom C3–F3 (130–175 Hz); Max Roach and Philly Joe Jones pushed it up near E3–F3, a
+    taut, bongo-like snap over the bass and piano. 14" × 14" floor tom G2–C3 (98–130 Hz), well above
+    the upright bass's low register. A 16" floor tom E2–G2 (82–98 Hz), tight enough to speak with
+    brushes.
+  - Intervals matter more than absolute pitch: a **fourth** (floor G2, rack C3) is the traditional,
+    open, conversational one; a **fifth** (F2, C3) wider and more dramatic; a **major third**
+    (Bill Stewart, Brian Blade) a tight, vocal cluster.
+  - Heads: **equal tension** top and bottom for the most sustain and a round fundamental with little
+    glide; the **resonant head higher** (up to a minor third) gives an upward swell on the stroke
+    and a shorter decay, which keeps fast bebop articulate in live rooms. **No muffling**: no gels,
+    tape or internal dampers.
+  - The model (`src/tom.cc`) as of this date: 12" 164.8 Hz (E3), 14" 110 Hz (A2, a fifth under), 16"
+    92.5 Hz (F#2), the low 16" 73.4 Hz (D2: GM's low floor tom, under the jazz range); both heads at
+    one lug tension (`PJ_TOM_RESO` 1.0), light damping only. All within the ranges. Not tried yet: a
+    fourth (the 14" up to B2, 123 Hz) and the resonant head a little higher (`PJ_TOM_RESO` above 1).
 
 ### 2.2 Lug pitch and the drum's pitch
 

@@ -384,6 +384,80 @@ vortex losses with α_vc 0.6, and a stopped quarter-wave pipe. Where they differ
     a 3 ms seal and 14 ms release; "k" the same firmer. A tongued legato elsewhere is the tip's "l": 0.8 ms,
     the air barely broken.
 
+- **Long notes shaped by the player itself** (2026-11-28, by request: "even if the director is not giving
+  instructions, long notes should either have expansion (if there is plenty of other activity), or at least slight
+  decrescendo if there is no activity, … with the end of the note when vibrato starts with no or less decrescendo —
+  or if the long note is a ramp up to a higher activity and key velocity, … a crescendo towards the end").
+  - **What the player hears** (`src/midifile.cc`, after the director; `kCueOwnLen`, `kCueOwnBusy`, `kCueOwnRamp` in
+    `src/director.h`): the note's length, the other parts' note-ons per second while it sounds (a drum stroke
+    counting half), and whether it leads up. Leading up means the part's next note comes within 0.6 s, at least 2
+    semitones higher (0.4) or 6 velocity harder (0.3), with the band busier after it (+0.3).
+  - The pan flute's and the bottles' notes without a cue get one carrying only that, even with `-director off`.
+  - **When:** the cue gives no shape: a vibrato-only cue, or no swell and the level moving under 0.05 through
+    the note. From 0.6 s long; full from 1.2 s; deeper for the longest (× up to 1.3); ±20 % per note.
+  - **What** (`Player::shapeOwn`, in dynamics, and heard as loudness at `PJ_PAN_OWNDB` 16 dB per unit, as the
+    director's):
+    - **expansion** over a busy band (3 note-ons a second or more; blended from 1): a grow to +0.12 by 60 % of the
+      note, easing 30 % over its last 15 % (`PJ_PAN_EXPAND`);
+    - **sinking** over a quiet one: −0.1 across the note; from 40–70 % of it on, a quarter as fast once the vibrato
+      has come in (`PJ_PAN_DECR`). Not on a phrase's last note, which tapers already;
+    - **crescendo** into the higher, harder note: up to +0.18 from 40 % of the note to its end (`PJ_PAN_CRESC`).
+      Where the director already gives one (its level rising through the note), the director's is kept.
+  - **[M]** `research/gm_compare/work/panflute-long/long.mid` (90 bpm, 4.7 s notes, the pan flute alone, level
+    against the note's start at 30 / 55 / 75 / 90 % of it, dB):
+
+    | | busy band | quiet band |
+    |---|---|---|
+    | without (`PJ_PAN_EXPAND=0 PJ_PAN_CRESC=0 PJ_PAN_DECR=0`) | +1.9 +0.6 +0.8 +0.2 | +1.0 +1.0 +0.9 +0.3 |
+    | with | +2.9 +2.6 +2.8 +2.1 | +0.6 +0.0 −0.2 −0.9 |
+
+- **A long last note of a solo line does not fade while the band plays on** (2026-11-28, by request: "long
+  solistic last note should not easily fade away if others are still playing — and likely it should have vibrato
+  in the end", for any wind or string).
+  - **Which notes** (`src/midifile.cc`, the same pass): any wind (not the bagpipes) or solo string; 1.2 s or longer;
+    a phrase's last note, or the part's last, or followed by over 1 s of rest; no other note of its own part under
+    it. Others must play on: note-ons under it at 1 a second or more, or a note sounding through its end.
+  - **What:**
+    - no phrase-end taper (`kCuePhraseEnd` cleared);
+    - its level not falling through it, nor the director's level curve under its start;
+    - vibrato if it had little (depth 1, coming in after 45 % of the note, at most 1.5 s in), or its delay
+      brought to half the note at most.
+  - `PJ_HOLD_LAST=0`: as before. The file player prints how many it held.
+  - **[M]** The test file's last note (4 beats, the band on 8ths under it): +0.2 −0.1 +0.7 +0.6 dB before, +1.4 +2.4
+    +3.2 +2.9 dB now (held, and expanding over the busy band).
+  - Listening: `long-new.wav`; `long-noown.wav` (the player's own shapes off, the held last note still on); `long-before.wav` (both off).
+
+- **The other winds and the solo strings shape their long notes too** (2026-11-28, by request: "give it there --
+  probably the long notes should be very considerate about their surroundings so that they don't become comical").
+  - **The same shape** (`src/longnote.h`, shared with the pan flute), smaller: expansion 0.08, crescendo 0.12,
+    sinking 0.06 (`PJ_OWN_EXPAND`, `PJ_OWN_CRESC`, `PJ_OWN_DECR`). It goes through the part's level, as the
+    director's swells do (`ownLevel` in `src/midifile.cc`): heard as loudness at 16 dB per unit, with only 0.4 of it
+    in the breath (`PJ_OWN_BREATH`). With the whole shape in the breath, a clarinet expanded +3.5 dB and sank −3.6 dB:
+    its level follows its breath strongly.
+  - Uncued notes too: `-director off`, or a part the director leaves alone.
+  - **Considerate** (in the score pass; the pan flute gets the same, through `kCueOwnSize`):
+    - nothing for a part that plays chords (its notes overlapping more than 15 % of the time);
+    - no growing for a pad's note (two other parts or more beginning notes of 0.6 × its length with it);
+    - no expansion under a busy melody (1.5 or more note-ons a second over 2 semitones above it), and half the
+      crescendo;
+    - a crescendo only into a clear rise (its lead-up 0.6 or more);
+    - a run of long notes (1.2 s or more, under 1 s apart): the second shaped 0.7, the third on 0.35.
+  - **[M]** `long-<instrument>.mid` (the test file, its lead played by each), the lead alone, against the same with
+    the player's shapes and the held last note off (dB against the note's start at 30 / 55 / 75 / 90 %):
+
+    | | busy band, before → now | quiet band, before → now |
+    |---|---|---|
+    | flute | +1.1 +0.9 +0.7 +0.2 → +2.1 +2.8 +2.6 +1.7 | +2.2 +1.0 +1.8 +1.7 → +2.0 +0.5 +1.2 +1.1 |
+    | clarinet | +1.3 +2.6 +1.0 +1.7 → +2.3 +5.1 +3.6 +4.1 | +1.4 +0.6 −0.1 −0.9 → +1.2 +0.0 −1.2 −2.6 |
+    | trumpet | +0.5 +0.4 −0.4 −1.0 → +2.1 +2.9 +2.4 +1.2 | +1.1 +0.1 −1.9 −3.0 → +0.8 −0.5 −2.6 −3.7 |
+    | oboe | +0.2 +0.4 −0.8 +0.0 → +1.2 +2.3 +1.1 +1.6 | +0.7 +0.2 +0.1 −0.3 → +0.4 −0.3 −0.6 −1.0 |
+
+    The violin's level wanders ±4 dB between the two renders: no reading.
+  - The ramp note is the same in both: the director's own crescendo there is kept.
+  - `consid.mid` (`mk2.py`): a clarinet long note under a busy flute melody is unchanged (no expansion). A chord
+    held by clarinet, flute and oboe: none of them grows.
+  - Listening: `long-<instrument>-new.wav` against `-before.wav`; `consid-new.wav` against `consid-before.wav`.
+
 ## 8. Proposed order of work, with checks
 
 | # | change | check |

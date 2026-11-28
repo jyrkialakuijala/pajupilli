@@ -4,7 +4,7 @@ Status: 2026-11-27. Built as `tubularBellsDesign()` in `src/bars.cc` (the player
 `src/barsinst.cc`): church bells C2–B3, tubes C4–G5, carillon bells G♯5–C8 (section 12), the
 tubes' modes from a Timoshenko finite-element model with the plug, doublets, the longitudinal
 mode, the two-faced hammer chosen by velocity, the ring times of 3.5, and jyrki-spectral tuning
-per stroke (section 9). Not yet: the damper, the pedal and hand damping, the swing, the
+per stroke (section 9). Not yet: hand damping, the swing, the
 director's rules (section 8). See section 10a for what was measured on the result. GM program 15 "Tubular Bells". This note
 replaces that section's guesses with measurements and sources, and puts the weight where the
 user asked: how the bells are **played** (which part of the tube, at what angle, with which face
@@ -477,9 +477,14 @@ Status of each step on 2026-11-27:
    `PJ_BELLS_CLICK`), the wood's 5 × the rawhide's. The face rule of 4.3 in `BarsPlayer`, the
    wood's stroke eased to 0.75 of the speed (`PJ_BELLS_HARD_EASE`). The cap's own give in
    series with the wood: not modelled.
-6. **Damper, pedal, hand damping — not yet.** The tubes and bells ring on; a note-off does
-   nothing. (Most GM files give the bells short notes, so a damper on the note-off would cut
-   them wrongly; the director should decide, as a player does.)
+6. **Damper and pedal — built (2026-11-28, the user: "tubular bells need to be dampened when the
+   key goes [up], unless the sustain pedal is pressed").** A key's note-off brings the felt down
+   (`BarsPlayer::noteOff`); the pedal (CC 64) holds every damper off and its release damps every
+   key not held (`setHold`). The felt: `PJ_BELLS_DAMPER` 20 1/s at 500 Hz, x sqrt(f / 500)
+   (0.7 .. 2.5: the higher modes sooner), about 0.35 s to -60 dB on a tube's strike note; the
+   cast bells beyond the tubes 0.6 of it (no damper on a real set: a hand on the heavier bell);
+   the felt coming down over `PJ_BELLS_DAMPER_TIME` 0.04 s. Not yet: hand damping, damped
+   strokes, the damper's own release sound, the director choosing to let a short note ring.
 7. **Swing — not yet.**
 8. **Tuning — built** (section 9): `BarsPlayer::pull` at each stroke of a key not ringing, its
    own ringing bells heard too (`hearOwn`), ±15 c; `kBandChime` and `bandRatio` in `src/band.*`

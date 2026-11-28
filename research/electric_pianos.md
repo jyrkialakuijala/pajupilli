@@ -481,6 +481,55 @@ Per key (one block, all keys in a row; a key sleeps below −100 dB as in `Piano
 - tine piano coil inductance and resistance, harp network output impedance.
 - Suitcase pan rate range and LFO shape; reed electric piano tremolo rate (measure from recordings).
 
+## 10. What is recorded: DI or amp, the style's choice (2026-11-28)
+
+The owner's notes (studio practice): straight in through a DI or preamp is the dominant way in
+jazz, neo-soul, R&B and pop (the low end clear, the bell-like attack kept, no amp hiss, the
+Suitcase's stereo vibrato wide and clean). An amp (a valve 2 x 12 combo of the Twin kind, a
+solid-state chorus combo, a rotary speaker) is preferred in rock, funk, blues and indie: the tubes
+and the cone compress the hard upper-mid bark and add saturation. Engineers then often record both
+and blend the amp under the DI (the amp for grit, air and body; the DI for the weight and the
+articulation).
+
+Built (src/tinepiano.cc, `PJ_TINEPIANO_OUT`; -1 the director's choice):
+- 0 **The Suitcase's preamp direct** (its stereo vibrato, no power amp, no 4 x 12): the default.
+- 1 The Suitcase whole, its 4 x 12 heard (the default until now; `PJ_TINEPIANO_SUITCASE=1`).
+- 2 A Stage straight in (`PJ_TINEPIANO_SUITCASE=0`).
+- 3 **A Stage into a clean valve 2 x 12 combo, miked, its DI 30 % under it** (`PJ_TINEPIANO_BLEND`),
+  lined up with the mic: GuitarAmp's clean combo (two 12AX7 stages, the three-knob stack, the
+  power stage, the open-back 2 x 12 as filters). The harp (0.65 H, 1.4 kOhm) through the Stage's
+  10 kOhm pot. Its EMF x2 into the combo (`PJ_TINEPIANO_AMPIN`): a ff bass chord's second stage
+  ~1.3 of its knee (the grit), a mf line ~0.2 (clean). Chosen when the director reads the piece as
+  rock, funk or blues (src/director.cc: GM 30 / 31 guitars, 19 rock organ, 8 clavinet, 37 / 38
+  slap basses; or a shuffle not read as jazz).
+- 4 **A Stage into two rotary cabinets** (the owner: the organ's Leslie 122 model reused, no DI at
+  all): the organ's two-cabinet set (src/rotary.h: each +-7 % off nominal, speeds x1.172 and
+  x1.081, horn-to-drum ratios the model's own and the published 122's), each its own valve amp, fed
+  the Stage x8 (`PJ_TINEPIANO_LESIN`), together as loud as one (0.54). In a room they stand as
+  the organ's left and right cabinets (0.3 m forward, 2 m either side, each turned 25 degrees in)
+  and radiate into it as the organ's do (src/rotary.h RotaryRoom, moved out of the organ: its
+  output bit-identical after): each cabinet's rays along its paths to the listener's pair, the
+  room's late field fed their mean; +1.7 dB in the room (`PJ_TINEPIANO_LESROOM_DB`) to match the
+  DI there. Dry, or `PJ_ROTARY_MICS=close`: their close microphone pairs summed. Slow until the mod wheel reaches 64 (as the
+  organ's). Chosen (the owner: "an option when there are not many instruments, e.g. only singer,
+  bass, drums and e-piano; also for ballads") when the director reads a small band (at most three
+  parts besides the drums) or a ballad (a quarter of 0.75 s or longer over the piece), not jazz:
+  jazz keeps the DI; then the Leslies before the combo of rock, funk, blues. ~8 % of a core (the
+  piano alone ~2 %).
+- The five levelled to the old default (a chord, a line, a bass chord): trims -1.5, 0, +12.5, +13,
+  -2.4 dB; the first four within 0.1 dB of each other.
+- On the owner's files: walking.mid, I Get Around and Barbie Girl read as rock/funk/blues (Barbie
+  Girl's distorted guitar: a pop record; the reading is crude); Faith, hammond.mid, rdmdngt.mid
+  not; benblues.mid jazz.
+
+The owner's ear (2026-11-28): "epiano-new.wav is good [the Suitcase's preamp direct, the new
+default], both -leslie's are great, too" (option 4, slow and fast). The combo (new2) not remarked on.
+
+Not yet: the combo's speakers as physical (src/bassspeaker.h with an open back: a dipole, no box
+spring); a solid-state chorus combo and the rotary speaker as further choices; the 300-500 Hz
+"boxiness" cut and the chorus / phaser / spring reverb of the mix (the engineer's, not the
+instrument's).
+
 ## 9. Sources
 
 - [Sh11] G. Shear, *The Electromagnetically Sustained Rhodes Piano*, MS thesis, UC Santa Barbara

@@ -50,6 +50,12 @@ enum {
   kCueTongue,     // a fast run's tonguing, the note's place in its group: 0 none (the player's own), 1 / 2
                   //    the front / back of a pair (ta-ka, da-ga), 3 / 4 / 5 the first / second / third of
                   //    a three (triplets, a compound beat: da-da-ga or da-ga-ga, the player's habit)
+  // What a player hears around the note, for its own shaping where the cue gives none (the file
+  // player fills them for every cued note, src/midifile.cc; the pan flute's long notes):
+  kCueOwnLen,     // the note's sounding length (s)
+  kCueOwnBusy,    // the band's activity while it sounds: the other parts' note-ons per second
+  kCueOwnRamp,    // 0 .. 1: it leads up: the part's next note higher and harder, the band busier after it
+  kCueOwnSize,    // 0 .. 1: how far it may grow, considered (0: a pad's note, a chord's, under a melody)
   kCueDims
 };
 struct Cue {
@@ -102,10 +108,22 @@ struct Direction {
   // players choose their own ways from it (the electric bass's DI share). What it heard, to print.
   bool jazz = false;
   std::string jazzWhy;
+  // Rock, funk or blues (not jazz): the band's overdriven or distorted guitars, a rock organ, a
+  // clavinet, a slapped bass; or a shuffle (swung, not jazz). Where the players reach for amps
+  // (the electric piano through a valve combo, its DI under it).
+  bool amped = false;
+  // A small band (at most three parts besides the drums: a singer, a bass, a keyboard) or a ballad
+  // (slow: a quarter of 0.75 s or longer, under 80 a minute): room for a keyboard's rotary
+  // speaker (the owner's: the electric piano into its Leslies).
+  bool sparse = false, ballad = false;
 };
 
 // The director's verdict on the piece being played: jazz or not (false until a file is read).
 bool& jazzPiece();
+// ... rock, funk or blues (Direction::amped).
+bool& ampedPiece();
+// ... a small band or a ballad (Direction::sparse, ballad): room for a rotary speaker.
+bool& rotaryRoom();
 
 // -director on|off|auto (default auto). False: not one of those.
 bool setDirectorMode(const std::string& mode);

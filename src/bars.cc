@@ -488,6 +488,11 @@ BarDesign tubularBellsDesign() {
   d.keys = 73;  // C2 .. C8
   d.speedLo = 0.5; d.speedHi = 3.0;
   d.micDist = 1.5;
+  // Dampers: a key's note-off brings the felt down unless the pedal (CC 64) holds them all off
+  // (BarsPlayer::noteOff, setHold).
+  d.dampers = true;
+  d.damperTime = knob("PJ_BELLS_DAMPER_TIME", 0.04);
+  const double damper = knob("PJ_BELLS_DAMPER", 20);
   // The tubes' diameter (mm): 19.05 (3/4", as the recorded sets and the user's video), 31.8 or 38.1.
   const double D = knob("PJ_BELLS_DIAMETER", 19.05) * 1e-3;
   uint32_t rng = 1515;
@@ -495,10 +500,18 @@ BarDesign tubularBellsDesign() {
     BarKey& k = d.key[i];
     const int midi = d.lowMidi + i;
     const double fs = pitch(midi);  // the strike note
-    if (midi >= kTubeLow && midi <= kTubeHigh) tubeKey(k, fs, D, rng);
+    const bool tube = midi >= kTubeLow && midi <= kTubeHigh;
+    if (tube) tubeKey(k, fs, D, rng);
     else castBellKey(k, fs, midi > kTubeHigh, rng);
-    for (int m = 0; m < k.modes; ++m)
+    for (int m = 0; m < k.modes; ++m) {
       if (fs * k.ratio[m] > 20000) { k.hit[m] = k.hitVary[m] = 0; k.rad[m] = 0; }
+      // The damper (research/tubular_bells.md 2, 6): the felt bar pressed against the tube's side,
+      // the higher modes (shorter waves, more motion in the felt) taken sooner. PJ_BELLS_DAMPER
+      // (1/s at 500 Hz: 20, ~0.35 s to -60 dB). The bells beyond the tubes have none on a real set;
+      // a file's note-off asks for the stop all the same: a hand on the heavier bell, 0.6 of it.
+      const double f = fs * k.ratio[m];
+      k.damp[m] = damper * (tube ? 1.0 : 0.6) * std::clamp(std::sqrt(f / 500), 0.7, 2.5);
+    }
     k.x = 1.6 * ((i + 0.5) / d.keys - 0.5);
   }
   // The cap's rim under the blow: a short metallic tick (the wood face's more than the rawhide's).
@@ -594,7 +607,7 @@ Bars::Bars(double fs, const BarDesign& design) : d_(design), fs_(fs), dt_(1 / fs
       k.w2[kModes] = float(wr * wr);
       k.rad[kModes] = float(b.resRad);
     }
-    k.damperDown = d_.dampers;
+    k.damperWant = d_.dampers ? 1 : 0;
     k.engage = d_.dampers ? 1 : 0;
     const double dl = std::hypot(b.x + d_.micApart / 2, d_.micDist), dr = std::hypot(b.x - d_.micApart / 2, d_.micDist);
     k.gainL = float(d_.micDist / dl);
@@ -625,7 +638,7 @@ void Bars::reset() {
     std::fill(k.v, k.v + kModes + 1, 0.0f);
     k.hammerOn = false;
     k.active = false;
-    k.engage = k.damperDown ? 1 : 0;
+    k.engage = k.damperWant;
     coefs(k, d_.key[i]);
   }
   nActive_ = 0;
@@ -688,11 +701,11 @@ void Bars::strike(int key, double speed, int face) {
   k.dPrev = 0;
 }
 
-void Bars::damper(int key, bool down) {
+void Bars::damper(int key, float depth) {
   if (key < 0 || key >= n_ || !d_.dampers) return;
   Key& k = key_[key];
-  k.damperDown = down;
-  if (!k.active && down != (k.engage > 0.5f)) { k.engage = down ? 1 : 0; coefs(k, d_.key[key]); }
+  k.damperWant = std::clamp(depth, 0.0f, 1.0f);
+  if (!k.active && k.engage != k.damperWant) { k.engage = k.damperWant; coefs(k, d_.key[key]); }
 }
 
 float Bars::sample() {
@@ -703,7 +716,7 @@ float Bars::sample() {
     Key& k = key_[ki];
     const BarKey& b = d_.key[ki];
     // The damper coming down or going up.
-    const float want = k.damperDown ? 1.0f : 0.0f;
+    const float want = k.damperWant;
     if (k.engage != want) {
       const float step = float(dt_ / d_.damperTime);
       k.engage = want > k.engage ? std::min(want, k.engage + step) : std::max(want, k.engage - 4 * step);

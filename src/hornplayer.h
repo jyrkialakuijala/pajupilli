@@ -56,6 +56,13 @@ class HornPlayer : public Performer {
   bool kBellTurn_ = false;
   double kBellSoft_ = -12, kBellLoud_ = 12, bellK_ = 0.05, bellDb_ = 0, bellVel_ = 0;
   float bellLp_ = 0;
+  // A trumpet's bell raised and lowered as it plays (the owner, 2026-11-28: "trumpet can use up
+  // and down direction for changing the ability to project"): its angle below the line to the
+  // listener (radians, two lags), heard as the sound above its beaming (~1.5 kHz) PJ_TP_BEAM (6) dB
+  // x (angle / 30 degrees)^2 against its usual 15 degrees. PJ_TP_AIM=0: still.
+  bool kBellAim_ = false;
+  double kTpBeam_ = 6, aimAng_[2] = {0.26, 0.26}, aimDrift_ = 0, aimDb_ = 0;
+  float aimLp_ = 0, aimK_ = 0.18f;
   double atkPush_ = 0;
   // A slur to another partial: the lips overshoot towards it and the air
   // pushes, briefly (log of the lips' factor; the breath's extra share).

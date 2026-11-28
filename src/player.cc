@@ -10,6 +10,8 @@
 
 #include "knob.h"
 #include "rng.h"
+#include "heldaim.h"
+#include "longnote.h"
 #include "vmath.h"
 
 namespace pajupilli {
@@ -62,6 +64,11 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
   kPanEndDyn_ = knob("PJ_PAN_ENDDYN", 0.12);  // a phrase's last note: this much softer (dynamics) ...
   kPanEndAir_ = knob("PJ_PAN_ENDAIR", 0.3);   // ... and airier (a wider, less focused lip opening)
   kPanEndTune_ = knob("PJ_PAN_ENDTUNE", 0.17);
+  kPanLong_ = knob("PJ_PAN_LONG", 0.9);     // a long note's own shape: from this long (s) ...
+  kPanExp_ = knob("PJ_PAN_EXPAND", 0.12);   // ... expanding by this much (dynamics) over a busy band,
+  kPanCresc_ = knob("PJ_PAN_CRESC", 0.18);  // ... growing by this much into a higher, harder note,
+  kPanDecr_ = knob("PJ_PAN_DECR", 0.1);     // ... sinking by this much over a quiet one;
+  kPanOwnDb_ = knob("PJ_PAN_OWNDB", 16);    // ... heard as this many dB per unit (as the director's, PJ_DIRECTOR_WINDDB)
   kPanEndP_ = knob("PJ_PAN_ENDP", 0.4);      // ... the breath this much lower  // ... the lips uncovering that much more (log) to keep it in tune
   breath_ = knob("PJ_BREATH", 0.01);
   kKickP_ = knob("PJ_KICKP", 0.3);
@@ -95,6 +102,9 @@ Player::Player(Flute& f) : Performer(f), flute_(f) {
 
 void Player::noteOn(int midi, int velocity) {
   if (!info(midi)) return;
+  // (a note the director did not cue just now has no shape of its own: none is carried over)
+  if (!ownFresh_) own_.on = false;
+  ownFresh_ = false;
   held_[midi] = 1;
   if (stackTop_ < 16) stack_[stackTop_++] = midi;
   const bool legato = note_ >= 0 && blowing_ && (stackTop_ > 1 || hold_);
@@ -228,8 +238,7 @@ void Player::noteOff(int midi) {
 // firm push, with a lot of air a full kick overblows past the note (piccolo D7).
 void Player::seed(unsigned s) {
   rng_ = 4242u + 7907u * s;
-  aimRng_ = 9191u + 104723u * s;
-  aimSidePh_ = 2 * M_PI * aimRand();
+  aimSeed_ = s;
   vib_.seed(s);
   tkk_ = knob("PJ_PAN_TKK", 0) > 0;
   bendRng_.reseed(randomSeed(3, int(s)));
@@ -398,48 +407,45 @@ void Player::direct(const Cue& c) {
   vibHand_ = std::clamp(kPanHand_ * (1 + 1.2 * deep) * (1 + 0.3 * wander_ * urand()), 0.0, 0.7);
   vibThroat_ = std::clamp(kVibThroat_ + 0.1 + 0.3 * quick, 0.0, 0.6);
   if (vibHand_ + vibThroat_ > 0.9) vibHand_ = 0.9 - vibThroat_;
+  // The long note's own shape, where the cue has none (src/longnote.h, research/panflute.md 7c).
+  own_ = longShape(c, kPanExp_, kPanCresc_, kPanDecr_, kPanLong_, endSoft_, wander_ * urand());
+  ownFresh_ = true;
+  ownSink_ = 0;
 }
 
-// How the instrument is held into the room (Tube::setPose). A shakuhachi player projects with
-// the instrument and the upper body: the foot comes up (towards the hall) as the playing grows
-// loud, on an accent and in the high register, and sinks for a phrase's end (over its last note)
-// and between phrases; each new phrase turns to a side, 4 .. 16 degrees, mostly the other side
-// from the last, with a slow sway (+-2.5 degrees, ~15 s) inside it; the face turns with the
-// instrument by 0.6 of its swing. The lift follows in ~0.3 s twice over (a body, not a hand), the
-// side in ~0.6 s.
+// The long note's own shape now (Player::direct, src/longnote.h), followed in ~60 ms: a breath, not a step.
+void Player::shapeOwn(double dt) {
+  const double to = own_.on && note_ >= 0 && blowing_ ? longShapeAt(own_, sinceOn_, dt, vib_.env(), ownSink_) : 0.0;
+  ownDyn_ += (1 - std::exp(-dt / 0.06)) * (to - ownDyn_);
+}
+
+// How the instrument is held into the room (Tube::setPose, src/heldaim.h): the shakuhachi lifted
+// and lowered only (its blowing is delicate), the recorder circling freely as an oboe does, the
+// flute held across and swayed with the body.
 void Player::aim(double dt) {
-  const double deg = M_PI / 180;
+  if (!aimKind_) {
+    aimKind_ = true;
+    const bool across = inst_.kind == Kind::kFlute;
+    const HeldAim::Kind k = std::strcmp(inst_.name, "shakuhachi") == 0 ? HeldAim::kUpDown : across ? HeldAim::kTransverse : HeldAim::kFree;
+    held_aim_.setKind(k, randomSeed(11, int(aimSeed_)));
+    flute_.setTransverse(across);
+  }
   aimSince_ += dt;
   if (aimNew_) {
     aimNew_ = false;
-    if (aimRand() < 0.75) aimSign_ = -aimSign_;
-    aimSideTo_ = aimSign_ * (4 + 12 * aimRand()) * deg;
+    held_aim_.newPhrase();
   }
   const bool on = note_ >= 0 && blowing_;
-  double down = 55 * deg, side = aimSideTo_;
-  if (on) {
-    const double loud = std::clamp(dyn_ + breathCtl_ + velDyn_, 0.0, 1.0);
-    const double high = std::clamp((note_ - 69) / 17.0, 0.0, 1.0);
-    const double accent = cued_ ? std::max(0.0, double(cue_.v[kCueAccent])) : 0.0;
-    down = 50 * deg - 18 * deg * (loud - 0.5) - 6 * deg * high - 5 * deg * accent;
-    if (aimEnd_) down += 10 * deg * std::min(1.0, aimSince_ / 0.8);  // (bowing into the phrase's end)
-  } else if (sinceOff_ > 1.5) {
-    side *= 0.3;  // (a long rest: back towards the front)
-  }
-  aimSidePh_ += dt * 2 * M_PI / 15;
-  side += 2.5 * deg * std::sin(aimSidePh_);
-  down = 50 * deg + kAim_ * (std::clamp(down, 28 * deg, 72 * deg) - 50 * deg);
-  side *= kAim_;
-  const double ad = 1 - std::exp(-dt / 0.3), as = 1 - std::exp(-dt / 0.6);
-  aimDown_[0] += ad * (down - aimDown_[0]);
-  aimDown_[1] += ad * (aimDown_[0] - aimDown_[1]);
-  aimSide_[0] += as * (side - aimSide_[0]);
-  aimSide_[1] += as * (aimSide_[0] - aimSide_[1]);
+  const double loud = std::clamp(dyn_ + breathCtl_ + velDyn_, 0.0, 1.0);
+  const double high = std::clamp((note_ - 69) / 17.0, 0.0, 1.0);
+  const double accent = cued_ ? std::max(0.0, double(cue_.v[kCueAccent])) : 0.0;
+  double down = 0, side = 0, turn = 0;
+  held_aim_.step(dt, on, loud, high, accent, aimEnd_, aimSince_, sinceOff_, &down, &side, &turn);
   // (the room hears a new pose once it has moved by a millimetre at the foot)
-  if (std::fabs(aimDown_[1] - aimSet_[0]) + std::fabs(aimSide_[1] - aimSet_[1]) > 0.002) {
-    aimSet_[0] = aimDown_[1];
-    aimSet_[1] = aimSide_[1];
-    flute_.setPose(aimDown_[1], aimSide_[1], 0.6 * aimSide_[1]);
+  if (std::fabs(down - aimSet_[0]) + std::fabs(side - aimSet_[1]) > 0.002) {
+    aimSet_[0] = down;
+    aimSet_[1] = side;
+    flute_.setPose(down, side, turn);
   }
 }
 
@@ -460,6 +466,7 @@ void Player::render(float* out, int n) {
       const double to = pipes_ && note_ >= 0 && pipeNote_ >= 0 ? pipeNote_ - note_ : 0;
       bend_ += (1 - std::exp(-bdt / 0.05)) * (to - bend_);
     }
+    if (pipes_) shapeOwn(bdt);
     sinceSlur_ += bdt;
     if (leadLeft_ > 0 && (leadLeft_ -= bdt) <= 0) flute_.setHoles(leadHoles_, leadSpeed_);
     if (gliding()) glideEar();
@@ -509,7 +516,7 @@ void Player::render(float* out, int n) {
       // the note holds its register at (learned by calibration).
       // (a bend's air goes down into the pipe: at a semitone barely changed, at two darker,
       // airier and weaker)
-      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_ - kPanEndDyn_ * endAir_ - 0.03 * bend_ * bend_, dynLo[en], std::max(dynLo[en], dynHi[en]));
+      const double dyn = std::clamp(dyn_ + breathCtl_ + velDyn_ + ownDyn_ - kPanEndDyn_ * endAir_ - 0.03 * bend_ * bend_, dynLo[en], std::max(dynLo[en], dynHi[en]));
       const double air = air_ + kPanEndAir_ * endAir_ + 0.03 * bend_ * bend_;
       // Fletcher 1975: p ~ 0.8 f Pa, lip to edge l ~ 1.8 + 100 / sqrt(f) mm, of
       // which the first 1.8 mm is where the jet forms; the jet's convective length
@@ -672,6 +679,10 @@ void Player::render(float* out, int n) {
       if (en >= 0) pipeTarget_ = fastPow(10.0, (kJugTrim_ * std::max(0, 60 - en) - kVialTrim_ * std::max(0, en - 84)) / 240.0);
       const double a = 1 - std::exp(-1.0 / (0.040 * fs_));
       for (int k = 0; k < m; ++k) out[i + k] *= float(pipeGain_ += a * (pipeTarget_ - pipeGain_));
+    }
+    if (pipes_ && (ownDyn_ != 0 || ownGain_ != 1)) {  // (the long note's own shape heard as its loudness too)
+      const double g1 = fastPow(10.0, kPanOwnDb_ * ownDyn_ / 20), a = 1 - std::exp(-1.0 / (0.02 * fs_));
+      for (int k = 0; k < m; ++k) out[i + k] *= float(ownGain_ += a * (g1 - ownGain_));
     }
     if (kTrillTune_ > 0 && note_ >= 0) {
       if (trillEar) listen(out + i, m, trillCorr_[trill_ - kTrills], 0, trillClock_, 116, kTrillTune_);

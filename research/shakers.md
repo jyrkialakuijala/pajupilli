@@ -246,6 +246,9 @@ constants **[code, STK]**:
   - room pressure on the bodies (negligible);
   - fits to recordings: none of these instruments is in the separated stems.
 
+- **2026-11-27:** the tambourine's spectrum revised against recordings (a 4th disc mode, less
+  3 kHz, a contact that grows brighter with speed): `research/tambourine.md` §8.4.
+
 ## 9. Keys for `drumFor` (src/drumkit.cc)
 
     case 54: return {"tambourine", 54};

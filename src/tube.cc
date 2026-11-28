@@ -615,9 +615,17 @@ void Tube::setPose(double down, double side, double turn) {
   // The axis (top to foot), the instrument's front (where its front holes look: out and up),
   // the face's forward (it bows with the instrument, by 0.7 of its tilt past 45 degrees).
   const double cd = std::cos(down), sd = std::sin(down), cs = std::cos(side), ss = std::sin(side);
-  const double u[3] = {ss * cd, cs * cd, -sd}, f[3] = {ss * sd, cs * sd, cd};
+  double u[3] = {ss * cd, cs * cd, -sd}, f[3] = {ss * sd, cs * sd, cd};
   const double bow = 0.7 * (down - M_PI / 4);
-  const double h[3] = {std::sin(turn) * std::cos(bow), std::cos(turn) * std::cos(bow), -std::sin(bow)};
+  double h[3] = {std::sin(turn) * std::cos(bow), std::cos(turn) * std::cos(bow), -std::sin(bow)};
+  if (transverse_) {
+    // (held across: the axis to the player's right, the listener's left when facing them; the
+    // foot dipping by `down`; the face forward; the holes up, a little out)
+    const double u1[3] = {-cs * cd, ss * cd, -sd}, h1[3] = {std::sin(turn), std::cos(turn), 0};
+    const double n = std::sqrt(0.09 + 1.0);
+    const double f1[3] = {0.3 * ss / n, 0.3 * cs / n, 1 / n};
+    for (int c = 0; c < 3; ++c) { u[c] = u1[c]; h[c] = h1[c]; f[c] = f1[c]; }
+  }
   for (int r = 0; r < nRad_; ++r) {
     const int k = radKind_[r];
     const double x = radX_[r];

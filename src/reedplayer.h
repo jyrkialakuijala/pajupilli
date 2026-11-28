@@ -16,6 +16,7 @@
 #include <cstdint>
 
 #include "drone.h"
+#include "heldaim.h"
 #include "performer.h"
 #include "reed.h"
 #include "slurs.h"
@@ -50,6 +51,12 @@ class ReedPlayer : public Performer {
   const char* leadHoles_ = nullptr;
 
   Reed& reed_;
+  // Held into the room (Tube::aimOn, src/heldaim.h): the clarinet's, the oboe's motion.
+  void aim(double dt);
+  HeldAim heldAim_;
+  double aimSet_[2] = {-1, 0};
+  unsigned aimSeed_ = 0;
+  bool aimNew_ = false, aimEnd_ = false, aimKind_ = false;
   int held_[128] = {};
   int stackTop_ = 0, stack_[16];
   int keyVel_ = 64;

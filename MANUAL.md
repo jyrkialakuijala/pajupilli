@@ -3325,7 +3325,12 @@ resonances (PhISEM's resonances, but the things themselves simulated, cheaply). 
 seeds fly on when the hand stops and hit the far wall together (the chick, at the key's time),
 then rattle off each other and settle in ~0.1 s; two maracas take the strokes in turn. The
 shaker's tube alternates push and pull. The tambourine's six pairs of jingles slam against their
-slots and each other, each disc ringing its own modes (3-8 kHz), over the frame's knock; the
+slots and each other, each disc ringing its own four modes (most at 5.6-8 kHz, a second
+cluster near 12.5 kHz, little at 3 kHz; measured against recordings, `research/tambourine.md`), over
+the frame's knock; a harder meeting is a briefer contact and reaches the higher modes, so a soft
+stroke is darker as well as quieter (`PJ_TAMB_LOW` 0.3, the 3.2 kHz mode; `PJ_TAMB_HIGH` 0.6, the
+12.5 kHz one, 0 drops it; `PJ_TAMB_HARD` 0.7, the contact's growth with speed, 0 every mode alike;
+`PJ_TAMB_HARDHZ` 9000; the sound before: `PJ_TAMB_LOW=1 PJ_TAMB_HIGH=0 PJ_TAMB_HARD=0`); the
 jingle bell's balls ring their bells. Every stroke finds the jingles otherwise arranged: the
 frame held at its own tilt and rocking on the blow (one side's pairs thrown harder), the kick
 reaching the pairs over a few ms, each disc tilted on its pin (its bounce and free travel its
@@ -3348,6 +3353,36 @@ a tight bunch, a firmer slap; 111 up); a key held past 3/4 of a beat (0.4 s live
 maraca in loops, the seeds rolling round the wall, until it is let go (`PJ_MARACA_CHEST`,
 `_SLAP`, `_DOUBLE` move the borders). The maracas and shaker sit 5-6 dB under the common level (a chick's peak
 is ~30 dB over its loudness). Under 0.5 % of a core each.
+
+The tambourine is played by gestures (`src/tambgesture.h`, `src/tambplan.h`,
+`research/tambourine.md` 1.1-1.2): a key 54 is a hint that the tambourine does something about
+then and about that hard, and the player chooses what. A gesture is what makes the jingles move
+(a hit against the other hand's heel, the thigh or the knee, the frame stopped; a turn in the
+air, down or up; a quick twist of the wrist, the pairs thrown round the ring; a stroke on the
+head with the fingertips, fingers, fist or palm, at the rim (the nearest pairs, no head) or in
+the centre (the head's pop, all the pairs); a shake roll; a thumb roll along the head; a choke),
+where it is held (high: brighter, louder; low against the thigh: darker), its tilt (flat: the
+discs lie on each other, short and dry; upright: they hang free and ring), its strength, the
+lift (the small jingle as the motion begins, `PJ_TAMB_LEAD` 0.10 s before the stroke in a song)
+and what follows (ring, or choked). Live: velocity chooses the hand and the place (fingertips at
+the rim to 45, fingers to 75, the fist in the centre to 105, then the other hand's heel), a key
+within 0.11 s of the last is a turn in the air (down, up in turn), a key held past 3/4 of a beat
+(0.4 s live) a roll until released (a thumb roll to velocity 50, else shaken). In a song the
+player plans before it starts, from the meter, the band and the director's verdicts, and prints
+what it read: the file's velocities taken as intent where they vary, otherwise the band's
+loudness and the meter; a transcription's stray notes skipped (one on a strong beat with the
+band playing out kept soft), and its notes that keep sounding with a shaker's (30 % or more)
+left to the shaker; a run of fast notes a roll; a groove's beats and ands down strokes, the
+in-between up strokes, weaker, and the backbeat with the snare a stopped hit against the hand on
+one of 2 and 4 (the one with less of the tune around it; both where the band plays out); the
+in-between ones left to the hats when they play sixteenths too, and in jazz; single notes on
+the head by their strength, a twist into a crash, softer under it; without a drum kit (an
+orchestra) the concert player's ways (the fingers, the fist and the knee in turn, fingertips on
+the thigh); the song's last note choked; where a run begins after two bars' rest and the band
+grows louder, a shake of a beat into it (`PJ_TAMB_LEADINS`, at most 2). `PJ_TAMB_PLAN=0`: every
+key the single stroke of before; `PJ_TAMB_VEXP` 1.0 (the hand's speed by velocity: the striker
+carries the rest), `PJ_TAMB_GTRIM` -7.5 dB (the gestures' level to the single stroke's),
+`PJ_TAMB_HEAD` 1 (the head's pop).
 
     ./pajupilli -inst maracas -seq "on 70 100 wait 0.23 on 70 55 wait 0.23 on 70 75 wait 0.23 on 70 55 wait 1"
 
@@ -3452,8 +3487,19 @@ as on a recorded triangle), and the rod's longitudinal modes; struck by a steel 
 tens of us) on the bottom side, a little elsewhere each time. The low modes barely radiate: the
 shimmer from 1 to 15 kHz, T60 about 3 s. A key 80 (or the hold) is the hand clasping it (T60
 0.35 s), and it chokes a ringing triangle; 81 lets go. The cowbell: the partials and decays of a
-recorded one (472 Hz with its rough neighbours, the walls at 2-3.7 kHz), a hickory shaft on the
-mouth's edge. (The agogo's partials, `-inst agogo`, now as a recorded pair's too: 3.73 and 5.12 x
+recorded one (472 Hz with its rough neighbours, the walls at 2-3.7 kHz). Key 56 is the open
+stroke of the stick's side on the mouth. Keys 40 + 4 x place + mute (a bell mounted on the kit) and
+60 + 4 x place + mute (held in the hand, and turned as it is struck: the top toward the listener,
+the mouth tipped up 60 degrees, its 2-4 kHz partials beaming away) give the four main tones, open or
+muted, mouth or top: place 0, 1 the mouth with the side of the stick, 2, 3 the top with its tip
+(drier, higher); mute 0 .. 3 the lower fingers pressing. With `-play` the cowbell player
+(`src/cowbellplan.cc`) chooses each key 56's stroke from the meter, the clave, the kick, the snare's
+backbeat and the file's own accents, and prints what it read (`PJ_COWBELL_PLAN=0`: every note the
+open stroke, as before).
+
+    ./pajupilli -inst cowbell -seq "on 60 100 wait 0.3 wait 0.3 on 70 80 wait 0.3 on 60 100 wait 0.3 wait 0.3 on 70 80 wait 0.3 on 60 100 wait 0.3 on 70 80 wait 0.3"
+
+(The agogo's partials, `-inst agogo`, now as a recorded pair's too: 3.73 and 5.12 x
 the strongest.) Velocity^1.65: about 30 dB from 16 to 127; 0.2 % of a core each.
 
     ./pajupilli -inst triangle -seq "on 80 70 wait 0.12 on 80 60 wait 0.12 on 81 95 wait 0.25 on 80 70 wait 0.12 on 81 90 wait 1.5"

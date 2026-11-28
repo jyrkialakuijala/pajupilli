@@ -475,4 +475,79 @@ void Rotary::process(float in, float& left, float& right, float* rays) {
   }
 }
 
+// The paths (src/rotary.h RotaryRoom; moved here from src/tonewheel.cc as it was): for each image
+// of the cabinet (the walls 4 m either side, the back wall 1.5 m behind, its corners, the floor 1
+// m down), the direction leaving the cabinet toward it (the path to the microphone, mirrored back
+// by its walls), in the cabinet's own frame (its facing): the two rays either side of it blended
+// (they are 60 degrees apart).
+void RotaryRoom::setup(double fs, const std::vector<Place>& places) {
+  cab_.assign(places.size(), Cab{});
+  for (size_t c = 0; c < places.size(); ++c) {
+    cab_[c].p = places[c];
+    for (auto& ring : cab_[c].ring) ring.assign(2048, 0.0f);
+  }
+  pos_ = 0;
+  static const double kD = knob("PJ_ROTARY_LISTENER", 4.0), kC = 343, kW = 4.0, kH = 1.0;
+  // (the back wall 1.5 m behind the rearmost cabinet)
+  double kB = 1.5;
+  for (const Cab& cb : cab_) kB = std::max(kB, 1.5 - cb.p.x);
+  static const double kRefl[7] = {1.0, 0.75, 0.75, 0.75, 0.56, 0.56, 0.6 * 0.8};
+  // (the rays' angles in order round the cabinet, -180 .. 180, and which ray each is)
+  static const double kAng[7] = {-180, -120, -60, 0, 60, 120, 180};
+  static const int kRay[7] = {5, 4, 2, 0, 1, 3, 5};
+  const int len = int(cab_[0].ring[0].size());
+  for (Cab& cb : cab_)
+    for (int m = 0; m < 2; ++m) {
+      const double mx = kD, my = m == 0 ? 1 : -1;
+      for (int p = 0; p < 7; ++p) {
+        // the image: mirrored in y (side walls), in x (the back wall), both (corners)
+        const bool fy = p == 1 || p == 2 || p == 4 || p == 5, fx = p == 3 || p == 4 || p == 5;
+        const double wy = (p == 1 || p == 4) ? kW : -kW;
+        const double ix = fx ? -2 * kB - cb.p.x : cb.p.x, iy = fy ? 2 * wy - cb.p.y : cb.p.y;
+        double vx = mx - ix, vy = my - iy;
+        const double flat = std::hypot(vx, vy);
+        const double dist = p == 6 ? std::hypot(flat, 2 * kH) : flat;
+        // (the microphone aimed out to its side: between omni and cardioid)
+        const double arrive = std::atan2(iy - my, ix - mx) - (m == 0 ? 1 : -1) * 55 * M_PI / 180 - M_PI;
+        const double aim = 0.6 + 0.4 * std::cos(arrive);
+        // (the direction the sound leaves the cabinet: the path mirrored back by its walls)
+        if (fy) vy = -vy;
+        if (fx) vx = -vx;
+        double a = (std::atan2(vy, vx) - cb.p.rot) * 180 / M_PI;
+        a = std::remainder(a, 360.0);
+        int seg = 0;
+        while (seg < 5 && a > kAng[seg + 1]) ++seg;
+        const double w = std::clamp((a - kAng[seg]) / 60, 0.0, 1.0);
+        const double gain = kRefl[p] * aim / dist;
+        cb.dly[p][m] = std::min(int(dist / kC * fs), len - 1);
+        cb.ray[p][m][0] = kRay[seg];
+        cb.ray[p][m][1] = kRay[seg + 1];
+        cb.g[p][m][0] = gain * (1 - w);
+        cb.g[p][m][1] = gain * w;
+      }
+    }
+}
+
+void RotaryRoom::step(const float (*rays)[Rotary::kRays], int nc, double& el, double& er, double& sum) {
+  const int len = int(cab_[0].ring[0].size()), mask = len - 1;
+  for (int c = 0; c < nc; ++c) {
+    Cab& cb = cab_[c];
+    for (int k = 0; k < Rotary::kRays; ++k) {
+      cb.ring[k][pos_] = rays[c][k];
+      sum += rays[c][k];
+    }
+    for (int p = 0; p < 7; ++p)
+      for (int m = 0; m < 2; ++m) {
+        const int at = (pos_ - cb.dly[p][m]) & mask;
+        (m == 0 ? el : er) += cb.g[p][m][0] * cb.ring[cb.ray[p][m][0]][at] + cb.g[p][m][1] * cb.ring[cb.ray[p][m][1]][at];
+      }
+  }
+  pos_ = (pos_ + 1) & mask;
+}
+
+void RotaryRoom::reset() {
+  for (Cab& cb : cab_)
+    for (auto& ring : cb.ring) std::fill(ring.begin(), ring.end(), 0.0f);
+}
+
 }  // namespace pajupilli

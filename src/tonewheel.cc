@@ -358,7 +358,6 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
     cab_.resize(kCount);
     for (int c = 0; c < kCount; ++c) {
       cab_[c].les.setup(fs, serial + 7919u * c, kCount > 1 ? kSpread : 0.0, c == 0, speed[c], c ? 1.20 : 0.0, c ? 1.17 : 0.0);
-      for (auto& ring : cab_[c].ring) ring.assign(2048, 0.0f);
       if (kCount > 1) {
         cab_[c].x = place[c][0];
         cab_[c].y = place[c][1];
@@ -370,7 +369,9 @@ TonewheelModel::TonewheelModel(const Instrument& inst) : Tube(inst) {
       for (int c = 0; c < kCount; ++c) e2 += mix[c][m] * mix[c][m];
       for (int c = 0; c < kCount; ++c) cab_[c].mix[m] = e2 > 0 ? mix[c][m] * std::sqrt(kCount / e2) : 1;
     }
-    placeCabinets();
+    std::vector<RotaryRoom::Place> places;
+    for (const Cab& cb : cab_) places.push_back({cb.x, cb.y, cb.rot});
+    room_.setup(fs, places);
   }
   roomMics_ = std::getenv("PJ_ROTARY_MICS") == nullptr || std::string(std::getenv("PJ_ROTARY_MICS")) != "close";
   setRegistration(tonewheelPreset(inst.name));
@@ -863,7 +864,7 @@ float TonewheelModel::sample() {
     microZ_[2] = vib;
     micro = kMicro * vib;
   }
-  // Each Rotary its own mix of the manuals (mix_: placeCabinets), through its own channel of the
+  // Each Rotary its own mix of the manuals (mix_), through its own channel of the
   // console's amplification (the expression's bass, the tone, the valve stage, its overload): each
   // cabinet's amplifier distorts its own mix. One Rotary (or none): all of each.
   float rays[4][Rotary::kRays];
@@ -939,24 +940,11 @@ float TonewheelModel::sample() {
     // sides, D m in front of the cabinets (PJ_ROTARY_LISTENER, 4: past a hall's critical
     // distance), each hearing every cabinet's rays by their own paths (image sources: directly and
     // off the floor, the side walls 4 m off, the back wall 1.5 m behind, its corners), each path
-    // fed by the rays leaving the cabinet toward it (placeCabinets). Each microphone hears each
+    // fed by the rays leaving the cabinet toward it (RotaryRoom, src/rotary.h). Each microphone hears each
     // cabinet's swirl its own way, as ears in a room do. The room's late field is fed the rays'
     // mean (all round: its level steady).
     double el = 0, er = 0, mean = 0;
-    const int len = int(cab_[0].ring[0].size()), mask = len - 1;
-    for (int c = 0; c < nc; ++c) {
-      Cab& cb = cab_[c];
-      for (int k = 0; k < Rotary::kRays; ++k) {
-        cb.ring[k][rayPos_] = rays[c][k];
-        mean += rays[c][k];
-      }
-      for (int p = 0; p < 7; ++p)
-        for (int m = 0; m < 2; ++m) {
-          const int at = (rayPos_ - cb.dly[p][m]) & mask;
-          (m == 0 ? el : er) += cb.g[p][m][0] * cb.ring[cb.ray[p][m][0]][at] + cb.g[p][m][1] * cb.ring[cb.ray[p][m][1]][at];
-        }
-    }
-    rayPos_ = (rayPos_ + 1) & mask;
+    room_.step(rays, nc, el, er, mean);
     earlyL_.push_back(float(kOut * el * outScale()));
     earlyR_.push_back(float(kOut * er * outScale()));
     last_ = float(kOut * mean / Rotary::kRays);
@@ -966,55 +954,6 @@ float TonewheelModel::sample() {
     side_.push_back(float(outScale() * kOut * 0.5 * (l - r)));
   }
   return finish(last_);
-}
-
-// Each cabinet's paths to the listener's microphones (2 m apart, aimed 55 degrees out to their
-// sides, D m in front): for each image of the cabinet (the walls 4 m either side, the back wall 1.5
-// m behind, its corners, the floor 1 m down), the direction leaving the cabinet toward it (the
-// path to the microphone, mirrored back by its walls), in the cabinet's own frame (its facing):
-// the two rays either side of it blended (they are 60 degrees apart). (One cabinet at the origin
-// facing the listener: the paths as before, but each now fed by the rays toward it, the direct one
-// mostly the front ray with a little of the +-60 ones, not the front ray alone.)
-void TonewheelModel::placeCabinets() {
-  static const double kD = knob("PJ_ROTARY_LISTENER", 4.0), kC = 343, kW = 4.0, kH = 1.0;
-  // (the back wall 1.5 m behind the rearmost cabinet)
-  double kB = 1.5;
-  for (const Cab& cb : cab_) kB = std::max(kB, 1.5 - cb.x);
-  static const double kRefl[7] = {1.0, 0.75, 0.75, 0.75, 0.56, 0.56, 0.6 * 0.8};
-  // (the rays' angles in order round the cabinet, -180 .. 180, and which ray each is)
-  static const double kAng[7] = {-180, -120, -60, 0, 60, 120, 180};
-  static const int kRay[7] = {5, 4, 2, 0, 1, 3, 5};
-  const int len = int(cab_[0].ring[0].size());
-  for (Cab& cb : cab_)
-    for (int m = 0; m < 2; ++m) {
-      const double mx = kD, my = m == 0 ? 1 : -1;
-      for (int p = 0; p < 7; ++p) {
-        // the image: mirrored in y (side walls), in x (the back wall), both (corners)
-        const bool fy = p == 1 || p == 2 || p == 4 || p == 5, fx = p == 3 || p == 4 || p == 5;
-        const double wy = (p == 1 || p == 4) ? kW : -kW;
-        const double ix = fx ? -2 * kB - cb.x : cb.x, iy = fy ? 2 * wy - cb.y : cb.y;
-        double vx = mx - ix, vy = my - iy;
-        const double flat = std::hypot(vx, vy);
-        const double dist = p == 6 ? std::hypot(flat, 2 * kH) : flat;
-        // (the microphone aimed out to its side: between omni and cardioid)
-        const double arrive = std::atan2(iy - my, ix - mx) - (m == 0 ? 1 : -1) * 55 * M_PI / 180 - M_PI;
-        const double aim = 0.6 + 0.4 * std::cos(arrive);
-        // (the direction the sound leaves the cabinet: the path mirrored back by its walls)
-        if (fy) vy = -vy;
-        if (fx) vx = -vx;
-        double a = (std::atan2(vy, vx) - cb.rot) * 180 / M_PI;
-        a = std::remainder(a, 360.0);
-        int seg = 0;
-        while (seg < 5 && a > kAng[seg + 1]) ++seg;
-        const double w = std::clamp((a - kAng[seg]) / 60, 0.0, 1.0);
-        const double gain = kRefl[p] * aim / dist;
-        cb.dly[p][m] = std::min(int(dist / kC * fs_), len - 1);
-        cb.ray[p][m][0] = kRay[seg];
-        cb.ray[p][m][1] = kRay[seg + 1];
-        cb.g[p][m][0] = gain * (1 - w);
-        cb.g[p][m][1] = gain * w;
-      }
-    }
 }
 
 // (called by the room each block: from then on the Rotary radiates into it)

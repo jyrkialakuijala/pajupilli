@@ -3,6 +3,8 @@
 #pragma once
 
 #include "flute.h"
+#include "heldaim.h"
+#include "longnote.h"
 #include "performer.h"
 #include "rng.h"
 #include "slurs.h"
@@ -77,6 +79,16 @@ class Player : public Performer {
   // diffuse, a lower, airier breath, growing over the note (endAir_ 0 .. 1).
   bool endSoft_ = false;
   double endAir_ = 0, kPanEndDyn_ = 0.12, kPanEndAir_ = 0.3, kPanEndTune_ = 0.17, kPanEndP_ = 0.4;
+  // A pan flute's long note shaped by the player itself where the cue gives no shape (the
+  // director silent or leaving the level flat; kCueOwn*: what it hears around the note): it
+  // expands (grows, then holds) over a busy band, sinks a little over a quiet one, less once
+  // the vibrato has come in, and grows towards its end when it leads up into a higher, harder
+  // note. ownDyn_: the dynamics now (added); its gain on the sound (PJ_PAN_OWNDB per unit).
+  void shapeOwn(double dt);
+  LongShape own_;
+  bool ownFresh_ = false;
+  double ownSink_ = 0, ownDyn_ = 0, ownGain_ = 1;
+  double kPanLong_ = 0.9, kPanExp_ = 0.12, kPanCresc_ = 0.18, kPanDecr_ = 0.1, kPanOwnDb_ = 16;
   // The bottles' jugs and vials (C2..C4, C6..C8): radiation grows with pitch, ~9 dB an octave
   // out there against ~5 dB in the middle; a player picks a jug a size up to be heard, and blows
   // a vial gently. Trimmed (dB an octave, below C4 and above C6) towards ~3 dB an octave.
@@ -88,12 +100,10 @@ class Player : public Performer {
   // and while resting; each phrase turns to a side of its own, mostly the other one, with a slow
   // sway inside it (aim()). PJ_AIM scales the motion (0: held still, at 50 degrees).
   void aim(double dt);
-  double aimDown_[2] = {0.873, 0.873}, aimSide_[2] = {0, 0}, aimSideTo_ = 0, aimSidePh_ = 0;
+  HeldAim held_aim_;
   double aimSet_[2] = {-1, 0}, kAim_ = 1, aimSince_ = 0;
-  int aimSign_ = 1;
-  bool aimNew_ = false, aimEnd_ = false;
-  uint32_t aimRng_ = 9191;
-  double aimRand() { aimRng_ = aimRng_ * 1664525u + 1013904223u; return (aimRng_ >> 8) * (1.0 / 16777216.0); }
+  bool aimNew_ = false, aimEnd_ = false, aimKind_ = false;
+  unsigned aimSeed_ = 0;
   double glottisClock_ = 1e9;
   Vibrato vib_;  // its own vibrato (performer.h)
   double lung_ = 0;

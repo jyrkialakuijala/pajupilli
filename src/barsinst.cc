@@ -118,6 +118,11 @@ void BarsPlayer::noteOn(int midi, int velocity) {
     }
     cents_[midi & 127] = m_.bars().cents(key);
   }
+  // (the bells: a note let go dies out on the half pedal; the next stroke clears them all, the
+  // dampers fully down on every key let go: the player moving on, not a smear)
+  if (tubular && !hold_)
+    for (int k = 0; k < m_.bars().keys(); ++k)
+      if (!down_[k] && k != key && m_.bars().damperDepth(k) < 1) m_.bars().damper(k, true);
   articulate(midi, velocity, false);
   down_[key] = true;
   note_ = midi;
@@ -137,7 +142,13 @@ void BarsPlayer::noteOn(int midi, int velocity) {
 void BarsPlayer::noteOff(int midi) {
   const int key = keyOf(midi);
   down_[key] = false;
-  if (!hold_) m_.bars().damper(key, true);
+  if (hold_) return;
+  // The tubular bells: the player half-pedals a note let go, the felt only touching the tube, so
+  // it dies out (PJ_BELLS_HALFPEDAL, 0.2 of the full damper: ~1.7 s to -60 dB on a tube's strike
+  // note) unless the next stroke comes, which clears it (noteOn). 1: the full damper at once.
+  static const float kHalf = float(knob("PJ_BELLS_HALFPEDAL", 0.2));
+  const bool tubular = std::strcmp(m_.bars().design().name, "tubular-bells") == 0;
+  m_.bars().damper(key, tubular ? kHalf : 1.0f);
 }
 
 void BarsPlayer::setHold(bool h) {
