@@ -43,6 +43,7 @@
 #include "flute.h"
 #include "live.h"
 #include "player.h"
+#include "tinepiano.h"
 #include "reed.h"
 #include "room.h"
 #include "vmath.h"
@@ -381,6 +382,8 @@ const char kUsage[] =
     "Modes:\n"
     "  -live               play from a MIDI keyboard\n"
     "  -selftest           -live without a keyboard: plays an arpeggio\n"
+    "  -inst electric-piano-1:OUTPUT  the tine piano with its output forced:\n"
+    "                      preamp, suitcase, di, combo, leslie (the two Leslies)\n"
     "  -inst drums         (live) the drum kit on the keys and the pads, as General\n"
     "                      MIDI's drum keys: the keyboard's lowest C the bass drum (36)\n"
     "  -pads drums         (live) the pads play the drum kit beside any instrument\n"
@@ -429,7 +432,10 @@ const char kUsage[] =
     "  -reinstrument R     with -play: FROM=TO[,FROM=TO]: a channel's instrument\n"
     "                      (a name, a family, or * for all but the drums) on\n"
     "                      another (organ: the church organ by its plan), e.g.\n"
-    "                      -reinstrument grand-piano=organ,piano=tonewheel\n"
+    "                      -reinstrument grand-piano=organ,piano=tonewheel;\n"
+    "                      electric-piano-1:OUTPUT forces its output (preamp,\n"
+    "                      suitcase, di, combo, leslie: the two Leslies), e.g.\n"
+    "                      -reinstrument grand-piano=electric-piano-1:leslie\n"
     "  -style S            with -play: the director's reading in style S (baroque, classical,\n"
     "                      romantic; french: Baroque with notes inegales; auto: read from\n"
     "                      the rhythm), and the director on\n"
@@ -585,7 +591,19 @@ int run(int argc, char** argv) {
       // (The drum kit is every percussion at once: its keys and pads are
       // General MIDI's drum keys; the keyboard's own instrument stays silent.)
       if (std::string(nm) == "drums") { kitOnKeys = padDrums = true; nm = "taiko"; }
-      gInst = findInstrument(nm);
+      // (electric-piano-1:leslie: the tine piano's output, see tinepiano.h)
+      std::string name = nm;
+      if (const size_t colon = name.find(':'); colon != std::string::npos) {
+        const int out = tinePianoOutNamed(name.substr(colon + 1));
+        name.resize(colon);
+        const Instrument* in = findInstrument(name.c_str());
+        if (out < 0 || !in || !tinepiano(*in)) {
+          std::fprintf(stderr, "-inst: %s: only electric-piano-1 takes an output: :preamp, :suitcase, :di, :combo, :leslie\n", nm);
+          return 1;
+        }
+        tinePianoOut() = out;
+      }
+      gInst = findInstrument(name.c_str());
       if (!gInst) { std::fprintf(stderr, "-inst: the instruments\n%s", instrumentList().c_str()); return 1; }
     }
     else if (a == "-cfoot") cfoot = true;

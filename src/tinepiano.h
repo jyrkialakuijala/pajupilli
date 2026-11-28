@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "guitaramp.h"
@@ -51,6 +52,13 @@
 namespace pajupilli {
 
 bool tinepiano(const Instrument& inst);  // -inst electric-piano-1
+
+// The output the command line asked for (-inst electric-piano-1:leslie, -reinstrument
+// grand-piano=electric-piano-1:leslie; -1: the style's), and its names: preamp (the Suitcase's
+// preamp direct) 0, suitcase (the whole) 1, di (a Stage straight in) 2, combo (a Stage into the
+// valve combo, its DI under it) 3, leslie (the two Leslies) 4; -1 for none of them.
+int& tinePianoOut();
+int tinePianoOutNamed(const std::string& w);
 
 class TinePianoModel : public Tube {
  public:

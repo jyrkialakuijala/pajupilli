@@ -36,6 +36,7 @@
 #include "longnote.h"
 #include "rng.h"
 #include "tambplan.h"
+#include "tinepiano.h"
 #include "director.h"
 #include "drumkit.h"
 #include "band.h"
@@ -457,7 +458,7 @@ bool setReinstrument(const std::string& spec) {
     std::string to = rule.substr(eq + 1);
     // (TO:N: transposed N semitones; TO:VOICE: the lead singer's voice; both: voice-lead:tenor:-12)
     int shift = kNoShift;
-    std::string voiceName;
+    std::string voiceName, outName;  // (outName: the tine piano's output, electric-piano-1:leslie)
     for (size_t colon = to.rfind(':'); colon != std::string::npos; colon = to.rfind(':')) {
       const std::string part = to.substr(colon + 1);
       char* endp = nullptr;
@@ -468,10 +469,12 @@ bool setReinstrument(const std::string& spec) {
           return false;
         }
         shift = int(v);
+      } else if (tinePianoOutNamed(part) >= 0) {
+        outName = part;
       } else {
         JazzSinger probe;
         if (!probe.setVoice(part)) {
-          std::fprintf(stderr, "-reinstrument: %s: want TO:SEMITONES or TO:VOICE (profondo, bass, baritone, tenor, countertenor, contralto, mezzo, soprano, coloratura)\n",
+          std::fprintf(stderr, "-reinstrument: %s: want TO:SEMITONES, TO:VOICE or electric-piano-1:OUTPUT (preamp, suitcase, di, combo, leslie; voices: profondo, bass, baritone, tenor, countertenor, contralto, mezzo, soprano, coloratura)\n",
                        rule.c_str());
           return false;
         }
@@ -488,6 +491,14 @@ bool setReinstrument(const std::string& spec) {
     if ((shift != kNoShift || !voiceName.empty()) && std::strcmp(in->name, "voice-lead") != 0) {
       std::fprintf(stderr, "-reinstrument: %s: only voice-lead takes a transposition or a voice so far\n", rule.c_str());
       return false;
+    }
+    if (!outName.empty()) {
+      if (!tinepiano(*in)) {
+        std::fprintf(stderr, "-reinstrument: %s: only electric-piano-1 takes an output (:preamp, :suitcase, :di, :combo, :leslie)\n", rule.c_str());
+        return false;
+      }
+      tinePianoOut() = tinePianoOutNamed(outName);
+      std::fprintf(stderr, "  reinstrumented: %s's output: %s\n", in->name, outName.c_str());
     }
     gReinstrument.push_back({from, in});
     gReinstrumentShift.push_back(shift);

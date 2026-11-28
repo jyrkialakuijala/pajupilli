@@ -16,6 +16,18 @@ namespace pajupilli {
 
 bool tinepiano(const Instrument& inst) { return std::strcmp(inst.name, "electric-piano-1") == 0; }
 
+int& tinePianoOut() {
+  static int out = -1;
+  return out;
+}
+
+int tinePianoOutNamed(const std::string& w) {
+  static const char* const kNames[] = {"preamp", "suitcase", "di", "combo", "leslie"};
+  for (int i = 0; i < 5; ++i)
+    if (w == kNames[i]) return i;
+  return -1;
+}
+
 namespace {
 
 // Piecewise linear through (midi, value) points.
@@ -126,11 +138,12 @@ TinePianoModel::TinePianoModel(const Instrument& inst) : Tube(inst), dt_(1.0 / i
   static const double kP = knob("PJ_TINEPIANO_P", 1.25);          // the bell's exponent
   static const double kBarQ = knob("PJ_TINEPIANO_BAR_Q", 40);
   static const double kSideDb = knob("PJ_TINEPIANO_SIDE_DB", -20);  // the sideways polarisation's share
-  // What is recorded: the style's (see tinepiano.h), PJ_TINEPIANO_OUT sets it; the older
+  // What is recorded: the style's (see tinepiano.h), or the command line's (electric-piano-1:leslie);
+  // PJ_TINEPIANO_OUT sets it over both; the older
   // PJ_TINEPIANO_SUITCASE=0 is the Stage straight in, =1 the Suitcase whole.
   {
     // (Jazz: the DI; a small band or a ballad: the Leslies; rock, funk, blues: the combo; else the DI.)
-    const int byStyle = jazzPiece() ? 0 : rotaryRoom() ? 4 : ampedPiece() ? 3 : 0;
+    const int byStyle = tinePianoOut() >= 0 ? tinePianoOut() : jazzPiece() ? 0 : rotaryRoom() ? 4 : ampedPiece() ? 3 : 0;
     const double old = knob("PJ_TINEPIANO_SUITCASE", -1);
     out_ = int(knob("PJ_TINEPIANO_OUT", old < 0 ? byStyle : old > 0 ? 1 : 2));
     out_ = std::clamp(out_, 0, 4);
